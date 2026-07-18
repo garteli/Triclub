@@ -2,16 +2,17 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Squad.Core", "src\Squad.Core\Squad.Core.csproj", "{C0000001-0000-0000-0000-000000000001}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Squad.Core", "src\Squad.Core\Squad.Core.csproj", "{C0000001-0000-0000-0000-000000000001}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Squad.Infrastructure", "src\Squad.Infrastructure\Squad.Infrastructure.csproj", "{C0000002-0000-0000-0000-000000000002}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Squad.Infrastructure", "src\Squad.Infrastructure\Squad.Infrastructure.csproj", "{C0000002-0000-0000-0000-000000000002}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Squad.Web", "src\Squad.Web\Squad.Web.csproj", "{1BA65D0B-69F6-4D3B-BC2A-458BC785345A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Squad.Web", "src\Squad.Web\Squad.Web.csproj", "{1BA65D0B-69F6-4D3B-BC2A-458BC785345A}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Squad.Client", "Squad.Client", "{072CD0C7-B0DE-407A-9D8B-1BE70240AC93}"
 	ProjectSection(SolutionItems) = preProject
 		src\Squad.Client\package.json = src\Squad.Client\package.json
 		src\Squad.Client\vite.config.js = src\Squad.Client\vite.config.js
+		src\Squad.Client\NATIVE-SETUP.md = src\Squad.Client\NATIVE-SETUP.md
 	EndProjectSection
 EndProject
 Global
@@ -35,5 +36,10 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {5C0FFEE5-0000-0000-0000-00000000BEEF}
 	EndGlobalSection
 EndGlobal
