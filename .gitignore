@@ -1,0 +1,17 @@
+# ---- .NET ----
+bin/
+obj/
+*.user
+
+# ---- Node / client ----
+node_modules/
+
+# ---- Generated SPA build output (produced by `npm run build`) ----
+src/Squad.Web/wwwroot/assets/
+src/Squad.Web/wwwroot/index.html
+src/Squad.Web/wwwroot/vite.svg
+
+# ---- IDE / OS ----
+.vs/
+.idea/
+.DS_Store

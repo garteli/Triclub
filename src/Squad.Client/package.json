@@ -1,0 +1,21 @@
+{
+  "name": "squad-client",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Squad — team training platform (React implementation of the Claude Design handoff)",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@microsoft/signalr": "^8.0.7",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "vite": "^5.4.2"
+  }
+}

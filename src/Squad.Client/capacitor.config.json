@@ -1,0 +1,11 @@
+{
+  "appId": "club.kaza.squad",
+  "appName": "Squad",
+  "webDir": "../Squad.Web/wwwroot",
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "BackgroundGeolocation": {}
+  }
+}
