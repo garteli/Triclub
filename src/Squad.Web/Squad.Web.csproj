@@ -7,10 +7,11 @@
     <RootNamespace>Squad.Web</RootNamespace>
   </PropertyGroup>
 
-  <!--
-    The React app (Squad.Client) builds its production output directly into
-    this project's wwwroot folder (see ../Squad.Client/vite.config.js), so the
-    host serves the compiled SPA as static files with an index.html fallback.
-  -->
+  <ItemGroup>
+    <ProjectReference Include="..\Squad.Core\Squad.Core.csproj" />
+    <ProjectReference Include="..\Squad.Infrastructure\Squad.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <!-- The React app (Squad.Client) builds into wwwroot; served as static files. -->
 
 </Project>

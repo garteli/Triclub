@@ -1,4 +1,4 @@
-namespace Squad.Core.Activities;
+namespace Squad.Core;
 
 /// <summary>
 /// The canonical activity. Every collection surface normalizes to exactly this

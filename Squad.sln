@@ -2,6 +2,10 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Squad.Core", "src\Squad.Core\Squad.Core.csproj", "{C0000001-0000-0000-0000-000000000001}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Squad.Infrastructure", "src\Squad.Infrastructure\Squad.Infrastructure.csproj", "{C0000002-0000-0000-0000-000000000002}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Squad.Web", "src\Squad.Web\Squad.Web.csproj", "{1BA65D0B-69F6-4D3B-BC2A-458BC785345A}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Squad.Client", "Squad.Client", "{072CD0C7-B0DE-407A-9D8B-1BE70240AC93}"
@@ -16,6 +20,14 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{C0000001-0000-0000-0000-000000000001}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C0000001-0000-0000-0000-000000000001}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C0000001-0000-0000-0000-000000000001}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C0000001-0000-0000-0000-000000000001}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C0000002-0000-0000-0000-000000000002}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C0000002-0000-0000-0000-000000000002}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C0000002-0000-0000-0000-000000000002}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C0000002-0000-0000-0000-000000000002}.Release|Any CPU.Build.0 = Release|Any CPU
 		{1BA65D0B-69F6-4D3B-BC2A-458BC785345A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{1BA65D0B-69F6-4D3B-BC2A-458BC785345A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1BA65D0B-69F6-4D3B-BC2A-458BC785345A}.Release|Any CPU.ActiveCfg = Release|Any CPU

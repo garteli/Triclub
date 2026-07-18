@@ -1,4 +1,4 @@
-namespace Squad.Core.Activities;
+namespace Squad.Core;
 
 /// <summary>Canonical sport classification. Persisted as TINYINT.</summary>
 public enum ActivitySport : byte

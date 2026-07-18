@@ -1,4 +1,4 @@
-namespace Squad.Core.Activities;
+namespace Squad.Core;
 
 /// <summary>
 /// The original payload exactly as a collection surface produced it, plus the
