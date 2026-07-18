@@ -1,4 +1,5 @@
 import { s } from '../lib/style.js';
+import { groupRadar } from '../lib/radar.js';
 
 const W = 344;
 const H = 280;
@@ -41,6 +42,7 @@ export default function LiveRideMap({ riders = [], route = [] }) {
   }
 
   const project = makeProjector(basis);
+  const gr = groupRadar(riders);
   const routePts = route.map(([la, lo]) => project(la, lo));
   const routeD = routePts.length
     ? 'M' + routePts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' L')
@@ -76,6 +78,12 @@ export default function LiveRideMap({ riders = [], route = [] }) {
           const textFill = r.you ? '#141a05' : '#0c0e11';
           return (
             <g key={r.athleteId} style={{ transform: `translate(${x}px,${y}px)`, transition: 'transform 1s linear' }}>
+              {r.radar?.level > 0 && (
+                <circle r="15" fill="none" stroke={r.radar.level >= 2 ? 'var(--bad)' : 'var(--warn)'} strokeWidth="2.5">
+                  <animate attributeName="r" values="13;19;13" dur="1.2s" repeatCount="indefinite" />
+                  <animate attributeName="opacity" values="0.9;0.15;0.9" dur="1.2s" repeatCount="indefinite" />
+                </circle>
+              )}
               {r.you && (
                 <circle r="14" fill="none" stroke="var(--accent)" strokeWidth="2" opacity=".5">
                   <animate attributeName="r" values="12;16;12" dur="2s" repeatCount="indefinite" />
@@ -87,6 +95,13 @@ export default function LiveRideMap({ riders = [], route = [] }) {
           );
         })}
       </svg>
+
+      {gr.level > 0 && (
+        <div style={s(`position:absolute;top:12px;left:12px;right:76px;border-radius:12px;padding:9px 11px;display:flex;align-items:center;gap:8px;font-size:11.5px;font-weight:700;line-height:1.25;backdrop-filter:blur(8px);color:${gr.level >= 2 ? '#fff' : '#1a1405'};background:${gr.level >= 2 ? 'var(--bad)' : 'var(--warn)'};animation:floatUp .25s ease`)}>
+          <span style={s('font-size:15px')}>🚗</span>
+          <span>Vehicle {gr.level >= 2 ? 'approaching fast' : 'approaching'} the pack{gr.closestM != null ? ` · ${gr.closestM} m` : ''}{gr.byName ? ` · spotted by ${gr.byName}` : ''}</span>
+        </div>
+      )}
 
       <div style={s('position:absolute;top:12px;right:12px;background:color-mix(in srgb,var(--bg2) 80%,transparent);border:1px solid var(--line);border-radius:11px;padding:7px 10px;backdrop-filter:blur(8px);text-align:center')}>
         <div className="mono" style={s('font-size:13px;font-weight:700;color:var(--good)')}>{riders.filter((r) => !r.dropped).length} up</div>

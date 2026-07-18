@@ -28,6 +28,11 @@ export function useSimulatedRide() {
     const tick = () => {
       t.current += 1;
       const tt = t.current;
+      // Demo: a car sweeps past the pack every ~18s; the rider off the back sees it first.
+      const phase = tt % 18;
+      const carActive = phase < 6;
+      const carDist = carActive ? Math.max(12, Math.round(140 - (phase / 6) * 125)) : null;
+      const carLevel = carActive ? (carDist < 45 ? 2 : 1) : 0;
       setRiders(
         rideBase.map((r, i) => {
           const dropped = !!r.dropped;
@@ -47,6 +52,7 @@ export function useSimulatedRide() {
             spd: spd.toFixed(1),
             hr: Math.round(hr),
             dist: (24.6 - i * 0.4 + tt * 0.009).toFixed(1),
+            radar: carActive && dropped ? { level: carLevel, count: 1, closestM: carDist } : null,
             hrPct: Math.min(100, Math.round(((hr - 110) / 70) * 100)),
             hrColor: hr > 168 ? 'var(--bad)' : hr > 158 ? 'var(--warn)' : 'var(--good)',
             dropped,
