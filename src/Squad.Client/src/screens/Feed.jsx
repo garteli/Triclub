@@ -41,10 +41,10 @@ export default function Feed({ vm, state, actions }) {
               const end = project(a.routePath[a.routePath.length - 1][0], a.routePath[a.routePath.length - 1][1]);
               return (
                 <>
-                  <path d={d} fill="none" stroke="rgba(0,0,0,.45)" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d={d} fill="none" stroke="rgba(255,255,255,.9)" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
                   <path d={d} fill="none" stroke={a.sportColor} strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
-                  <circle cx={start.x} cy={start.y} r="6" fill="var(--good)" stroke="#0b0f14" strokeWidth="2.5" />
-                  <circle cx={end.x} cy={end.y} r="5.5" fill="var(--bad)" stroke="#0b0f14" strokeWidth="2.5" />
+                  <circle cx={start.x} cy={start.y} r="6" fill="var(--good)" stroke="#fff" strokeWidth="2.5" />
+                  <circle cx={end.x} cy={end.y} r="5.5" fill="var(--bad)" stroke="#fff" strokeWidth="2.5" />
                 </>
               );
             }}

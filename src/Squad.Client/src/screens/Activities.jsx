@@ -11,9 +11,9 @@ const MiniMap = ({ a }) => (
         const start = project(a.routePath[0][0], a.routePath[0][1]);
         return (
           <>
-            <path d={d} fill="none" stroke="rgba(0,0,0,.45)" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" />
+            <path d={d} fill="none" stroke="rgba(255,255,255,.9)" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" />
             <path d={d} fill="none" stroke={a.sportColor} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-            <circle cx={start.x} cy={start.y} r="5" fill="var(--good)" stroke="#0b0f14" strokeWidth="2" />
+            <circle cx={start.x} cy={start.y} r="5" fill="var(--good)" stroke="#fff" strokeWidth="2" />
           </>
         );
       }}

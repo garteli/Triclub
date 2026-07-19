@@ -61,17 +61,20 @@ export function liveChartsView(t) {
   };
 }
 
-// Rear-radar rollup for the Group side column (clear → approaching → fast, 22s loop).
+// Rear-radar rollup for the Group side column (22s loop): a vehicle closes from far
+// to near over ~12s (distance monotonically shrinking so it reads as *approaching*),
+// then the road clears. `dist` drives the blip's position on the rail.
 export function liveRadarView(t) {
   const rc = t % 22;
-  const level = rc < 3 ? 2 : rc < 8 ? 1 : 0;
-  const closest = level >= 2 ? 30 + rc * 4 : level ? 120 - (rc - 3) * 10 : null;
+  const active = rc < 12;
+  const dist = active ? Math.max(12, 150 - rc * 12) : null; // metres: 150 → 18, closing
+  const level = !active ? 0 : (dist < 45 ? 2 : 1);
   const hi = level >= 2;
   return {
-    level, hi,
+    level, hi, dist,
     label: level >= 2 ? 'Vehicle approaching fast' : level ? 'Vehicle approaching' : 'Road clear',
     color: level ? (hi ? 'var(--bad)' : 'var(--warn)') : 'var(--good)',
-    closest: closest != null ? closest + '' : '—',
+    closest: dist != null ? dist + '' : '—',
     hasVehicle: level > 0,
   };
 }

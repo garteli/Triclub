@@ -23,10 +23,10 @@ export default function Segments({ vm }) {
             const top = project(SEGMENT_CLIMB[SEGMENT_CLIMB.length - 1][0], SEGMENT_CLIMB[SEGMENT_CLIMB.length - 1][1]);
             return (
               <>
-                <path d={d} fill="none" stroke="rgba(0,0,0,.5)" strokeWidth="6.5" strokeLinecap="round" strokeLinejoin="round" />
+                <path d={d} fill="none" stroke="rgba(255,255,255,.9)" strokeWidth="6.5" strokeLinecap="round" strokeLinejoin="round" />
                 <path d={d} fill="none" stroke="var(--bike)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                <circle cx={start.x} cy={start.y} r="6" fill="var(--good)" stroke="#0b0f14" strokeWidth="2.5" />
-                <circle cx={top.x} cy={top.y} r="6" fill="var(--bad)" stroke="#0b0f14" strokeWidth="2.5" />
+                <circle cx={start.x} cy={start.y} r="6" fill="var(--good)" stroke="#fff" strokeWidth="2.5" />
+                <circle cx={top.x} cy={top.y} r="6" fill="var(--bad)" stroke="#fff" strokeWidth="2.5" />
               </>
             );
           }}

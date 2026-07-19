@@ -30,9 +30,9 @@ function Lobby({ vm, actions, live }) {
             const start = project(RIDE_ROUTE[0][0], RIDE_ROUTE[0][1]);
             return (
               <>
-                <path d={d} fill="none" stroke="rgba(0,0,0,.45)" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
+                <path d={d} fill="none" stroke="rgba(255,255,255,.9)" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
                 <path d={d} fill="none" stroke="var(--accent)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
-                <circle cx={start.x} cy={start.y} r="6" fill="var(--good)" stroke="#0b0f14" strokeWidth="2.5" />
+                <circle cx={start.x} cy={start.y} r="6" fill="var(--good)" stroke="#fff" strokeWidth="2.5" />
               </>
             );
           }}
@@ -114,7 +114,7 @@ function Active({ vm, actions, live, tick, livePages }) {
   const you = riders.find((r) => r.you) || riders[0];
 
   return (
-    <div style={s('padding:6px 0 8px')}>
+    <div className="live-active">
       {/* timer header */}
       <div style={s('display:flex;align-items:center;justify-content:space-between;padding:2px 18px 12px')}>
         <div style={s('display:flex;align-items:center;gap:9px')}>

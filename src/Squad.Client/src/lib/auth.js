@@ -13,19 +13,31 @@ const BIOMETRIC_KEY = 'squad.biometric';  // { credentialId, athleteId } — loc
 
 // --- HTTP -------------------------------------------------------------------
 
-async function api(path, { method = 'GET', body, token } = {}) {
-  const res = await fetch(path, {
-    method,
-    headers: {
-      ...(body ? { 'Content-Type': 'application/json' } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  let data = null;
-  try { data = await res.json(); } catch { /* empty body */ }
-  if (!res.ok) throw new Error(data?.error || `Request failed (${res.status})`);
-  return data;
+async function api(path, { method = 'GET', body, token, timeoutMs = 45000 } = {}) {
+  // Bound every request so a stalled connection can't leave the caller (e.g. the
+  // sign-in button) spinning forever.
+  const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = ctrl ? setTimeout(() => ctrl.abort(), timeoutMs) : null;
+  try {
+    const res = await fetch(path, {
+      method,
+      headers: {
+        ...(body ? { 'Content-Type': 'application/json' } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+      signal: ctrl?.signal,
+    });
+    let data = null;
+    try { data = await res.json(); } catch { /* empty body */ }
+    if (!res.ok) throw new Error(data?.error || `Request failed (${res.status})`);
+    return data;
+  } catch (e) {
+    if (e?.name === 'AbortError') throw new Error('The server took too long — please try again.');
+    throw e;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 // --- session persistence ----------------------------------------------------

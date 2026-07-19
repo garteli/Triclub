@@ -20,8 +20,11 @@ function GroupColumn({ t }) {
           </div>
         ))}
         {rv.hasVehicle && (
-          <div style={s('position:absolute;left:50%;top:95%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:1px')}>
-            <div style={s(`width:22px;height:22px;border-radius:7px;background:${rv.color};box-shadow:0 0 9px ${rv.color};display:flex;align-items:center;justify-content:center;font-size:12px`)}>🚗</div>
+          // Distinct round blip (riders are rounded squares). Position tracks the closing
+          // distance — far → bottom of the rail, near → up by "you" — and glides between
+          // 1 Hz updates so it visibly moves closer.
+          <div style={s(`position:absolute;left:50%;top:${Math.max(10, Math.min(98, 6 + (rv.dist / 150) * 92)).toFixed(1)}%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:2px;transition:top .9s linear;z-index:3`)}>
+            <div style={s(`width:26px;height:26px;border-radius:50%;background:${rv.color};box-shadow:0 0 ${rv.hi ? 15 : 9}px ${rv.color};border:2px solid var(--bg2);display:flex;align-items:center;justify-content:center;font-size:13px`)}>🚗</div>
             <span className="mono" style={s(`font-size:8px;font-weight:700;color:${rv.color}`)}>{rv.closest}m</span>
           </div>
         )}
@@ -36,8 +39,7 @@ function FieldCell({ f, editing, actions, index }) {
   const stop = (e) => { if (e && e.stopPropagation) e.stopPropagation(); };
   return (
     <div
-      className="ctl"
-      onClick={() => actions.openPicker(index)}
+      className={'ctl' + (f.kind === 'metric' ? ' live-tile' : '')}
       draggable={editing}
       onDragStart={() => actions.onDragStart(index)}
       onDragOver={(e) => e.preventDefault()}
@@ -50,8 +52,8 @@ function FieldCell({ f, editing, actions, index }) {
       {f.kind === 'metric' && (
         <>
           <div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;font-weight:600')}>{f.label}</div>
-          <div style={s('display:flex;align-items:baseline;gap:4px;margin-top:auto')}>
-            <span className="mono" style={s(f.valStyle)}>{f.value}</span>
+          <div style={s('display:flex;align-items:baseline;gap:4px;margin-top:auto;min-width:0')}>
+            <span className={'mono live-metric-val' + (f.hero ? ' hero' : '')} style={s(`--vf:${f.vf}px;color:${f.color}`)}>{f.value}</span>
             {f.unit && <span className="mono" style={s('font-size:12px;color:var(--text2);font-weight:600')}>{f.unit}</span>}
           </div>
         </>
@@ -78,10 +80,10 @@ function FieldCell({ f, editing, actions, index }) {
                 const pack = f.pack.map((p) => project(p.lat, p.lon));
                 return (
                   <>
-                    <path d={d} fill="none" stroke="rgba(0,0,0,.5)" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d={d} fill="none" stroke="rgba(255,255,255,.9)" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
                     <path d={d} fill="none" stroke="var(--accent)" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
-                    {pack.map((p, k) => <circle key={k} cx={p.x} cy={p.y} r="6" fill={f.pack[k].color} stroke="#0b0f14" strokeWidth="2.5" />)}
-                    <circle cx={you.x} cy={you.y} r="9" fill="var(--accent)" stroke="#0b0f14" strokeWidth="3" />
+                    {pack.map((p, k) => <circle key={k} cx={p.x} cy={p.y} r="6" fill={f.pack[k].color} stroke="#fff" strokeWidth="2.5" />)}
+                    <circle cx={you.x} cy={you.y} r="9" fill="var(--accent)" stroke="#fff" strokeWidth="3" />
                   </>
                 );
               }}
@@ -96,8 +98,10 @@ function FieldCell({ f, editing, actions, index }) {
         </div>
       )}
       {editing && (
-        <div style={s('position:absolute;top:8px;right:8px;width:20px;height:20px;border-radius:6px;background:var(--bg3);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--text3)')}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><circle cx="9" cy="6" r="1" /><circle cx="15" cy="6" r="1" /><circle cx="9" cy="12" r="1" /><circle cx="15" cy="12" r="1" /><circle cx="9" cy="18" r="1" /><circle cx="15" cy="18" r="1" /></svg>
+        // Cog → open the field picker for this tile. In edit mode only; tapping the
+        // tile body no longer opens it (that just enters edit via long-press).
+        <div onClick={(e) => { stop(e); actions.openPicker(index); }} style={s('position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:7px;background:var(--accent);display:flex;align-items:center;justify-content:center;color:var(--accent-ink)')}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3.2" /><path d="M12 2.6v3M12 18.4v3M2.6 12h3M18.4 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1" /></svg>
         </div>
       )}
     </div>
@@ -128,7 +132,7 @@ function EditPanel({ page, actions }) {
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" /></svg>
         </div>
       </div>
-      <div style={s('font-size:11px;color:var(--text3);margin-top:10px;line-height:1.4')}>Tap any field to change it — pick a metric, a chart, or the route map.</div>
+      <div style={s('font-size:11px;color:var(--text3);margin-top:10px;line-height:1.4')}>Tap a tile's ⚙ to change it — pick a metric, a chart, or the route map. Drag tiles to reorder.</div>
     </div>
   );
 }
@@ -211,7 +215,9 @@ export default function LivePages({ t, lp }) {
     const val = mv[tok] || { v: '—' };
     const vs = hero ? big + 10 : big;
     const color = val.color || (hero ? 'var(--accent)' : 'var(--text)');
-    return { ...base, kind: 'metric', label: m.label, unit: m.unit, value: val.v, valStyle: `font-size:${vs}px;font-weight:700;line-height:.95;letter-spacing:-1px;color:${color}` };
+    // vf is the px fallback (count-based); the .live-metric-val class scales it up to
+    // fill the tile via container queries where supported.
+    return { ...base, kind: 'metric', hero, label: m.label, unit: m.unit, value: val.v, vf: vs, color };
   });
 
   const gridStyle = `flex:1;display:grid;grid-template-columns:repeat(${cols},1fr);gap:8px;grid-auto-rows:1fr;min-width:0`;
@@ -222,7 +228,7 @@ export default function LivePages({ t, lp }) {
   return (
     <>
       {/* full-screen page: optional Group column + fields grid */}
-      <div style={s('display:flex;gap:9px;height:544px;padding:0 12px')} onPointerDown={actions.pokePager}>
+      <div className="live-row" style={s('display:flex;gap:9px;padding:0 12px')} onPointerDown={actions.pokePager}>
         {withSide && <GroupColumn t={t} />}
         <div style={s(gridStyle)}>
           {fields.map((f, i) => <FieldCell key={i} f={f} index={i} editing={editFields} actions={actions} />)}
