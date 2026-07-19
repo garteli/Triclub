@@ -36,6 +36,7 @@ import EditProfile from './screens/EditProfile.jsx';
 import Notifications from './screens/Notifications.jsx';
 import Activities from './screens/Activities.jsx';
 import UploadActivity from './screens/UploadActivity.jsx';
+import Sensors from './screens/Sensors.jsx';
 
 // Initial prototype state (matches the handoff's Component.state).
 const initialState = {
@@ -56,7 +57,7 @@ const screens = {
   discover: Discover, group: GroupProfile, pay: Checkout, requests: JoinRequests, chat: Messages,
   settings: Settings, welcome: Welcome, register: Register, login: Login, newgroup: CreateGroup,
   athlete: AthleteProfile, editprofile: EditProfile, notifs: Notifications, activities: Activities,
-  upload: UploadActivity,
+  upload: UploadActivity, sensors: Sensors,
 };
 
 export default function App() {

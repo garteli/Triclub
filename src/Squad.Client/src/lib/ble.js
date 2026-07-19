@@ -10,12 +10,33 @@ export const POWER = {
   service: '00001818-0000-1000-8000-00805f9b34fb',
   measurement: '00002a63-0000-1000-8000-00805f9b34fb',
 };
+// Cycling Speed and Cadence (CSC) — one sensor reports wheel revs (speed) and/or
+// crank revs (cadence) in a single measurement.
+export const CSC = {
+  service: '00001816-0000-1000-8000-00805f9b34fb',
+  measurement: '00002a5b-0000-1000-8000-00805f9b34fb',
+};
+// Running Speed and Cadence (RSC) — footpod: instantaneous speed + cadence.
+export const RSC = {
+  service: '00001814-0000-1000-8000-00805f9b34fb',
+  measurement: '00002a53-0000-1000-8000-00805f9b34fb',
+};
+// Fitness Machine (FTMS) — smart trainers. We read the Indoor Bike Data characteristic
+// (power / speed / cadence). Erg/resistance *control* (Control Point 0x2AD9) is a follow-up.
+export const FTMS = {
+  service: '00001826-0000-1000-8000-00805f9b34fb',
+  measurement: '00002ad2-0000-1000-8000-00805f9b34fb', // Indoor Bike Data
+};
 // Garmin Varia radar — PROPRIETARY, community reverse-engineered (no official public
 // spec; Garmin runs a gated "Radar Data BLE Program"). Verify against real hardware.
 export const RADAR = {
   service: '6a4e3200-667b-11e3-949a-0800200c9a66',
   measurement: '6a4e3203-667b-11e3-949a-0800200c9a66',
 };
+
+// Default wheel circumference for CSC speed (700x25c ≈ 2105 mm). A per-bike override
+// belongs in settings; this is a sane default so speed isn't wildly off out of the box.
+export const DEFAULT_WHEEL_MM = 2105;
 
 // Heart Rate Measurement (0x2A37): flags byte, then 8- or 16-bit BPM (bit0 of flags).
 export function parseHeartRate(dv) {
@@ -49,10 +70,84 @@ export function parseVariaRadar(dv) {
   };
 }
 
-// kind -> { service, measurement, apply(dataView, latest) }. Both sensor sources
-// iterate this, so adding a sensor type is one entry here plus a parser above.
+// CSC Measurement (0x2A5B): flags byte, then optional wheel block (uint32 cumulative
+// revolutions + uint16 last-event-time @ 1/1024 s) and/or crank block (uint16 revs +
+// uint16 event-time). Speed and cadence are *rates*, so we diff against the previous
+// packet (stashed on latest._csc) and handle the 16-bit event-time rollover.
+export function applyCSC(dv, latest, wheelMm = DEFAULT_WHEEL_MM) {
+  const flags = dv.getUint8(0);
+  let o = 1;
+  const st = latest._csc || (latest._csc = {});
+  if (flags & 0x01) { // wheel revolution data → speed
+    const revs = dv.getUint32(o, true); o += 4;
+    const time = dv.getUint16(o, true); o += 2;
+    if (st.wt != null) {
+      const dt = ((time - st.wt) & 0xffff) / 1024;              // seconds
+      const dr = (revs - st.wr) >>> 0;                          // uint32 wrap-safe
+      if (dt > 0) latest.speedKph = (dr * (wheelMm / 1000)) / dt * 3.6;
+    }
+    st.wr = revs; st.wt = time;
+  }
+  if (flags & 0x02) { // crank revolution data → cadence
+    const revs = dv.getUint16(o, true); o += 2;
+    const time = dv.getUint16(o, true); o += 2;
+    if (st.ct != null) {
+      const dt = ((time - st.ct) & 0xffff) / 1024;
+      const dr = (revs - st.cr) & 0xffff;
+      if (dt > 0) latest.cadence = Math.round((dr / dt) * 60);
+    }
+    st.cr = revs; st.ct = time;
+  }
+}
+
+// RSC Measurement (0x2A53): flags, then instantaneous speed (uint16 @ 1/256 m/s) and
+// instantaneous cadence (uint8, steps/min) — both delivered directly, no diffing needed.
+export function applyRSC(dv, latest) {
+  latest.speedKph = (dv.getUint16(1, true) / 256) * 3.6;
+  latest.cadence = dv.getUint8(3);
+}
+
+// FTMS Indoor Bike Data (0x2AD2): uint16 flags (LE) then a variable field list. We walk
+// the flags in field order and pull speed / cadence / power. Note bit0 is "More Data" —
+// when it's 0 the Instantaneous Speed field IS present (inverted, per the FTMS spec).
+export function applyIndoorBike(dv, latest) {
+  const flags = dv.getUint16(0, true);
+  let o = 2;
+  if (!(flags & 0x0001)) { latest.speedKph = dv.getUint16(o, true) * 0.01; o += 2; }
+  if (flags & 0x0002) o += 2;                                             // average speed
+  if (flags & 0x0004) { latest.cadence = Math.round(dv.getUint16(o, true) * 0.5); o += 2; }
+  if (flags & 0x0008) o += 2;                                             // average cadence
+  if (flags & 0x0010) o += 3;                                            // total distance (uint24)
+  if (flags & 0x0020) o += 2;                                            // resistance level
+  if (flags & 0x0040) { latest.powerW = dv.getInt16(o, true); o += 2; }  // instantaneous power
+  // remaining fields (avg power, energy, HR, MET, time) are not needed here
+}
+
+// kind -> { service, measurement, apply(dataView, latest), clears }. Both sensor sources
+// iterate this, so adding a BLE sensor type is one entry here plus a parser above.
+// `clears` lists the snapshot fields to null on disconnect; `reset` clears rolling state.
 export const SENSOR_SPECS = {
-  hr:    { ...HR,    apply: (dv, l) => { l.heartRate = parseHeartRate(dv); } },
-  power: { ...POWER, apply: (dv, l) => { l.powerW = parseCyclingPower(dv); } },
-  radar: { ...RADAR, apply: (dv, l) => { l.radar = parseVariaRadar(dv); } },
+  hr:      { ...HR,    clears: ['heartRate'],                 apply: (dv, l) => { l.heartRate = parseHeartRate(dv); } },
+  power:   { ...POWER, clears: ['powerW'],                    apply: (dv, l) => { l.powerW = parseCyclingPower(dv); } },
+  csc:     { ...CSC,   clears: ['speedKph', 'cadence'], reset: '_csc', apply: applyCSC },
+  rsc:     { ...RSC,   clears: ['speedKph', 'cadence'],       apply: applyRSC },
+  trainer: { ...FTMS,  clears: ['powerW', 'speedKph', 'cadence'], apply: applyIndoorBike },
+  radar:   { ...RADAR, clears: ['radar'],                     apply: (dv, l) => { l.radar = parseVariaRadar(dv); } },
 };
+
+// Display catalog for the Sensors screen: order, labels, which metrics each device
+// surfaces, and honest availability. `available:false` renders a disabled row with a note.
+export const SENSOR_CATALOG = [
+  { kind: 'hr',      label: 'Heart rate',        hint: 'Chest strap or optical HRM',       metrics: ['heartRate'] },
+  { kind: 'power',   label: 'Power meter',       hint: 'Crank, pedal or hub power',        metrics: ['powerW'] },
+  { kind: 'csc',     label: 'Speed & cadence',   hint: 'Standard CSC sensor',              metrics: ['speedKph', 'cadence'] },
+  { kind: 'trainer', label: 'Smart trainer',     hint: 'FTMS indoor trainer (power)',      metrics: ['powerW', 'speedKph', 'cadence'] },
+  { kind: 'rsc',     label: 'Run footpod',       hint: 'Running speed & cadence',          metrics: ['speedKph', 'cadence'] },
+  { kind: 'radar',   label: 'Rear radar',        hint: 'Garmin Varia · unofficial',        metrics: ['radar'] },
+  { kind: 'gears',   label: 'Electronic shifting', hint: 'Di2 / AXS — no standard BLE profile', metrics: [], available: false },
+];
+
+// Blank snapshot — the shape every controller keeps and the recorder/UI read.
+export function emptySnapshot() {
+  return { heartRate: null, powerW: null, cadence: null, speedKph: null, radar: null };
+}

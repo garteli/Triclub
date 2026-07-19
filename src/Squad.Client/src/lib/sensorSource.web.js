@@ -1,22 +1,17 @@
 // Web Bluetooth sensors — Chrome/Edge/Android only (iOS Safari has no Web Bluetooth).
 // Same shape and shared parsers as the native controller; foreground-only.
-import { SENSOR_SPECS } from './ble.js';
+import { SENSOR_SPECS, emptySnapshot } from './ble.js';
 
 export function createWebSensorController() {
-  const latest = { heartRate: null, powerW: null, cadence: null, radar: null };
+  const latest = emptySnapshot();
   const conns = {}; // kind -> { device, characteristic, handler }
 
   const supported = typeof navigator !== 'undefined' && 'bluetooth' in navigator;
 
-  async function connect(kind) {
-    if (!supported) throw new Error('Web Bluetooth not supported on this browser');
+  // Wire notifications for an already-selected device. Shared by fresh pairs (connect)
+  // and silent reconnects (connectKnown).
+  async function subscribe(kind, device) {
     const spec = SENSOR_SPECS[kind];
-    if (!spec) throw new Error(`Unknown sensor: ${kind}`);
-
-    const device = await navigator.bluetooth.requestDevice({
-      filters: [{ services: [spec.service] }],
-      optionalServices: [spec.service],
-    });
     const server = await device.gatt.connect();
     const service = await server.getPrimaryService(spec.service);
     const characteristic = await service.getCharacteristic(spec.measurement);
@@ -27,7 +22,30 @@ export function createWebSensorController() {
     device.addEventListener('gattserverdisconnected', () => clearKind(kind));
 
     conns[kind] = { device, characteristic, handler };
-    return device.name || kind;
+    return { id: device.id, name: device.name || kind };
+  }
+
+  async function connect(kind) {
+    if (!supported) throw new Error('Web Bluetooth not supported on this browser');
+    const spec = SENSOR_SPECS[kind];
+    if (!spec) throw new Error(`Unknown sensor: ${kind}`);
+
+    const device = await navigator.bluetooth.requestDevice({
+      filters: [{ services: [spec.service] }],
+      optionalServices: [spec.service],
+    });
+    return subscribe(kind, device);
+  }
+
+  // Best-effort silent reconnect to a previously-paired device id. Relies on
+  // navigator.bluetooth.getDevices() (permission-backed; behind a flag on some
+  // browsers), so it can legitimately fail — the caller falls back to connect().
+  async function connectKnown(kind, deviceId) {
+    if (!supported || !navigator.bluetooth.getDevices) throw new Error('reconnect unsupported');
+    const devices = await navigator.bluetooth.getDevices();
+    const device = devices.find((d) => d.id === deviceId);
+    if (!device) throw new Error('device not remembered by this browser');
+    return subscribe(kind, device);
   }
 
   async function disconnect(kind) {
@@ -41,10 +59,10 @@ export function createWebSensorController() {
 
   function clearKind(kind) {
     delete conns[kind];
-    if (kind === 'hr') latest.heartRate = null;
-    if (kind === 'power') latest.powerW = null;
-    if (kind === 'radar') latest.radar = null;
+    const spec = SENSOR_SPECS[kind];
+    spec?.clears?.forEach((f) => { latest[f] = null; });
+    if (spec?.reset) delete latest[spec.reset];
   }
 
-  return { kind: 'web', supported, connect, disconnect, snapshot: () => ({ ...latest }) };
+  return { kind: 'web', supported, connect, connectKnown, disconnect, snapshot: () => ({ ...latest }) };
 }

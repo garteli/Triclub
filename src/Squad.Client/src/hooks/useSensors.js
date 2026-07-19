@@ -1,18 +1,33 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createWebSensorController } from '../lib/sensorSource.web.js';
+import { SENSOR_SPECS, emptySnapshot } from '../lib/ble.js';
+
+const KINDS = Object.keys(SENSOR_SPECS); // hr, power, csc, rsc, trainer, radar
+const PAIRED_KEY = 'squad.sensors';      // { [kind]: { id, name } } — remembered devices
 
 function isNativePlatform() {
   return !!(typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.());
 }
 
-// Manages BLE sensor pairing (heart rate, power, radar) and exposes:
-//   - status  per-kind connection state for the UI
-//   - metrics latest values, polled for display
-//   - current() a synchronous snapshot the recorder merges into each telemetry push
+function loadPaired() {
+  try { return JSON.parse(localStorage.getItem(PAIRED_KEY)) || {}; } catch { return {}; }
+}
+function savePaired(map) {
+  try { localStorage.setItem(PAIRED_KEY, JSON.stringify(map)); } catch { /* storage unavailable */ }
+}
+
+const offStatus = () => KINDS.reduce((o, k) => ((o[k] = 'off'), o), {});
+
+// Manages BLE sensor pairing across every supported profile and exposes:
+//   - status   per-kind connection state for the UI
+//   - metrics  latest values, polled for display
+//   - paired   remembered devices ({ id, name }) for reconnect + display
+//   - current()  a synchronous snapshot the recorder merges into each telemetry push
 export function useSensors() {
   const ctrl = useRef(null);
-  const [status, setStatus] = useState({ hr: 'off', power: 'off', radar: 'off' });
-  const [metrics, setMetrics] = useState({ heartRate: null, powerW: null, radar: null });
+  const [status, setStatus] = useState(offStatus);
+  const [metrics, setMetrics] = useState(emptySnapshot);
+  const [paired, setPaired] = useState(loadPaired);
 
   // Poll the shared store so the UI reflects incoming notifications.
   useEffect(() => {
@@ -31,23 +46,60 @@ export function useSensors() {
     return ctrl.current;
   }, []);
 
+  const rememberPaired = useCallback((kind, device) => {
+    setPaired((prev) => {
+      const next = { ...prev, [kind]: { id: device.id, name: device.name } };
+      savePaired(next);
+      return next;
+    });
+  }, []);
+
   const connect = useCallback(async (kind) => {
     setStatus((s) => ({ ...s, [kind]: 'connecting' }));
     try {
       const c = await ensureController();
-      await c.connect(kind);
+      const device = await c.connect(kind);
+      rememberPaired(kind, device);
       setStatus((s) => ({ ...s, [kind]: 'connected' }));
-    } catch (e) {
+    } catch {
       setStatus((s) => ({ ...s, [kind]: 'error' }));
     }
-  }, [ensureController]);
+  }, [ensureController, rememberPaired]);
 
-  const disconnect = useCallback(async (kind) => {
+  const disconnect = useCallback(async (kind, { forget = true } = {}) => {
     try { await ctrl.current?.disconnect(kind); } catch { /* ignore */ }
     setStatus((s) => ({ ...s, [kind]: 'off' }));
+    if (forget) {
+      setPaired((prev) => {
+        const next = { ...prev }; delete next[kind]; savePaired(next);
+        return next;
+      });
+    }
   }, []);
+
+  // On mount, silently try to re-establish previously-paired sensors (in range, same
+  // browser/device). Best-effort: a failure just leaves the row as "remembered, tap to
+  // reconnect" rather than surfacing an error.
+  useEffect(() => {
+    const remembered = loadPaired();
+    const kinds = Object.keys(remembered);
+    if (kinds.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const c = await ensureController();
+      if (!c.connectKnown) return;
+      for (const kind of kinds) {
+        if (cancelled) return;
+        try {
+          await c.connectKnown(kind, remembered[kind].id);
+          if (!cancelled) setStatus((s) => ({ ...s, [kind]: 'connected' }));
+        } catch { /* leave remembered-but-off */ }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [ensureController]);
 
   const current = useCallback(() => (ctrl.current ? ctrl.current.snapshot() : {}), []);
 
-  return { status, metrics, connect, disconnect, current };
+  return { kinds: KINDS, status, metrics, paired, connect, disconnect, current };
 }

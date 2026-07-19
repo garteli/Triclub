@@ -78,7 +78,7 @@ export default function Settings({ vm, state, actions }) {
       <div style={s(card)}>
         <NavRow>Units · Metric (km, kg)</NavRow>
         <NavRow>Notifications</NavRow>
-        <NavRow>Connected apps &amp; sensors</NavRow>
+        <NavRow onClick={() => actions.go('sensors')}>Connected apps &amp; sensors</NavRow>
         <NavRow last>Privacy</NavRow>
       </div>
 
