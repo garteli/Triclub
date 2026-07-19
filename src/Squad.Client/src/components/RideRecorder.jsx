@@ -1,6 +1,4 @@
 import { s } from '../lib/style.js';
-import { useRideRecorder } from '../hooks/useRideRecorder.js';
-import { useSensors } from '../hooks/useSensors.js';
 
 const radarLabel = (r) => (!r ? '—' : r.level > 0 ? `${r.closestM ?? '?'}m` : 'clear');
 
@@ -22,11 +20,11 @@ const Dot = ({ color, pulse }) => (
   <span style={s(`width:9px;height:9px;border-radius:50%;background:${color};${pulse ? 'animation:pulseDot 1.1s infinite' : ''}`)} />
 );
 
-// If `pushTelemetry` is provided (from useLiveRide), fixes stream to the ride hub;
-// without it, the recorder still runs locally so you can test GPS/distance on a phone.
-export default function RideRecorder({ pushTelemetry }) {
-  const sensors = useSensors();
-  const { recording, paused, distanceKm, lastFix, error, mode, start, stop } = useRideRecorder({ pushTelemetry, sensors });
+// Presentational: the shared recorder + sensors are owned by App (so recording and the
+// hub connection persist across lobby→active). `streaming` reflects whether fixes are
+// going to the ride hub.
+export default function RideRecorder({ recorder, sensors, streaming }) {
+  const { recording, paused, distanceKm, lastFix, error, mode, start, stop } = recorder;
   const radar = sensors.metrics.radar;
 
   return (
@@ -38,7 +36,7 @@ export default function RideRecorder({ pushTelemetry }) {
             {recording ? (paused ? 'Paused' : 'Recording') : 'Record ride'}
           </span>
         </div>
-        {!pushTelemetry && <span style={s('font-size:10px;color:var(--text3)')}>local · not streaming</span>}
+        {!streaming && <span style={s('font-size:10px;color:var(--text3)')}>local · not streaming</span>}
       </div>
 
       {/* BLE sensors — tap to pair / unpair */}

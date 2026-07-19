@@ -2,8 +2,8 @@
 //  Client constants. The demo/seed content has been removed — screens now render
 //  real data from the .NET API (squad, feed, activities, leaderboard, plan,
 //  groups) or an empty state when there is none. What remains here is structural
-//  (nav, icons, status colours), the workout-detail templates, and the live-ride
-//  telemetry simulator (rideBase) which still stands in for real sensor feeds.
+//  (nav, icons, status colours) and the workout-detail templates. The live ride now
+//  runs on real telemetry (useLiveRide + recorder + sensors), so no simulator remains.
 // ---------------------------------------------------------------------------
 
 // Squad members / feed / leaderboard / activities / groups / requests / chat /
@@ -92,16 +92,3 @@ const discPaths = {
 export const discIcon = (d) =>
   '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
   (discPaths[d] || discPaths.rest) + '</svg>';
-
-// Riders used by the live-ride telemetry simulator (useSimulatedRide). This stands
-// in for real sensor/GPS feeds until useLiveRide is wired — it is a functional
-// simulation, not squad demo data.
-export const rideBase = [
-  { name: 'You',  initials: 'DL', color: '#d6ff3f', bk: 34, bh: 158, you: true, dropped: false },
-  { name: 'R2',   initials: 'R2', color: '#ff9a4c', bk: 35, bh: 162, dropped: false },
-  { name: 'R3',   initials: 'R3', color: '#5a86ff', bk: 34, bh: 151, dropped: false },
-  { name: 'R4',   initials: 'R4', color: '#4fe08b', bk: 33, bh: 147, dropped: false },
-  { name: 'R5',   initials: 'R5', color: '#37c0ff', bk: 33, bh: 155, dropped: false },
-  { name: 'R6',   initials: 'R6', color: '#c68bff', bk: 32, bh: 149, dropped: false },
-  { name: 'R7',   initials: 'R7', color: '#ff6f61', bk: 29, bh: 171, dropped: true },
-];

@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTick } from './hooks/useTick.js';
-import { useSimulatedRide } from './hooks/useSimulatedRide.js';
+import { useLiveRide } from './hooks/useLiveRide.js';
+import { useSensors } from './hooks/useSensors.js';
+import { useRideRecorder } from './hooks/useRideRecorder.js';
+import { useRideTelemetry } from './hooks/useRideTelemetry.js';
 import { useLivePages } from './hooks/useLivePages.js';
 import { useSquadFeed } from './hooks/useSquadFeed.js';
 import { useLeaderboard } from './hooks/useLeaderboard.js';
@@ -226,13 +229,21 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.token]);
 
-  // Live ride feed. Simulated so the coordinate map animates without a native
-  // recorder; swap for: useLiveRide(rideId, { getToken, meId }) to go real.
-  const live = useSimulatedRide();
+  // Real live ride. Hub riders (SignalR) + this device's own GPS recorder + BLE
+  // sensors. There is no simulation: fields show real values or "—"/"waiting" until a
+  // ride is active with a fix/sensors, or teammates are streaming. The squad shares
+  // one ride channel (rideId = squadId).
+  const onRide = state.screen === 'ride';
+  const rideActive = onRide && state.rideState === 'active';
+  const sensors = useSensors();
+  const liveRide = useLiveRide(squadId, { getToken, meId: session?.athleteId, enabled: onRide && !!squadId });
+  const recorder = useRideRecorder({ pushTelemetry: liveRide.pushTelemetry, sensors });
+  const tel = useRideTelemetry({ t, active: rideActive, riders: liveRide.riders, recorder, sensors });
 
   // Garmin Edge–style live-ride pages (configurable fields, auto-rotate, edit).
-  const rideActive = state.screen === 'ride' && state.rideState === 'active';
   const livePages = useLivePages(t, rideActive);
+
+  const live = { riders: liveRide.riders, status: liveRide.status, pushTelemetry: liveRide.pushTelemetry, recorder, sensors, tel, livePages };
 
   const Screen = screens[state.screen] || Dashboard;
   const dir = state.lang === 'he' ? 'rtl' : 'ltr';

@@ -1,13 +1,11 @@
 import { s } from '../lib/style.js';
 import { metricCatalog, liveMetricValues, liveChartsView, liveRadarView, spreadRiders } from '../lib/liveMetrics.js';
 import TileMap from './TileMap.jsx';
-import { toPathD } from '../lib/tiles.js';
-import { RIDE_ROUTE, ridePointAt } from '../data/course.js';
 
 // ---- Group side column: teammates front→back on a rail + rear-radar vehicle blip ----
-function GroupColumn({ t }) {
-  const riders = spreadRiders(t);
-  const rv = liveRadarView(t);
+function GroupColumn({ tel }) {
+  const riders = spreadRiders(tel);
+  const rv = liveRadarView(tel);
   return (
     <div style={s('width:76px;flex:none;background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:9px 6px;display:flex;flex-direction:column')}>
       <div style={s('font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:700')}>Group</div>
@@ -73,21 +71,16 @@ function FieldCell({ f, editing, actions, index }) {
       {f.kind === 'map' && (
         <>
           <div style={s('position:absolute;inset:0')}>
-            <TileMap points={RIDE_ROUTE} W={344} H={240} radius={0} pad={20}>
-              {(project) => {
-                const d = toPathD(RIDE_ROUTE, project);
-                const you = project(f.you.lat, f.you.lon);
-                const pack = f.pack.map((p) => project(p.lat, p.lon));
-                return (
-                  <>
-                    <path d={d} fill="none" stroke="rgba(255,255,255,.9)" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d={d} fill="none" stroke="var(--accent)" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
-                    {pack.map((p, k) => <circle key={k} cx={p.x} cy={p.y} r="6" fill={f.pack[k].color} stroke="#fff" strokeWidth="2.5" />)}
-                    <circle cx={you.x} cy={you.y} r="9" fill="var(--accent)" stroke="#fff" strokeWidth="3" />
-                  </>
-                );
-              }}
-            </TileMap>
+            {f.pts.length ? (
+              <TileMap points={f.pts} W={344} H={240} radius={0} pad={28}>
+                {(project) => f.riders.map((r, k) => {
+                  const p = project(r.lat, r.lon);
+                  return <circle key={k} cx={p.x} cy={p.y} r={r.you ? 9 : 6} fill={r.you ? 'var(--accent)' : r.color} stroke="#fff" strokeWidth={r.you ? 3 : 2.5} />;
+                })}
+              </TileMap>
+            ) : (
+              <div style={s('position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg3);color:var(--text3);font-size:11px;text-align:center;padding:0 16px')}>Waiting for GPS…</div>
+            )}
           </div>
           <div style={s('position:absolute;top:10px;left:11px;font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.8px;font-weight:600;background:color-mix(in srgb,var(--bg) 60%,transparent);padding:2px 7px;border-radius:6px;z-index:2')}>Route</div>
         </>
@@ -175,7 +168,7 @@ function PickerSheet({ page, slot, actions }) {
 }
 
 // ---- the unified full-screen rotating page system ----
-export default function LivePages({ t, lp }) {
+export default function LivePages({ tel, lp }) {
   const { pages, pageIdx, editFields, picker, autoRotate, pagerVisible, actions } = lp;
   const page = pages[pageIdx];
   const side = page.side || 'none';
@@ -187,8 +180,8 @@ export default function LivePages({ t, lp }) {
     : (count <= 2 ? 54 : count <= 3 ? 46 : count <= 4 ? 40 : count <= 6 ? 34 : 28);
   const heroIdx = page.layout === 'hero' ? (page.heroIndex == null ? 0 : page.heroIndex) : -1;
 
-  const mv = liveMetricValues(t);
-  const charts = liveChartsView(t);
+  const mv = liveMetricValues(tel);
+  const charts = liveChartsView(tel);
 
   const fields = page.fields.map((tok, i) => {
     const hero = i === heroIdx;
@@ -203,12 +196,10 @@ export default function LivePages({ t, lp }) {
       starStroke: hero ? 'var(--accent-ink)' : 'var(--text2)',
     };
     if (tok === 'map') {
-      // Riders orbit the same real loop the ride uses — you (accent) plus a few pack
-      // dots — so the map field animates in step with the group.
-      const you = ridePointAt((t * 0.01) % 1);
-      const pack = [['#ff9a4c', 0.012], ['#5a86ff', -0.018], ['#4fe08b', 0.026]]
-        .map(([color, off]) => ({ color, ...ridePointAt(((t * 0.01) + off + 1) % 1) }));
-      return { ...base, kind: 'map', label: 'Route', you, pack };
+      // Real rider positions from the hub (those with a GPS fix). Empty → "Waiting for GPS".
+      const riders = (tel?.riders || []).filter((r) => r.lat != null && r.lon != null);
+      const pts = riders.map((r) => [r.lat, r.lon]);
+      return { ...base, kind: 'map', label: 'Route', riders, pts };
     }
     if (charts[tok]) { const c = charts[tok]; return { ...base, kind: 'chart', label: c.label, value: c.cur, unit: c.unit, color: c.color, pts: c.pts, area: c.area }; }
     const m = metricCatalog[tok] || { label: tok, unit: '' };
@@ -229,7 +220,7 @@ export default function LivePages({ t, lp }) {
     <>
       {/* full-screen page: optional Group column + fields grid */}
       <div className="live-row" style={s('display:flex;gap:9px;padding:0 12px')} onPointerDown={actions.pokePager}>
-        {withSide && <GroupColumn t={t} />}
+        {withSide && <GroupColumn tel={tel} />}
         <div style={s(gridStyle)}>
           {fields.map((f, i) => <FieldCell key={i} f={f} index={i} editing={editFields} actions={actions} />)}
         </div>

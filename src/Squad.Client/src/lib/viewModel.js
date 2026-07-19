@@ -22,7 +22,6 @@ function timeAgo(iso) {
 
 const SPORT_COLOR = { Bike: 'var(--bike)', Run: 'var(--run)', Swim: 'var(--swim)', Gym: 'var(--gym)' };
 const SPORT_ICON = { Bike: '🚴', Run: '🏃', Swim: '🏊', Gym: '🏋️' };
-import { deriveRideRiders, formatTimer, gapMeters } from './derive.js';
 import { activityAnalysis } from './activityAnalysis.js';
 
 // Builds everything the screens need for a given (state, tick). This is the
@@ -55,11 +54,6 @@ export function buildViewModel(state, t, opts = {}) {
   const squadOnTrack = squadSource.filter((m) => m.status !== 'behind').length;
   const squadTotal = squadSource.length;
 
-  // ---- live ride (time-driven) ----
-  const rideRiders = deriveRideRiders(t);
-  const you = rideRiders[0];
-  const rideTimer = formatTimer(t);
-  const gap = gapMeters(t);
 
   // ---- plan week ---- (live plan from opts.plan overrides the seed)
   const planSource = opts.plan?.length ? opts.plan : planWeek;
@@ -354,7 +348,6 @@ export function buildViewModel(state, t, opts = {}) {
     noApplicantOpen: !selApplicant, applicantOpen: !!selApplicant,
     applicantPending: !!selApplicant && (reqStatus[selApplicant] || 'pending') === 'pending',
     chatThread,
-    rideRiders, you, rideTimer, gapMeters: gap, joinedCount: rideRiders.length,
     plan, wkDetail, monthCells,
     planSummary: opts.planSummary
       ? {
