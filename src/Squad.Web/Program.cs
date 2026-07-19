@@ -86,7 +86,7 @@ app.UseStaticFiles();
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapGet("/api/health", () => Results.Ok(new { status = "ok", app = "Squad" }));
+app.MapGet("/api/health", () => Results.Ok(new { status = "ok", app = "Domestique Club" }));
 
 app.MapAuth();             // POST /api/auth/{register,login,google,apple}  GET /api/auth/{config,me}
 app.MapProfile();          // GET/PUT /api/profile
