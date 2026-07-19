@@ -20,7 +20,7 @@ function Lobby({ vm, actions, live }) {
         <div style={s('display:flex;align-items:center;gap:7px')}><span style={s('width:8px;height:8px;border-radius:50%;background:var(--accent);animation:pulseDot 1.4s infinite')} /><span style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.4px;font-weight:600')}>Ride starting soon</span></div>
       </div>
       <div style={s('font-size:26px;font-weight:700;letter-spacing:-.6px;margin-top:6px')}>Tuesday Threshold</div>
-      <div style={s('font-size:13px;color:var(--text2);margin-top:2px')}>Group ride · led by Coach Ronen</div>
+      <div style={s('font-size:13px;color:var(--text2);margin-top:2px')}>Group ride · led by your coach</div>
 
       {/* route preview */}
       <div style={s('margin-top:16px;border-radius:20px;overflow:hidden;border:1px solid var(--line);background:var(--bg2);position:relative')}>
@@ -70,7 +70,7 @@ function Lobby({ vm, actions, live }) {
 
       <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-top:16px;display:flex;gap:10px;align-items:flex-start')}>
         <div style={s('width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#37c0ff,#5a86ff);flex:none;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff')}>C</div>
-        <div style={s('font-size:12px;color:var(--text2);line-height:1.45')}><span style={s('color:var(--text);font-weight:600')}>Coach Ronen:</span> Neutral roll for 10′, then we hit the 3 threshold blocks together. Regroup at the top of each climb.</div>
+        <div style={s('font-size:12px;color:var(--text2);line-height:1.45')}><span style={s('color:var(--text);font-weight:600')}>Coach:</span> Neutral roll for 10′, then we hit the 3 threshold blocks together. Regroup at the top of each climb.</div>
       </div>
 
       <RideRecorder pushTelemetry={live?.pushTelemetry} />

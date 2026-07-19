@@ -1,4 +1,5 @@
 import { s } from '../lib/style.js';
+import EmptyState from '../components/EmptyState.jsx';
 
 export default function Coach({ vm }) {
   return (
@@ -28,7 +29,10 @@ export default function Coach({ vm }) {
         </div>
       </div>
 
-      <div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.3px;font-weight:600;margin:22px 2px 12px')}>Insights · 4 this week</div>
+      <div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.3px;font-weight:600;margin:22px 2px 12px')}>Insights{vm.coach.length ? ` · ${vm.coach.length} this week` : ''}</div>
+      {vm.coach.length === 0 && (
+        <EmptyState icon="🤖" title="No insights yet" sub="Once you log a couple of weeks of training, your AI coach surfaces recovery, balance and focus tips here." />
+      )}
       <div style={s('display:flex;flex-direction:column;gap:12px')}>
         {vm.coach.map((c, i) => (
           <div key={i} style={s('background:var(--bg2);border:1px solid var(--line);border-radius:18px;padding:15px 15px 13px;position:relative;overflow:hidden')}>

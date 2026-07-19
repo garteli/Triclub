@@ -255,7 +255,7 @@ export function buildViewModel(state, t, opts = {}) {
       }))
     : null;
 
-  const danaExtra = athleteExtra.dana;
+  const danaExtra = athleteExtra.dana || {};
   // Real signed-in profile (opts.profile) wins; unedited client state (me) overlays;
   // the mock Dana defaults are only a fallback for the no-session prototype.
   const p = opts.profile;
@@ -270,13 +270,14 @@ export function buildViewModel(state, t, opts = {}) {
     bio: me.bio ?? p.bio ?? '',
     initials: p.initials || '', color: p.avatarColor, photo: opts.avatar || null,
   } : {
-    name: me.name || 'Dana Levi', club: me.club || danaExtra.club, ageGroup: me.ageGroup || danaExtra.ageGroup,
-    sport: me.sport || danaExtra.sport, level: me.level || danaExtra.level,
-    ftp: me.ftp ?? danaExtra.ftp, weekly: me.weekly || danaExtra.weekly, bio: me.bio || danaExtra.bio, initials: 'DL',
+    name: me.name || '', club: me.club || danaExtra.club || '', ageGroup: me.ageGroup || danaExtra.ageGroup || '',
+    sport: me.sport || danaExtra.sport || 'Triathlon', level: me.level || danaExtra.level || '',
+    ftp: me.ftp ?? danaExtra.ftp ?? '', weekly: me.weekly || danaExtra.weekly || '', bio: me.bio || danaExtra.bio || '', initials: me.initials || '',
     photo: opts.avatar || null,
   };
   const athlete = (() => {
-    const m = members.find((x) => x.id === selMember) || members[1];
+    const m = members.find((x) => x.id === selMember) || members[0];
+    if (!m) return null;
     const extra = athleteExtra[m.id] || {};
     const lb = lbById[m.id] || {};
     const isMe = m.id === 'dana';
@@ -330,6 +331,7 @@ export function buildViewModel(state, t, opts = {}) {
   const selActivity = state.selActivity || 'a1';
   const activityDetail = (() => {
     const a = activities.find((x) => x.id === selActivity) || activities[0];
+    if (!a) return null;
     const metricCards = [
       [a.dist, a.distU, 'Distance', null],
       [a.moving, '', 'Moving', null],

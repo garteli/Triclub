@@ -78,8 +78,8 @@ export default function EditProfile({ vm, actions, getToken, onProfileSaved }) {
         {photoError && <div style={s('font-size:11.5px;color:var(--bad);margin-top:8px;text-align:center')}>{photoError}</div>}
       </div>
 
-      <Field label="Full name" value={form.name} onChange={set('name')} placeholder="Dana Levi" />
-      <Field label="Club" value={form.club} onChange={set('club')} placeholder="Kaza Tri Club" />
+      <Field label="Full name" value={form.name} onChange={set('name')} placeholder="Your full name" />
+      <Field label="Club" value={form.club} onChange={set('club')} placeholder="Your club name" />
 
       <FieldLabel>Primary sport</FieldLabel>
       <Chips options={SPORTS} value={form.sport} onChange={set('sport')} />

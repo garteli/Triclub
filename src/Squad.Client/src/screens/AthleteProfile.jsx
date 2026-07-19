@@ -1,6 +1,7 @@
 import { s } from '../lib/style.js';
 import { useAthlete } from '../hooks/useAthlete.js';
 import Avatar from '../components/Avatar.jsx';
+import EmptyState from '../components/EmptyState.jsx';
 
 const label = 'font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.3px;font-weight:600;margin:22px 2px 10px';
 
@@ -12,6 +13,16 @@ const label = 'font-size:11px;color:var(--text3);text-transform:uppercase;letter
 export default function AthleteProfile({ vm, state, actions, getToken }) {
   const { athlete: liveAthlete, live, follow, unfollow } = useAthlete({ id: state.selMember, getToken });
   const a = live ? liveAthlete : vm.athlete;
+  if (!a) {
+    return (
+      <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
+        <div className="ctl" onClick={() => actions.go(state.profileBack || 'dash')} style={s('width:34px;height:34px;border-radius:10px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center')}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round"><path d="M15 6l-6 6 6 6" /></svg>
+        </div>
+        <EmptyState icon="👤" title="Athlete not found" sub="This profile isn't available." />
+      </div>
+    );
+  }
   const onToggleFollow = live
     ? () => (a.following ? unfollow() : follow())
     : () => actions.toggleFollow(a.id);

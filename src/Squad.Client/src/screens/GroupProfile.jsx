@@ -48,7 +48,7 @@ export default function GroupProfile({ vm, actions, onJoinSquad }) {
         {/* coach contact */}
         <div className="ctl" onClick={() => actions.go('chat')} style={s('display:flex;align-items:center;gap:11px;background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:12px 13px;margin-top:14px')}>
           <div style={s('width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#37c0ff,#5a86ff);flex:none;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff')}>R</div>
-          <div style={s('flex:1')}><div style={s('font-size:13px;font-weight:600')}>Coach Ronen · manager</div><div style={s('font-size:11px;color:var(--text2)')}>Usually replies within an hour</div></div>
+          <div style={s('flex:1')}><div style={s('font-size:13px;font-weight:600')}>Coach · manager</div><div style={s('font-size:11px;color:var(--text2)')}>Usually replies within an hour</div></div>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round"><path d="M21 11.5a8.5 8.5 0 0 1-12 7.7L3 21l1.8-6A8.5 8.5 0 1 1 21 11.5z" /></svg>
         </div>
 

@@ -1,4 +1,5 @@
 import { s } from '../lib/style.js';
+import EmptyState from '../components/EmptyState.jsx';
 
 export default function Leaderboard({ vm, state, actions }) {
   return (
@@ -15,7 +16,12 @@ export default function Leaderboard({ vm, state, actions }) {
         ))}
       </div>
 
+      {vm.lbRows.length === 0 && (
+        <EmptyState icon="🏆" title="No rankings yet" sub="Once teammates log activities this week, the leaderboard fills in here." />
+      )}
+
       {/* podium */}
+      {vm.lbRows.length > 0 && <>
       <div style={s('display:flex;align-items:flex-end;gap:8px;margin-top:20px')}>
         {vm.podium.map((p) => (
           <div key={p.name} style={s('flex:1;text-align:center')}>
@@ -44,6 +50,7 @@ export default function Leaderboard({ vm, state, actions }) {
           </div>
         ))}
       </div>
+      </>}
     </div>
   );
 }
