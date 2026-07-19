@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as signalR from '@microsoft/signalr';
+import { API_BASE } from '../lib/apiBase.js';
 
 // Turns a server RiderUpdate into the row shape LiveRide's list/strip already render
 // (hr color/bar, accent row for "you", metric strings). meId flags the caller's own row.
@@ -36,7 +37,7 @@ export function mapLiveRider(u, meId) {
 
 // Live ride over SignalR. Watching and recording share one connection: subscribe to
 // riders, and call pushTelemetry(...) when THIS device is the one recording.
-export function useLiveRide(rideId, { hubUrl = '/hubs/ride', getToken, meId, enabled = true } = {}) {
+export function useLiveRide(rideId, { hubUrl = API_BASE + '/hubs/ride', getToken, meId, enabled = true } = {}) {
   const [byId, setById] = useState({});
   const [status, setStatus] = useState('idle'); // 'idle' | 'live' | 'offline'
   const connRef = useRef(null);

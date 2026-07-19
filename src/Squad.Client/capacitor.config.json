@@ -3,9 +3,7 @@
   "appName": "Domestique Club",
   "webDir": "../Squad.Web/wwwroot",
   "server": {
-    "androidScheme": "https",
-    "url": "https://triclub-epcjf6hxaaaed6b3.canadacentral-01.azurewebsites.net",
-    "cleartext": false
+    "androidScheme": "https"
   },
   "plugins": {
     "BackgroundGeolocation": {}

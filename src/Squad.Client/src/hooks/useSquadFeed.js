@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import * as signalR from '@microsoft/signalr';
+import { API_BASE } from '../lib/apiBase.js';
 
 // Subscribes to the squad feed hub. The server auto-joins the connection to the
 // caller's squad group from their identity, so we only listen — no group plumbing
 // on the client. New activities (posted after the worker parses an upload) arrive
 // on 'activityPosted' and are prepended; 'leaderboardChanged' fires onLeaderboardChanged
 // so ranked views can refetch.
-export function useSquadFeed({ hubUrl = '/hubs/squad', feedUrl = '/api/feed', getToken, initial = [], enabled = true, onLeaderboardChanged } = {}) {
+export function useSquadFeed({ hubUrl = API_BASE + '/hubs/squad', feedUrl = '/api/feed', getToken, initial = [], enabled = true, onLeaderboardChanged } = {}) {
   const [feed, setFeed] = useState(initial);
   const [status, setStatus] = useState('connecting'); // 'connecting' | 'live' | 'offline'
   const cbRef = useRef(onLeaderboardChanged);

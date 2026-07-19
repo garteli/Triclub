@@ -19,10 +19,14 @@ npx cap sync
 ```
 
 `capacitor.config.json` is already in this folder (appId `com.triclub.app`, appName
-`Domestique Club`, `webDir` points at the Vite output). `server.url` points the native
-shell at the deployed Azure site, so on device the SPA + its `/api` calls run same-origin
-against the real backend — front-end changes ship by redeploying the SPA (no new native
-build needed). After every web build, run `npx cap copy`.
+`Domestique Club`, `webDir` points at the Vite output). The SPA is **bundled into the
+native shell** (no `server.url`), so it loads from `capacitor://localhost` and works
+offline-first. Because the app origin is then local, root-relative `/api` and `/hubs`
+requests are pointed at the deployed backend by `src/lib/apiBase.js` (`API_BASE`) — a
+fetch shim rewrites `fetch('/api/…')`, and the SignalR hooks + the XHR upload use
+`API_BASE`/`apiUrl(…)` explicitly. On web, `API_BASE` is empty and everything stays
+same-origin. Front-end changes now require a new native build (`npm run build` →
+`npx cap sync` → TestFlight); update `API_BASE` in `apiBase.js` if the backend moves.
 
 ## 2. iOS — `ios/App/App/Info.plist`
 
