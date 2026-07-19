@@ -58,5 +58,17 @@
 	</array>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<!-- Native Google Sign-In callback. REPLACE the placeholder below with your
+	     REVERSED iOS OAuth client id: an iOS client id "123-abc.apps.googleusercontent.com"
+	     becomes the scheme "com.googleusercontent.apps.123-abc". See NATIVE-SETUP.md. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.85703052598-ncbmmqmqdv4rjqdrpk6fpvj8375oh609</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

@@ -1,6 +1,9 @@
 import { s } from '../lib/style.js';
 import RideRecorder from '../components/RideRecorder.jsx';
 import LivePages from '../components/LivePages.jsx';
+import TileMap from '../components/TileMap.jsx';
+import { toPathD } from '../lib/tiles.js';
+import { RIDE_ROUTE } from '../data/course.js';
 import { gearComponents } from '../lib/liveMetrics.js';
 
 const Back = ({ onClick }) => (
@@ -21,15 +24,20 @@ function Lobby({ vm, actions, live }) {
 
       {/* route preview */}
       <div style={s('margin-top:16px;border-radius:20px;overflow:hidden;border:1px solid var(--line);background:var(--bg2);position:relative')}>
-        <svg viewBox="0 0 344 150" style={{ width: '100%', display: 'block' }}>
-          <defs><linearGradient id="lobRoute" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="var(--accent)" /><stop offset="1" stopColor="var(--swim)" /></linearGradient></defs>
-          <rect width="344" height="150" fill="var(--bg3)" />
-          <path d="M20,120 C40,60 90,70 120,90 C150,110 180,40 220,45 C270,52 300,90 324,60" fill="none" stroke="var(--line2)" strokeWidth="8" strokeLinecap="round" />
-          <path d="M20,120 C40,60 90,70 120,90 C150,110 180,40 220,45 C270,52 300,90 324,60" fill="none" stroke="url(#lobRoute)" strokeWidth="3.5" strokeLinecap="round" />
-          <circle cx="20" cy="120" r="6" fill="var(--good)" stroke="var(--bg2)" strokeWidth="2" />
-          <circle cx="324" cy="60" r="6" fill="var(--bad)" stroke="var(--bg2)" strokeWidth="2" />
-        </svg>
-        <div style={s('position:absolute;bottom:0;left:0;right:0;display:flex;background:linear-gradient(0deg,var(--bg2),transparent);padding:22px 14px 12px')}>
+        <TileMap points={RIDE_ROUTE} W={344} H={150} radius={20}>
+          {(project) => {
+            const d = toPathD(RIDE_ROUTE, project);
+            const start = project(RIDE_ROUTE[0][0], RIDE_ROUTE[0][1]);
+            return (
+              <>
+                <path d={d} fill="none" stroke="rgba(0,0,0,.45)" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
+                <path d={d} fill="none" stroke="var(--accent)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx={start.x} cy={start.y} r="6" fill="var(--good)" stroke="#0b0f14" strokeWidth="2.5" />
+              </>
+            );
+          }}
+        </TileMap>
+        <div style={s('position:absolute;bottom:0;left:0;right:0;display:flex;background:linear-gradient(0deg,var(--bg2),transparent);padding:22px 14px 12px;pointer-events:none')}>
           <div style={s('flex:1')}><div className="mono" style={s('font-size:16px;font-weight:700')}>42.0<span style={s('font-size:11px;color:var(--text2)')}>km</span></div><div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.7px')}>Distance</div></div>
           <div style={s('flex:1')}><div className="mono" style={s('font-size:16px;font-weight:700')}>480<span style={s('font-size:11px;color:var(--text2)')}>m</span></div><div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.7px')}>Elevation</div></div>
           <div style={s('flex:1')}><div className="mono" style={s('font-size:16px;font-weight:700;color:var(--accent)')}>~1:15</div><div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.7px')}>Est. time</div></div>
@@ -91,7 +99,7 @@ function Lobby({ vm, actions, live }) {
             </div>
           ))}
         </div>
-        <div className="ctl" style={s('margin-top:12px;text-align:center;padding:9px;border-radius:11px;font-size:12px;font-weight:700;background:var(--bg3);border:1px dashed var(--line2);color:var(--text2)')}>+ Pair a component</div>
+        <div className="ctl" onClick={() => actions.go('sensors')} style={s('margin-top:12px;text-align:center;padding:9px;border-radius:11px;font-size:12px;font-weight:700;background:var(--bg3);border:1px dashed var(--line2);color:var(--text2)')}>+ Pair a component</div>
       </div>
 
       <div className="ctl" onClick={actions.startRide} style={s('background:var(--accent);color:var(--accent-ink);text-align:center;padding:15px;border-radius:15px;font-weight:700;font-size:15px;margin-top:16px;box-shadow:0 8px 22px -8px color-mix(in srgb,var(--accent) 60%,transparent)')}>Join the ride</div>

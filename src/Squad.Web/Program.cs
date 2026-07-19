@@ -68,14 +68,16 @@ builder.Services.AddHttpClient();
 // simply not wired — its /api/auth/{provider} endpoint reports "not configured" and
 // the client hides that button (GET /api/auth/config).
 var googleClientId = builder.Configuration["Auth:Google:ClientId"];
+var googleIosClientId = builder.Configuration["Auth:Google:iOSClientId"];   // native iOS SDK audience
 if (!string.IsNullOrWhiteSpace(googleClientId))
     builder.Services.AddSingleton<IExternalTokenVerifier>(sp =>
-        OidcTokenVerifier.Google(googleClientId, sp.GetRequiredService<IHttpClientFactory>().CreateClient()));
+        OidcTokenVerifier.Google(googleClientId, sp.GetRequiredService<IHttpClientFactory>().CreateClient(), googleIosClientId));
 
 var appleClientId = builder.Configuration["Auth:Apple:ClientId"];
+var appleBundleId = builder.Configuration["Auth:Apple:BundleId"];           // native iOS Sign in with Apple audience
 if (!string.IsNullOrWhiteSpace(appleClientId))
     builder.Services.AddSingleton<IExternalTokenVerifier>(sp =>
-        OidcTokenVerifier.Apple(appleClientId, sp.GetRequiredService<IHttpClientFactory>().CreateClient()));
+        OidcTokenVerifier.Apple(appleClientId, sp.GetRequiredService<IHttpClientFactory>().CreateClient(), appleBundleId));
 
 var app = builder.Build();
 

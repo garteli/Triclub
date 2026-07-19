@@ -1,14 +1,23 @@
 import { useState } from 'react';
 import { s } from '../lib/style.js';
+import TileMap from '../components/TileMap.jsx';
+import { toPathD } from '../lib/tiles.js';
 
-const MiniMap = ({ color }) => (
-  <div style={s('margin-top:11px;border-radius:14px;overflow:hidden;border:1px solid var(--line);background:#0d1512')}>
-    <svg viewBox="0 0 356 120" style={{ width: '100%', display: 'block' }}>
-      <rect width="356" height="120" fill="var(--bg3)" />
-      <g stroke="var(--line)" strokeWidth="1"><path d="M0,40 H356 M0,80 H356 M89,0 V120 M178,0 V120 M267,0 V120" /></g>
-      <path d="M30,96 C22,60 60,44 100,48 C150,54 150,16 200,20 C255,24 320,36 330,72 C334,96 300,104 250,100 C200,96 150,104 100,102 C62,100 38,102 30,96Z" fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" opacity=".95" />
-      <circle cx="30" cy="96" r="5" fill="var(--good)" stroke="var(--bg3)" strokeWidth="2" />
-    </svg>
+const MiniMap = ({ a }) => (
+  <div style={s('margin-top:11px;border-radius:14px;overflow:hidden;border:1px solid var(--line)')}>
+    <TileMap points={a.routePath} W={356} H={120} radius={14} pad={16}>
+      {(project) => {
+        const d = toPathD(a.routePath, project);
+        const start = project(a.routePath[0][0], a.routePath[0][1]);
+        return (
+          <>
+            <path d={d} fill="none" stroke="rgba(0,0,0,.45)" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" />
+            <path d={d} fill="none" stroke={a.sportColor} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+            <circle cx={start.x} cy={start.y} r="5" fill="var(--good)" stroke="#0b0f14" strokeWidth="2" />
+          </>
+        );
+      }}
+    </TileMap>
   </div>
 );
 
@@ -30,7 +39,7 @@ function Card({ a, onOpen, onAthlete }) {
 
       <div style={s('font-size:15px;font-weight:700;margin-top:10px')}>{a.title}</div>
 
-      {a.hasMap && <MiniMap color={a.sportColor} />}
+      {a.hasMap && a.routePath && <MiniMap a={a} />}
 
       {/* stats */}
       <div style={s('display:flex;margin-top:12px')}>

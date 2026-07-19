@@ -20,7 +20,7 @@ namespace Squad.Web;
 public sealed class OidcTokenVerifier : IExternalTokenVerifier
 {
     private readonly ConfigurationManager<OpenIdConnectConfiguration> _config;
-    private readonly string _clientId;
+    private readonly string[] _validAudiences;
     private readonly string[] _validIssuers;
     // MapInboundClaims=false keeps the OIDC claim names as-is ('sub', 'email',
     // 'name', 'email_verified'); the default remaps 'sub' -> the legacy
@@ -29,28 +29,41 @@ public sealed class OidcTokenVerifier : IExternalTokenVerifier
 
     public ExternalProvider Provider { get; }
 
-    private OidcTokenVerifier(ExternalProvider provider, string metadataUrl, string clientId, string[] validIssuers, HttpClient http)
+    private OidcTokenVerifier(ExternalProvider provider, string metadataUrl, string[] audiences, string[] validIssuers, HttpClient http)
     {
         Provider = provider;
-        _clientId = clientId;
+        _validAudiences = audiences;
         _validIssuers = validIssuers;
         _config = new ConfigurationManager<OpenIdConnectConfiguration>(
             metadataUrl, new OpenIdConnectConfigurationRetriever(), new HttpDocumentRetriever(http));
     }
 
-    public static OidcTokenVerifier Google(string clientId, HttpClient http) => new(
+    // Web sign-in (GSI) issues an id_token whose audience is the web client id; the
+    // native iOS Google SDK issues one whose audience is the iOS client id. Accept
+    // either (both are our own Google project clients). `extraAudiences` are ignored
+    // when null/blank, so existing web-only deployments are unaffected.
+    public static OidcTokenVerifier Google(string clientId, HttpClient http, params string?[] extraAudiences) => new(
         ExternalProvider.Google,
         "https://accounts.google.com/.well-known/openid-configuration",
-        clientId,
+        Audiences(clientId, extraAudiences),
         new[] { "https://accounts.google.com", "accounts.google.com" },
         http);
 
-    public static OidcTokenVerifier Apple(string clientId, HttpClient http) => new(
+    // Web Sign in with Apple uses the Services ID as audience; native iOS uses the
+    // app's bundle id. Accept either.
+    public static OidcTokenVerifier Apple(string clientId, HttpClient http, params string?[] extraAudiences) => new(
         ExternalProvider.Apple,
         "https://appleid.apple.com/.well-known/openid-configuration",
-        clientId,
+        Audiences(clientId, extraAudiences),
         new[] { "https://appleid.apple.com" },
         http);
+
+    private static string[] Audiences(string clientId, string?[] extra) =>
+        new[] { clientId }
+            .Concat(extra.Where(a => !string.IsNullOrWhiteSpace(a))!)
+            .Cast<string>()
+            .Distinct()
+            .ToArray();
 
     public async Task<ExternalVerifyResult> VerifyAsync(string idToken, CancellationToken ct)
     {
@@ -62,7 +75,7 @@ public sealed class OidcTokenVerifier : IExternalTokenVerifier
                 ValidateIssuer = true,
                 ValidIssuers = _validIssuers,
                 ValidateAudience = true,
-                ValidAudience = _clientId,
+                ValidAudiences = _validAudiences,
                 ValidateIssuerSigningKey = true,
                 IssuerSigningKeys = config.SigningKeys,
                 ValidateLifetime = true,

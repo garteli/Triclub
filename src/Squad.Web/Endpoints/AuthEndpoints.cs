@@ -23,10 +23,12 @@ public static class AuthEndpoints
             var enabled = verifiers.Select(v => v.Provider).ToHashSet();
             return Results.Ok(new
             {
+                // clientId = web client (GSI / Apple JS). iosClientId / bundleId let the
+                // native app initialize the native Google / Apple SDKs at runtime (not secrets).
                 google = enabled.Contains(ExternalProvider.Google)
-                    ? new { clientId = config["Auth:Google:ClientId"] } : null,
+                    ? new { clientId = config["Auth:Google:ClientId"], iosClientId = config["Auth:Google:iOSClientId"] } : null,
                 apple = enabled.Contains(ExternalProvider.Apple)
-                    ? new { clientId = config["Auth:Apple:ClientId"] } : null,
+                    ? new { clientId = config["Auth:Apple:ClientId"], bundleId = config["Auth:Apple:BundleId"] } : null,
             });
         });
 

@@ -20,3 +20,7 @@ src/Squad.Web/wwwroot/icon-192.png
 src/Squad.Web/wwwroot/icon-512.png
 src/Squad.Web/wwwroot/apple-touch-icon.png
 src/Squad.Web/wwwroot/manifest.webmanifest
+
+# ---- Claude Code (personal) ----
+.claude/settings.local.json
+deploy/last-deploy.log

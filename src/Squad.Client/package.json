@@ -16,7 +16,9 @@
     "@capacitor/cli": "^7.6.8",
     "@capacitor/core": "^7.6.8",
     "@capacitor/ios": "^7.6.8",
+    "@capgo/capacitor-social-login": "^7.20.0",
     "@microsoft/signalr": "^8.0.7",
+    "@perfood/capacitor-healthkit": "^1.0.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

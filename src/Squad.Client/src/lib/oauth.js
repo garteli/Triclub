@@ -1,9 +1,39 @@
-// Loads the provider sign-in SDKs on demand and returns a verified id_token that
-// the backend (/api/auth/{provider}) validates against the provider's JWKS.
+// Returns a verified provider id_token that the backend (/api/auth/{provider})
+// validates against the provider's JWKS.
 //
-// These SDKs are third-party scripts loaded from the provider's CDN — required for
-// the real OAuth flow. They only run once the user taps a social button, and only
-// when the provider is configured (server returns its clientId via /api/auth/config).
+// Two paths, chosen at runtime:
+//   • Web browser — load the provider's JS SDK from its CDN (GSI / Apple JS).
+//   • Native app (Capacitor iOS/Android) — Google & Apple block their *web* SDKs
+//     inside embedded webviews, so use the native SDKs via @capgo/capacitor-social-login.
+// The plugin is dynamically imported only on native, so the web bundle never loads it.
+//
+// Both run only once the user taps a social button, and only when the provider is
+// configured (server returns clientId + iosClientId/bundleId via /api/auth/config).
+
+import { Capacitor } from '@capacitor/core';
+
+const isNative = () => { try { return Capacitor.isNativePlatform(); } catch { return false; } };
+
+// --- native SDK (Capacitor) — initialized once from /api/auth/config values ---
+let _nativeReady;
+async function nativeSocialLogin(cfg) {
+  const { SocialLogin } = await import('@capgo/capacitor-social-login');
+  if (!_nativeReady) {
+    _nativeReady = SocialLogin.initialize({
+      google: {
+        iOSClientId: cfg?.google?.iosClientId,      // native iOS OAuth client
+        iOSServerClientId: cfg?.google?.clientId,   // web client id (server audience)
+        webClientId: cfg?.google?.clientId,
+      },
+      apple: {
+        clientId: cfg?.apple?.clientId,             // Services ID (web/Android); iOS uses the bundle id
+        redirectUrl: '',                            // empty => no redirect on iOS
+      },
+    }).catch((e) => { _nativeReady = undefined; throw e; });
+  }
+  await _nativeReady;
+  return SocialLogin;
+}
 
 // --- script loader (once per src) ---
 const loaded = new Map();
@@ -21,10 +51,19 @@ function loadScript(src) {
   return p;
 }
 
-// --- Google Identity Services ---
-// https://accounts.google.com/gsi/client → window.google.accounts.id
-// The callback receives { credential } = a signed OIDC id_token.
-export async function getGoogleIdToken(clientId) {
+// --- Google ---
+// Native: @capgo native Google SDK. Web: Google Identity Services
+// (https://accounts.google.com/gsi/client → window.google.accounts.id).
+// `cfg` is the full /api/auth/config object.
+export async function getGoogleIdToken(cfg) {
+  if (isNative()) {
+    const SocialLogin = await nativeSocialLogin(cfg);
+    const res = await SocialLogin.login({ provider: 'google', options: { scopes: ['email', 'profile'] } });
+    const idToken = res?.result?.idToken;
+    if (!idToken) throw new Error('Google sign-in did not return a token.');
+    return idToken;
+  }
+  const clientId = cfg?.google?.clientId;
   await loadScript('https://accounts.google.com/gsi/client');
   const id = window.google?.accounts?.id;
   if (!id) throw new Error('Google sign-in failed to load.');
@@ -49,9 +88,19 @@ export async function getGoogleIdToken(clientId) {
   });
 }
 
-// --- Sign in with Apple JS ---
-// https://appleid.cdn-apple.com/.../appleid.auth.js → window.AppleID.auth
-export async function getAppleIdToken(clientId) {
+// --- Apple ---
+// Native: @capgo native Sign in with Apple (ASAuthorization). Web: Sign in with
+// Apple JS (https://appleid.cdn-apple.com/.../appleid.auth.js → window.AppleID.auth).
+// `cfg` is the full /api/auth/config object.
+export async function getAppleIdToken(cfg) {
+  if (isNative()) {
+    const SocialLogin = await nativeSocialLogin(cfg);
+    const res = await SocialLogin.login({ provider: 'apple', options: { scopes: ['email', 'name'] } });
+    const idToken = res?.result?.idToken;
+    if (!idToken) throw new Error('Apple sign-in did not return a token.');
+    return idToken;
+  }
+  const clientId = cfg?.apple?.clientId;
   await loadScript('https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js');
   const auth = window.AppleID?.auth;
   if (!auth) throw new Error('Apple sign-in failed to load.');

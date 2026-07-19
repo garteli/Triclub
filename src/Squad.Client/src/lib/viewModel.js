@@ -5,6 +5,7 @@ import {
   nearbyGroups as nearbyGroupsData, applicants as applicantsData, chatThread as chatThreadData,
   athleteExtra, activities as activitiesData,
 } from '../data/squadData.js';
+import { activityRoute, anchorFor } from '../data/course.js';
 
 // Compact "18m ago" / "3h ago" / "2d ago" from an ISO timestamp (server feed).
 function timeAgo(iso) {
@@ -311,6 +312,11 @@ export function buildViewModel(state, t, opts = {}) {
         ? `🔥 ${a.fire} · 💪 ${a.strong} · 👏 ${a.clap}`
         : 'Be the first to react',
       hasMap: a.sport === 'Bike' || a.sport === 'Run',
+      // Real-world route anchored on the activity's named location, framed on a live
+      // basemap. Swap for the ingested GPS track / summary polyline in production.
+      routePath: (a.sport === 'Bike' || a.sport === 'Run')
+        ? activityRoute(a.id, anchorFor(a.location), a.sport === 'Bike' ? 3.4 : 2)
+        : null,
       hasSplits: a.sport === 'Bike' || a.sport === 'Run',
       hasPower: a.sport === 'Bike', hasLaps: a.sport === 'Bike',
       hasSegment: a.sport === 'Bike' || a.sport === 'Run',

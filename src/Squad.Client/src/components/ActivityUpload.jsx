@@ -96,7 +96,7 @@ export default function ActivityUpload({ endpoint = '/api/activities/upload', ge
   const pending = items.some((it) => it.status === 'uploading');
 
   return (
-    <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
+    <div style={s('padding:6px 18px 0;animation:floatUp .35s ease')}>
       <div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.6px;font-weight:600')}>Add training</div>
       <div style={s('font-size:23px;font-weight:700;letter-spacing:-.5px;margin-bottom:4px')}>Upload activity</div>
       <div style={s('font-size:12.5px;color:var(--text2);margin-bottom:16px')}>Drop a <span className="mono">.fit</span> from any device — Garmin, Wahoo, Zwift. We dedupe automatically.</div>

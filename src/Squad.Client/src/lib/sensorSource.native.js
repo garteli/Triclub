@@ -1,26 +1,40 @@
 // Native BLE sensors via @capacitor-community/bluetooth-le. Dynamically imported so
 // the web build never needs it (also externalized in vite.config.js). Keeps a shared
 // `latest` store that the recorder samples each push; works in the background on native.
-import { SENSOR_SPECS } from './ble.js';
+import { SENSOR_SPECS, emptySnapshot } from './ble.js';
 
 export async function createNativeSensorController() {
   const { BleClient } = await import('@capacitor-community/bluetooth-le');
   await BleClient.initialize({ androidNeverForLocation: true });
 
-  const latest = { heartRate: null, powerW: null, cadence: null, radar: null };
+  const latest = emptySnapshot();
   const deviceIds = {}; // kind -> deviceId
+
+  // Subscribe to a connected device's measurement characteristic. Shared by connect
+  // (after a scan) and connectKnown (silent reconnect by stored id).
+  async function subscribe(kind, deviceId) {
+    const spec = SENSOR_SPECS[kind];
+    await BleClient.connect(deviceId, () => clearKind(kind));
+    await BleClient.startNotifications(deviceId, spec.service, spec.measurement, (dv) => {
+      try { spec.apply(dv, latest); } catch { /* malformed packet — skip */ }
+    });
+    deviceIds[kind] = deviceId;
+  }
 
   async function connect(kind) {
     const spec = SENSOR_SPECS[kind];
     if (!spec) throw new Error(`Unknown sensor: ${kind}`);
-
     const device = await BleClient.requestDevice({ services: [spec.service] });
-    await BleClient.connect(device.deviceId, () => clearKind(kind));
-    await BleClient.startNotifications(device.deviceId, spec.service, spec.measurement, (dv) => {
-      try { spec.apply(dv, latest); } catch { /* malformed packet — skip */ }
-    });
-    deviceIds[kind] = device.deviceId;
-    return device.name || kind;
+    await subscribe(kind, device.deviceId);
+    return { id: device.deviceId, name: device.name || kind };
+  }
+
+  // Silent reconnect to a remembered device id — no scan/picker. iOS/Android keep the
+  // pairing, so this works across app launches when the sensor is in range.
+  async function connectKnown(kind, deviceId) {
+    if (!SENSOR_SPECS[kind]) throw new Error(`Unknown sensor: ${kind}`);
+    await subscribe(kind, deviceId);
+    return { id: deviceId, name: kind };
   }
 
   async function disconnect(kind) {
@@ -34,10 +48,10 @@ export async function createNativeSensorController() {
 
   function clearKind(kind) {
     delete deviceIds[kind];
-    if (kind === 'hr') latest.heartRate = null;
-    if (kind === 'power') latest.powerW = null;
-    if (kind === 'radar') latest.radar = null;
+    const spec = SENSOR_SPECS[kind];
+    spec?.clears?.forEach((f) => { latest[f] = null; });
+    if (spec?.reset) delete latest[spec.reset];
   }
 
-  return { kind: 'native', connect, disconnect, snapshot: () => ({ ...latest }) };
+  return { kind: 'native', connect, connectKnown, disconnect, snapshot: () => ({ ...latest }) };
 }

@@ -106,8 +106,8 @@ export async function oauthSignIn(provider) {
   if (!providerCfg?.clientId) throw new Error(`${provider} sign-in isn't configured yet.`);
 
   const idToken = provider === 'apple'
-    ? await getAppleIdToken(providerCfg.clientId)
-    : await getGoogleIdToken(providerCfg.clientId);
+    ? await getAppleIdToken(cfg)
+    : await getGoogleIdToken(cfg);
 
   return api(`/api/auth/${provider}`, { method: 'POST', body: { idToken } });
 }
