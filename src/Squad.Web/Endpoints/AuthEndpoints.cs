@@ -173,7 +173,7 @@ public static class AuthEndpoints
     {
         var id = Guid.NewGuid();
         return new NewAthleteAccount(
-            id, name, Initials(name), AvatarColor(id), Squads.Demo,
+            id, name, Initials(name), AvatarColor(id), Squads.Landing,
             email, passwordHash, googleSub, appleSub);
     }
 
