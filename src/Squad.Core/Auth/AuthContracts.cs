@@ -85,6 +85,20 @@ public interface ISquadService
     Task JoinAsync(Guid squadId, Guid athleteId, CancellationToken ct);
 }
 
+// ----- Squad chat -----
+
+/// <summary>A squad chat message enriched with the sender's display fields.</summary>
+public sealed record ChatMessage(
+    Guid Id, Guid SquadId, Guid AthleteId, string AthleteName, string Initials, string AvatarColor,
+    string Body, DateTimeOffset CreatedUtc);
+
+public interface IChatService
+{
+    Task<IReadOnlyList<ChatMessage>> GetRecentAsync(Guid squadId, int take, CancellationToken ct);
+    /// <summary>Persist a message and return it enriched with sender display fields.</summary>
+    Task<ChatMessage?> PostAsync(Guid squadId, Guid athleteId, string body, CancellationToken ct);
+}
+
 /// <summary>Verifies a provider id_token and returns its trustworthy claims. Null if invalid.</summary>
 public interface IExternalTokenVerifier
 {

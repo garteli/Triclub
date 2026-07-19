@@ -95,7 +95,9 @@ app.MapActivityQuery();    // GET  /api/activities
 app.MapSquads();           // GET/POST /api/squads (+ /{id}, /{id}/join)
 app.MapLeaderboard();      // GET  /api/squads/{squadId}/leaderboard
 app.MapFeed();             // GET  /api/feed
+app.MapChat();             // GET/POST /api/messages
 app.MapSquadHub();         // /hubs/squad
+app.MapChatHub();          // /hubs/chat
 app.MapRideHub();          // /hubs/ride
 
 // SPA fallback for client-side routes.
