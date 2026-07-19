@@ -55,6 +55,11 @@ jobs:
             exit 1
           fi
           echo "All required App Store Connect secrets are present."
+          # Publish whitespace-trimmed IDs for later steps. A stray space or
+          # newline pasted into the secret makes xcodebuild reject the key
+          # ("Invalid authentication key credential ... keyPathInvalidFormat").
+          printf 'ASC_KEY_ID=%s\n'    "$(printf '%s' "$ASC_KEY_ID"    | tr -d '[:space:]')" >> "$GITHUB_ENV"
+          printf 'ASC_ISSUER_ID=%s\n' "$(printf '%s' "$ASC_ISSUER_ID" | tr -d '[:space:]')" >> "$GITHUB_ENV"
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -74,7 +79,6 @@ jobs:
 
       - name: Install App Store Connect API key
         env:
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
         run: |
           mkdir -p ~/.appstoreconnect/private_keys
@@ -94,9 +98,6 @@ jobs:
           echo "API key installed ($(wc -c < "$KEYFILE") bytes)."
 
       - name: Archive (Release, automatic signing)
-        env:
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
         run: |
           xcodebuild \
             -workspace ios/App/App.xcworkspace \
@@ -114,9 +115,6 @@ jobs:
             archive
 
       - name: Export .ipa
-        env:
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
         run: |
           cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
           <?xml version="1.0" encoding="UTF-8"?>
@@ -141,9 +139,6 @@ jobs:
             -authenticationKeyIssuerID "$ASC_ISSUER_ID"
 
       - name: Upload to TestFlight
-        env:
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
         run: |
           IPA=$(ls "$RUNNER_TEMP"/export/*.ipa | head -1)
           echo "Uploading $IPA"
