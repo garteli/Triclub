@@ -36,6 +36,8 @@ jobs:
         working-directory: src/Squad.Client
 
     steps:
+      - uses: actions/checkout@v4
+
       - name: Verify required secrets are present
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
@@ -53,8 +55,6 @@ jobs:
             exit 1
           fi
           echo "All required App Store Connect secrets are present."
-
-      - uses: actions/checkout@v4
 
       - name: Set up Node
         uses: actions/setup-node@v4
