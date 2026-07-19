@@ -221,16 +221,23 @@ Nothing extra is needed for the web build. For the **native** build, provide:
   returns it so the native SDK initializes at runtime (no client rebuild for the value).
 
 ### 2. Apple — enable Sign in with Apple
-- `ios/App/App/App.entitlements` (with `com.apple.developer.applesignin` = `Default`) is
-  **already committed** and wired into the App target (`CODE_SIGN_ENTITLEMENTS`, both
-  Debug/Release). Native ASAuthorization needs it — without the entitlement the Apple
-  button hangs at "Signing in…".
-- Apple Developer → Identifiers → App ID `com.triclub.app` → enable **Sign in with Apple**,
-  then **regenerate the `triclub` distribution provisioning profile** so it carries the
-  entitlement, and update the `IOS_PROVISION_PROFILE_BASE64` secret. (A profile that lacks
-  the entitlement makes the signed archive fail at build time — this step is required.)
-- App Service settings → **`Auth__Apple__BundleId`** = `com.triclub.app` (the audience of a
-  native Apple id_token is the bundle id, not the web Services ID). The backend accepts both.
+Apple native sign-in needs the `com.apple.developer.applesignin` entitlement, and the
+signing profile must carry it or the archive fails to sign. The entitlements file
+(`ios/App/App/App.entitlements`) is committed but **currently NOT wired into the build**
+(`CODE_SIGN_ENTITLEMENTS` is intentionally absent) so builds pass with the existing
+`triclub` profile and **Google** works today. To turn Apple on:
+
+1. Apple Developer → Identifiers → App ID `com.triclub.app` → enable **Sign in with Apple**,
+   regenerate the `triclub` distribution provisioning profile, and update the
+   `IOS_PROVISION_PROFILE_BASE64` secret.
+2. Re-wire the entitlement: add `CODE_SIGN_ENTITLEMENTS = App/App.entitlements;` to **both**
+   App-target build configs in `ios/App/App.xcodeproj/project.pbxproj` (next to
+   `ASSETCATALOG_COMPILER_APPICON_NAME`).
+3. App Service settings → **`Auth__Apple__BundleId`** = `com.triclub.app` (the audience of a
+   native Apple id_token is the bundle id, not the web Services ID). The backend accepts both.
+
+Until step 2 is done, the Apple button surfaces an error on tap instead of signing in — do
+step 1 first so the profile is ready, then re-wire in the same or a follow-up build.
 
 ### 3. Ship
 - No code change needed beyond the above. CI (`.github/workflows/ios-testflight.yml`) runs
