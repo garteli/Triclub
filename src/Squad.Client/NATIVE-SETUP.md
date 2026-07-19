@@ -205,9 +205,10 @@ Nothing extra is needed for the web build. For the **native** build, provide:
 ### 1. Google — create an iOS OAuth client
 - Google Cloud Console → Credentials → **Create OAuth client ID → iOS**, bundle id
   `com.triclub.app`. Copy the **iOS client id** (`NNN-xxxx.apps.googleusercontent.com`).
-- **`ios/App/App/Info.plist`** — replace the `CFBundleURLTypes` placeholder
-  `com.googleusercontent.apps.REPLACE_WITH_REVERSED_IOS_CLIENT_ID` with the **reversed**
-  iOS client id (`com.googleusercontent.apps.NNN-xxxx`).
+- **`ios/App/App/Info.plist`** — the `CFBundleURLTypes` scheme is set to this app's
+  **reversed** iOS client id (already committed):
+  `com.googleusercontent.apps.85703052598-ncbmmqmqdv4rjqdrpk6fpvj8375oh609`
+  (the reverse of iOS client id `85703052598-ncbmmqmqdv4rjqdrpk6fpvj8375oh609.apps.googleusercontent.com`).
 - App Service settings → **`Auth__Google__iOSClientId`** = the iOS client id. The backend
   then accepts id_tokens with that audience (`OidcTokenVerifier.Google`), and `/api/auth/config`
   returns it so the native SDK initializes at runtime (no client rebuild for the value).
