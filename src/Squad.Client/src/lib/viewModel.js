@@ -46,8 +46,9 @@ export function buildViewModel(state, t, opts = {}) {
   const rideTimer = formatTimer(t);
   const gap = gapMeters(t);
 
-  // ---- plan week ----
-  const plan = planWeek.map((p) => {
+  // ---- plan week ---- (live plan from opts.plan overrides the seed)
+  const planSource = opts.plan?.length ? opts.plan : planWeek;
+  const plan = planSource.map((p) => {
     const badge =
       p.status === 'done' ? { t: 'Done', c: 'var(--good)', bg: 'color-mix(in srgb,var(--good) 16%,transparent)' }
         : p.status === 'today' ? { t: 'Today', c: 'var(--accent-ink)', bg: 'var(--accent)' }
@@ -331,6 +332,14 @@ export function buildViewModel(state, t, opts = {}) {
     chatThread,
     rideRiders, you, rideTimer, gapMeters: gap, joinedCount: rideRiders.length,
     plan, wkDetail, monthCells,
+    planSummary: opts.planSummary
+      ? {
+          planned: `${Math.floor(opts.planSummary.plannedMin / 60)}:${String(opts.planSummary.plannedMin % 60).padStart(2, '0')}`,
+          load: String(opts.planSummary.load),
+          done: opts.planSummary.done,
+          total: opts.planSummary.total,
+        }
+      : null,
     lbRows, podium, lbTabs,
     coach,
     pbs, hrZones, laps, powerCurve, achievements, segRows, segEffortBars, splitBars,

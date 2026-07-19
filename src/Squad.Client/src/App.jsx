@@ -6,6 +6,7 @@ import { useSquadFeed } from './hooks/useSquadFeed.js';
 import { useLeaderboard } from './hooks/useLeaderboard.js';
 import { useActivities } from './hooks/useActivities.js';
 import { useSquads } from './hooks/useSquads.js';
+import { usePlan } from './hooks/usePlan.js';
 import { createSquad, joinSquad } from './lib/squads.js';
 // import { useLiveRide } from './hooks/useLiveRide.js'; // swap in for real telemetry
 import { buildViewModel } from './lib/viewModel.js';
@@ -82,6 +83,7 @@ export default function App() {
   const { rows: liveLeaderboard } = useLeaderboard(authed ? squadId : null, { getToken, refreshSignal });
   const { items: liveActivities } = useActivities({ getToken, enabled: authed, refreshSignal });
   const { items: liveSquads } = useSquads({ getToken, enabled: authed, refreshSignal });
+  const { plan: livePlan, summary: livePlanSummary } = usePlan({ getToken, enabled: authed });
 
   // The signed-in athlete's persisted profile (drives vm.me + Edit profile).
   const [profile, setProfile] = useState(null);
@@ -94,8 +96,8 @@ export default function App() {
   }, [session?.token, refreshSignal]);
 
   const vm = useMemo(
-    () => buildViewModel(state, t, { feedItems: liveFeed, leaderboardRows: liveLeaderboard, activityItems: liveActivities, profile, squads: liveSquads }),
-    [state, t, liveFeed, liveLeaderboard, liveActivities, profile, liveSquads],
+    () => buildViewModel(state, t, { feedItems: liveFeed, leaderboardRows: liveLeaderboard, activityItems: liveActivities, profile, squads: liveSquads, plan: livePlan, planSummary: livePlanSummary }),
+    [state, t, liveFeed, liveLeaderboard, liveActivities, profile, liveSquads, livePlan, livePlanSummary],
   );
 
   // After joining/creating a squad the athlete's active SquadId changes server-side;
