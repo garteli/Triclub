@@ -70,5 +70,9 @@
 			</array>
 		</dict>
 	</array>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Domestique Club reads your workouts from Apple Health to add them to your training log and squad feed.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Domestique Club writes completed workouts back to Apple Health so your activity rings and history stay in sync.</string>
 </dict>
 </plist>
