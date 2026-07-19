@@ -48,10 +48,18 @@ npm run dev            # dev server — proxy /api and /hubs to the .NET host wi
 
 ## Status
 
-- **Client**: complete and esbuild-clean — all 8 screens, live-ride coordinate map,
-  recorder, sensors, group radar warning. Live data currently comes from
-  `useSimulatedRide` (a dev simulator); swap to `useLiveRide(rideId, …)` in `App.jsx` for
-  real telemetry (identical rider shape).
+- **Client**: complete and esbuild-clean — all 8 screens, recorder, sensors, group radar
+  warning. Live data currently comes from `useSimulatedRide` (a dev simulator); swap to
+  `useLiveRide(rideId, …)` in `App.jsx` for real telemetry (identical rider shape).
+- **Live Group Ride — Active** is now the Garmin Edge–style rotating page system (the
+  flagship). See `src/Squad.Client/src/components/LivePages.jsx` (unified full-screen page:
+  Group side-column with radar+spread, grid of metric/chart/map fields, edit panel, field
+  picker, drag-drop reorder, hero star, long-press-to-edit), `src/hooks/useLivePages.js`
+  (page state + 4s pager auto-hide + 500ms long-press + 7s auto-rotate off the tick), and
+  `src/lib/liveMetrics.js` (metricCatalog / mv values / charts / radar / gear / spread —
+  all derived from tick `t`; swap for real sensor feeds in production). The Lobby also gained
+  the **Bike & gear** battery panel. The old ControlDock "Live Ride A·Map / B·Focus" variant
+  toggles are now inert (the harness dock is not part of the shipped app).
 - **Backend**: written but **never compiled** (the scaffolding environment had no .NET SDK).
   Expect small first-`dotnet build` fixups.
 

@@ -27,6 +27,11 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IRawActivityStore>(_ => new SqlRawActivityStore(sqlConnectionString));
         services.AddScoped<IAthleteDirectory>(_ => new SqlAthleteDirectory(sqlConnectionString));
         services.AddScoped<ILeaderboardService>(_ => new SqlLeaderboardService(sqlConnectionString));
+        services.AddScoped<IFeedReadService>(_ => new SqlFeedService(sqlConnectionString));
+        services.AddScoped<IActivityReadService>(_ => new SqlActivityReadService(sqlConnectionString));
+        services.AddScoped<IAthleteAccounts>(_ => new SqlAthleteAccounts(sqlConnectionString));
+        services.AddScoped<IProfileService>(_ => new SqlProfileService(sqlConnectionString));
+        services.AddScoped<ISquadService>(_ => new SqlSquadService(sqlConnectionString));
 
         // Live-ride relay state (ephemeral).
         services.AddSingleton<IRideSessionState, InMemoryRideSessionState>();

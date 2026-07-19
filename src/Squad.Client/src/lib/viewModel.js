@@ -2,8 +2,27 @@ import {
   members, statusColor, ringColor, feed, planWeek, workoutDefs, discIcon,
   leaderboardData, coachInsights, activitySplits, hrZones, laps as lapsData,
   powerCurve as powerCurveData, achievements, segmentRows, segEfforts, pbs,
+  nearbyGroups as nearbyGroupsData, applicants as applicantsData, chatThread as chatThreadData,
+  athleteExtra, activities as activitiesData,
 } from '../data/squadData.js';
+
+// Compact "18m ago" / "3h ago" / "2d ago" from an ISO timestamp (server feed).
+function timeAgo(iso) {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return '';
+  const secs = Math.max(0, (Date.now() - then) / 1000);
+  if (secs < 60) return 'just now';
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+const SPORT_COLOR = { Bike: 'var(--bike)', Run: 'var(--run)', Swim: 'var(--swim)', Gym: 'var(--gym)' };
+const SPORT_ICON = { Bike: '🚴', Run: '🏃', Swim: '🏊', Gym: '🏋️' };
 import { deriveRideRiders, formatTimer, gapMeters } from './derive.js';
+import { activityAnalysis } from './activityAnalysis.js';
 
 // Builds everything the screens need for a given (state, tick). This is the
 // React port of the prototype's renderVals() — same derivations, same numbers.
@@ -76,10 +95,11 @@ export function buildViewModel(state, t, opts = {}) {
   const leaderboardSource = opts.leaderboardRows?.length ? opts.leaderboardRows : leaderboardData;
   const sorted = [...leaderboardSource].sort((a, b) => sortKey(b) - sortKey(a));
   const maxV = Math.max(...sorted.map(sortKey));
+  const initialsToId = Object.fromEntries(members.map((m) => [m.initials, m.id]));
   const lbRows = sorted.map((r, i) => {
     const rank = i + 1;
     return {
-      ...r, rank, val: valOf(r), unit: unitOf,
+      ...r, rank, id: initialsToId[r.initials], val: valOf(r), unit: unitOf,
       barPct: Math.round((sortKey(r) / maxV) * 100),
       moveIcon: r.move > 0 ? '▲' : r.move < 0 ? '▼' : '—',
       moveColor: r.move > 0 ? 'var(--good)' : r.move < 0 ? 'var(--bad)' : 'var(--text3)',
@@ -123,9 +143,192 @@ export function buildViewModel(state, t, opts = {}) {
     return { km: i + 1, pace: sv.toFixed(1), h: Math.round(((sv - minSplit) / (maxSplit - minSplit + 0.01)) * 60 + 18), fast, barColor: fast ? 'var(--accent)' : 'var(--bike)', op: fast ? '1' : '.55' };
   });
 
+  // ---- discover / groups / join / pay / requests / chat ----
+  const { selGroup = 'galilee', selApplicant = null, payPlan = null } = state;
+  const joinState = state.joinState || {};
+  const reqStatus = state.reqStatus || {};
+
+  // Live squads (from the API) override the seed groups when present.
+  const groupSource = opts.squads?.length ? opts.squads : nearbyGroupsData;
+  const nearbyGroups = groupSource.map((g) => ({
+    ...g,
+    badgeStyle:
+      g.kind === 'free' ? 'color:var(--good);background:color-mix(in srgb,var(--good) 15%,transparent)'
+        : g.kind === 'coach' ? 'color:var(--gym);background:color-mix(in srgb,var(--gym) 15%,transparent)'
+        : 'color:var(--accent);background:var(--accent-dim)',
+  }));
+  const selGroupData = nearbyGroups.find((x) => x.id === selGroup) || nearbyGroups[0];
+
+  const joinBtnLock = 'margin-top:5px;background:var(--bg4);color:var(--text3);font-size:11px;font-weight:700;padding:5px 12px;border-radius:8px;opacity:.7';
+  const g2 = selGroupData || {};
+  const jState = joinState[selGroup];
+  const open = jState === 'approved';
+  const applyState = {
+    free: g2.kind === 'free', member: g2.member,
+    notApplied: !g2.member && !jState,
+    applied: jState === 'applied',
+    approvedPaid: jState === 'approved' && g2.kind !== 'free',
+    approvedFree: jState === 'approved' && g2.kind === 'free',
+    paid: jState === 'paid' || g2.member,
+    joinBtnStyle: open ? 'margin-top:5px;background:var(--accent);color:var(--accent-ink);font-size:11px;font-weight:700;padding:5px 12px;border-radius:8px' : joinBtnLock,
+    bookBtnStyle: open ? 'margin-top:5px;background:var(--bg4);border:1px solid var(--line);color:var(--text);font-size:11px;font-weight:700;padding:5px 12px;border-radius:8px' : joinBtnLock,
+    coachBtnStyle: open ? 'margin-top:5px;background:color-mix(in srgb,var(--gym) 18%,transparent);color:var(--gym);font-size:11px;font-weight:700;padding:5px 12px;border-radius:8px' : joinBtnLock,
+    tierLabel: open ? '' : '🔒',
+  };
+  const tierOpenNote = open ? 'Approved — choose how to pay' : 'Locked until your application is approved';
+  const payTitle = payPlan === 'dropin' ? 'One-time group ride' : payPlan === 'coach' ? '1:1 Coaching' : 'Membership';
+  const payPrice = payPlan === 'dropin' ? '₪35'
+    : payPlan === 'coach' ? '₪450/mo'
+    : (g2.price || '₪90') + (payPlan === 'coach' ? '' : (g2.per || '/mo'));
+
+  const fitColor = (a) => (a.fitKind === 'good' ? 'var(--good)' : 'var(--warn)');
+  const fitBg = (a) => (a.fitKind === 'good' ? 'color-mix(in srgb,var(--good) 15%,transparent)' : 'color-mix(in srgb,var(--warn) 15%,transparent)');
+  const statusLabelOf = (stt) => (stt === 'approved' ? 'Approved' : stt === 'declined' ? 'Declined' : 'Pending');
+  const applicantList = applicantsData.map((a) => {
+    const stt = reqStatus[a.id] || 'pending';
+    return {
+      ...a, status: stt, decided: stt !== 'pending',
+      fitColor: fitColor(a), fitBg: fitBg(a),
+      statusLabel: statusLabelOf(stt),
+      statusColor: stt === 'approved' ? 'var(--good)' : stt === 'declined' ? 'var(--bad)' : 'var(--text3)',
+    };
+  });
+  const pendingCount = applicantsData.filter((a) => (reqStatus[a.id] || 'pending') === 'pending').length;
+  const selApplicantData = (() => {
+    if (!selApplicant) return null;
+    const a = applicantsData.find((x) => x.id === selApplicant);
+    if (!a) return null;
+    const stt = reqStatus[a.id] || 'pending';
+    return { ...a, status: stt, decided: stt !== 'pending', statusLabel: statusLabelOf(stt), fitColor: fitColor(a), fitBg: fitBg(a) };
+  })();
+
+  const chatThread = chatThreadData.map((m) => ({
+    ...m,
+    wrap: m.me ? 'align-self:flex-end;align-items:flex-end' : 'align-self:flex-start;align-items:flex-start',
+    timeAlign: m.me ? 'text-align:right' : 'text-align:left',
+    bubble: m.me
+      ? 'background:var(--accent);color:var(--accent-ink);border-radius:15px 15px 4px 15px;padding:10px 13px;font-size:13px;line-height:1.4'
+      : 'background:var(--bg2);border:1px solid var(--line);color:var(--text);border-radius:15px 15px 15px 4px;padding:10px 13px;font-size:13px;line-height:1.4',
+  }));
+
+  // ---- athlete profile (view a teammate, or your own public profile) ----
+  const me = state.me || {};
+  const selMember = state.selMember || 'noa';
+  const following = state.following || {};
+  const rankById = Object.fromEntries(lbRows.map((r) => [r.id, r.rank]));
+  const lbById = Object.fromEntries(leaderboardSource.map((r) => [initialsToId[r.initials], r]));
+  const actByAthlete = {};
+  activitiesData.forEach((a) => { if (!actByAthlete[a.athleteId]) actByAthlete[a.athleteId] = a.id; });
+  const feedRows = feed.map((f) => { const aid = initialsToId[f.initials]; return { ...f, athleteId: aid, activityId: actByAthlete[aid] }; });
+  // Live feed injection: when App passes server feed items (ActivityFeedItem[]),
+  // render those instead of the seed feed. Same downstream shape as feedRows.
+  const liveFeedRows = opts.feedItems?.length
+    ? opts.feedItems.map((f) => ({
+        id: f.id,
+        name: f.athleteName,
+        initials: f.initials,
+        color: f.avatarColor,
+        action: f.action,
+        metric: f.metric,
+        time: timeAgo(f.startUtc),
+        icon: f.icon,
+        discColor: f.discColor,
+        reacts: f.reacts ?? 0,
+        athleteId: f.athleteId,
+        activityId: null,
+      }))
+    : null;
+
+  const danaExtra = athleteExtra.dana;
+  // Real signed-in profile (opts.profile) wins; unedited client state (me) overlays;
+  // the mock Dana defaults are only a fallback for the no-session prototype.
+  const p = opts.profile;
+  const meFull = p ? {
+    name: me.name || p.name || '',
+    club: me.club ?? p.club ?? '',
+    ageGroup: me.ageGroup ?? p.ageGroup ?? '',
+    sport: me.sport || p.primarySport || 'Triathlon',
+    level: me.level || p.level || 'Intermediate',
+    ftp: me.ftp ?? p.ftp ?? '',
+    weekly: me.weekly ?? p.weeklyHours ?? '',
+    bio: me.bio ?? p.bio ?? '',
+    initials: p.initials || '', color: p.avatarColor,
+  } : {
+    name: me.name || 'Dana Levi', club: me.club || danaExtra.club, ageGroup: me.ageGroup || danaExtra.ageGroup,
+    sport: me.sport || danaExtra.sport, level: me.level || danaExtra.level,
+    ftp: me.ftp ?? danaExtra.ftp, weekly: me.weekly || danaExtra.weekly, bio: me.bio || danaExtra.bio, initials: 'DL',
+  };
+  const athlete = (() => {
+    const m = members.find((x) => x.id === selMember) || members[1];
+    const extra = athleteExtra[m.id] || {};
+    const lb = lbById[m.id] || {};
+    const isMe = m.id === 'dana';
+    const pick = (meVal, exVal) => (isMe ? (meVal ?? exVal) : exVal);
+    const loads = [
+      { key: 'swim', label: 'Swim', color: 'var(--swim)', v: lb.swim || 0 },
+      { key: 'bike', label: 'Bike', color: 'var(--bike)', v: lb.bike || 0 },
+      { key: 'run', label: 'Run', color: 'var(--run)', v: lb.run || 0 },
+    ];
+    return {
+      id: m.id, isMe, following: !!following[m.id],
+      name: isMe ? meFull.name : m.name, initials: m.initials, color: m.color,
+      club: pick(me.club, extra.club), ageGroup: pick(me.ageGroup, extra.ageGroup),
+      sport: pick(me.sport, extra.sport), level: pick(me.level, extra.level),
+      ftp: pick(me.ftp, extra.ftp), weekly: pick(me.weekly, extra.weekly), bio: pick(me.bio, extra.bio),
+      pct: m.pct, streak: lb.streak ?? 0, rank: rankById[m.id], statusColor: statusColor(m.status),
+      loads, recent: feedRows.filter((f) => f.name === m.name),
+    };
+  })();
+
+  // ---- activities (Strava-style list + selected-activity detail) ----
+  const memberById = Object.fromEntries(members.map((m) => [m.id, m]));
+  const enrichAct = (a) => {
+    const m = memberById[a.athleteId] || {};
+    // Live rows carry their own athlete display fields + isMe flag; seed rows fall
+    // back to the mock member lookup (and the legacy 'dana' == me convention).
+    const isMe = a.isMe ?? (a.athleteId === 'dana');
+    return {
+      ...a,
+      athleteName: isMe ? 'You' : (a.athleteName ?? m.name), isMe,
+      initials: a.initials ?? m.initials, color: a.color ?? m.color,
+      sportColor: SPORT_COLOR[a.sport] || 'var(--accent)', icon: SPORT_ICON[a.sport] || '🏅',
+      reactText: (a.fire || a.strong || a.clap)
+        ? `🔥 ${a.fire} · 💪 ${a.strong} · 👏 ${a.clap}`
+        : 'Be the first to react',
+      hasMap: a.sport === 'Bike' || a.sport === 'Run',
+      hasSplits: a.sport === 'Bike' || a.sport === 'Run',
+      hasPower: a.sport === 'Bike', hasLaps: a.sport === 'Bike',
+      hasSegment: a.sport === 'Bike' || a.sport === 'Run',
+    };
+  };
+  // Live activity list injected by App (mapped server rows) overrides the seed data.
+  const activitySource = opts.activityItems?.length ? opts.activityItems : activitiesData;
+  const activities = activitySource.map(enrichAct);
+  const myActivities = activities.filter((a) => a.isMe);
+  const selActivity = state.selActivity || 'a1';
+  const activityDetail = (() => {
+    const a = activities.find((x) => x.id === selActivity) || activities[0];
+    const metricCards = [
+      [a.dist, a.distU, 'Distance', null],
+      [a.moving, '', 'Moving', null],
+      [String(a.load), '', 'Load', 'var(--accent)'],
+      [a.avgSpeed, a.speedU, 'Avg speed', null],
+      [a.elev, 'm', 'Elev gain', null],
+      [String(a.avgHr), '', 'Avg HR', 'var(--run)'],
+    ];
+    return { ...a, metricCards, analysis: activityAnalysis(a) };
+  })();
+
   return {
     squad, squadOnTrack, squadTotal,
-    feed,
+    feed: liveFeedRows ?? feedRows,
+    activities, myActivities, activityDetail,
+    athlete, me: meFull,
+    nearbyGroups, selGroupData, applyState, tierOpenNote, payTitle, payPrice,
+    applicantList, pendingCount, selApplicant: selApplicantData,
+    noApplicantOpen: !selApplicant, applicantOpen: !!selApplicant,
+    applicantPending: !!selApplicant && (reqStatus[selApplicant] || 'pending') === 'pending',
+    chatThread,
     rideRiders, you, rideTimer, gapMeters: gap, joinedCount: rideRiders.length,
     plan, wkDetail, monthCells,
     lbRows, podium, lbTabs,

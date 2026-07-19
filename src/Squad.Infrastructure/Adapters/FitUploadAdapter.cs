@@ -16,6 +16,11 @@ using Dynastream.Fit;
 
 using Squad.Core;
 
+// The FIT SDK ships its own Dynastream.Fit.Activity and Dynastream.Fit.DateTime;
+// in this file these names always mean the canonical domain / BCL types.
+using Activity = Squad.Core.Activity;
+using DateTime = System.DateTime;
+
 namespace Squad.Infrastructure;
 
 public sealed class FitParseException(string message) : Exception(message);

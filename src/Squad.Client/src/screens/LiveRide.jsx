@@ -1,6 +1,7 @@
 import { s } from '../lib/style.js';
-import LiveRideMap from '../components/LiveRideMap.jsx';
 import RideRecorder from '../components/RideRecorder.jsx';
+import LivePages from '../components/LivePages.jsx';
+import { gearComponents } from '../lib/liveMetrics.js';
 
 const Back = ({ onClick }) => (
   <div className="ctl" onClick={onClick} style={s('width:34px;height:34px;border-radius:10px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center')}>
@@ -64,134 +65,49 @@ function Lobby({ vm, actions, live }) {
         <div style={s('font-size:12px;color:var(--text2);line-height:1.45')}><span style={s('color:var(--text);font-weight:600')}>Coach Ronen:</span> Neutral roll for 10′, then we hit the 3 threshold blocks together. Regroup at the top of each climb.</div>
       </div>
 
-      <div className="ctl" onClick={actions.startRide} style={s('background:var(--accent);color:var(--accent-ink);text-align:center;padding:15px;border-radius:15px;font-weight:700;font-size:15px;margin-top:16px;box-shadow:0 8px 22px -8px color-mix(in srgb,var(--accent) 60%,transparent)')}>Join the ride</div>
-
       <RideRecorder pushTelemetry={live?.pushTelemetry} />
-    </div>
-  );
-}
 
-// One animated rider on the loop route (SMIL survives re-render, like the prototype).
-function Rider({ begin, fill, textFill, label, dashed, you }) {
-  const r = you ? 12 : 11;
-  const off = you ? -15 : -13;
-  const c = you ? 15 : 13;
-  return (
-    <g>
-      <animateMotion dur="44s" repeatCount="indefinite" begin={begin}><mpath href="#rideRoute" /></animateMotion>
-      <g transform={`translate(${off},${off})`}>
-        {you && <circle cx="15" cy="15" r="14" fill="none" stroke="var(--accent)" strokeWidth="2" opacity=".5"><animate attributeName="r" values="13;16;13" dur="2s" repeatCount="indefinite" /></circle>}
-        <circle cx={c} cy={c} r={r} fill={fill} stroke={you ? 'var(--bg)' : dashed ? 'var(--behind)' : 'var(--bg)'} strokeWidth="2.5" strokeDasharray={dashed ? '3 2' : undefined} />
-        <text x={c} y={c + 4} textAnchor="middle" fontSize="9" fontWeight="700" fill={textFill} fontFamily="'JetBrains Mono',monospace">{label}</text>
-      </g>
-    </g>
-  );
-}
-
-function ActiveMap({ vm }) {
-  return (
-    <div style={s('position:relative;margin:0 12px;border-radius:22px;overflow:hidden;border:1px solid var(--line2);background:radial-gradient(120% 100% at 50% 0%, var(--bg3), var(--bg))')}>
-      <svg viewBox="0 0 344 280" style={{ width: '100%', display: 'block' }}>
-        <defs>
-          <radialGradient id="glow" cx="50%" cy="45%" r="60%"><stop offset="0" stopColor="color-mix(in srgb,var(--accent) 20%,transparent)" /><stop offset="1" stopColor="transparent" /></radialGradient>
-          <linearGradient id="routeg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="var(--accent)" /><stop offset="1" stopColor="var(--swim)" /></linearGradient>
-        </defs>
-        <rect width="344" height="280" fill="url(#glow)" />
-        <g stroke="var(--line)" strokeWidth="1"><path d="M0,70 H344 M0,140 H344 M0,210 H344 M86,0 V280 M172,0 V280 M258,0 V280" /></g>
-        <path id="rideRoute" d="M28,232 C24,168 66,140 110,142 C156,144 168,86 210,78 C258,69 306,92 314,140 C321,182 280,204 236,202 C186,200 156,238 108,244 C68,249 34,248 28,232 Z" fill="none" stroke="var(--line2)" strokeWidth="9" strokeLinecap="round" />
-        <path d="M28,232 C24,168 66,140 110,142 C156,144 168,86 210,78 C258,69 306,92 314,140 C321,182 280,204 236,202 C186,200 156,238 108,244 C68,249 34,248 28,232 Z" fill="none" stroke="url(#routeg)" strokeWidth="3" strokeLinecap="round" strokeDasharray="4 7" opacity=".9" />
-        <Rider begin="-3.4s" fill="#5a86ff" textFill="#fff" label="TV" />
-        <Rider begin="-2.9s" fill="#4fe08b" textFill="#0c0e11" label="RG" />
-        <Rider begin="-2.5s" fill="#37c0ff" textFill="#0c0e11" label="AB" />
-        <Rider begin="-2.1s" fill="#c68bff" textFill="#0c0e11" label="MK" />
-        <Rider begin="-1.7s" fill="#ff9a4c" textFill="#0c0e11" label="NR" />
-        <Rider begin="-8.5s" fill="#ff6f61" textFill="#fff" label="YS" dashed />
-        <Rider begin="-2.3s" fill="var(--accent)" textFill="#141a05" label="YOU" you />
-      </svg>
-      {/* regroup indicator */}
-      <div style={s('position:absolute;top:12px;left:12px;background:color-mix(in srgb,var(--behind) 22%, var(--bg));border:1px solid color-mix(in srgb,var(--behind) 50%,transparent);border-radius:12px;padding:8px 11px;display:flex;align-items:center;gap:8px;backdrop-filter:blur(8px)')}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--behind)" strokeWidth="2.2" strokeLinecap="round"><path d="M12 9v4M12 17h.01" /><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /></svg>
-        <div><div style={s('font-size:11.5px;font-weight:700;color:var(--behind);line-height:1.1')}>Yoav dropped</div><div className="mono" style={s('font-size:10px;color:var(--text2)')}>{vm.gapMeters}m back</div></div>
-      </div>
-      <div style={s('position:absolute;top:12px;right:12px;background:color-mix(in srgb,var(--bg2) 80%,transparent);border:1px solid var(--line);border-radius:11px;padding:7px 10px;backdrop-filter:blur(8px);text-align:center')}><div className="mono" style={s('font-size:13px;font-weight:700;color:var(--good)')}>6 up</div><div style={s('font-size:8.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px')}>pack</div></div>
-      <div className="ctl" style={s('position:absolute;bottom:12px;right:12px;background:var(--accent);color:var(--accent-ink);border-radius:11px;padding:9px 13px;font-size:12px;font-weight:700;box-shadow:0 6px 16px -6px rgba(0,0,0,.5)')}>Regroup ping</div>
-    </div>
-  );
-}
-
-function ActiveList({ riders }) {
-  return (
-    <>
-      <div style={s('display:flex;justify-content:space-between;align-items:baseline;margin:18px 18px 10px')}><div style={s('font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:1.4px;font-weight:600')}>Live riders</div><div className="mono" style={s('font-size:11px;color:var(--text2)')}>avg 33.8 kph</div></div>
-      <div style={s('display:flex;flex-direction:column;gap:7px;padding:0 12px')}>
-        {riders.map((r) => (
-          <div key={r.athleteId ?? r.name} style={s(`${r.rowBg};border-radius:14px;padding:9px 11px;display:flex;align-items:center;gap:11px`)}>
-            <div style={s(`width:34px;height:34px;border-radius:11px;background:${r.color};flex:none;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#0c0e11`)}>{r.initials}</div>
-            <div style={s('flex:1;min-width:0')}>
-              <div style={s('display:flex;align-items:center;gap:6px')}><span style={s('font-size:13px;font-weight:600')}>{r.name}</span>{r.dropped && <span style={s('font-size:9px;font-weight:700;color:var(--behind);background:color-mix(in srgb,var(--behind) 18%,transparent);padding:1px 5px;border-radius:5px;text-transform:uppercase')}>Gap</span>}</div>
-              <div style={s('height:4px;background:var(--bg4);border-radius:3px;margin-top:5px;overflow:hidden')}><div style={s(`height:100%;width:${r.hrPct}%;background:${r.hrColor};border-radius:3px`)} /></div>
+      {/* Bike & gear — connected components with live battery bars */}
+      <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:14px;margin-top:14px')}>
+        <div style={s('display:flex;align-items:center;justify-content:space-between;margin-bottom:11px')}>
+          <div style={s('display:flex;align-items:center;gap:8px')}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round"><circle cx="5.5" cy="17.5" r="3.5" /><circle cx="18.5" cy="17.5" r="3.5" /><path d="M15 17.5l-3-6.5H8.5m6.5 0l-2.5 6.5M9.5 6.5h3l2 4.5" /></svg>
+            <span style={s('font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--text2)')}>Bike & gear</span>
+          </div>
+          <span style={s('font-size:10px;color:var(--good);font-weight:700')}>5 connected</span>
+        </div>
+        <div style={s('display:flex;flex-direction:column;gap:10px')}>
+          {gearComponents.map((c) => (
+            <div key={c.name} style={s('display:flex;align-items:center;gap:10px')}>
+              <span style={s('width:8px;height:8px;border-radius:50%;background:var(--good);flex:none')} />
+              <div style={s('flex:1;min-width:0')}>
+                <div style={s('font-size:12.5px;font-weight:600')}>{c.name}</div>
+                <div style={s('font-size:10px;color:var(--text3)')}>{c.sub}</div>
+              </div>
+              <div style={s('display:flex;align-items:center;gap:7px;flex:none')}>
+                <div style={s('width:34px;height:6px;border-radius:3px;background:var(--bg4);overflow:hidden')}><div style={s(`height:100%;width:${c.battW};background:${c.battColor};border-radius:3px`)} /></div>
+                <span className="mono" style={s(`font-size:11px;font-weight:700;color:${c.battColor};width:30px;text-align:right`)}>{c.battLabel}</span>
+              </div>
             </div>
-            <div style={s('text-align:right;flex:none;width:52px')}><div className="mono" style={s('font-size:14px;font-weight:700')}>{r.spd}</div><div style={s('font-size:8.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px')}>kph</div></div>
-            <div style={s('text-align:right;flex:none;width:52px')}><div className="mono" style={s(`font-size:14px;font-weight:700;color:${r.hrColor}`)}>{r.hr}</div><div style={s('font-size:8.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px')}>bpm</div></div>
-          </div>
-        ))}
+          ))}
+        </div>
+        <div className="ctl" style={s('margin-top:12px;text-align:center;padding:9px;border-radius:11px;font-size:12px;font-weight:700;background:var(--bg3);border:1px dashed var(--line2);color:var(--text2)')}>+ Pair a component</div>
       </div>
-    </>
-  );
-}
 
-function ActiveFocus({ you, riders, gapMeters }) {
-  return (
-    <div style={s('padding:0 16px')}>
-      <div style={s('background:linear-gradient(160deg,var(--bg3),var(--bg2));border:1px solid var(--line2);border-radius:22px;padding:20px 18px;position:relative;overflow:hidden')}>
-        <div style={s('position:absolute;right:-40px;top:-40px;width:150px;height:150px;border-radius:50%;background:var(--accent-dim);filter:blur(10px)')} />
-        <div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.6px;font-weight:600')}>Your live effort</div>
-        <div style={s('display:flex;align-items:flex-end;gap:6px;margin-top:4px')}><div className="mono" style={s('font-size:60px;font-weight:700;line-height:.9;letter-spacing:-2px')}>{you.spd}</div><div style={s('font-size:15px;color:var(--text2);font-weight:600;margin-bottom:9px')}>kph</div></div>
-        <div style={s('display:flex;gap:10px;margin-top:18px')}>
-          <div style={s('flex:1;background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:11px 12px')}><div className="mono" style={s(`font-size:22px;font-weight:700;color:${you.hrColor}`)}>{you.hr}</div><div style={s('font-size:9.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.7px')}>Heart rate</div></div>
-          <div style={s('flex:1;background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:11px 12px')}><div className="mono" style={s('font-size:22px;font-weight:700')}>287</div><div style={s('font-size:9.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.7px')}>Power W</div></div>
-          <div style={s('flex:1;background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:11px 12px')}><div className="mono" style={s('font-size:22px;font-weight:700')}>91</div><div style={s('font-size:9.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.7px')}>Cadence</div></div>
-        </div>
-      </div>
-      <div style={s('display:flex;gap:10px;margin-top:12px')}>
-        <div style={s('flex:1;border-radius:16px;overflow:hidden;border:1px solid var(--line);background:var(--bg2)')}>
-          <svg viewBox="0 0 160 96" style={{ width: '100%', display: 'block' }}>
-            <rect width="160" height="96" fill="var(--bg3)" />
-            <path d="M14,78 C10,44 34,32 58,36 C86,40 92,20 112,22 C138,24 150,44 148,60" fill="none" stroke="var(--line2)" strokeWidth="5" strokeLinecap="round" />
-            <path d="M14,78 C10,44 34,32 58,36 C86,40 92,20 112,22 C138,24 150,44 148,60" fill="none" stroke="var(--accent)" strokeWidth="2.2" strokeLinecap="round" />
-            <circle cx="92" cy="21" r="5" fill="var(--accent)" stroke="var(--bg2)" strokeWidth="2" />
-            <circle cx="112" cy="22" r="4" fill="#ff9a4c" stroke="var(--bg2)" strokeWidth="1.5" />
-            <circle cx="34" cy="34" r="4" fill="var(--behind)" stroke="var(--bg2)" strokeWidth="1.5" />
-          </svg>
-        </div>
-        <div style={s('flex:1;background:color-mix(in srgb,var(--behind) 14%,var(--bg2));border:1px solid color-mix(in srgb,var(--behind) 35%,transparent);border-radius:16px;padding:12px;display:flex;flex-direction:column;justify-content:center')}>
-          <div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:600')}>Regroup</div>
-          <div style={s('font-size:14px;font-weight:700;color:var(--behind);margin-top:3px')}>Yoav is off the back</div>
-          <div className="mono" style={s('font-size:19px;font-weight:700;margin-top:4px')}>{gapMeters}m</div>
-          <div className="ctl" style={s('margin-top:8px;background:var(--behind);color:#1a0d06;text-align:center;padding:7px;border-radius:9px;font-size:11px;font-weight:700')}>Soft-pedal</div>
-        </div>
-      </div>
-      <div className="hscroll" style={s('display:flex;gap:8px;overflow-x:auto;margin:14px -16px 0;padding:0 16px')}>
-        {riders.map((r) => (
-          <div key={r.athleteId ?? r.name} style={s('flex:none;width:64px;background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:9px 6px;text-align:center')}>
-            <div style={s(`width:30px;height:30px;border-radius:9px;background:${r.color};margin:0 auto;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;color:#0c0e11`)}>{r.initials}</div>
-            <div className="mono" style={s('font-size:12px;font-weight:700;margin-top:6px')}>{r.spd}</div>
-            <div className="mono" style={s(`font-size:10px;color:${r.hrColor}`)}>{r.hr}</div>
-          </div>
-        ))}
-      </div>
+      <div className="ctl" onClick={actions.startRide} style={s('background:var(--accent);color:var(--accent-ink);text-align:center;padding:15px;border-radius:15px;font-weight:700;font-size:15px;margin-top:16px;box-shadow:0 8px 22px -8px color-mix(in srgb,var(--accent) 60%,transparent)')}>Join the ride</div>
     </div>
   );
 }
 
-function Active({ vm, state, actions, live }) {
-  // Live telemetry when a ride feed is connected; otherwise the local simulation.
-  const isLive = !!live?.riders?.length;
-  const riders = isLive ? live.riders : vm.rideRiders;
+// Active — Garmin Edge–style full-screen rotating page system.
+function Active({ vm, actions, live, tick, livePages }) {
+  // Your distance in the timer header — real feed if connected, else simulation.
+  const riders = live?.riders?.length ? live.riders : vm.rideRiders;
   const you = riders.find((r) => r.you) || riders[0];
 
   return (
-    <div style={s('padding:6px 0 120px')}>
+    <div style={s('padding:6px 0 8px')}>
+      {/* timer header */}
       <div style={s('display:flex;align-items:center;justify-content:space-between;padding:2px 18px 12px')}>
         <div style={s('display:flex;align-items:center;gap:9px')}>
           <Back onClick={actions.backToLobby} />
@@ -201,22 +117,17 @@ function Active({ vm, state, actions, live }) {
         <div style={s('text-align:right')}><div className="mono" style={s('font-size:16px;font-weight:700;color:var(--accent)')}>{you.dist}<span style={s('font-size:10px;color:var(--text2)')}>km</span></div><div style={s('font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1px')}>Your dist</div></div>
       </div>
 
-      {state.rideVar === 'a' ? (
-        <>
-          {isLive ? <LiveRideMap riders={live.riders} route={live.route} /> : <ActiveMap vm={vm} />}
-          <ActiveList riders={riders} />
-        </>
-      ) : (
-        <ActiveFocus you={you} riders={riders} gapMeters={vm.gapMeters} />
-      )}
+      <LivePages t={tick} lp={livePages} />
     </div>
   );
 }
 
-export default function LiveRide({ vm, state, actions, live }) {
+export default function LiveRide({ vm, state, actions, live, tick, livePages }) {
   return (
     <div style={s('animation:floatUp .35s ease')}>
-      {state.rideState === 'lobby' ? <Lobby vm={vm} actions={actions} live={live} /> : <Active vm={vm} state={state} actions={actions} live={live} />}
+      {state.rideState === 'lobby'
+        ? <Lobby vm={vm} actions={actions} live={live} />
+        : <Active vm={vm} actions={actions} live={live} tick={tick} livePages={livePages} />}
     </div>
   );
 }

@@ -2,7 +2,11 @@ import { s } from '../lib/style.js';
 import StatusBar from './StatusBar.jsx';
 import BottomNav from './BottomNav.jsx';
 
+// Logged-out / full-screen flows render without the bottom tab bar.
+const CHROMELESS = new Set(['welcome', 'register', 'newgroup']);
+
 export default function Phone({ theme, accent, lang, dir, screen, go, children }) {
+  const hideNav = CHROMELESS.has(screen);
   return (
     <div
       className="phone"
@@ -19,7 +23,7 @@ export default function Phone({ theme, accent, lang, dir, screen, go, children }
         {children}
       </div>
 
-      <BottomNav screen={screen} lang={lang} go={go} />
+      {!hideNav && <BottomNav screen={screen} lang={lang} go={go} />}
     </div>
   );
 }
