@@ -30,7 +30,7 @@ export default function Segments({ vm }) {
           <div style={s('font-size:11px;color:var(--text2)')}>Rank 2 of 6 · 12 efforts</div>
         </div>
         <div style={s('flex:1;background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:13px 14px')}>
-          <div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;font-weight:600')}>👑 Squad QOM</div>
+          <div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;font-weight:600')}>👑 Domestique Club QOM</div>
           <div className="mono" style={s('font-size:24px;font-weight:700;margin-top:3px')}>6:42</div>
           <div style={s('font-size:11px;color:var(--text2)')}>Noa · 16s ahead</div>
         </div>
@@ -47,7 +47,7 @@ export default function Segments({ vm }) {
       </div>
 
       {/* squad leaderboard */}
-      <div style={s(label + ';margin:22px 18px 12px')}>Squad leaderboard</div>
+      <div style={s(label + ';margin:22px 18px 12px')}>Domestique Club leaderboard</div>
       <div style={s('display:flex;flex-direction:column;gap:8px;padding:0 18px')}>
         {vm.segRows.map((r) => (
           <div key={r.rank} style={s(`${r.rowStyle};border-radius:14px;padding:10px 12px;display:flex;align-items:center;gap:11px`)}>
