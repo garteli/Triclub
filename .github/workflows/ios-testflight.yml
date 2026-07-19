@@ -36,6 +36,24 @@ jobs:
         working-directory: src/Squad.Client
 
     steps:
+      - name: Verify required secrets are present
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+        run: |
+          missing=
+          [ -z "$ASC_KEY_ID" ] && missing="$missing ASC_KEY_ID"
+          [ -z "$ASC_ISSUER_ID" ] && missing="$missing ASC_ISSUER_ID"
+          [ -z "$ASC_KEY_P8_BASE64" ] && missing="$missing ASC_KEY_P8_BASE64"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing/empty repository secret(s):$missing"
+            echo "Add them as *Repository* secrets (NOT Environment secrets), exact names above, at:"
+            echo "  Settings -> Secrets and variables -> Actions -> New repository secret"
+            exit 1
+          fi
+          echo "All required App Store Connect secrets are present."
+
       - uses: actions/checkout@v4
 
       - name: Set up Node
