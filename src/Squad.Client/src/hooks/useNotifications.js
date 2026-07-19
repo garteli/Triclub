@@ -12,6 +12,9 @@ const ago = (iso) => {
 const KIND = {
   follow:   { icon: 'heart', color: '#ff6f61' },
   join:     { icon: 'bike', color: '#37c0ff' },
+  request:  { icon: 'clipboard', color: '#ffce4a' },
+  approved: { icon: 'trophy', color: '#4fe08b' },
+  declined: { icon: 'clipboard', color: '#ff6a2c' },
   message:  { icon: 'chat', color: '#5a86ff' },
   activity: { icon: 'trophy', color: '#ffce4a' },
 };

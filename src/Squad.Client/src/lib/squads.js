@@ -20,6 +20,11 @@ export const getSquad = (token, id) => req(`/api/squads/${id}`, { token });
 export const createSquad = (token, body) => req('/api/squads', { method: 'POST', token, body });
 export const joinSquad = (token, id) => req(`/api/squads/${id}/join`, { method: 'POST', token });
 
+// Owner-side join-request management.
+export const listRequests = (token) => req('/api/requests', { token });
+export const approveRequest = (token, squadId, athleteId) => req(`/api/squads/${squadId}/requests/${athleteId}/approve`, { method: 'POST', token });
+export const declineRequest = (token, squadId, athleteId) => req(`/api/squads/${squadId}/requests/${athleteId}/decline`, { method: 'POST', token });
+
 // Map a server SquadSummary to the shape the Discover / Group screens render
 // (see data/squadData.js nearbyGroups). Price/rating are display strings already.
 export function mapSquad(s) {
@@ -36,6 +41,7 @@ export function mapSquad(s) {
     rating: s.rating || '—',
     color: s.color,
     member: s.isMember,
+    requestStatus: s.requestStatus || 'none', // none | pending | approved | declined
     description: s.description || '',
   };
 }
