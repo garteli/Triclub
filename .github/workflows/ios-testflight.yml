@@ -108,7 +108,7 @@ jobs:
           # A .mobileprovision embeds its plist as plaintext XML inside a CMS
           # wrapper; extract that directly (more reliable than `security cms -D`).
           PLIST_FILE="$RUNNER_TEMP/profile.plist"
-          LC_ALL=C sed -n '/<?xml/,/<\/plist>/p' "$PROFILE" > "$PLIST_FILE"
+          openssl smime -inform DER -verify -noverify -in "$PROFILE" > "$PLIST_FILE" 2>/dev/null
           if [ ! -s "$PLIST_FILE" ]; then
             echo "::error::IOS_PROVISION_PROFILE_BASE64 did not decode to a valid .mobileprovision (no embedded plist found). Re-check that secret."
             exit 1
