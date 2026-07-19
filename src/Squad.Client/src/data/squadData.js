@@ -35,7 +35,7 @@ export const navIcons = {
 };
 
 export const navDef = [
-  { id: 'dash',  label: { en: 'Squad',    he: 'המועדון' }, icon: navIcons.dash },
+  { id: 'dash',  label: { en: 'Club',    he: 'המועדון' }, icon: navIcons.dash },
   { id: 'plan',  label: { en: 'Plan',     he: 'תוכנית' },  icon: navIcons.plan },
   { id: 'ride',  label: { en: 'Live',     he: 'רכיבה' },   icon: navIcons.ride },
   { id: 'lb',    label: { en: 'Ranks',    he: 'טבלה' },    icon: navIcons.lb },

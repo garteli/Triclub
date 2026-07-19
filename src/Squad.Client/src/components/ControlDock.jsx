@@ -8,7 +8,7 @@ const dockSeg = (active) =>
 const menuBase = 'padding:7px 10px;border-radius:9px;font-size:12px;font-weight:500;';
 
 const screenMenuDef = [
-  ['dash', 'Squad Dashboard'], ['ride', 'Live Group Ride'], ['plan', 'Plan / Calendar'],
+  ['dash', 'Domestique Club Dashboard'], ['ride', 'Live Group Ride'], ['plan', 'Plan / Calendar'],
   ['lb', 'Leaderboard'], ['feed', 'Activity + Feed'], ['seg', 'Segments'], ['coach', 'AI Coach'], ['profile', 'Profile'],
 ];
 
@@ -34,7 +34,7 @@ export default function ControlDock({ state, actions }) {
       <div style={s('display:flex;align-items:center;gap:9px')}>
         <div style={s('width:30px;height:30px;border-radius:9px;background:#d6ff3f;display:flex;align-items:center;justify-content:center;font-weight:700;color:#141a05;font-size:15px')}>S</div>
         <div>
-          <div style={s('font-weight:700;color:#fff;font-size:15px;letter-spacing:-.3px')}>Squad</div>
+          <div style={s('font-weight:700;color:#fff;font-size:15px;letter-spacing:-.3px')}>Domestique Club</div>
           <div style={s('color:#5f6976;font-size:10.5px;text-transform:uppercase;letter-spacing:1.5px')}>prototype</div>
         </div>
       </div>
@@ -101,7 +101,7 @@ export default function ControlDock({ state, actions }) {
         <div style={s('color:#8b93a0;font-size:10.5px;margin-bottom:4px')}>Dashboard</div>
         <div style={s('display:flex;gap:6px;margin-bottom:10px')}>
           <div className="ctl" onClick={() => actions.setDashVar('a')} style={s(dockSeg(dashVar === 'a'))}>A · Feed</div>
-          <div className="ctl" onClick={() => actions.setDashVar('b')} style={s(dockSeg(dashVar === 'b'))}>B · Squad</div>
+          <div className="ctl" onClick={() => actions.setDashVar('b')} style={s(dockSeg(dashVar === 'b'))}>B · Domestique Club</div>
         </div>
         <div style={s('color:#8b93a0;font-size:10.5px;margin-bottom:4px')}>Live Ride</div>
         <div style={s('display:flex;gap:6px')}>

@@ -39,7 +39,7 @@ function DashboardEN({ vm, state, go }) {
       {/* header */}
       <div style={s('display:flex;align-items:center;justify-content:space-between;margin-bottom:18px')}>
         <div>
-          <div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.6px;font-weight:600')}>Squad</div>
+          <div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.6px;font-weight:600')}>Domestique Club</div>
           <div style={s('font-size:23px;font-weight:700;letter-spacing:-.6px;line-height:1.05')}>Kaza Tri Club</div>
         </div>
         <div style={s('display:flex;align-items:center;gap:10px')}>
@@ -67,7 +67,7 @@ function DashboardEN({ vm, state, go }) {
             </div>
             <div style={s('flex:1')}>
               <div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.4px;font-weight:600')}>This week · Base block</div>
-              <div style={s('font-size:19px;font-weight:700;letter-spacing:-.3px;margin-top:2px')}>Squad is on pace</div>
+              <div style={s('font-size:19px;font-weight:700;letter-spacing:-.3px;margin-top:2px')}>Domestique Club is on pace</div>
               <div style={s('display:flex;gap:8px;margin-top:12px')}>
                 <div style={s('flex:1;background:var(--bg);border:1px solid var(--line);border-radius:11px;padding:8px 9px')}><div className="mono" style={s('font-size:17px;font-weight:700;color:var(--good)')}>{vm.squadOnTrack}</div><div style={s('font-size:8.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px')}>On track</div></div>
                 <div style={s('flex:1;background:var(--bg);border:1px solid var(--line);border-radius:11px;padding:8px 9px')}><div className="mono" style={s('font-size:17px;font-weight:700;color:var(--behind)')}>2</div><div style={s('font-size:8.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px')}>Behind</div></div>
@@ -141,14 +141,14 @@ function DashboardEN({ vm, state, go }) {
 
       {/* squad status */}
       <div style={s('display:flex;justify-content:space-between;align-items:baseline;margin:22px 2px 12px')}>
-        <div style={s('font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:1.4px;font-weight:600')}>Squad this week</div>
+        <div style={s('font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:1.4px;font-weight:600')}>Domestique Club this week</div>
         <div className="ctl" onClick={() => go('lb')} style={s('font-size:11.5px;color:var(--accent);font-weight:600')}>Leaderboard →</div>
       </div>
       <SquadRail squad={vm.squad} />
 
       {/* team feed */}
       <div style={s('display:flex;justify-content:space-between;align-items:baseline;margin:20px 2px 12px')}>
-        <div style={s('font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:1.4px;font-weight:600')}>Squad activity</div>
+        <div style={s('font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:1.4px;font-weight:600')}>Domestique Club activity</div>
         <div className="ctl" onClick={() => go('feed')} style={s('font-size:11.5px;color:var(--accent);font-weight:600')}>See all →</div>
       </div>
       <div style={s('display:flex;flex-direction:column;gap:10px')}>
