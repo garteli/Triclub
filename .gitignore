@@ -15,3 +15,8 @@ src/Squad.Web/wwwroot/vite.svg
 .vs/
 .idea/
 .DS_Store
+src/Squad.Web/wwwroot/icon.svg
+src/Squad.Web/wwwroot/icon-192.png
+src/Squad.Web/wwwroot/icon-512.png
+src/Squad.Web/wwwroot/apple-touch-icon.png
+src/Squad.Web/wwwroot/manifest.webmanifest
