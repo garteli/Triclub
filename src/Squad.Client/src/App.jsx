@@ -216,7 +216,8 @@ export default function App() {
           getToken={getToken} onDataChanged={() => setRefreshSignal((n) => n + 1)}
           profile={profile} onProfileSaved={setProfile}
           onJoinSquad={authed ? squadOps.onJoinSquad : undefined}
-          onCreateSquad={authed ? squadOps.onCreateSquad : undefined} />
+          onCreateSquad={authed ? squadOps.onCreateSquad : undefined}
+          meId={session?.athleteId} />
       </Phone>
     </div>
   );
