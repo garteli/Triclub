@@ -11,6 +11,8 @@ import { createSquad, joinSquad } from './lib/squads.js';
 // import { useLiveRide } from './hooks/useLiveRide.js'; // swap in for real telemetry
 import { buildViewModel } from './lib/viewModel.js';
 import { loadSession, saveSession, clearSession, enrollBiometric, fetchMe, getProfile } from './lib/auth.js';
+import { loadPrefs, savePrefs } from './lib/prefs.js';
+import { loadAvatar, saveAvatar } from './lib/avatar.js';
 import ControlDock from './components/ControlDock.jsx';
 import Phone from './components/Phone.jsx';
 import Dashboard from './screens/Dashboard.jsx';
@@ -37,6 +39,11 @@ import Notifications from './screens/Notifications.jsx';
 import Activities from './screens/Activities.jsx';
 import UploadActivity from './screens/UploadActivity.jsx';
 import Sensors from './screens/Sensors.jsx';
+import Units from './screens/Units.jsx';
+import NotificationPrefs from './screens/NotificationPrefs.jsx';
+import Privacy from './screens/Privacy.jsx';
+import Help from './screens/Help.jsx';
+import Legal from './screens/Legal.jsx';
 
 // Initial prototype state (matches the handoff's Component.state).
 const initialState = {
@@ -58,6 +65,7 @@ const screens = {
   settings: Settings, welcome: Welcome, register: Register, login: Login, newgroup: CreateGroup,
   athlete: AthleteProfile, editprofile: EditProfile, notifs: Notifications, activities: Activities,
   upload: UploadActivity, sensors: Sensors,
+  units: Units, notifprefs: NotificationPrefs, privacy: Privacy, help: Help, legal: Legal,
 };
 
 export default function App() {
@@ -65,7 +73,9 @@ export default function App() {
   // the app; otherwise start on the logged-out Welcome screen.
   const [state, setState] = useState(() => {
     const session = loadSession();
-    return { ...initialState, session, screen: session ? 'dash' : 'welcome' };
+    // Hydrate device-scoped preferences (units / notifications / privacy) and the
+    // locally-stored profile photo so both reflect saved choices on boot.
+    return { ...initialState, ...loadPrefs(), avatar: loadAvatar(session?.athleteId), session, screen: session ? 'dash' : 'welcome' };
   });
   const t = useTick();
 
@@ -99,7 +109,7 @@ export default function App() {
   const vm = useMemo(
     () => buildViewModel(state, t, {
       feedItems: liveFeed, leaderboardRows: liveLeaderboard, activityItems: liveActivities,
-      profile, squads: liveSquads, plan: livePlan, planSummary: livePlanSummary,
+      profile, squads: liveSquads, plan: livePlan, planSummary: livePlanSummary, avatar: state.avatar,
       // The athlete's active squad name (for the dashboard header).
       squadName: authed ? liveSquads.find((sq) => sq.id === squadId)?.name : undefined,
     }),
@@ -139,6 +149,17 @@ export default function App() {
     setTheme: (theme) => patch({ theme }),
     setLang: (lang) => patch({ lang }),
     setAccent: (accent) => patch({ accent }),
+    // settings preferences (persisted to localStorage via savePrefs)
+    setUnits: (units) => setState((s) => savePrefs({ ...s, units })),
+    setTemp: (temp) => setState((s) => savePrefs({ ...s, temp })),
+    setNotif: (key, value) => setState((s) => savePrefs({ ...s, notif: { ...s.notif, [key]: value } })),
+    setPrivacy: (key, value) => setState((s) => savePrefs({ ...s, privacy: { ...s.privacy, [key]: value } })),
+    // profile photo (client-side; persisted per athlete in localStorage)
+    setAvatar: (dataUrl) => setState((s) => { saveAvatar(s.session?.athleteId, dataUrl); return { ...s, avatar: dataUrl || null }; }),
+    openLink: (url) => { try { window.open(url, '_blank', 'noopener'); } catch { /* ignore */ } },
+    copyDiagnostics: () => { try { navigator.clipboard?.writeText('Domestique Team 1.0.0 (build 100)'); } catch { /* ignore */ } },
+    exportData: () => { try { window.open('https://domestique.team/account/export', '_blank', 'noopener'); } catch { /* ignore */ } },
+    deleteAccount: () => { try { window.open('https://domestique.team/account/delete', '_blank', 'noopener'); } catch { /* ignore */ } },
     setDashVar: (dashVar) => patch({ dashVar }),
     setRideVar: (rideVar) => patch({ rideVar }),
     // ride

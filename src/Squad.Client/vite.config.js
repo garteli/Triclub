@@ -9,13 +9,18 @@ export default defineConfig({
     outDir: '../Squad.Web/wwwroot',
     emptyOutDir: true,
     rollupOptions: {
-      // Only loaded at runtime inside the native shell; keep them out of the web bundle
-      // so a web-only install doesn't need the Capacitor packages present.
-      external: ['@capacitor/core', '@capacitor-community/background-geolocation', '@capacitor-community/bluetooth-le', '@perfood/capacitor-healthkit'],
+      // These native-only plugins are loaded at runtime inside the native shell (behind
+      // dynamic import() gated on Capacitor.isNativePlatform()), so keep them out of the
+      // web bundle — a web-only install doesn't need them present.
+      // NB: do NOT externalize @capacitor/core. oauth.js imports it statically, so
+      // externalizing leaves a bare `import '@capacitor/core'` the browser can't resolve
+      // and the web SPA never mounts (stuck on splash). It's a dependency, so it bundles.
+      external: ['@capacitor-community/background-geolocation', '@capacitor-community/bluetooth-le', '@perfood/capacitor-healthkit'],
     },
   },
   server: {
-    port: 5173,
+    // Honor a harness/CI-assigned PORT when present, else the conventional dev port.
+    port: process.env.PORT ? Number(process.env.PORT) : 5173,
     // Dev-only: forward API + realtime to the .NET host (`dotnet run` → http://localhost:5186).
     // Production serves the built SPA from the same origin, so no proxy is needed there.
     proxy: {

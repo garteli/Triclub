@@ -1,4 +1,5 @@
 import { s } from '../lib/style.js';
+import Avatar from '../components/Avatar.jsx';
 
 const BikeIcon = ({ size = 26, stroke = 'var(--bike)' }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round">
@@ -50,7 +51,7 @@ function DashboardEN({ vm, state, go, openAthlete, openActivity }) {
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
             <div style={s('position:absolute;top:8px;right:9px;width:7px;height:7px;border-radius:50%;background:var(--accent);border:1.5px solid var(--bg2)')} />
           </div>
-          <div className="ctl" onClick={() => go('profile')} style={s(`width:38px;height:38px;border-radius:12px;background:${vm.me.color || 'linear-gradient(135deg,#ff6f61,#ffb84d)'};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:${vm.me.color ? '#0c0e11' : '#fff'}`)}>{vm.me.initials || '·'}</div>
+          <div className="ctl" onClick={() => go('profile')}><Avatar photo={vm.me.photo} initials={vm.me.initials} color={vm.me.color} size={38} radius={12} fontSize={14} /></div>
         </div>
       </div>
 
@@ -187,7 +188,7 @@ function DashboardHE({ vm, go, openAthlete, openActivity }) {
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
             <div style={s('position:absolute;top:8px;right:9px;width:7px;height:7px;border-radius:50%;background:var(--accent);border:1.5px solid var(--bg2)')} />
           </div>
-          <div className="ctl" onClick={() => go('profile')} style={s(`width:38px;height:38px;border-radius:12px;background:${vm.me.color || 'linear-gradient(135deg,#ff6f61,#ffb84d)'};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:${vm.me.color ? '#0c0e11' : '#fff'}`)}>{vm.me.initials || '·'}</div>
+          <div className="ctl" onClick={() => go('profile')}><Avatar photo={vm.me.photo} initials={vm.me.initials} color={vm.me.color} size={38} radius={12} fontSize={14} /></div>
         </div>
       </div>
 
