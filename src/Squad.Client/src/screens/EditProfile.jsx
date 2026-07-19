@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { s } from '../lib/style.js';
 import { Back, Field, TextArea, Chips, FieldLabel, PrimaryBtn } from './wizard.jsx';
 import { updateProfile } from '../lib/auth.js';
+import Avatar from '../components/Avatar.jsx';
+import { fileToAvatarDataUrl } from '../lib/avatar.js';
 
 const SPORTS = ['Triathlon', 'Cycling', 'Running', 'Swimming'];
 const LEVELS = ['New to it', 'Intermediate', 'Advanced', 'Racing'];
@@ -16,7 +18,22 @@ export default function EditProfile({ vm, actions, getToken, onProfileSaved }) {
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [photoError, setPhotoError] = useState('');
+  const fileRef = useRef(null);
   const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const pickPhoto = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-selecting the same file
+    if (!file) return;
+    setPhotoError('');
+    try {
+      const dataUrl = await fileToAvatarDataUrl(file);
+      actions.setAvatar(dataUrl);
+    } catch (err) {
+      setPhotoError(err.message || 'Could not use that image.');
+    }
+  };
 
   const save = async () => {
     setError(''); setBusy(true);
@@ -46,8 +63,19 @@ export default function EditProfile({ vm, actions, getToken, onProfileSaved }) {
 
       {/* avatar */}
       <div style={s('display:flex;flex-direction:column;align-items:center;margin-top:18px')}>
-        <div style={s(`width:80px;height:80px;border-radius:24px;background:${m.color || 'linear-gradient(135deg,#ff6f61,#ffb84d)'};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:28px;color:#fff`)}>{m.initials}</div>
-        <div className="ctl" style={s('font-size:12px;font-weight:600;color:var(--accent);margin-top:10px')}>Change photo</div>
+        <div className="ctl" onClick={() => fileRef.current?.click()} style={s('position:relative')}>
+          <Avatar photo={m.photo} initials={m.initials} color={m.color} size={80} radius={24} fontSize={28} />
+          {/* small camera badge */}
+          <div style={s('position:absolute;right:-3px;bottom:-3px;width:28px;height:28px;border-radius:50%;background:var(--accent);border:3px solid var(--bg);display:flex;align-items:center;justify-content:center')}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-ink)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></svg>
+          </div>
+        </div>
+        <input ref={fileRef} type="file" accept="image/*" onChange={pickPhoto} style={s('display:none')} />
+        <div style={s('display:flex;gap:14px;align-items:center;margin-top:10px')}>
+          <div className="ctl" onClick={() => fileRef.current?.click()} style={s('font-size:12px;font-weight:600;color:var(--accent)')}>{m.photo ? 'Change photo' : 'Add photo'}</div>
+          {m.photo && <div className="ctl" onClick={() => actions.setAvatar(null)} style={s('font-size:12px;font-weight:600;color:var(--text3)')}>Remove</div>}
+        </div>
+        {photoError && <div style={s('font-size:11.5px;color:var(--bad);margin-top:8px;text-align:center')}>{photoError}</div>}
       </div>
 
       <Field label="Full name" value={form.name} onChange={set('name')} placeholder="Dana Levi" />

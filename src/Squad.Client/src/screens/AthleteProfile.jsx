@@ -1,5 +1,6 @@
 import { s } from '../lib/style.js';
 import { useAthlete } from '../hooks/useAthlete.js';
+import Avatar from '../components/Avatar.jsx';
 
 const label = 'font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.3px;font-weight:600;margin:22px 2px 10px';
 
@@ -27,7 +28,7 @@ export default function AthleteProfile({ vm, state, actions, getToken }) {
 
       {/* identity */}
       <div style={s('display:flex;align-items:center;gap:14px;margin-top:14px')}>
-        <div style={s(`width:64px;height:64px;border-radius:20px;background:${a.color};flex:none;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:22px;color:#0c0e11`)}>{a.initials}</div>
+        <Avatar photo={a.photo} initials={a.initials} color={a.color} size={64} radius={20} fontSize={22} />
         <div style={s('flex:1;min-width:0')}>
           <div style={s('font-size:21px;font-weight:700;letter-spacing:-.4px')}>{a.name}</div>
           <div style={s('font-size:12.5px;color:var(--text2)')}>{a.club} · Age-group {a.ageGroup}</div>

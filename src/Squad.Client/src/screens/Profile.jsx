@@ -1,5 +1,6 @@
 import { s } from '../lib/style.js';
 import SportIcon from '../components/SportIcon.jsx';
+import Avatar from '../components/Avatar.jsx';
 
 const label = 'font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.3px;font-weight:600';
 
@@ -15,7 +16,7 @@ export default function Profile({ vm, actions }) {
     <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
       {/* header */}
       <div style={s('display:flex;align-items:center;gap:14px')}>
-        <div style={s(`width:64px;height:64px;border-radius:20px;background:${vm.me.color || 'linear-gradient(135deg,#ff6f61,#ffb84d)'};flex:none;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:22px;color:${vm.me.color ? '#0c0e11' : '#fff'}`)}>{vm.me.initials || '·'}</div>
+        <Avatar photo={vm.me.photo} initials={vm.me.initials} color={vm.me.color} size={64} radius={20} fontSize={22} />
         <div style={s('flex:1')}>
           <div style={s('font-size:21px;font-weight:700;letter-spacing:-.4px')}>{vm.me.name}</div>
           <div style={s('font-size:12.5px;color:var(--text2)')}>{[vm.me.club, vm.me.ageGroup && `Age-group ${vm.me.ageGroup}`].filter(Boolean).join(' · ')}</div>

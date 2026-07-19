@@ -1,4 +1,6 @@
 import { s } from '../lib/style.js';
+import { unitsLabel } from '../lib/prefs.js';
+import Avatar from '../components/Avatar.jsx';
 
 const label = 'font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.3px;font-weight:600;margin:22px 2px 10px';
 const card = 'background:var(--bg2);border:1px solid var(--line);border-radius:16px';
@@ -23,7 +25,7 @@ const NavRow = ({ children, danger, last, onClick }) => (
 );
 
 export default function Settings({ vm, state, actions }) {
-  const { theme, accent, lang } = state;
+  const { theme, accent, lang, units } = state;
   const me = vm.me;
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
@@ -37,7 +39,7 @@ export default function Settings({ vm, state, actions }) {
 
       {/* account */}
       <div className="ctl" onClick={() => actions.go('editprofile')} style={s(card + ';display:flex;align-items:center;gap:13px;padding:13px 14px;margin-top:16px')}>
-        <div style={s('width:46px;height:46px;border-radius:14px;background:linear-gradient(135deg,#ff6f61,#ffb84d);flex:none;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;color:#fff')}>{me.initials}</div>
+        <Avatar photo={me.photo} initials={me.initials} color={me.color} size={46} radius={14} fontSize={16} />
         <div style={s('flex:1')}>
           <div style={s('font-size:15px;font-weight:700')}>{me.name}</div>
           <div style={s('font-size:11.5px;color:var(--text2)')}>{me.club} · Age-group {me.ageGroup}</div>
@@ -76,17 +78,17 @@ export default function Settings({ vm, state, actions }) {
       {/* general */}
       <div style={s(label)}>General</div>
       <div style={s(card)}>
-        <NavRow>Units · Metric (km, kg)</NavRow>
-        <NavRow>Notifications</NavRow>
+        <NavRow onClick={() => actions.go('units')}>Units · {unitsLabel(units)}</NavRow>
+        <NavRow onClick={() => actions.go('notifprefs')}>Notifications</NavRow>
         <NavRow onClick={() => actions.go('sensors')}>Connected apps &amp; sensors</NavRow>
-        <NavRow last>Privacy</NavRow>
+        <NavRow last onClick={() => actions.go('privacy')}>Privacy</NavRow>
       </div>
 
       {/* about */}
       <div style={s(label)}>About</div>
       <div style={s(card)}>
-        <NavRow>Help &amp; feedback</NavRow>
-        <NavRow>Terms &amp; privacy policy</NavRow>
+        <NavRow onClick={() => actions.go('help')}>Help &amp; feedback</NavRow>
+        <NavRow onClick={() => actions.go('legal')}>Terms &amp; privacy policy</NavRow>
         <div style={s('display:flex;align-items:center;padding:14px 15px;border-top:1px solid var(--line)')}>
           <span style={s('flex:1;font-size:13.5px;font-weight:600;color:var(--text2)')}>Version</span>
           <span className="mono" style={s('font-size:12.5px;color:var(--text3)')}>1.0.0</span>

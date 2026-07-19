@@ -268,11 +268,12 @@ export function buildViewModel(state, t, opts = {}) {
     ftp: me.ftp ?? p.ftp ?? '',
     weekly: me.weekly ?? p.weeklyHours ?? '',
     bio: me.bio ?? p.bio ?? '',
-    initials: p.initials || '', color: p.avatarColor,
+    initials: p.initials || '', color: p.avatarColor, photo: opts.avatar || null,
   } : {
     name: me.name || 'Dana Levi', club: me.club || danaExtra.club, ageGroup: me.ageGroup || danaExtra.ageGroup,
     sport: me.sport || danaExtra.sport, level: me.level || danaExtra.level,
     ftp: me.ftp ?? danaExtra.ftp, weekly: me.weekly || danaExtra.weekly, bio: me.bio || danaExtra.bio, initials: 'DL',
+    photo: opts.avatar || null,
   };
   const athlete = (() => {
     const m = members.find((x) => x.id === selMember) || members[1];
@@ -287,7 +288,7 @@ export function buildViewModel(state, t, opts = {}) {
     ];
     return {
       id: m.id, isMe, following: !!following[m.id],
-      name: isMe ? meFull.name : m.name, initials: m.initials, color: m.color,
+      name: isMe ? meFull.name : m.name, initials: m.initials, color: m.color, photo: isMe ? (opts.avatar || null) : null,
       club: pick(me.club, extra.club), ageGroup: pick(me.ageGroup, extra.ageGroup),
       sport: pick(me.sport, extra.sport), level: pick(me.level, extra.level),
       ftp: pick(me.ftp, extra.ftp), weekly: pick(me.weekly, extra.weekly), bio: pick(me.bio, extra.bio),
