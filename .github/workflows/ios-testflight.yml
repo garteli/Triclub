@@ -7,11 +7,12 @@ name: iOS TestFlight
 # upload never happens by accident on an ordinary push/PR.
 #
 # Required repository secrets (Settings -> Secrets and variables -> Actions):
-#   APPLE_TEAM_ID     - 10-char Apple Developer Team ID (e.g. AB12CD34EF)
 #   ASC_KEY_ID        - App Store Connect API Key ID
 #   ASC_ISSUER_ID     - App Store Connect API Issuer ID (UUID)
 #   ASC_KEY_P8_BASE64 - the .p8 private key, base64-encoded
 #                       (macOS: base64 -i AuthKey_XXXX.p8 | pbcopy)
+#
+# The Apple Developer Team ID is not secret and is set below in env.
 #
 # Prerequisites (one-time, on Apple's side):
 #   - An app record in App Store Connect for bundle id com.triclub.app
@@ -23,6 +24,9 @@ on:
   push:
     tags:
       - 'v*'
+
+env:
+  APPLE_TEAM_ID: '64CADALDVN'
 
 jobs:
   testflight:
@@ -60,7 +64,6 @@ jobs:
 
       - name: Archive (Release, automatic signing)
         env:
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
         run: |
@@ -81,7 +84,6 @@ jobs:
 
       - name: Export .ipa
         env:
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
         run: |
