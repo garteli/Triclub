@@ -151,11 +151,14 @@ public interface IPlanService
     Task<IReadOnlyList<PlannedWorkoutRow>> GetWeekAsync(Guid athleteId, DateTime weekStart, CancellationToken ct);
 }
 
-/// <summary>Verifies a provider id_token and returns its trustworthy claims. Null if invalid.</summary>
+/// <summary>Result of verifying a provider id_token: the identity, or a diagnostic error reason.</summary>
+public sealed record ExternalVerifyResult(ExternalIdentity? Identity, string? Error);
+
+/// <summary>Verifies a provider id_token and returns its trustworthy claims (or a failure reason).</summary>
 public interface IExternalTokenVerifier
 {
     ExternalProvider Provider { get; }
-    Task<ExternalIdentity?> VerifyAsync(string idToken, CancellationToken ct);
+    Task<ExternalVerifyResult> VerifyAsync(string idToken, CancellationToken ct);
 }
 
 /// <summary>The claims we trust from a verified provider id_token.</summary>

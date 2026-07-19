@@ -30,6 +30,25 @@ public static class AuthEndpoints
             });
         });
 
+        // TEMP diagnostics for OAuth bring-up: does the App Service have egress to the
+        // provider JWKS endpoints? (VNet-integrated apps sometimes can't reach the internet.)
+        g.MapGet("/_diag", async (IHttpClientFactory factory, CancellationToken ct) =>
+        {
+            var http = factory.CreateClient();
+            http.Timeout = TimeSpan.FromSeconds(10);
+            async Task<object> Probe(string url)
+            {
+                try { var r = await http.GetAsync(url, ct); return new { url, status = (int)r.StatusCode, ok = r.IsSuccessStatusCode }; }
+                catch (Exception e) { return new { url, error = $"{e.GetType().Name}: {e.Message}" }; }
+            }
+            return Results.Ok(new
+            {
+                google = await Probe("https://accounts.google.com/.well-known/openid-configuration"),
+                googleCerts = await Probe("https://www.googleapis.com/oauth2/v3/certs"),
+                apple = await Probe("https://appleid.apple.com/.well-known/openid-configuration"),
+            });
+        });
+
         g.MapPost("/register", Register);
         g.MapPost("/login", Login);
         g.MapPost("/google", (ExternalLoginRequest req, HttpContext http, IAthleteAccounts accounts, ITokenIssuer issuer, IEnumerable<IExternalTokenVerifier> verifiers, CancellationToken ct)
@@ -85,9 +104,11 @@ public static class AuthEndpoints
         if (string.IsNullOrWhiteSpace(req.IdToken))
             return Results.BadRequest(new { error = "idToken is required." });
 
-        var identity = await verifier.VerifyAsync(req.IdToken, ct);
+        var result = await verifier.VerifyAsync(req.IdToken, ct);
+        var identity = result.Identity;
         if (identity is null)
-            return Results.Json(new { error = $"The {provider} token could not be verified." }, statusCode: 401);
+            // NOTE: `detail` is temporary diagnostics for OAuth bring-up — remove once sign-in is confirmed.
+            return Results.Json(new { error = $"The {provider} token could not be verified: {result.Error}", detail = result.Error }, statusCode: 401);
 
         // 1) Known federated subject → sign straight in.
         var account = await accounts.FindByProviderAsync(provider, identity.Subject, ct);
