@@ -99,7 +99,7 @@ export function buildViewModel(state, t, opts = {}) {
   const lbRows = sorted.map((r, i) => {
     const rank = i + 1;
     return {
-      ...r, rank, id: initialsToId[r.initials], val: valOf(r), unit: unitOf,
+      ...r, rank, id: r.athleteId ?? initialsToId[r.initials], val: valOf(r), unit: unitOf,
       barPct: Math.round((sortKey(r) / maxV) * 100),
       moveIcon: r.move > 0 ? '▲' : r.move < 0 ? '▼' : '—',
       moveColor: r.move > 0 ? 'var(--good)' : r.move < 0 ? 'var(--bad)' : 'var(--text3)',

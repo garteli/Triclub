@@ -23,6 +23,12 @@ public static class FeedCard
         (ActivitySport)r.Sport, r.StartUtc, r.MovingTimeSec,
         r.DistanceMeters, r.TrainingLoad, r.AvgHeartRate, reacts: 0);
 
+    /// <summary>From an activity summary row (athlete-profile recent-activity list).</summary>
+    public static ActivityFeedItem From(ActivitySummaryRow r) => Build(
+        r.Id, r.AthleteId, r.AthleteName, r.Initials, r.AvatarColor,
+        (ActivitySport)r.Sport, r.StartUtc, r.MovingTimeSec,
+        r.DistanceMeters, r.TrainingLoad, r.AvgHeartRate, reacts: 0);
+
     private static ActivityFeedItem Build(
         Guid id, Guid athleteId, string name, string initials, string color,
         ActivitySport sport, DateTimeOffset startUtc, int movingTimeSec,

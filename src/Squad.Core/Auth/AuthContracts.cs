@@ -99,6 +99,15 @@ public interface IChatService
     Task<ChatMessage?> PostAsync(Guid squadId, Guid athleteId, string body, CancellationToken ct);
 }
 
+// ----- Follow -----
+
+public interface IFollowService
+{
+    Task FollowAsync(Guid followerId, Guid followeeId, CancellationToken ct);
+    Task UnfollowAsync(Guid followerId, Guid followeeId, CancellationToken ct);
+    Task<bool> IsFollowingAsync(Guid followerId, Guid followeeId, CancellationToken ct);
+}
+
 /// <summary>Verifies a provider id_token and returns its trustworthy claims. Null if invalid.</summary>
 public interface IExternalTokenVerifier
 {
