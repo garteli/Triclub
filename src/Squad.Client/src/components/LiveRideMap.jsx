@@ -31,7 +31,7 @@ export default function LiveRideMap({ riders = [], route = [] }) {
             <>
               {routeD && (
                 <>
-                  <path d={routeD} fill="none" stroke="rgba(0,0,0,.5)" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d={routeD} fill="none" stroke="rgba(255,255,255,.9)" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round" />
                   <path d={routeD} fill="none" stroke="var(--accent)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="4 7" opacity=".95" />
                 </>
               )}
@@ -54,7 +54,7 @@ export default function LiveRideMap({ riders = [], route = [] }) {
                         <animate attributeName="r" values="12;16;12" dur="2s" repeatCount="indefinite" />
                       </circle>
                     )}
-                    <circle r={r.you ? 12 : 11} fill={fill} stroke={r.dropped ? 'var(--behind)' : '#0b0f14'} strokeWidth="2.5" strokeDasharray={r.dropped ? '3 2' : undefined} />
+                    <circle r={r.you ? 12 : 11} fill={fill} stroke={r.dropped ? 'var(--behind)' : '#fff'} strokeWidth="2.5" strokeDasharray={r.dropped ? '3 2' : undefined} />
                     <text y="4" textAnchor="middle" fontSize="9" fontWeight="700" fill={textFill} fontFamily="'JetBrains Mono',monospace">{r.you ? 'YOU' : r.initials}</text>
                   </g>
                 );

@@ -96,7 +96,7 @@ export default function Register({ actions }) {
 
           {anySocial ? <OrDivider>or sign up with email</OrDivider> : <div style={s('height:8px')} />}
 
-          <Field label="Full name" value={form.name} onChange={set('name')} placeholder="Dana Levi" />
+          <Field label="Full name" value={form.name} onChange={set('name')} placeholder="Your full name" />
           <Field label="Email" value={form.email} onChange={set('email')} placeholder="you@email.com" type="email" />
           <Field label="Password" value={form.pass} onChange={set('pass')} placeholder="At least 6 characters" type="password" />
           <RememberRow on={remember} onChange={setRemember} />

@@ -1,4 +1,5 @@
 import { s } from '../lib/style.js';
+import EmptyState from '../components/EmptyState.jsx';
 
 // Group bike glyph, reused as the tile mark on each club row.
 const GroupBike = () => (
@@ -37,6 +38,9 @@ export default function Discover({ vm, actions }) {
 
       {/* group list */}
       <div style={s('display:flex;flex-direction:column;gap:11px;margin-top:16px')}>
+        {vm.nearbyGroups.length === 0 && (
+          <EmptyState icon="🔍" title="No groups nearby" sub="New clubs and coached groups will appear here as they join." />
+        )}
         {vm.nearbyGroups.map((g) => (
           <div key={g.id} className="ctl" onClick={() => actions.openGroup(g.id)} style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:13px 14px;display:flex;gap:12px;align-items:center')}>
             <div style={s(`width:46px;height:46px;border-radius:13px;background:${g.color};flex:none;display:flex;align-items:center;justify-content:center`)}><GroupBike /></div>

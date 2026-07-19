@@ -65,10 +65,12 @@ export function tilesFor(view) {
   return out;
 }
 
-// CARTO dark basemap (retina), free for reasonable use. Subdomain rotation a–d.
+// CARTO Voyager basemap (retina) — a clean, light street map (soft greens, light
+// roads), free for reasonable use. Subdomain rotation a–d. Swap the style segment for
+// 'light_all' (Positron, more minimal/grayscale) or 'dark_all' if the look changes.
 export function tileUrl(x, y, z) {
   const sub = 'abcd'[(x + y) % 4];
-  return `https://${sub}.basemaps.cartocdn.com/dark_all/${z}/${x}/${y}@2x.png`;
+  return `https://${sub}.basemaps.cartocdn.com/rastertiles/voyager/${z}/${x}/${y}@2x.png`;
 }
 
 export const TILE_ATTRIBUTION = '© OpenStreetMap · © CARTO';

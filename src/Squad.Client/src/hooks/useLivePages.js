@@ -4,7 +4,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 //   { name, side:'none'|'group', layout:'grid'|'hero', heroIndex?, fields:[token] }
 // Field tokens: a metric id ('spd'…), 'chart:spd|hr|power', or 'map'.
 const DEFAULT_PAGES = [
-  { name: 'Overview', side: 'none', layout: 'hero', heroIndex: 0, fields: ['spd', 'time', 'dist', 'hr', 'pwr', 'cad'] },
+  // Hero pages carry an odd field count so the hero (full-width) sits above complete
+  // rows of two — no ragged half-empty last row. See balanceHero().
+  { name: 'Overview', side: 'none', layout: 'hero', heroIndex: 0, fields: ['spd', 'time', 'dist', 'hr', 'pwr', 'cad', 'grad'] },
   { name: 'Climb', side: 'group', layout: 'grid', fields: ['grad', 'elev', 'spd', 'hr'] },
   { name: 'Group', side: 'group', layout: 'grid', fields: ['spd', 'avgspd', 'hr', 'dist'] },
   { name: 'Gear', side: 'none', layout: 'grid', fields: ['gear', 'gearratio', 'di2', 'cad'] },
@@ -13,6 +15,17 @@ const DEFAULT_PAGES = [
 ];
 
 const COUNT_POOL = ['spd', 'hr', 'pwr', 'dist', 'time', 'cad', 'avgspd', 'grad'];
+
+// A hero tile spans the full width, so the remaining tiles should complete rows of two.
+// If they don't (even total), append a fresh metric so the grid never leaves a gap.
+function balanceHero(c) {
+  if (c.layout !== 'hero') return c;
+  const f = c.fields.slice();
+  while (f.length % 2 === 0) {
+    f.push(COUNT_POOL.find((t) => !f.includes(t)) || COUNT_POOL[f.length % COUNT_POOL.length]);
+  }
+  return { ...c, fields: f };
+}
 
 // Owns the live-ride page state (pages, current page, edit/picker/pager/drag) plus
 // the two timers the design calls for: 4s pager auto-hide and 500ms long-press to
@@ -56,12 +69,12 @@ export function useLivePages(t, active) {
   const toggleEdit = useCallback(() => { setEditFields((e) => !e); closePicker(); }, [closePicker]);
   const toggleAutoRotate = useCallback(() => setAutoRotate((a) => !a), []);
 
-  const setPageLayout = useCallback((layout) => mut((c) => ({ ...c, layout })), [mut]);
+  const setPageLayout = useCallback((layout) => mut((c) => balanceHero({ ...c, layout })), [mut]);
   const setPageSide = useCallback((side) => mut((c) => ({ ...c, side })), [mut]);
   const setPageCount = useCallback((n) => mut((c) => {
     const f = c.fields.slice(0, n); let k = 0;
     while (f.length < n) f.push(COUNT_POOL[k++ % COUNT_POOL.length]);
-    return { ...c, fields: f };
+    return balanceHero({ ...c, fields: f });
   }), [mut]);
 
   // Long-press (500ms) anywhere on a field → edit mode.
@@ -89,7 +102,7 @@ export function useLivePages(t, active) {
     });
   }, [mut]);
 
-  const setHero = useCallback((i) => mut((c) => ({ ...c, heroIndex: i, layout: 'hero' })), [mut]);
+  const setHero = useCallback((i) => mut((c) => balanceHero({ ...c, heroIndex: i, layout: 'hero' })), [mut]);
 
   const openPicker = useCallback((slot) => setPicker({ open: true, slot }), []);
   const pickField = useCallback((tok) => {

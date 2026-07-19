@@ -1,6 +1,7 @@
 import { s } from '../lib/style.js';
 import TileMap from '../components/TileMap.jsx';
 import { toPathD } from '../lib/tiles.js';
+import EmptyState from '../components/EmptyState.jsx';
 
 const Comment = ({ av, avBg, avColor, name, time, body }) => (
   <div style={s('display:flex;gap:10px')}>
@@ -19,6 +20,18 @@ const label = 'font-size:11px;color:var(--text3);text-transform:uppercase;letter
 // gated per sport (no power/laps for a swim, etc).
 export default function Feed({ vm, state, actions }) {
   const a = vm.activityDetail;
+  if (!a) {
+    return (
+      <div style={s('padding:6px 0 120px;animation:floatUp .35s ease')}>
+        <div style={s('display:flex;align-items:center;gap:11px;padding:2px 18px 12px')}>
+          <div className="ctl" onClick={() => actions.go(state.activityBack || 'activities')} style={s('width:34px;height:34px;border-radius:10px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;flex:none')}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round"><path d="M15 6l-6 6 6 6" /></svg>
+          </div>
+        </div>
+        <EmptyState icon="🚴" title="Activity not found" sub="This activity isn't available. Record a ride or sync from Apple Health to see it here." />
+      </div>
+    );
+  }
   return (
     <div style={s('padding:6px 0 120px;animation:floatUp .35s ease')}>
       {/* header */}
@@ -41,10 +54,10 @@ export default function Feed({ vm, state, actions }) {
               const end = project(a.routePath[a.routePath.length - 1][0], a.routePath[a.routePath.length - 1][1]);
               return (
                 <>
-                  <path d={d} fill="none" stroke="rgba(0,0,0,.45)" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d={d} fill="none" stroke="rgba(255,255,255,.9)" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
                   <path d={d} fill="none" stroke={a.sportColor} strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
-                  <circle cx={start.x} cy={start.y} r="6" fill="var(--good)" stroke="#0b0f14" strokeWidth="2.5" />
-                  <circle cx={end.x} cy={end.y} r="5.5" fill="var(--bad)" stroke="#0b0f14" strokeWidth="2.5" />
+                  <circle cx={start.x} cy={start.y} r="6" fill="var(--good)" stroke="#fff" strokeWidth="2.5" />
+                  <circle cx={end.x} cy={end.y} r="5.5" fill="var(--bad)" stroke="#fff" strokeWidth="2.5" />
                 </>
               );
             }}
@@ -180,8 +193,8 @@ export default function Feed({ vm, state, actions }) {
       {/* comments */}
       {a.comments > 0 && (
         <div style={s('padding:16px 18px 0;display:flex;flex-direction:column;gap:12px')}>
-          <Comment av="NR" avBg="#ff9a4c" avColor="#0c0e11" name="Noa" time="2h" body="That climb at km 40 is brutal 😮‍💨 strong ride!" />
-          {a.comments > 1 && <Comment av="C" avBg="linear-gradient(135deg,#37c0ff,#5a86ff)" avColor="#fff" name="Coach Ronen" time="1h" body="Great pacing on the back half. Negative split — exactly what we wanted." />}
+          <Comment av="NR" avBg="#ff9a4c" avColor="#0c0e11" name="Teammate" time="2h" body="That climb at km 40 is brutal 😮‍💨 strong ride!" />
+          {a.comments > 1 && <Comment av="C" avBg="linear-gradient(135deg,#37c0ff,#5a86ff)" avColor="#fff" name="Coach" time="1h" body="Great pacing on the back half. Negative split — exactly what we wanted." />}
         </div>
       )}
 

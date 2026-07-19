@@ -13,6 +13,13 @@ const Chevron = ({ stroke = 'var(--accent)', w = 18 }) => (
 );
 
 function SquadRail({ squad, rtl, onOpen }) {
+  if (!squad.length) {
+    return (
+      <div style={s('margin:2px 0 6px;padding:16px;border:1px dashed var(--line2);border-radius:16px;text-align:center;font-size:12.5px;color:var(--text3);line-height:1.5')}>
+        No teammates training yet — invite your club and their weekly progress shows up here.
+      </div>
+    );
+  }
   return (
     <div className="hscroll" style={s(`display:flex;gap:11px;overflow-x:auto;padding:2px 18px 6px;margin:0 -18px;${rtl ? 'flex-direction:row-reverse' : ''}`)}>
       {squad.map((m) => (
@@ -130,7 +137,7 @@ function DashboardEN({ vm, state, go, openAthlete, openActivity }) {
               </div>
               <div style={s('background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:14px;display:flex;gap:9px;align-items:flex-start')}>
                 <div style={s('width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,#37c0ff,#5a86ff);flex:none;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff')}>C</div>
-                <div style={s('font-size:12px;color:var(--text2);line-height:1.45')}><span style={s('color:var(--text);font-weight:600')}>Coach Ronen:</span> Hold the last interval — don't fade. Cadence 90+.</div>
+                <div style={s('font-size:12px;color:var(--text2);line-height:1.45')}><span style={s('color:var(--text);font-weight:600')}>Coach:</span> Hold the last interval — don't fade. Cadence 90+.</div>
               </div>
               <div style={s('display:flex;gap:9px;margin-top:14px')}>
                 <div className="ctl" onClick={() => go('ride')} style={s('flex:1;background:var(--accent);color:var(--accent-ink);text-align:center;padding:13px;border-radius:13px;font-weight:700;font-size:14px')}>Start session</div>
@@ -155,6 +162,9 @@ function DashboardEN({ vm, state, go, openAthlete, openActivity }) {
         <div style={s('font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:1.4px;font-weight:600')}>Domestique Team activity</div>
         <div className="ctl" onClick={() => go('activities')} style={s('font-size:11.5px;color:var(--accent);font-weight:600')}>See all →</div>
       </div>
+      {vm.feed.length === 0 && (
+        <div style={s('padding:18px;border:1px dashed var(--line2);border-radius:16px;text-align:center;font-size:12.5px;color:var(--text3);line-height:1.5')}>No activity yet. When the club trains, it shows up here.</div>
+      )}
       <div style={s('display:flex;flex-direction:column;gap:10px')}>
         {vm.feed.map((f) => (
           <div key={f.id} className="ctl" onClick={() => (f.activityId ? openActivity(f.activityId) : go('activities'))} style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:13px 14px;display:flex;gap:12px;align-items:center')}>
@@ -238,6 +248,9 @@ function DashboardHE({ vm, go, openAthlete, openActivity }) {
       <SquadRail squad={vm.squad} rtl onOpen={openAthlete} />
 
       <div style={s('font-size:12px;color:var(--text3);font-weight:600;margin:20px 2px 12px')}>פעילות המועדון</div>
+      {vm.feed.length === 0 && (
+        <div style={s('padding:18px;border:1px dashed var(--line2);border-radius:16px;text-align:center;font-size:12.5px;color:var(--text3);line-height:1.5')}>אין עדיין פעילות.</div>
+      )}
       <div style={s('display:flex;flex-direction:column;gap:10px')}>
         {vm.feed.map((f) => (
           <div key={f.id} className="ctl" onClick={() => (f.activityId ? openActivity(f.activityId) : go('activities'))} style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:13px 14px;display:flex;gap:12px;align-items:center;flex-direction:row-reverse;text-align:right')}>
