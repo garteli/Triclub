@@ -1,12 +1,13 @@
 import { s } from '../lib/style.js';
+import SportIcon from '../components/SportIcon.jsx';
 
 const label = 'font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.3px;font-weight:600';
 
 const seasonRows = [
-  ['🚴 Bike', '642 km · 21h'],
-  ['🏃 Run', '118 km · 9h'],
-  ['🏊 Swim', '28.4 km · 11h'],
-  ['🏋️ Gym · Mobility', '14 sessions · 9h'],
+  ['bike', 'Bike', '642 km · 21h', 'var(--bike)'],
+  ['run', 'Run', '118 km · 9h', 'var(--run)'],
+  ['swim', 'Swim', '28.4 km · 11h', 'var(--swim)'],
+  ['gym', 'Gym · Mobility', '14 sessions · 9h', 'var(--gym)'],
 ];
 
 export default function Profile({ vm, actions }) {
@@ -81,9 +82,9 @@ export default function Profile({ vm, actions }) {
       {/* season stats */}
       <div style={s(label + ';margin:22px 2px 12px')}>This block</div>
       <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:4px 0')}>
-        {seasonRows.map(([name, val], i) => (
-          <div key={name} style={s(`display:flex;padding:12px 16px${i < seasonRows.length - 1 ? ';border-bottom:1px solid var(--line)' : ''}`)}>
-            <span style={s('flex:1;font-size:12.5px;color:var(--text2)')}>{name}</span>
+        {seasonRows.map(([key, name, val, color], i) => (
+          <div key={name} style={s(`display:flex;align-items:center;padding:12px 16px${i < seasonRows.length - 1 ? ';border-bottom:1px solid var(--line)' : ''}`)}>
+            <span style={s('flex:1;display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--text2)')}><SportIcon name={key} size={18} color={color} />{name}</span>
             <span className="mono" style={s('font-size:13px;font-weight:600')}>{val}</span>
           </div>
         ))}

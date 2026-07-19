@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { s } from '../lib/style.js';
 import { SocialButton, BiometricButton, OrDivider } from '../components/AuthButtons.jsx';
 import Logo from '../components/Logo.jsx';
+import SportIcon from '../components/SportIcon.jsx';
 import {
   oauthSignIn, authConfig,
   biometricAvailable, biometricEnrolled, signInWithBiometric,
@@ -46,11 +47,11 @@ export default function Welcome({ actions }) {
         <div style={s('font-size:30px;font-weight:700;letter-spacing:-.6px;margin-top:22px')}>Domestique<span style={s('color:var(--accent)')}> Club</span></div>
         <div style={s('font-size:14px;color:var(--text2);line-height:1.5;margin-top:8px;max-width:250px')}>Train together. Ride together. Your team's triathlon season, in one app.</div>
 
-        <div style={s('display:flex;gap:20px;margin-top:26px')}>
-          {[['🏊', 'Swim'], ['🚴', 'Bike'], ['🏃', 'Run']].map(([e, l]) => (
+        <div style={s('display:flex;gap:22px;margin-top:26px')}>
+          {[['swim', 'Swim', 'var(--swim)'], ['bike', 'Bike', 'var(--bike)'], ['run', 'Run', 'var(--run)']].map(([key, l, c]) => (
             <div key={l} style={s('text-align:center')}>
-              <div style={s('font-size:24px')}>{e}</div>
-              <div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-top:4px')}>{l}</div>
+              <div style={s('display:flex;justify-content:center;height:28px;align-items:center')}><SportIcon name={key} size={26} color={c} /></div>
+              <div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-top:6px')}>{l}</div>
             </div>
           ))}
         </div>
