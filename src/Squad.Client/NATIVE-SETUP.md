@@ -189,3 +189,39 @@ Varia RTL-series but is unofficial and needs validation against your hardware; t
 speed is left `null` because its scale is uncalibrated. For production, enroll in Garmin's
 official **Radar Data BLE Program** (developer.garmin.com/radar-data-ble) for the real spec.
 Split radar packets aren't reassembled yet (marked TODO in `ble.js`).
+
+---
+
+# Native social sign-in (Google & Apple)
+
+Google and Apple **block their web sign-in SDKs inside the app's embedded webview**
+(anti-phishing policy), so in the browser the app uses GSI / Apple JS, and in the
+native app it uses the native SDKs via `@capgo/capacitor-social-login`. The client
+picks the path automatically (`Capacitor.isNativePlatform()` in `src/lib/oauth.js`);
+both return an `id_token` the existing `/api/auth/{google,apple}` endpoints verify.
+
+Nothing extra is needed for the web build. For the **native** build, provide:
+
+### 1. Google — create an iOS OAuth client
+- Google Cloud Console → Credentials → **Create OAuth client ID → iOS**, bundle id
+  `com.triclub.app`. Copy the **iOS client id** (`NNN-xxxx.apps.googleusercontent.com`).
+- **`ios/App/App/Info.plist`** — replace the `CFBundleURLTypes` placeholder
+  `com.googleusercontent.apps.REPLACE_WITH_REVERSED_IOS_CLIENT_ID` with the **reversed**
+  iOS client id (`com.googleusercontent.apps.NNN-xxxx`).
+- App Service settings → **`Auth__Google__iOSClientId`** = the iOS client id. The backend
+  then accepts id_tokens with that audience (`OidcTokenVerifier.Google`), and `/api/auth/config`
+  returns it so the native SDK initializes at runtime (no client rebuild for the value).
+
+### 2. Apple — enable Sign in with Apple
+- Apple Developer → Identifiers → App ID `com.triclub.app` → enable **Sign in with Apple**;
+  regenerate the provisioning profile used by CI so it carries the entitlement.
+- Xcode (App target) → Signing & Capabilities → **+ Sign in with Apple** (creates
+  `App.entitlements` with `com.apple.developer.applesignin`). Commit that file.
+- App Service settings → **`Auth__Apple__BundleId`** = `com.triclub.app` (the audience of a
+  native Apple id_token is the bundle id, not the web Services ID). The backend accepts both.
+
+### 3. Ship
+- No code change needed beyond the above. CI (`.github/workflows/ios-testflight.yml`) runs
+  `npm ci` → `npm run build` → `npx cap sync ios`, which pulls the plugin's iOS pod
+  automatically. Push/commit → TestFlight build carries native Google + Apple sign-in.
+- `.npmrc` sets `legacy-peer-deps=true` so `npm ci` tolerates the mixed Capacitor peer ranges.
