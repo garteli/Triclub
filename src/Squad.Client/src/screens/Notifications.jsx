@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { s } from '../lib/style.js';
-import { notifications } from '../data/squadData.js';
+import { notifications as mockNotifications } from '../data/squadData.js';
+import { useNotifications } from '../hooks/useNotifications.js';
 
 // Inline icons keyed by notification kind.
 const ICONS = {
@@ -12,15 +13,20 @@ const ICONS = {
   calendar: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/>',
 };
 
-export default function Notifications({ actions }) {
-  const [read, setRead] = useState(() => new Set(notifications.filter((n) => !n.unread).map((n) => n.id)));
-  const markAll = () => setRead(new Set(notifications.map((n) => n.id)));
+export default function Notifications({ actions, getToken }) {
+  // Live notifications when signed in; the prototype falls back to the seed list.
+  const { items: liveItems, ready, markAllRead } = useNotifications({ getToken, enabled: !!getToken });
+  const notifications = ready ? liveItems : mockNotifications;
+
+  const [read, setRead] = useState(() => new Set());
+  const markAll = () => { setRead(new Set(notifications.map((n) => n.id))); if (ready) markAllRead(); };
   const open = (n) => {
     setRead((r) => new Set(r).add(n.id));
     if (n.athlete) actions.openAthlete(n.athlete);
-    else actions.go(n.target);
+    else if (n.target) actions.go(n.target);
   };
-  const unread = notifications.filter((n) => !read.has(n.id)).length;
+  const isRead = (n) => read.has(n.id) || !n.unread;
+  const unread = notifications.filter((n) => !isRead(n)).length;
 
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
@@ -38,8 +44,11 @@ export default function Notifications({ actions }) {
 
       {/* list */}
       <div style={s('display:flex;flex-direction:column;gap:9px;margin-top:16px')}>
+        {notifications.length === 0 && (
+          <div style={s('font-size:12.5px;color:var(--text3);background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:22px;text-align:center')}>You're all caught up — no notifications yet.</div>
+        )}
         {notifications.map((n) => {
-          const isUnread = !read.has(n.id);
+          const isUnread = !isRead(n);
           return (
             <div key={n.id} className="ctl" onClick={() => open(n)}
               style={s('display:flex;gap:12px;align-items:center;border-radius:15px;padding:13px 14px;' + (isUnread ? 'background:var(--accent-dim);border:1px solid color-mix(in srgb,var(--accent) 22%,transparent)' : 'background:var(--bg2);border:1px solid var(--line)'))}>

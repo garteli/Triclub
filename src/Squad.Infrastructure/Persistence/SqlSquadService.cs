@@ -24,7 +24,8 @@ public sealed class SqlSquadService(string connectionString) : ISquadService
                (SELECT COUNT(*) FROM dbo.Membership m WHERE m.SquadId = s.Id) AS MemberCount,
                CAST(CASE WHEN EXISTS (
                     SELECT 1 FROM dbo.Membership mm WHERE mm.SquadId = s.Id AND mm.AthleteId = @me
-               ) THEN 1 ELSE 0 END AS bit) AS IsMember
+               ) THEN 1 ELSE 0 END AS bit) AS IsMember,
+               s.OwnerId
         FROM dbo.Squad s
         """;
 

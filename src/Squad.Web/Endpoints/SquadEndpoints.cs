@@ -44,12 +44,24 @@ public static class SquadEndpoints
         return Results.Created($"/api/squads/{id}", created);
     }
 
-    private static async Task<IResult> Join(Guid id, HttpContext http, ISquadService squads, CancellationToken ct)
+    private static async Task<IResult> Join(
+        Guid id, HttpContext http, ISquadService squads,
+        IAthleteDirectory directory, INotificationService notes, CancellationToken ct)
     {
         if (Me(http) is not { } me) return Results.Unauthorized();
-        if (await squads.GetAsync(id, me, ct) is null) return Results.NotFound();
+        var squad = await squads.GetAsync(id, me, ct);
+        if (squad is null) return Results.NotFound();
 
+        var wasMember = squad.IsMember;
         await squads.JoinAsync(id, me, ct);
+
+        // Notify the squad owner of a genuinely new member (not a re-join, not self).
+        if (!wasMember && squad.OwnerId is { } owner && owner != me)
+        {
+            var actor = await directory.GetAsync(me, ct);
+            if (actor is not null)
+                await notes.AddAsync(owner, "join", me, actor.Name, $"joined {squad.Name}", ct);
+        }
         return Results.Ok(await squads.GetAsync(id, me, ct));
     }
 

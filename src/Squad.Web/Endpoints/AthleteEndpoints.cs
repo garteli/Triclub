@@ -62,10 +62,20 @@ public static class AthleteEndpoints
         });
     }
 
-    private static async Task<IResult> Follow(Guid id, HttpContext http, IFollowService follows, CancellationToken ct)
+    private static async Task<IResult> Follow(
+        Guid id, HttpContext http, IFollowService follows,
+        IAthleteDirectory directory, INotificationService notes, CancellationToken ct)
     {
         if (!TryMe(http, out var me)) return Results.Unauthorized();
         await follows.FollowAsync(me, id, ct);
+
+        // Notify the followee (skip self-follow, which FollowAsync ignores anyway).
+        if (id != me)
+        {
+            var actor = await directory.GetAsync(me, ct);
+            if (actor is not null)
+                await notes.AddAsync(id, "follow", me, actor.Name, "started following you", ct);
+        }
         return Results.Ok(new { following = true });
     }
 

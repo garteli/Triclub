@@ -68,7 +68,7 @@ public interface IProfileService
 public sealed record SquadSummary(
     Guid Id, string Name, string Discipline, string? Location, string? Level, string Kind,
     string? Price, string? PerLabel, string Color, string? Rating, string? Description,
-    int MemberCount, bool IsMember);
+    int MemberCount, bool IsMember, Guid? OwnerId);
 
 /// <summary>Fields for creating a squad (from the Register-a-group wizard).</summary>
 public sealed record SquadCreate(
@@ -106,6 +106,18 @@ public interface IFollowService
     Task FollowAsync(Guid followerId, Guid followeeId, CancellationToken ct);
     Task UnfollowAsync(Guid followerId, Guid followeeId, CancellationToken ct);
     Task<bool> IsFollowingAsync(Guid followerId, Guid followeeId, CancellationToken ct);
+}
+
+// ----- Notifications -----
+
+public sealed record Notification(
+    Guid Id, Guid RecipientId, string Kind, Guid? ActorId, string ActorName, string Text, bool Read, DateTimeOffset CreatedUtc);
+
+public interface INotificationService
+{
+    Task AddAsync(Guid recipientId, string kind, Guid? actorId, string actorName, string text, CancellationToken ct);
+    Task<IReadOnlyList<Notification>> GetRecentAsync(Guid recipientId, int take, CancellationToken ct);
+    Task MarkAllReadAsync(Guid recipientId, CancellationToken ct);
 }
 
 /// <summary>Verifies a provider id_token and returns its trustworthy claims. Null if invalid.</summary>
