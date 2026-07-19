@@ -1,23 +1,21 @@
 name: iOS TestFlight
 
-# Archives the Capacitor iOS app with automatic signing (driven by an
-# App Store Connect API key) and uploads the build to TestFlight.
+# Archives the Capacitor iOS app with MANUAL signing (explicit Distribution
+# certificate + App Store provisioning profile) and uploads to TestFlight.
 #
-# Manual trigger only (workflow_dispatch) or by pushing a v* tag, so an
-# upload never happens by accident on an ordinary push/PR.
+# Manual trigger only (workflow_dispatch) or by pushing a v* tag.
 #
 # Required repository secrets (Settings -> Secrets and variables -> Actions):
-#   ASC_KEY_ID        - App Store Connect API Key ID
-#   ASC_ISSUER_ID     - App Store Connect API Issuer ID (UUID)
-#   ASC_KEY_P8_BASE64 - the .p8 private key, base64-encoded
-#                       (macOS: base64 -i AuthKey_XXXX.p8 | pbcopy)
+#   Signing (manual):
+#     IOS_DIST_CERT_P12_BASE64   - Apple Distribution cert exported as .p12, base64-encoded
+#     IOS_DIST_CERT_PASSWORD     - the password set when exporting the .p12
+#     IOS_PROVISION_PROFILE_BASE64 - App Store provisioning profile (.mobileprovision)
+#                                    for com.triclub.app, base64-encoded
+#   Upload (App Store Connect API key, already configured):
+#     ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8_BASE64
 #
 # The Apple Developer Team ID is not secret and is set below in env.
-#
-# Prerequisites (one-time, on Apple's side):
-#   - An app record in App Store Connect for bundle id com.triclub.app
-#   - The API key must have the "App Manager" role
-#   - The build number is set from the CI run number, so each upload is unique
+# Build number comes from the CI run number, so each upload is unique.
 
 on:
   workflow_dispatch:
@@ -40,24 +38,27 @@ jobs:
 
       - name: Verify required secrets are present
         env:
+          IOS_DIST_CERT_P12_BASE64: ${{ secrets.IOS_DIST_CERT_P12_BASE64 }}
+          IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          IOS_PROVISION_PROFILE_BASE64: ${{ secrets.IOS_PROVISION_PROFILE_BASE64 }}
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
         run: |
           missing=
-          [ -z "$ASC_KEY_ID" ] && missing="$missing ASC_KEY_ID"
-          [ -z "$ASC_ISSUER_ID" ] && missing="$missing ASC_ISSUER_ID"
-          [ -z "$ASC_KEY_P8_BASE64" ] && missing="$missing ASC_KEY_P8_BASE64"
+          [ -z "$IOS_DIST_CERT_P12_BASE64" ]     && missing="$missing IOS_DIST_CERT_P12_BASE64"
+          [ -z "$IOS_DIST_CERT_PASSWORD" ]        && missing="$missing IOS_DIST_CERT_PASSWORD"
+          [ -z "$IOS_PROVISION_PROFILE_BASE64" ]  && missing="$missing IOS_PROVISION_PROFILE_BASE64"
+          [ -z "$ASC_KEY_ID" ]                    && missing="$missing ASC_KEY_ID"
+          [ -z "$ASC_ISSUER_ID" ]                 && missing="$missing ASC_ISSUER_ID"
+          [ -z "$ASC_KEY_P8_BASE64" ]             && missing="$missing ASC_KEY_P8_BASE64"
           if [ -n "$missing" ]; then
             echo "::error::Missing/empty repository secret(s):$missing"
-            echo "Add them as *Repository* secrets (NOT Environment secrets), exact names above, at:"
-            echo "  Settings -> Secrets and variables -> Actions -> New repository secret"
+            echo "Add them as *Repository* secrets (NOT Environment secrets), exact names above."
             exit 1
           fi
-          echo "All required App Store Connect secrets are present."
-          # Publish whitespace-trimmed IDs for later steps. A stray space or
-          # newline pasted into the secret makes xcodebuild reject the key
-          # ("Invalid authentication key credential ... keyPathInvalidFormat").
+          echo "All required secrets are present."
+          # Trimmed IDs for the upload step (stray whitespace breaks auth).
           printf 'ASC_KEY_ID=%s\n'    "$(printf '%s' "$ASC_KEY_ID"    | tr -d '[:space:]')" >> "$GITHUB_ENV"
           printf 'ASC_ISSUER_ID=%s\n' "$(printf '%s' "$ASC_ISSUER_ID" | tr -d '[:space:]')" >> "$GITHUB_ENV"
 
@@ -77,27 +78,47 @@ jobs:
       - name: Capacitor sync (iOS)
         run: npx cap sync ios
 
-      - name: Install App Store Connect API key
+      - name: Import signing certificate & provisioning profile
         env:
-          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
+          IOS_DIST_CERT_P12_BASE64: ${{ secrets.IOS_DIST_CERT_P12_BASE64 }}
+          IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          IOS_PROVISION_PROFILE_BASE64: ${{ secrets.IOS_PROVISION_PROFILE_BASE64 }}
         run: |
-          mkdir -p ~/.appstoreconnect/private_keys
-          KEYFILE=~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8
-          if printf '%s' "$ASC_KEY_P8_BASE64" | grep -q "BEGIN PRIVATE KEY"; then
-            # Secret already holds the raw .p8 (PEM) — write it as-is.
-            printf '%s\n' "$ASC_KEY_P8_BASE64" > "$KEYFILE"
-          else
-            # Secret holds base64 of the .p8 — strip whitespace, then decode
-            # (openssl handles both wrapped and unwrapped base64 portably).
-            printf '%s' "$ASC_KEY_P8_BASE64" | tr -d '[:space:]' | openssl base64 -A -d > "$KEYFILE"
-          fi
-          if ! grep -q "BEGIN PRIVATE KEY" "$KEYFILE"; then
-            echo "::error::ASC_KEY_P8_BASE64 did not resolve to a valid .p8 (expected a PKCS#8 'BEGIN PRIVATE KEY' block). Re-check that secret: paste EITHER the raw AuthKey_*.p8 contents OR its base64 (base64 -i AuthKey_XXX.p8)."
-            exit 1
-          fi
-          echo "API key installed ($(wc -c < "$KEYFILE") bytes)."
+          set -euo pipefail
+          KEYCHAIN="$RUNNER_TEMP/build.keychain-db"
+          KEYCHAIN_PW="$(openssl rand -base64 24)"
+          CERT="$RUNNER_TEMP/dist.p12"
+          PROFILE="$RUNNER_TEMP/pp.mobileprovision"
 
-      - name: Archive (Release, automatic signing)
+          printf '%s' "$IOS_DIST_CERT_P12_BASE64"    | tr -d '[:space:]' | openssl base64 -A -d > "$CERT"
+          printf '%s' "$IOS_PROVISION_PROFILE_BASE64" | tr -d '[:space:]' | openssl base64 -A -d > "$PROFILE"
+
+          # Temp keychain holding the distribution identity.
+          security create-keychain -p "$KEYCHAIN_PW" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PW" "$KEYCHAIN"
+          security import "$CERT" -k "$KEYCHAIN" -P "$IOS_DIST_CERT_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PW" "$KEYCHAIN" >/dev/null
+          # Make the temp keychain searchable alongside the login keychain.
+          security list-keychains -d user -s "$KEYCHAIN" "$HOME/Library/Keychains/login.keychain-db"
+
+          # Install the provisioning profile and read its Name (used as the specifier).
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          PLIST="$(security cms -D -i "$PROFILE")"
+          UUID="$(/usr/libexec/PlistBuddy -c 'Print :UUID' /dev/stdin <<< "$PLIST")"
+          NAME="$(/usr/libexec/PlistBuddy -c 'Print :Name' /dev/stdin <<< "$PLIST")"
+          cp "$PROFILE" "$HOME/Library/MobileDevice/Provisioning Profiles/$UUID.mobileprovision"
+
+          # Identify the signing certificate common name in the keychain.
+          IDENTITY="$(security find-identity -v -p codesigning "$KEYCHAIN" | grep -o '"[^"]*"' | head -1 | tr -d '"')"
+
+          echo "PROFILE_NAME=$NAME"            >> "$GITHUB_ENV"
+          echo "SIGN_IDENTITY=$IDENTITY"       >> "$GITHUB_ENV"
+          echo "SIGN_KEYCHAIN=$KEYCHAIN"       >> "$GITHUB_ENV"
+          echo "Installed profile '$NAME' (UUID $UUID); signing identity: $IDENTITY"
+
+      - name: Archive (Release, manual signing)
         run: |
           xcodebuild \
             -workspace ios/App/App.xcworkspace \
@@ -105,12 +126,11 @@ jobs:
             -configuration Release \
             -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/App.xcarchive" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8 \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            CODE_SIGN_STYLE=Manual \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
-            CODE_SIGN_STYLE=Automatic \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
+            CODE_SIGN_IDENTITY="$SIGN_IDENTITY" \
+            OTHER_CODE_SIGN_FLAGS="--keychain $SIGN_KEYCHAIN" \
             CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
             archive
 
@@ -123,8 +143,12 @@ jobs:
           <dict>
             <key>method</key><string>app-store</string>
             <key>teamID</key><string>${APPLE_TEAM_ID}</string>
-            <key>signingStyle</key><string>automatic</string>
-            <key>destination</key><string>export</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>signingCertificate</key><string>${SIGN_IDENTITY}</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>com.triclub.app</key><string>${PROFILE_NAME}</string>
+            </dict>
             <key>uploadSymbols</key><true/>
           </dict>
           </plist>
@@ -132,15 +156,22 @@ jobs:
           xcodebuild -exportArchive \
             -archivePath "$RUNNER_TEMP/App.xcarchive" \
             -exportPath "$RUNNER_TEMP/export" \
-            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8 \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist"
 
       - name: Upload to TestFlight
+        env:
+          ASC_KEY_ID_SECRET: ${{ secrets.ASC_KEY_ID }}
+          ASC_KEY_P8_BASE64: ${{ secrets.ASC_KEY_P8_BASE64 }}
         run: |
-          IPA=$(ls "$RUNNER_TEMP"/export/*.ipa | head -1)
+          # Install the App Store Connect API key for altool (upload auth).
+          mkdir -p ~/.appstoreconnect/private_keys
+          KEYFILE=~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8
+          if printf '%s' "$ASC_KEY_P8_BASE64" | grep -q "BEGIN PRIVATE KEY"; then
+            printf '%s\n' "$ASC_KEY_P8_BASE64" > "$KEYFILE"
+          else
+            printf '%s' "$ASC_KEY_P8_BASE64" | tr -d '[:space:]' | openssl base64 -A -d > "$KEYFILE"
+          fi
+          IPA="$(ls "$RUNNER_TEMP"/export/*.ipa | head -1)"
           echo "Uploading $IPA"
           xcrun altool --upload-app \
             --type ios \
