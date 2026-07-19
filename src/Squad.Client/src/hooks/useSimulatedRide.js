@@ -1,24 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { rideBase } from '../data/squadData.js';
+import { ridePointAt as pointAt, RIDE_ROUTE as ROUTE } from '../data/course.js';
 
 // DEV ONLY. Produces the same { riders, route } shape LiveRideMap consumes, but the
-// coordinates are generated locally — riders orbit a real lat/lon loop — so you can
-// see the coordinate-projected map animate before a native recorder exists. In
-// production, delete this and use useLiveRide() instead (identical rider shape).
-const CENTER = { lat: 32.72, lon: 35.53 };   // Kaza reservoir-ish
-const R_LAT = 0.010;
-const R_LON = 0.014;
-
-function pointAt(u) {
-  const a = 2 * Math.PI * u;
-  return { lat: CENTER.lat + R_LAT * Math.cos(a), lon: CENTER.lon + R_LON * Math.sin(a) };
-}
-
-// Static course polyline sampled once around the loop.
-const ROUTE = Array.from({ length: 48 }, (_, i) => {
-  const p = pointAt(i / 48);
-  return [p.lat, p.lon];
-});
+// coordinates are generated locally — riders orbit a real lat/lon loop (see
+// ../data/course.js) — so you can see the coordinate-projected map animate before a
+// native recorder exists. In production, delete this and use useLiveRide() instead
+// (identical rider shape).
 
 export function useSimulatedRide() {
   const [riders, setRiders] = useState([]);

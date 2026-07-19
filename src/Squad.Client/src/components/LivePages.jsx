@@ -1,5 +1,8 @@
 import { s } from '../lib/style.js';
 import { metricCatalog, liveMetricValues, liveChartsView, liveRadarView, spreadRiders } from '../lib/liveMetrics.js';
+import TileMap from './TileMap.jsx';
+import { toPathD } from '../lib/tiles.js';
+import { RIDE_ROUTE, ridePointAt } from '../data/course.js';
 
 // ---- Group side column: teammates front→back on a rail + rear-radar vehicle blip ----
 function GroupColumn({ t }) {
@@ -68,17 +71,23 @@ function FieldCell({ f, editing, actions, index }) {
       {f.kind === 'map' && (
         <>
           <div style={s('position:absolute;inset:0')}>
-            <svg viewBox="0 0 344 240" preserveAspectRatio="xMidYMid slice" style={{ width: '100%', height: '100%', display: 'block' }}>
-              <rect width="344" height="240" fill="var(--bg3)" />
-              <g stroke="var(--line)" strokeWidth="1"><path d="M0,60 H344 M0,120 H344 M0,180 H344 M86,0 V240 M172,0 V240 M258,0 V240" /></g>
-              <path d="M28,200 C24,150 66,120 110,122 C156,124 168,70 210,64 C258,56 306,78 314,120" fill="none" stroke="var(--line2)" strokeWidth="8" strokeLinecap="round" />
-              <path d="M28,200 C24,150 66,120 110,122 C156,124 168,70 210,64 C258,56 306,78 314,120" fill="none" stroke="var(--accent)" strokeWidth="3.2" strokeLinecap="round" />
-              <circle cx="150" cy="98" r="10" fill="var(--accent)" stroke="var(--bg)" strokeWidth="3" />
-              <circle cx="196" cy="72" r="7" fill="#ff9a4c" stroke="var(--bg)" strokeWidth="2.5" />
-              <circle cx="118" cy="120" r="7" fill="#5a86ff" stroke="var(--bg)" strokeWidth="2.5" />
-            </svg>
+            <TileMap points={RIDE_ROUTE} W={344} H={240} radius={0} pad={20}>
+              {(project) => {
+                const d = toPathD(RIDE_ROUTE, project);
+                const you = project(f.you.lat, f.you.lon);
+                const pack = f.pack.map((p) => project(p.lat, p.lon));
+                return (
+                  <>
+                    <path d={d} fill="none" stroke="rgba(0,0,0,.5)" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d={d} fill="none" stroke="var(--accent)" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+                    {pack.map((p, k) => <circle key={k} cx={p.x} cy={p.y} r="6" fill={f.pack[k].color} stroke="#0b0f14" strokeWidth="2.5" />)}
+                    <circle cx={you.x} cy={you.y} r="9" fill="var(--accent)" stroke="#0b0f14" strokeWidth="3" />
+                  </>
+                );
+              }}
+            </TileMap>
           </div>
-          <div style={s('position:absolute;top:10px;left:11px;font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.8px;font-weight:600;background:color-mix(in srgb,var(--bg) 60%,transparent);padding:2px 7px;border-radius:6px')}>Route</div>
+          <div style={s('position:absolute;top:10px;left:11px;font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.8px;font-weight:600;background:color-mix(in srgb,var(--bg) 60%,transparent);padding:2px 7px;border-radius:6px;z-index:2')}>Route</div>
         </>
       )}
       {editing && (
@@ -189,7 +198,14 @@ export default function LivePages({ t, lp }) {
       starFill: hero ? 'var(--accent-ink)' : 'none',
       starStroke: hero ? 'var(--accent-ink)' : 'var(--text2)',
     };
-    if (tok === 'map') return { ...base, kind: 'map', label: 'Route' };
+    if (tok === 'map') {
+      // Riders orbit the same real loop the ride uses — you (accent) plus a few pack
+      // dots — so the map field animates in step with the group.
+      const you = ridePointAt((t * 0.01) % 1);
+      const pack = [['#ff9a4c', 0.012], ['#5a86ff', -0.018], ['#4fe08b', 0.026]]
+        .map(([color, off]) => ({ color, ...ridePointAt(((t * 0.01) + off + 1) % 1) }));
+      return { ...base, kind: 'map', label: 'Route', you, pack };
+    }
     if (charts[tok]) { const c = charts[tok]; return { ...base, kind: 'chart', label: c.label, value: c.cur, unit: c.unit, color: c.color, pts: c.pts, area: c.area }; }
     const m = metricCatalog[tok] || { label: tok, unit: '' };
     const val = mv[tok] || { v: '—' };

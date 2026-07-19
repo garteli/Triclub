@@ -1,4 +1,7 @@
 import { s } from '../lib/style.js';
+import TileMap from '../components/TileMap.jsx';
+import { toPathD } from '../lib/tiles.js';
+import { SEGMENT_CLIMB } from '../data/course.js';
 
 const label = 'font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.3px;font-weight:600';
 
@@ -12,14 +15,22 @@ export default function Segments({ vm }) {
       </div>
 
       {/* mini map */}
-      <div style={s('margin:14px 18px 0;border-radius:18px;overflow:hidden;border:1px solid var(--line);background:#0d1512;position:relative')}>
-        <svg viewBox="0 0 356 120" style={{ width: '100%', display: 'block' }}>
-          <rect width="356" height="120" fill="var(--bg3)" />
-          <path d="M20,100 C80,96 120,70 170,66 C230,60 280,34 336,22" fill="none" stroke="var(--line2)" strokeWidth="7" strokeLinecap="round" />
-          <path d="M20,100 C80,96 120,70 170,66 C230,60 280,34 336,22" fill="none" stroke="var(--bike)" strokeWidth="3" strokeLinecap="round" />
-          <circle cx="20" cy="100" r="6" fill="var(--good)" stroke="var(--bg3)" strokeWidth="2" />
-          <circle cx="336" cy="22" r="6" fill="var(--bad)" stroke="var(--bg3)" strokeWidth="2" />
-        </svg>
+      <div style={s('margin:14px 18px 0;border-radius:18px;overflow:hidden;border:1px solid var(--line);position:relative')}>
+        <TileMap points={SEGMENT_CLIMB} W={356} H={120} radius={18} pad={18}>
+          {(project) => {
+            const d = toPathD(SEGMENT_CLIMB, project);
+            const start = project(SEGMENT_CLIMB[0][0], SEGMENT_CLIMB[0][1]);
+            const top = project(SEGMENT_CLIMB[SEGMENT_CLIMB.length - 1][0], SEGMENT_CLIMB[SEGMENT_CLIMB.length - 1][1]);
+            return (
+              <>
+                <path d={d} fill="none" stroke="rgba(0,0,0,.5)" strokeWidth="6.5" strokeLinecap="round" strokeLinejoin="round" />
+                <path d={d} fill="none" stroke="var(--bike)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx={start.x} cy={start.y} r="6" fill="var(--good)" stroke="#0b0f14" strokeWidth="2.5" />
+                <circle cx={top.x} cy={top.y} r="6" fill="var(--bad)" stroke="#0b0f14" strokeWidth="2.5" />
+              </>
+            );
+          }}
+        </TileMap>
       </div>
 
       {/* your effort + QOM */}

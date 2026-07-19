@@ -1,4 +1,6 @@
 import { s } from '../lib/style.js';
+import TileMap from '../components/TileMap.jsx';
+import { toPathD } from '../lib/tiles.js';
 
 const Comment = ({ av, avBg, avColor, name, time, body }) => (
   <div style={s('display:flex;gap:10px')}>
@@ -30,16 +32,23 @@ export default function Feed({ vm, state, actions }) {
       </div>
 
       {/* map */}
-      {a.hasMap && (
-        <div style={s('margin:0 18px;border-radius:20px;overflow:hidden;border:1px solid var(--line);position:relative;background:#0d1512')}>
-          <svg viewBox="0 0 356 170" style={{ width: '100%', display: 'block' }}>
-            <rect width="356" height="170" fill="var(--bg3)" />
-            <g stroke="var(--line)" strokeWidth="1"><path d="M0,42 H356 M0,85 H356 M0,128 H356 M89,0 V170 M178,0 V170 M267,0 V170" /></g>
-            <path d="M30,140 C20,90 60,60 100,66 C150,74 150,20 200,26 C260,33 320,50 330,100 C336,132 300,150 250,144 C200,138 150,150 100,148 C60,146 38,150 30,140Z" fill="none" stroke={a.sportColor} strokeWidth="3" strokeLinecap="round" opacity=".95" />
-            <circle cx="30" cy="140" r="6" fill="var(--good)" stroke="var(--bg3)" strokeWidth="2" />
-            <circle cx="200" cy="26" r="5" fill="var(--warn)" stroke="var(--bg3)" strokeWidth="2" />
-          </svg>
-          <div style={s('position:absolute;bottom:8px;right:10px;font-size:9px;color:var(--text3);background:color-mix(in srgb,var(--bg) 70%,transparent);padding:3px 6px;border-radius:6px')}>Route map · placeholder</div>
+      {a.hasMap && a.routePath && (
+        <div style={s('margin:0 18px;border:1px solid var(--line);border-radius:20px;overflow:hidden')}>
+          <TileMap points={a.routePath} W={356} H={170} radius={20}>
+            {(project) => {
+              const d = toPathD(a.routePath, project);
+              const start = project(a.routePath[0][0], a.routePath[0][1]);
+              const end = project(a.routePath[a.routePath.length - 1][0], a.routePath[a.routePath.length - 1][1]);
+              return (
+                <>
+                  <path d={d} fill="none" stroke="rgba(0,0,0,.45)" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d={d} fill="none" stroke={a.sportColor} strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+                  <circle cx={start.x} cy={start.y} r="6" fill="var(--good)" stroke="#0b0f14" strokeWidth="2.5" />
+                  <circle cx={end.x} cy={end.y} r="5.5" fill="var(--bad)" stroke="#0b0f14" strokeWidth="2.5" />
+                </>
+              );
+            }}
+          </TileMap>
         </div>
       )}
 
