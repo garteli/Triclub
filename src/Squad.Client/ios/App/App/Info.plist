@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-        <string>Triclub</string>
+        <string>Domestique</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -46,11 +46,11 @@
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Triclub uses your location to show your position to teammates during a live ride.</string>
+	<string>Domestique uses your location to show your position to teammates during a live ride.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Triclub keeps recording your ride when the screen is off so your squad can see you.</string>
+	<string>Domestique keeps recording your ride when the screen is off so your squad can see you.</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>Triclub connects to your heart-rate strap, power meter, and radar.</string>
+	<string>Domestique connects to your heart-rate strap, power meter, and radar.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>

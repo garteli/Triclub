@@ -1,6 +1,6 @@
 {
   "appId": "com.triclub.app",
-  "appName": "Triclub",
+  "appName": "Domestique",
   "webDir": "../Squad.Web/wwwroot",
   "server": {
     "androidScheme": "https"
