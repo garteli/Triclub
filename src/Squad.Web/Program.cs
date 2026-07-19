@@ -15,6 +15,20 @@ builder.Services.AddSquadInfrastructure(sqlConnection);
 builder.Services.AddSignalR();
 builder.Services.AddScoped<IActivityFanout, SignalRActivityFanout>();
 
+// ---- CORS ----
+// The native app serves the bundled SPA from capacitor://localhost (iOS) and
+// https://localhost (Android), so its /api and /hubs calls to this backend are
+// cross-origin. Allow the Capacitor webview origins. SignalR + bearer flows need
+// an explicit origin list with credentials (not AllowAnyOrigin). On the web the SPA
+// is same-origin, so this policy is a no-op there.
+const string NativeCors = "native";
+builder.Services.AddCors(options =>
+    options.AddPolicy(NativeCors, policy => policy
+        .WithOrigins("capacitor://localhost", "ionic://localhost", "http://localhost", "https://localhost")
+        .AllowAnyHeader()
+        .AllowAnyMethod()
+        .AllowCredentials()));
+
 // ---- auth ----
 // Protected endpoints/hubs read the caller's athlete id from the NameIdentifier
 // (or 'sub') claim of a validated JWT bearer token. Configure the "Jwt" section
@@ -84,6 +98,8 @@ var app = builder.Build();
 // Serve the compiled React SPA from wwwroot.
 app.UseDefaultFiles();
 app.UseStaticFiles();
+
+app.UseCors(NativeCors);
 
 app.UseAuthentication();
 app.UseAuthorization();
