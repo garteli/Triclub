@@ -124,6 +124,65 @@ To keep sensors alive with the screen off, also add `bluetooth-central` to
 | Power | **Standard** GATT | `0x1818` / `0x2A63` |
 | Radar (Varia) | **Proprietary** | `6A4E3200-…` / `6A4E3203-…` |
 
+---
+
+# Apple Health (HealthKit) — import workout history
+
+HealthKit is **iOS-native only** — there is no web API for it (same platform reality as
+background GPS and Web Bluetooth on iOS). So the "Sync Apple Health" panel on the Upload
+screen is live only in the native iOS build; on web it renders a disabled, explanatory
+state. The read + upload lives entirely on the device — the backend HealthKit path
+(`POST /api/activities/native/healthkit`, `HealthKitAdapter`) was already there; this just
+feeds it.
+
+## How it fits
+
+`lib/health.js` (facade) → `lib/healthSource.native.js` (HealthKit reader) → posts each
+workout to `/api/activities/native/healthkit`. That endpoint is idempotent by HealthKit
+workout **UUID** and dedupes by fingerprint, so re-syncing is safe: already-imported
+workouts return `already-received` and never double-count. `useHealthSync` + the
+`AppleHealthSync` component drive the UI. The one plugin-specific mapping is `mapWorkout()`
+in `healthSource.native.js` — swap plugins and only that function changes.
+
+## Install
+
+```bash
+cd src/Squad.Client
+npm i @perfood/capacitor-healthkit
+npx cap sync
+```
+
+(Already listed in `package.json` and marked `external` in `vite.config.js`, so the web
+bundle never tries to resolve it.)
+
+## iOS — capability + `Info.plist`
+
+1. In Xcode → target **App** → **Signing & Capabilities** → **+ Capability** → **HealthKit**.
+2. Add the read-permission usage string (required — HealthKit auth throws without it):
+
+```xml
+<key>NSHealthShareUsageDescription</key>
+<string>Domestique Club reads your workouts from Apple Health to add them to your training log and squad feed.</string>
+```
+
+We only request **read** scopes (workouts, distance, activity energy, heart rate); no
+write. iOS never tells the app whether a specific type was granted (privacy by design), so
+a "successful" permission call just means the sheet was shown — a sync that finds nothing
+usually means read access was declined in Settings → Privacy → Health.
+
+## Notes
+
+- **Units**: `totalDistance` is mapped straight through as metres and `totalEnergyBurned`
+  as calories — validate against a known workout on real hardware, and adjust `mapWorkout`
+  if your locale/plugin version returns a different base unit.
+- **HR/power enrichment**: `mapWorkout` fills the fields an `HKWorkout` reliably carries;
+  average HR/power need separate per-workout `HKQuantity` queries and are left `null` for
+  now (a documented follow-up). The dedup fingerprint only needs sport + start + distance,
+  so imports are correct without them.
+- **Android**: the parallel path is Health Connect (`ActivitySource.HealthConnect`,
+  `/api/activities/native/healthconnect`) — the backend adapter exists; a Health Connect
+  reader on the client is the analogous next step.
+
 HR and power are Bluetooth SIG standards and parse to spec. **Radar is reverse-engineered**
 (1 header byte + 3 bytes/threat: distance + threat-level bits) — it works with Garmin
 Varia RTL-series but is unofficial and needs validation against your hardware; the closing

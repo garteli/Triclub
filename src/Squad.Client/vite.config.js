@@ -11,7 +11,7 @@ export default defineConfig({
     rollupOptions: {
       // Only loaded at runtime inside the native shell; keep them out of the web bundle
       // so a web-only install doesn't need the Capacitor packages present.
-      external: ['@capacitor/core', '@capacitor-community/background-geolocation', '@capacitor-community/bluetooth-le'],
+      external: ['@capacitor/core', '@capacitor-community/background-geolocation', '@capacitor-community/bluetooth-le', '@perfood/capacitor-healthkit'],
     },
   },
   server: {
