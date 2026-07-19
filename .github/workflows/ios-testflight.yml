@@ -135,7 +135,6 @@ jobs:
             -archivePath "$RUNNER_TEMP/App.xcarchive" \
             CODE_SIGN_STYLE=Manual \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
-            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
             CODE_SIGN_IDENTITY="$SIGN_IDENTITY" \
             OTHER_CODE_SIGN_FLAGS="--keychain $SIGN_KEYCHAIN" \
             CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
