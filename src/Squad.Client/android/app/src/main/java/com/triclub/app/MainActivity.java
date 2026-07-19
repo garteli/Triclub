@@ -1,4 +1,4 @@
-package club.kaza.squad;
+package com.triclub.app;
 
 import com.getcapacitor.BridgeActivity;
 

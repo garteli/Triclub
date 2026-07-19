@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Squad</string>
-    <string name="title_activity_main">Squad</string>
-    <string name="package_name">club.kaza.squad</string>
-    <string name="custom_url_scheme">club.kaza.squad</string>
+    <string name="app_name">Triclub</string>
+    <string name="title_activity_main">Triclub</string>
+    <string name="package_name">com.triclub.app</string>
+    <string name="custom_url_scheme">com.triclub.app</string>
 </resources>

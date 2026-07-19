@@ -1,0 +1,64 @@
+name: iOS build
+
+# Compiles the Capacitor iOS app on a macOS runner. Code signing is disabled,
+# so this validates the build (Swift/plugin compilation, Info.plist, SPM
+# resolution) and produces an unsigned .app artifact — it does not produce a
+# distributable .ipa (that needs signing certificates + a provisioning profile).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/Squad.Client/**'
+      - '.github/workflows/ios-build.yml'
+  pull_request:
+    paths:
+      - 'src/Squad.Client/**'
+      - '.github/workflows/ios-build.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    defaults:
+      run:
+        working-directory: src/Squad.Client
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: src/Squad.Client/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web assets
+        run: npm run build
+
+      - name: Capacitor sync (iOS)
+        run: npx cap sync ios
+
+      - name: Build iOS app (unsigned)
+        run: |
+          xcodebuild \
+            -workspace ios/App/App.xcworkspace \
+            -scheme App \
+            -configuration Debug \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Upload unsigned .app
+        uses: actions/upload-artifact@v4
+        with:
+          name: Triclub-ios-unsigned
+          path: src/Squad.Client/build/Build/Products/Debug-iphoneos/App.app
+          if-no-files-found: error
