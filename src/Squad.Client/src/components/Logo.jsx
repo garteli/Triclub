@@ -1,4 +1,4 @@
-// Domestique Club app mark — the white "Echelon" paceline on the ember squircle.
+// Domestique Team app mark — the white "Echelon" paceline on the ember squircle.
 // (Brand spec: rounded-square ember gradient with the diagonal 3-stroke paceline
 //  + lead-rider dot.) Sizes proportionally; pass `glow` to add the drop shadow.
 export default function Logo({ size = 74, radius, glow = true }) {
@@ -6,7 +6,7 @@ export default function Logo({ size = 74, radius, glow = true }) {
   const mark = Math.round(size * 0.6);
   return (
     <div
-      aria-label="Domestique Club"
+      aria-label="Domestique Team"
       style={{
         width: size,
         height: size,

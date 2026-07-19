@@ -18,7 +18,7 @@ export async function createNativeLocationSource() {
       watcherId = await BackgroundGeolocation.addWatcher(
         {
           backgroundMessage: 'Recording your ride. Tap to return.',
-          backgroundTitle: 'Domestique Club · live ride',
+          backgroundTitle: 'Domestique Team · live ride',
           requestPermissions: true,
           stale: false,
           distanceFilter: 5, // metres between fixes; smooths battery vs. resolution

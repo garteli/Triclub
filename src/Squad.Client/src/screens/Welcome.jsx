@@ -44,7 +44,7 @@ export default function Welcome({ actions }) {
       {/* hero */}
       <div style={s('flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center')}>
         <Logo size={78} />
-        <div style={s('font-size:30px;font-weight:700;letter-spacing:-.6px;margin-top:22px')}>Domestique<span style={s('color:var(--accent)')}> Club</span></div>
+        <div style={s('font-size:30px;font-weight:700;letter-spacing:-.6px;margin-top:22px')}>Domestique<span style={s('color:var(--accent)')}> Team</span></div>
         <div style={s('font-size:14px;color:var(--text2);line-height:1.5;margin-top:8px;max-width:250px')}>Train together. Ride together. Your team's triathlon season, in one app.</div>
 
         <div style={s('display:flex;gap:22px;margin-top:26px')}>
@@ -79,7 +79,7 @@ export default function Welcome({ actions }) {
         <div className="ctl" onClick={() => actions.go('register')} style={s('background:var(--accent);color:var(--accent-ink);text-align:center;padding:15px;border-radius:14px;font-weight:700;font-size:15px')}>Create account</div>
         <div className="ctl" onClick={() => actions.go('newgroup')} style={s('background:var(--bg2);border:1px solid var(--line);color:var(--text);text-align:center;padding:15px;border-radius:14px;font-weight:700;font-size:15px;margin-top:10px')}>Register a group</div>
         <div style={s('text-align:center;font-size:13px;color:var(--text2);margin-top:16px')}>Already have an account? <span className="ctl" onClick={() => actions.go('login')} style={s('color:var(--accent);font-weight:700')}>Log in</span></div>
-        <div style={s('text-align:center;font-size:10.5px;color:var(--text3);margin-top:14px;line-height:1.5')}>By continuing you agree to Domestique Club's Terms &amp; Privacy Policy.</div>
+        <div style={s('text-align:center;font-size:10.5px;color:var(--text3);margin-top:14px;line-height:1.5')}>By continuing you agree to Domestique Team's Terms &amp; Privacy Policy.</div>
       </div>
     </div>
   );

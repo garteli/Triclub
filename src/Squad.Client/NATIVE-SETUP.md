@@ -19,7 +19,7 @@ npx cap sync
 ```
 
 `capacitor.config.json` is already in this folder (appId `com.triclub.app`, appName
-`Domestique Club`, `webDir` points at the Vite output). The SPA is **bundled into the
+`Domestique Team`, `webDir` points at the Vite output). The SPA is **bundled into the
 native shell** (no `server.url`), so it loads from `capacitor://localhost` and works
 offline-first. Because the app origin is then local, root-relative `/api` and `/hubs`
 requests are pointed at the deployed backend by `src/lib/apiBase.js` (`API_BASE`) — a
@@ -169,7 +169,7 @@ bundle never tries to resolve it.)
 
 ```xml
 <key>NSHealthShareUsageDescription</key>
-<string>Domestique Club reads your workouts from Apple Health to add them to your training log and squad feed.</string>
+<string>Domestique Team reads your workouts from Apple Health to add them to your training log and squad feed.</string>
 ```
 
 We only request **read** scopes (workouts, distance, activity energy, heart rate); no

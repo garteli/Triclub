@@ -95,7 +95,7 @@ export default function Sensors({ actions }) {
 
       {webBleMissing && (
         <div style={s('background:color-mix(in srgb,var(--warn) 12%,transparent);border:1px solid color-mix(in srgb,var(--warn) 40%,transparent);border-radius:13px;padding:12px 14px;margin-top:14px;font-size:12px;color:var(--text2);line-height:1.5')}>
-          This browser has no Web Bluetooth (Safari and iOS don’t support it). Use the <b>Domestique Club app</b>, or Chrome on Android/desktop, to pair sensors.
+          This browser has no Web Bluetooth (Safari and iOS don’t support it). Use the <b>Domestique Team app</b>, or Chrome on Android/desktop, to pair sensors.
         </div>
       )}
 
