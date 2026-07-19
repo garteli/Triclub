@@ -60,5 +60,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Triclub-ios-unsigned
-          path: src/Squad.Client/ios/build/Build/Products/Debug-iphoneos/App.app
+          path: src/Squad.Client/build/Build/Products/Debug-iphoneos/App.app
           if-no-files-found: error
