@@ -22,7 +22,10 @@ public sealed class OidcTokenVerifier : IExternalTokenVerifier
     private readonly ConfigurationManager<OpenIdConnectConfiguration> _config;
     private readonly string _clientId;
     private readonly string[] _validIssuers;
-    private readonly JwtSecurityTokenHandler _handler = new();
+    // MapInboundClaims=false keeps the OIDC claim names as-is ('sub', 'email',
+    // 'name', 'email_verified'); the default remaps 'sub' -> the legacy
+    // nameidentifier URI, which made the 'sub' lookup below come back empty.
+    private readonly JwtSecurityTokenHandler _handler = new() { MapInboundClaims = false };
 
     public ExternalProvider Provider { get; }
 
@@ -49,7 +52,7 @@ public sealed class OidcTokenVerifier : IExternalTokenVerifier
         new[] { "https://appleid.apple.com" },
         http);
 
-    public async Task<ExternalIdentity?> VerifyAsync(string idToken, CancellationToken ct)
+    public async Task<ExternalVerifyResult> VerifyAsync(string idToken, CancellationToken ct)
     {
         try
         {
@@ -69,19 +72,20 @@ public sealed class OidcTokenVerifier : IExternalTokenVerifier
             var principal = _handler.ValidateToken(idToken, parameters, out _);
 
             var sub = principal.FindFirstValue(JwtRegisteredClaimNames.Sub);
-            if (string.IsNullOrEmpty(sub)) return null;
+            if (string.IsNullOrEmpty(sub)) return new ExternalVerifyResult(null, "token had no 'sub' claim");
 
             var email = principal.FindFirstValue(JwtRegisteredClaimNames.Email);
             var name = principal.FindFirstValue("name") ?? principal.FindFirstValue(JwtRegisteredClaimNames.GivenName);
             var emailVerified = string.Equals(
                 principal.FindFirstValue("email_verified"), "true", StringComparison.OrdinalIgnoreCase);
 
-            return new ExternalIdentity(sub, email, name, emailVerified);
+            return new ExternalVerifyResult(new ExternalIdentity(sub, email, name, emailVerified), null);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
             // Bad signature, wrong audience, expired, network/JWKS failure — all mean "not authenticated".
-            return null;
+            // The reason is surfaced for diagnostics (audience mismatch vs JWKS/egress failure look very different).
+            return new ExternalVerifyResult(null, $"{ex.GetType().Name}: {ex.Message}");
         }
     }
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { s } from '../lib/style.js';
 import { SocialButton, BiometricButton, OrDivider } from '../components/AuthButtons.jsx';
+import Logo from '../components/Logo.jsx';
 import {
   oauthSignIn, authConfig,
   biometricAvailable, biometricEnrolled, signInWithBiometric,
@@ -41,8 +42,8 @@ export default function Welcome({ actions }) {
     <div style={s('padding:0 22px 40px;height:100%;display:flex;flex-direction:column;animation:floatUp .35s ease')}>
       {/* hero */}
       <div style={s('flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center')}>
-        <div style={s('width:74px;height:74px;border-radius:22px;background:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:36px;color:var(--accent-ink);box-shadow:0 18px 40px -14px var(--accent)')}>D</div>
-        <div style={s('font-size:30px;font-weight:700;letter-spacing:-.6px;margin-top:22px')}>Domestique Club</div>
+        <Logo size={78} />
+        <div style={s('font-size:30px;font-weight:700;letter-spacing:-.6px;margin-top:22px')}>Domestique<span style={s('color:var(--accent)')}> Club</span></div>
         <div style={s('font-size:14px;color:var(--text2);line-height:1.5;margin-top:8px;max-width:250px')}>Train together. Ride together. Your team's triathlon season, in one app.</div>
 
         <div style={s('display:flex;gap:20px;margin-top:26px')}>

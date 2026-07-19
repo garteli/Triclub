@@ -5,8 +5,9 @@
 --
 --  dbo.Squad        one row per club (Discover list + Group profile)
 --  dbo.Membership   which athletes belong to which squads (PK squad+athlete)
---  The well-known demo squad (11111111-…-111111111111) gets a real row here so
---  it appears in Discover alongside user-created squads.
+--  The well-known landing squad (c1a5b000-…-000000000001, the club "מרוץ העצבים"
+--  that self-service sign-ups join — see Squad.Core Squads.Landing) gets a real
+--  row here so its feed/leaderboard/roster exist and it shows in Discover.
 -- ===========================================================================
 SET ANSI_NULLS ON;
 SET QUOTED_IDENTIFIER ON;
@@ -44,12 +45,14 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Membership_Athlete' AN
 CREATE INDEX IX_Membership_Athlete ON dbo.Membership (AthleteId);
 GO
 
--- Give the well-known demo squad a real row so it shows in Discover.
-IF NOT EXISTS (SELECT 1 FROM dbo.Squad WHERE Id = '11111111-1111-1111-1111-111111111111')
+-- Give the well-known landing squad a real row so its feed/leaderboard exist and
+-- it shows in Discover. Idempotent by id: on an existing DB the live row (with its
+-- real OwnerId) is preserved; this only inserts on a fresh database.
+IF NOT EXISTS (SELECT 1 FROM dbo.Squad WHERE Id = 'c1a5b000-0000-0000-0000-000000000001')
 INSERT INTO dbo.Squad (Id, Name, Discipline, Location, Level, Kind, Price, PerLabel, Color, Rating, Description)
-VALUES ('11111111-1111-1111-1111-111111111111', 'Kaza Tri Club', 'Triathlon', 'Tiberias',
-        'All levels', 'free', 'Free', '', '#ff6a2c', '4.9',
-        'The starter squad — weekly rides and a friendly crew chasing 70.3 and Olympic-distance goals.');
+VALUES ('c1a5b000-0000-0000-0000-000000000001', N'מרוץ העצבים', 'Triathlon', 'Israel',
+        'All levels', 'coach', NULL, NULL, '#e11d2a', NULL,
+        N'מרוץ העצבים — Israel triathlon club. Coached group training across swim, bike and run.');
 
 -- Backfill memberships for anyone already carrying a SquadId (seed peers + early signups).
 INSERT INTO dbo.Membership (SquadId, AthleteId, Role)

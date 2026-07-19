@@ -336,6 +336,7 @@ export function buildViewModel(state, t, opts = {}) {
 
   return {
     squad, squadOnTrack, squadTotal,
+    squadName: opts.squadName || null,
     feed: liveFeedRows ?? feedRows,
     activities, myActivities, activityDetail,
     athlete, me: meFull,

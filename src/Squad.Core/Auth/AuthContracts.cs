@@ -3,10 +3,11 @@
 // and verifies external id_tokens, Infrastructure persists accounts.
 namespace Squad.Core;
 
-/// <summary>The well-known squad self-service sign-ups join for the MVP (no Squad table yet).</summary>
+/// <summary>The well-known landing squad self-service sign-ups join — the club
+/// "מרוץ העצבים". Seeded by Squads.sql so its feed/leaderboard/roster exist.</summary>
 public static class Squads
 {
-    public static readonly Guid Demo = new("11111111-1111-1111-1111-111111111111");
+    public static readonly Guid Landing = new("c1a5b000-0000-0000-0000-000000000001");
 }
 
 /// <summary>A persisted account row (== an Athlete). Password and/or a federated subject.</summary>
@@ -151,11 +152,14 @@ public interface IPlanService
     Task<IReadOnlyList<PlannedWorkoutRow>> GetWeekAsync(Guid athleteId, DateTime weekStart, CancellationToken ct);
 }
 
-/// <summary>Verifies a provider id_token and returns its trustworthy claims. Null if invalid.</summary>
+/// <summary>Result of verifying a provider id_token: the identity, or a diagnostic error reason.</summary>
+public sealed record ExternalVerifyResult(ExternalIdentity? Identity, string? Error);
+
+/// <summary>Verifies a provider id_token and returns its trustworthy claims (or a failure reason).</summary>
 public interface IExternalTokenVerifier
 {
     ExternalProvider Provider { get; }
-    Task<ExternalIdentity?> VerifyAsync(string idToken, CancellationToken ct);
+    Task<ExternalVerifyResult> VerifyAsync(string idToken, CancellationToken ct);
 }
 
 /// <summary>The claims we trust from a verified provider id_token.</summary>

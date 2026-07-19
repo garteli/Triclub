@@ -2,17 +2,50 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Domestique Club · Team Training Platform</title>
+
+    <!-- Brand icons + PWA -->
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#0c0e11" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Domestique Club" />
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Heebo:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
+
+    <style>
+      html, body { background: #0c0e11; margin: 0; }
+      @keyframes bootpulse { 0%, 100% { transform: scale(1); opacity: 1 } 50% { transform: scale(.94); opacity: .82 } }
+      /* The boot splash lives inside #root and is replaced the moment React mounts. */
+      #boot-splash {
+        position: fixed; inset: 0; z-index: 9999;
+        display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px;
+        background: #0c0e11; font-family: 'Space Grotesk', system-ui, sans-serif;
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="boot-splash">
+        <div style="width:96px;height:96px;border-radius:26px;background:linear-gradient(155deg,#ff8a3d,#ef5f1f);display:flex;align-items:center;justify-content:center;box-shadow:0 20px 54px -12px rgba(239,95,31,.6);animation:bootpulse 1.6s ease-in-out infinite">
+          <svg width="58" height="58" viewBox="0 0 64 64" fill="none">
+            <g stroke="#fff" stroke-width="5.4" stroke-linecap="round">
+              <path d="M13 44 L23 30" /><path d="M25 46 L35 32" opacity=".85" /><path d="M37 48 L47 34" opacity=".55" />
+            </g>
+            <circle cx="49.5" cy="20.5" r="4.4" fill="#fff" />
+          </svg>
+        </div>
+        <div style="font-size:22px;font-weight:700;letter-spacing:-.4px;color:#eef2f6">Domestique<span style="color:#ff6a2c"> Club</span></div>
+      </div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
