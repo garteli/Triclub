@@ -30,15 +30,29 @@ export function buildViewModel(state, t, opts = {}) {
   const { workoutKey, lbTab } = state;
 
   // ---- squad members (progress rings) ----
-  const squad = members.map((m) => ({
+  // Live: derive the roster from the weekly leaderboard (real members + this-week
+  // training load → ring fill relative to the squad's top load). Else seed data.
+  const squadSource = opts.leaderboardRows?.length
+    ? (() => {
+        const maxLoad = Math.max(1, ...opts.leaderboardRows.map((r) => r.load || 0));
+        return opts.leaderboardRows.map((r) => {
+          const pct = Math.min(100, Math.round(((r.load || 0) / maxLoad) * 100));
+          return {
+            id: r.athleteId, name: r.you ? 'You' : r.name, initials: r.initials, color: r.color,
+            pct, status: pct >= 85 ? 'crushing' : pct >= 45 ? 'ontrack' : 'behind',
+          };
+        });
+      })()
+    : members;
+  const squad = squadSource.map((m) => ({
     ...m,
     dash: `${Math.round((m.pct / 100) * 138.2)} 138.2`,
     pctLabel: m.pct + '%',
     statusColor: statusColor(m.status),
     ringColor: ringColor(m.status),
   }));
-  const squadOnTrack = members.filter((m) => m.status !== 'behind').length;
-  const squadTotal = members.length;
+  const squadOnTrack = squadSource.filter((m) => m.status !== 'behind').length;
+  const squadTotal = squadSource.length;
 
   // ---- live ride (time-driven) ----
   const rideRiders = deriveRideRiders(t);
