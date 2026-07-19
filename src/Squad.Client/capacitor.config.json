@@ -1,6 +1,6 @@
 {
-  "appId": "club.kaza.squad",
-  "appName": "Squad",
+  "appId": "com.triclub.app",
+  "appName": "Triclub",
   "webDir": "../Squad.Web/wwwroot",
   "server": {
     "androidScheme": "https"
