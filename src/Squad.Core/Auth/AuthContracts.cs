@@ -68,7 +68,9 @@ public interface IProfileService
 public sealed record SquadSummary(
     Guid Id, string Name, string Discipline, string? Location, string? Level, string Kind,
     string? Price, string? PerLabel, string Color, string? Rating, string? Description,
-    int MemberCount, bool IsMember);
+    int MemberCount, bool IsMember, Guid? OwnerId,
+    // Caller's join-request state on a gated squad: none | pending | approved | declined.
+    string RequestStatus = "none");
 
 /// <summary>Fields for creating a squad (from the Register-a-group wizard).</summary>
 public sealed record SquadCreate(
@@ -83,7 +85,23 @@ public interface ISquadService
     Task<Guid> CreateAsync(SquadCreate squad, Guid ownerId, CancellationToken ct);
     /// <summary>Join a squad (idempotent) and make it the athlete's active squad.</summary>
     Task JoinAsync(Guid squadId, Guid athleteId, CancellationToken ct);
+
+    /// <summary>Free squad → join immediately; gated squad → create a pending request (idempotent).</summary>
+    Task<JoinOutcome> JoinOrRequestAsync(Guid squadId, string kind, Guid athleteId, CancellationToken ct);
+    /// <summary>Pending join requests across all squads owned by this athlete.</summary>
+    Task<IReadOnlyList<JoinRequestItem>> GetPendingRequestsForOwnerAsync(Guid ownerId, CancellationToken ct);
+    /// <summary>Owner approves a request → membership; returns the applicant's name (null if not owner / no request).</summary>
+    Task<string?> ApproveRequestAsync(Guid squadId, Guid athleteId, Guid ownerId, CancellationToken ct);
+    /// <summary>Owner declines a request; returns the applicant's name (null if not owner / no request).</summary>
+    Task<string?> DeclineRequestAsync(Guid squadId, Guid athleteId, Guid ownerId, CancellationToken ct);
 }
+
+public enum JoinOutcome { Joined, Requested, AlreadyMember, AlreadyRequested }
+
+/// <summary>A pending applicant for one of the owner's squads (list + review).</summary>
+public sealed record JoinRequestItem(
+    Guid SquadId, string SquadName, Guid AthleteId, string AthleteName, string Initials, string AvatarColor,
+    int? Ftp, string? WeeklyHours, DateTimeOffset CreatedUtc);
 
 // ----- Squad chat -----
 
@@ -106,6 +124,31 @@ public interface IFollowService
     Task FollowAsync(Guid followerId, Guid followeeId, CancellationToken ct);
     Task UnfollowAsync(Guid followerId, Guid followeeId, CancellationToken ct);
     Task<bool> IsFollowingAsync(Guid followerId, Guid followeeId, CancellationToken ct);
+}
+
+// ----- Notifications -----
+
+public sealed record Notification(
+    Guid Id, Guid RecipientId, string Kind, Guid? ActorId, string ActorName, string Text, bool Read, DateTimeOffset CreatedUtc);
+
+public interface INotificationService
+{
+    Task AddAsync(Guid recipientId, string kind, Guid? actorId, string actorName, string text, CancellationToken ct);
+    Task<IReadOnlyList<Notification>> GetRecentAsync(Guid recipientId, int take, CancellationToken ct);
+    Task MarkAllReadAsync(Guid recipientId, CancellationToken ct);
+}
+
+// ----- Training plan -----
+
+/// <summary>One planned workout on a date (a row in the weekly plan).</summary>
+public sealed record PlannedWorkoutRow(
+    Guid Id, DateTime WorkoutDate, string Discipline, string Title, string? Sub, int DurationMin, int Load);
+
+public interface IPlanService
+{
+    /// <summary>The athlete's plan for the Monday..Sunday week containing <paramref name="weekStart"/>,
+    /// seeding a template week the first time it's requested.</summary>
+    Task<IReadOnlyList<PlannedWorkoutRow>> GetWeekAsync(Guid athleteId, DateTime weekStart, CancellationToken ct);
 }
 
 /// <summary>Verifies a provider id_token and returns its trustworthy claims. Null if invalid.</summary>

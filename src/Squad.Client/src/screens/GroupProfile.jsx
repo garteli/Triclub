@@ -17,8 +17,11 @@ export default function GroupProfile({ vm, actions, onJoinSquad }) {
   const [error, setError] = useState('');
   const join = async () => {
     setError(''); setBusy(true);
-    try { await onJoinSquad(g.id); actions.go('dash'); }
-    catch (e) { setError(e.message || 'Could not join.'); }
+    try {
+      await onJoinSquad(g.id);
+      // Free squads land you in the app; gated squads stay put to show "pending".
+      if (g.kind === 'free') actions.go('dash');
+    } catch (e) { setError(e.message || 'Could not join.'); }
     finally { setBusy(false); }
   };
   return (
@@ -66,16 +69,24 @@ export default function GroupProfile({ vm, actions, onJoinSquad }) {
           </div>
         </div>
 
-        {/* live join / membership status */}
-        {live && (g.member ? (
-          <div style={s('background:color-mix(in srgb,var(--good) 14%,var(--bg2));border:1px solid color-mix(in srgb,var(--good) 35%,transparent);border-radius:13px;padding:12px 14px;margin-top:16px;font-size:12.5px;color:var(--text2)')}><span style={s('color:var(--good);font-weight:700')}>You're a member.</span> This is your active squad — its feed &amp; leaderboard are on your dashboard.</div>
-        ) : (
-          <>
-            <div className="ctl" onClick={busy ? undefined : join} style={s(`background:var(--accent);color:var(--accent-ink);text-align:center;padding:14px;border-radius:14px;font-weight:700;font-size:14px;margin-top:16px;${busy ? 'opacity:.6' : ''}`)}>{busy ? 'Joining…' : 'Join this squad'}</div>
-            {error && <div style={s('color:var(--bad);font-size:12px;text-align:center;margin-top:8px')}>{error}</div>}
-            <div style={s('font-size:11px;color:var(--text3);text-align:center;margin-top:8px;line-height:1.4')}>Joining makes this your active squad — its rides, feed and leaderboard become yours.</div>
-          </>
-        ))}
+        {/* live join / request / membership status */}
+        {live && (() => {
+          const gated = g.kind !== 'free';
+          if (g.member) return (
+            <div style={s('background:color-mix(in srgb,var(--good) 14%,var(--bg2));border:1px solid color-mix(in srgb,var(--good) 35%,transparent);border-radius:13px;padding:12px 14px;margin-top:16px;font-size:12.5px;color:var(--text2)')}><span style={s('color:var(--good);font-weight:700')}>You're a member.</span> This is your active squad — its feed &amp; leaderboard are on your dashboard.</div>
+          );
+          if (gated && g.requestStatus === 'pending') return (
+            <div style={s('background:color-mix(in srgb,var(--warn) 14%,var(--bg2));border:1px solid color-mix(in srgb,var(--warn) 35%,transparent);border-radius:13px;padding:12px 14px;margin-top:16px;font-size:12.5px;color:var(--text2)')}><span style={s('color:var(--warn);font-weight:700')}>Request pending.</span> The squad manager is reviewing your application.</div>
+          );
+          return (
+            <>
+              {gated && g.requestStatus === 'declined' && <div style={s('font-size:12px;color:var(--bad);text-align:center;margin-top:16px')}>Your previous request was declined — you can apply again.</div>}
+              <div className="ctl" onClick={busy ? undefined : join} style={s(`background:var(--accent);color:var(--accent-ink);text-align:center;padding:14px;border-radius:14px;font-weight:700;font-size:14px;margin-top:${gated && g.requestStatus === 'declined' ? '8' : '16'}px;${busy ? 'opacity:.6' : ''}`)}>{busy ? 'Sending…' : (gated ? 'Request to join' : 'Join this squad')}</div>
+              {error && <div style={s('color:var(--bad);font-size:12px;text-align:center;margin-top:8px')}>{error}</div>}
+              <div style={s('font-size:11px;color:var(--text3);text-align:center;margin-top:8px;line-height:1.4')}>{gated ? 'The manager reviews your training records before you join.' : 'Joining makes this your active squad — its rides, feed and leaderboard become yours.'}</div>
+            </>
+          );
+        })()}
 
         {/* apply / status (mock prototype only) */}
         {!live && a.notApplied && (

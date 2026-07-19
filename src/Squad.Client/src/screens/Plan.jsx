@@ -75,11 +75,13 @@ export default function Plan({ vm, state, actions }) {
 
         {week ? (
           <>
+            {(() => { const sm = vm.planSummary || { planned: '9:45', load: '583', done: 3, total: 7 }; return (
             <div style={s('display:flex;justify-content:space-between;margin-bottom:14px;background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:12px 8px')}>
-              <div style={s('flex:1;text-align:center;border-right:1px solid var(--line)')}><div className="mono" style={s('font-size:18px;font-weight:700')}>9:45</div><div style={s('font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.7px')}>Planned</div></div>
-              <div style={s('flex:1;text-align:center;border-right:1px solid var(--line)')}><div className="mono" style={s('font-size:18px;font-weight:700;color:var(--accent)')}>583</div><div style={s('font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.7px')}>Load</div></div>
-              <div style={s('flex:1;text-align:center')}><div className="mono" style={s('font-size:18px;font-weight:700')}>3<span style={s('font-size:11px;color:var(--text2)')}>/7</span></div><div style={s('font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.7px')}>Done</div></div>
+              <div style={s('flex:1;text-align:center;border-right:1px solid var(--line)')}><div className="mono" style={s('font-size:18px;font-weight:700')}>{sm.planned}</div><div style={s('font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.7px')}>Planned</div></div>
+              <div style={s('flex:1;text-align:center;border-right:1px solid var(--line)')}><div className="mono" style={s('font-size:18px;font-weight:700;color:var(--accent)')}>{sm.load}</div><div style={s('font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.7px')}>Load</div></div>
+              <div style={s('flex:1;text-align:center')}><div className="mono" style={s('font-size:18px;font-weight:700')}>{sm.done}<span style={s('font-size:11px;color:var(--text2)')}>/{sm.total}</span></div><div style={s('font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.7px')}>Done</div></div>
             </div>
+            ); })()}
             <div style={s('display:flex;flex-direction:column;gap:9px')}>
               {vm.plan.map((p) => (
                 <div key={p.day} className="ctl" onClick={() => actions.openWorkout(p.wk)} style={s(`background:var(--bg2);border:1px solid ${p.rowBorder};border-radius:16px;padding:12px 13px;display:flex;gap:12px;align-items:center`)}>
