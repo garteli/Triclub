@@ -22,7 +22,10 @@ public sealed class OidcTokenVerifier : IExternalTokenVerifier
     private readonly ConfigurationManager<OpenIdConnectConfiguration> _config;
     private readonly string _clientId;
     private readonly string[] _validIssuers;
-    private readonly JwtSecurityTokenHandler _handler = new();
+    // MapInboundClaims=false keeps the OIDC claim names as-is ('sub', 'email',
+    // 'name', 'email_verified'); the default remaps 'sub' -> the legacy
+    // nameidentifier URI, which made the 'sub' lookup below come back empty.
+    private readonly JwtSecurityTokenHandler _handler = new() { MapInboundClaims = false };
 
     public ExternalProvider Provider { get; }
 
