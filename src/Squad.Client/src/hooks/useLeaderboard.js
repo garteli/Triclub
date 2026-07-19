@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from 'react';
 // labelled Swim/Bike/Run rank on those.
 export function mapLeaderboardRows(server) {
   return (server ?? []).map((r) => ({
+    athleteId: r.athleteId,
     name: r.name,
     initials: r.initials,
     color: r.color,

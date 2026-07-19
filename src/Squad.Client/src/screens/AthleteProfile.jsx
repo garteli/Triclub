@@ -1,12 +1,19 @@
 import { s } from '../lib/style.js';
+import { useAthlete } from '../hooks/useAthlete.js';
 
 const label = 'font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.3px;font-weight:600;margin:22px 2px 10px';
 
 // Viewable athlete profile. Serves two roles:
 //  - a teammate's profile (opened from the squad rail / leaderboard / feed)
 //  - your own public profile (when it's you) — with Share + Edit actions.
-export default function AthleteProfile({ vm, state, actions }) {
-  const a = vm.athlete;
+// Real athletes (GUID id + signed in) load from /api/athletes/{id}; otherwise the
+// prototype falls back to vm.athlete.
+export default function AthleteProfile({ vm, state, actions, getToken }) {
+  const { athlete: liveAthlete, live, follow, unfollow } = useAthlete({ id: state.selMember, getToken });
+  const a = live ? liveAthlete : vm.athlete;
+  const onToggleFollow = live
+    ? () => (a.following ? unfollow() : follow())
+    : () => actions.toggleFollow(a.id);
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
       {/* header */}
@@ -46,7 +53,7 @@ export default function AthleteProfile({ vm, state, actions }) {
             <div className="ctl" onClick={() => actions.go('chat')} style={s('flex:1;background:var(--accent);color:var(--accent-ink);text-align:center;padding:12px;border-radius:13px;font-weight:700;font-size:13.5px;display:flex;align-items:center;justify-content:center;gap:7px')}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 11.5a8.5 8.5 0 0 1-12 7.7L3 21l1.8-6A8.5 8.5 0 1 1 21 11.5z" /></svg>Message
             </div>
-            <div className="ctl" onClick={() => actions.toggleFollow(a.id)} style={s('flex:1;text-align:center;padding:12px;border-radius:13px;font-weight:700;font-size:13.5px;' + (a.following ? 'background:var(--bg2);border:1px solid var(--line);color:var(--text2)' : 'background:var(--bg3);border:1px solid var(--line2);color:var(--text)'))}>{a.following ? '✓ Following' : '+ Follow'}</div>
+            <div className="ctl" onClick={onToggleFollow} style={s('flex:1;text-align:center;padding:12px;border-radius:13px;font-weight:700;font-size:13.5px;' + (a.following ? 'background:var(--bg2);border:1px solid var(--line);color:var(--text2)' : 'background:var(--bg3);border:1px solid var(--line2);color:var(--text)'))}>{a.following ? '✓ Following' : '+ Follow'}</div>
           </>
         )}
       </div>

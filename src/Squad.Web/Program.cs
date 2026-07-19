@@ -95,6 +95,7 @@ app.MapActivityQuery();    // GET  /api/activities
 app.MapSquads();           // GET/POST /api/squads (+ /{id}, /{id}/join)
 app.MapLeaderboard();      // GET  /api/squads/{squadId}/leaderboard
 app.MapFeed();             // GET  /api/feed
+app.MapAthletes();         // GET /api/athletes/{id} (+ follow/unfollow)
 app.MapChat();             // GET/POST /api/messages
 app.MapSquadHub();         // /hubs/squad
 app.MapChatHub();          // /hubs/chat
