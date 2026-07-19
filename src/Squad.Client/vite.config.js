@@ -16,5 +16,11 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    // Dev-only: forward API + realtime to the .NET host (`dotnet run` → http://localhost:5186).
+    // Production serves the built SPA from the same origin, so no proxy is needed there.
+    proxy: {
+      '/api': { target: 'http://localhost:5186', changeOrigin: true },
+      '/hubs': { target: 'http://localhost:5186', changeOrigin: true, ws: true },
+    },
   },
 })

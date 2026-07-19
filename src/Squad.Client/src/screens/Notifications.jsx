@@ -1,0 +1,60 @@
+import { useState } from 'react';
+import { s } from '../lib/style.js';
+import { notifications } from '../data/squadData.js';
+
+// Inline icons keyed by notification kind.
+const ICONS = {
+  clipboard: '<path d="M9 3h6a1 1 0 0 1 1 1v1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h1V4a1 1 0 0 1 1-1z"/><path d="M9 5h6"/>',
+  heart: '<path d="M20.8 6.6a5 5 0 0 0-7.1 0L12 8.3l-1.7-1.7a5 5 0 1 0-7.1 7.1L12 22l8.8-8.3a5 5 0 0 0 0-7.1z"/>',
+  chat: '<path d="M21 11.5a8.5 8.5 0 0 1-12 7.7L3 21l1.8-6A8.5 8.5 0 1 1 21 11.5z"/>',
+  trophy: '<path d="M8 21h8M12 17v4M6 4h12v5a6 6 0 0 1-12 0V4zM6 6H3v2a3 3 0 0 0 3 3M18 6h3v2a3 3 0 0 1-3 3"/>',
+  bike: '<circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 17.5l-3-6.5H8.5m6.5 0l-2.5 6.5M9.5 6.5h3l2 4.5"/>',
+  calendar: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/>',
+};
+
+export default function Notifications({ actions }) {
+  const [read, setRead] = useState(() => new Set(notifications.filter((n) => !n.unread).map((n) => n.id)));
+  const markAll = () => setRead(new Set(notifications.map((n) => n.id)));
+  const open = (n) => {
+    setRead((r) => new Set(r).add(n.id));
+    if (n.athlete) actions.openAthlete(n.athlete);
+    else actions.go(n.target);
+  };
+  const unread = notifications.filter((n) => !read.has(n.id)).length;
+
+  return (
+    <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
+      {/* header */}
+      <div style={s('display:flex;align-items:center;gap:10px')}>
+        <div className="ctl" onClick={() => actions.go('dash')} style={s('width:34px;height:34px;border-radius:10px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;flex:none')}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round"><path d="M15 6l-6 6 6 6" /></svg>
+        </div>
+        <div style={s('flex:1')}>
+          <div style={s('font-size:20px;font-weight:700')}>Notifications</div>
+          {unread > 0 && <div style={s('font-size:11.5px;color:var(--text2)')}>{unread} new</div>}
+        </div>
+        {unread > 0 && <div className="ctl" onClick={markAll} style={s('font-size:12px;font-weight:600;color:var(--accent)')}>Mark all read</div>}
+      </div>
+
+      {/* list */}
+      <div style={s('display:flex;flex-direction:column;gap:9px;margin-top:16px')}>
+        {notifications.map((n) => {
+          const isUnread = !read.has(n.id);
+          return (
+            <div key={n.id} className="ctl" onClick={() => open(n)}
+              style={s('display:flex;gap:12px;align-items:center;border-radius:15px;padding:13px 14px;' + (isUnread ? 'background:var(--accent-dim);border:1px solid color-mix(in srgb,var(--accent) 22%,transparent)' : 'background:var(--bg2);border:1px solid var(--line)'))}>
+              <div style={s(`width:40px;height:40px;border-radius:12px;flex:none;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,${n.color} 18%,transparent)`)}>
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke={n.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={{ __html: ICONS[n.icon] }} />
+              </div>
+              <div style={s('flex:1;min-width:0')}>
+                <div style={s('font-size:13px;line-height:1.35')}><span style={s('font-weight:700')}>{n.actor}</span> <span style={s('color:var(--text2)')}>{n.text}</span></div>
+                <div style={s('font-size:10.5px;color:var(--text3);margin-top:3px')}>{n.time}</div>
+              </div>
+              {isUnread && <div style={s('width:8px;height:8px;border-radius:50%;background:var(--accent);flex:none')} />}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,108 @@
+import { useState } from 'react';
+import { s } from '../lib/style.js';
+
+const Back = ({ onClick }) => (
+  <div className="ctl" onClick={onClick} style={s('width:34px;height:34px;border-radius:10px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center')}>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round"><path d="M15 6l-6 6 6 6" /></svg>
+  </div>
+);
+
+export default function GroupProfile({ vm, actions, onJoinSquad }) {
+  const g = vm.selGroupData;
+  const a = vm.applyState;
+  // Live mode: real squads from the API (onJoinSquad wired). The mock apply→pay
+  // state machine below is only used in the no-session prototype.
+  const live = !!onJoinSquad;
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const join = async () => {
+    setError(''); setBusy(true);
+    try { await onJoinSquad(g.id); actions.go('dash'); }
+    catch (e) { setError(e.message || 'Could not join.'); }
+    finally { setBusy(false); }
+  };
+  return (
+    <div style={s('padding:6px 0 120px;animation:floatUp .35s ease')}>
+      <div style={s('padding:2px 18px 0')}><Back onClick={() => actions.go('discover')} /></div>
+
+      {/* banner */}
+      <div style={s(`margin:12px 18px 0;height:96px;border-radius:18px;background:linear-gradient(135deg,${g.color},color-mix(in srgb,${g.color} 40%, var(--bg3)));position:relative;overflow:hidden`)}>
+        <div style={s('position:absolute;right:-10px;bottom:-16px;opacity:.25')}>
+          <svg width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="#0c0e11" strokeWidth="1.6"><circle cx="5.5" cy="17.5" r="3.5" /><circle cx="18.5" cy="17.5" r="3.5" /><path d="M15 17.5l-3-6.5H8.5m6.5 0l-2.5 6.5M9.5 6.5h3l2 4.5" /></svg>
+        </div>
+      </div>
+
+      <div style={s('padding:14px 18px 0')}>
+        <div style={s('font-size:22px;font-weight:700;letter-spacing:-.4px')}>{g.name}</div>
+        <div style={s('font-size:12.5px;color:var(--text2);margin-top:2px')}>{g.loc} · {g.disc} · {g.level}</div>
+        <div style={s('display:flex;gap:16px;margin-top:12px')}>
+          <div><div className="mono" style={s('font-size:18px;font-weight:700')}>★ {g.rating}</div><div style={s('font-size:9.5px;color:var(--text3);text-transform:uppercase')}>Rating</div></div>
+          <div><div className="mono" style={s('font-size:18px;font-weight:700')}>{g.members}</div><div style={s('font-size:9.5px;color:var(--text3);text-transform:uppercase')}>Riders</div></div>
+          <div><div className="mono" style={s('font-size:18px;font-weight:700')}>4×</div><div style={s('font-size:9.5px;color:var(--text3);text-transform:uppercase')}>Rides/wk</div></div>
+        </div>
+        <div style={s('font-size:12.5px;color:var(--text2);line-height:1.5;margin-top:14px')}>Structured group training with weekly threshold and long endurance rides. Coach-led plans, live group rides, and a supportive squad chasing 70.3 and Olympic-distance goals.</div>
+
+        {/* coach contact */}
+        <div className="ctl" onClick={() => actions.go('chat')} style={s('display:flex;align-items:center;gap:11px;background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:12px 13px;margin-top:14px')}>
+          <div style={s('width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#37c0ff,#5a86ff);flex:none;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff')}>R</div>
+          <div style={s('flex:1')}><div style={s('font-size:13px;font-weight:600')}>Coach Ronen · manager</div><div style={s('font-size:11px;color:var(--text2)')}>Usually replies within an hour</div></div>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round"><path d="M21 11.5a8.5 8.5 0 0 1-12 7.7L3 21l1.8-6A8.5 8.5 0 1 1 21 11.5z" /></svg>
+        </div>
+
+        {/* membership & services */}
+        <div style={s('display:flex;align-items:center;justify-content:space-between;margin:20px 0 10px')}><span style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.3px;font-weight:600')}>Membership &amp; services</span><span style={s('font-size:10px;color:var(--text3)')}>{live ? '' : vm.tierOpenNote}</span></div>
+        <div style={s('display:flex;flex-direction:column;gap:9px')}>
+          <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:13px 14px;display:flex;align-items:center;gap:12px')}>
+            <div style={s('flex:1')}><div style={s('font-size:14px;font-weight:700')}>Membership</div><div style={s('font-size:11.5px;color:var(--text2)')}>Full access · all group rides &amp; plan</div></div>
+            <div style={s('text-align:right')}><div className="mono" style={s('font-size:16px;font-weight:700')}>{g.price}<span style={s('font-size:11px;color:var(--text2)')}>{g.per}</span></div>{!live && <div className="ctl" onClick={actions.payMember} style={s(a.joinBtnStyle)}>Join {a.tierLabel}</div>}</div>
+          </div>
+          <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:13px 14px;display:flex;align-items:center;gap:12px')}>
+            <div style={s('flex:1')}><div style={s('font-size:14px;font-weight:700')}>One-time group ride</div><div style={s('font-size:11.5px;color:var(--text2)')}>Drop in for a single session</div></div>
+            <div style={s('text-align:right')}><div className="mono" style={s('font-size:16px;font-weight:700')}>₪35</div>{!live && <div className="ctl" onClick={actions.payDropin} style={s(a.bookBtnStyle)}>Book {a.tierLabel}</div>}</div>
+          </div>
+          <div style={s('background:var(--bg2);border:1px solid color-mix(in srgb,var(--gym) 30%,transparent);border-radius:14px;padding:13px 14px;display:flex;align-items:center;gap:12px')}>
+            <div style={s('flex:1')}><div style={s('font-size:14px;font-weight:700')}>1:1 Coaching</div><div style={s('font-size:11.5px;color:var(--text2)')}>Personalised plan + weekly review</div></div>
+            <div style={s('text-align:right')}><div className="mono" style={s('font-size:16px;font-weight:700')}>₪450<span style={s('font-size:11px;color:var(--text2)')}>/mo</span></div>{!live && <div className="ctl" onClick={actions.payCoach} style={s(a.coachBtnStyle)}>Enquire {a.tierLabel}</div>}</div>
+          </div>
+        </div>
+
+        {/* live join / membership status */}
+        {live && (g.member ? (
+          <div style={s('background:color-mix(in srgb,var(--good) 14%,var(--bg2));border:1px solid color-mix(in srgb,var(--good) 35%,transparent);border-radius:13px;padding:12px 14px;margin-top:16px;font-size:12.5px;color:var(--text2)')}><span style={s('color:var(--good);font-weight:700')}>You're a member.</span> This is your active squad — its feed &amp; leaderboard are on your dashboard.</div>
+        ) : (
+          <>
+            <div className="ctl" onClick={busy ? undefined : join} style={s(`background:var(--accent);color:var(--accent-ink);text-align:center;padding:14px;border-radius:14px;font-weight:700;font-size:14px;margin-top:16px;${busy ? 'opacity:.6' : ''}`)}>{busy ? 'Joining…' : 'Join this squad'}</div>
+            {error && <div style={s('color:var(--bad);font-size:12px;text-align:center;margin-top:8px')}>{error}</div>}
+            <div style={s('font-size:11px;color:var(--text3);text-align:center;margin-top:8px;line-height:1.4')}>Joining makes this your active squad — its rides, feed and leaderboard become yours.</div>
+          </>
+        ))}
+
+        {/* apply / status (mock prototype only) */}
+        {!live && a.notApplied && (
+          <>
+            <div className="ctl" onClick={actions.applyJoin} style={s('background:var(--accent);color:var(--accent-ink);text-align:center;padding:14px;border-radius:14px;font-weight:700;font-size:14px;margin-top:16px')}>Apply to join</div>
+            <div style={s('font-size:11px;color:var(--text3);text-align:center;margin-top:8px;line-height:1.4')}>The manager reviews your training history and records before you pay or join a ride.</div>
+          </>
+        )}
+        {a.applied && (
+          <>
+            <div style={s('background:color-mix(in srgb,var(--warn) 14%,var(--bg2));border:1px solid color-mix(in srgb,var(--warn) 35%,transparent);border-radius:13px;padding:13px 14px;margin-top:16px;display:flex;gap:10px;align-items:flex-start')}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--warn)" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+              <div style={s('font-size:12.5px;color:var(--text2);line-height:1.45')}><span style={s('color:var(--warn);font-weight:700')}>Application under review.</span> The manager is checking your records to confirm you're a fit for the group's pace.</div>
+            </div>
+            <div className="ctl" onClick={actions.simulateApprove} style={s('text-align:center;font-size:11px;font-weight:600;color:var(--text3);margin-top:10px')}>Simulate manager approval →</div>
+          </>
+        )}
+        {a.approvedPaid && (
+          <div style={s('background:color-mix(in srgb,var(--good) 14%,var(--bg2));border:1px solid color-mix(in srgb,var(--good) 35%,transparent);border-radius:13px;padding:13px 14px;margin-top:16px;font-size:12.5px;color:var(--text2)')}><span style={s('color:var(--good);font-weight:700')}>You're approved! 🎉</span> Choose a plan above to complete payment and join the squad.</div>
+        )}
+        {a.approvedFree && (
+          <div className="ctl" onClick={actions.freeJoin} style={s('background:var(--good);color:#04140b;text-align:center;padding:14px;border-radius:14px;font-weight:700;font-size:14px;margin-top:16px')}>Approved — join for free</div>
+        )}
+        {a.paid && (
+          <div style={s('background:color-mix(in srgb,var(--good) 14%,var(--bg2));border:1px solid color-mix(in srgb,var(--good) 35%,transparent);border-radius:13px;padding:12px 14px;margin-top:16px;font-size:12.5px;color:var(--text2)')}><span style={s('color:var(--good);font-weight:700')}>Membership active.</span> Welcome to the squad — see you on the next ride.</div>
+        )}
+      </div>
+    </div>
+  );
+}

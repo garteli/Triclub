@@ -1,0 +1,82 @@
+import { useState } from 'react';
+import { s } from '../lib/style.js';
+
+const MiniMap = ({ color }) => (
+  <div style={s('margin-top:11px;border-radius:14px;overflow:hidden;border:1px solid var(--line);background:#0d1512')}>
+    <svg viewBox="0 0 356 120" style={{ width: '100%', display: 'block' }}>
+      <rect width="356" height="120" fill="var(--bg3)" />
+      <g stroke="var(--line)" strokeWidth="1"><path d="M0,40 H356 M0,80 H356 M89,0 V120 M178,0 V120 M267,0 V120" /></g>
+      <path d="M30,96 C22,60 60,44 100,48 C150,54 150,16 200,20 C255,24 320,36 330,72 C334,96 300,104 250,100 C200,96 150,104 100,102 C62,100 38,102 30,96Z" fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" opacity=".95" />
+      <circle cx="30" cy="96" r="5" fill="var(--good)" stroke="var(--bg3)" strokeWidth="2" />
+    </svg>
+  </div>
+);
+
+function Card({ a, onOpen, onAthlete }) {
+  const stats = a.sport === 'Gym'
+    ? [[a.moving, 'Time'], [String(a.load), 'Load'], [String(a.avgHr), 'Avg HR']]
+    : [[a.dist + (a.distU ? ' ' + a.distU : ''), 'Distance'], [a.moving, 'Moving'], [String(a.load), 'Load']];
+  return (
+    <div className="ctl" onClick={() => onOpen(a.id)} style={s('background:var(--bg2);border:1px solid var(--line);border-radius:18px;padding:14px')}>
+      {/* athlete row */}
+      <div style={s('display:flex;align-items:center;gap:11px')}>
+        <div className="ctl" onClick={(e) => { e.stopPropagation(); onAthlete(a.athleteId); }} style={s(`width:40px;height:40px;border-radius:12px;background:${a.color};flex:none;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#0c0e11`)}>{a.initials}</div>
+        <div style={s('flex:1;min-width:0')}>
+          <div style={s('font-size:13.5px;font-weight:700')}>{a.athleteName}</div>
+          <div style={s('font-size:11px;color:var(--text3)')}>{a.when} · {a.location}</div>
+        </div>
+        <div style={s(`background:color-mix(in srgb,${a.sportColor} 16%,transparent);color:${a.sportColor};font-size:10px;font-weight:700;padding:4px 9px;border-radius:7px;text-transform:uppercase`)}>{a.sport}</div>
+      </div>
+
+      <div style={s('font-size:15px;font-weight:700;margin-top:10px')}>{a.title}</div>
+
+      {a.hasMap && <MiniMap color={a.sportColor} />}
+
+      {/* stats */}
+      <div style={s('display:flex;margin-top:12px')}>
+        {stats.map(([v, l], i) => (
+          <div key={l} style={s('flex:1' + (i > 0 ? ';border-left:1px solid var(--line);padding-left:12px' : ''))}>
+            <div className="mono" style={s('font-size:16px;font-weight:700')}>{v}</div>
+            <div style={s('font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px')}>{l}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* footer */}
+      <div style={s('display:flex;align-items:center;gap:10px;margin-top:12px;padding-top:11px;border-top:1px solid var(--line)')}>
+        <span style={s('font-size:12px;color:var(--text2);flex:1')}>{a.reactText}</span>
+        {a.achievements > 0 && <span style={s('font-size:10px;font-weight:700;color:var(--bike);background:color-mix(in srgb,var(--bike) 15%,transparent);padding:3px 8px;border-radius:6px')}>🏆 {a.achievements}</span>}
+        {a.comments > 0 && <span style={s('font-size:11px;color:var(--text3)')}>💬 {a.comments}</span>}
+      </div>
+    </div>
+  );
+}
+
+export default function Activities({ vm, actions }) {
+  const [tab, setTab] = useState('squad');
+  const list = tab === 'you' ? vm.myActivities : vm.activities;
+  const tabs = [['squad', 'Squad'], ['you', 'You']];
+  return (
+    <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
+      <div style={s('display:flex;align-items:flex-end;justify-content:space-between;gap:10px')}>
+        <div><div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.6px;font-weight:600')}>Feed</div><div style={s('font-size:23px;font-weight:700;letter-spacing:-.5px')}>Activities</div></div>
+        <div className="ctl" onClick={() => actions.go('upload')} style={s('display:flex;align-items:center;gap:6px;background:var(--accent);color:var(--accent-ink);font-size:12.5px;font-weight:700;padding:9px 13px;border-radius:11px;flex:none')}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 16V4M6 10l6-6 6 6" /></svg>
+          Upload
+        </div>
+      </div>
+
+      {/* filter */}
+      <div style={s('display:flex;gap:7px;margin-top:14px')}>
+        {tabs.map(([id, lbl]) => (
+          <div key={id} className="ctl" onClick={() => setTab(id)} style={s('padding:8px 16px;border-radius:11px;font-size:12.5px;font-weight:600;' + (tab === id ? 'background:var(--accent);color:var(--accent-ink)' : 'background:var(--bg2);border:1px solid var(--line);color:var(--text2)'))}>{lbl}</div>
+        ))}
+      </div>
+
+      {/* list */}
+      <div style={s('display:flex;flex-direction:column;gap:12px;margin-top:16px')}>
+        {list.map((a) => <Card key={a.id} a={a} onOpen={actions.openActivity} onAthlete={actions.openAthlete} />)}
+      </div>
+    </div>
+  );
+}

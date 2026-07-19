@@ -110,13 +110,18 @@ public sealed class SqlLeaderboardService(string connectionString) : ILeaderboar
         FROM dbo.Athlete WHERE SquadId = @squadId;
         """;
 
+    // Every numeric column is CAST to float so it maps to the double-typed Agg
+    // record parameters. Without the cast, `SUM(...) / 3600.0` returns SQL decimal,
+    // which Dapper won't bind to a `double` constructor parameter (it rejects the
+    // record's constructor and throws "a parameterless/single parameterized ctor is
+    // required"). Keeping all six numeric columns float avoids that mismatch.
     private const string AggregateSql = """
         SELECT a.AthleteId,
-               SUM(ISNULL(a.TrainingLoad, 0))                                    AS Load,
-               SUM(a.MovingTimeSec) / 3600.0                                     AS VolumeHours,
-               SUM(CASE WHEN a.Sport = 1 THEN ISNULL(a.TrainingLoad,0) ELSE 0 END) AS SwimLoad,
-               SUM(CASE WHEN a.Sport = 2 THEN ISNULL(a.TrainingLoad,0) ELSE 0 END) AS BikeLoad,
-               SUM(CASE WHEN a.Sport = 3 THEN ISNULL(a.TrainingLoad,0) ELSE 0 END) AS RunLoad
+               CAST(SUM(ISNULL(a.TrainingLoad, 0)) AS float)                     AS Load,
+               CAST(SUM(a.MovingTimeSec) / 3600.0 AS float)                      AS VolumeHours,
+               CAST(SUM(CASE WHEN a.Sport = 1 THEN ISNULL(a.TrainingLoad,0) ELSE 0 END) AS float) AS SwimLoad,
+               CAST(SUM(CASE WHEN a.Sport = 2 THEN ISNULL(a.TrainingLoad,0) ELSE 0 END) AS float) AS BikeLoad,
+               CAST(SUM(CASE WHEN a.Sport = 3 THEN ISNULL(a.TrainingLoad,0) ELSE 0 END) AS float) AS RunLoad
         FROM dbo.Activity a
         JOIN dbo.Athlete ath ON ath.Id = a.AthleteId
         WHERE ath.SquadId = @squadId AND a.StartUtc >= @from AND a.StartUtc < @to

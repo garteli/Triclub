@@ -9,19 +9,34 @@ const seasonRows = [
   ['🏋️ Gym · Mobility', '14 sessions · 9h'],
 ];
 
-export default function Profile({ vm }) {
+export default function Profile({ vm, actions }) {
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
       {/* header */}
       <div style={s('display:flex;align-items:center;gap:14px')}>
-        <div style={s('width:64px;height:64px;border-radius:20px;background:linear-gradient(135deg,#ff6f61,#ffb84d);flex:none;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:22px;color:#fff')}>DL</div>
+        <div style={s(`width:64px;height:64px;border-radius:20px;background:${vm.me.color || 'linear-gradient(135deg,#ff6f61,#ffb84d)'};flex:none;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:22px;color:${vm.me.color ? '#0c0e11' : '#fff'}`)}>{vm.me.initials || '·'}</div>
         <div style={s('flex:1')}>
-          <div style={s('font-size:21px;font-weight:700;letter-spacing:-.4px')}>Dana Levi</div>
-          <div style={s('font-size:12.5px;color:var(--text2)')}>Kaza Tri Club · Age-group 30–34</div>
+          <div style={s('font-size:21px;font-weight:700;letter-spacing:-.4px')}>{vm.me.name}</div>
+          <div style={s('font-size:12.5px;color:var(--text2)')}>{[vm.me.club, vm.me.ageGroup && `Age-group ${vm.me.ageGroup}`].filter(Boolean).join(' · ')}</div>
           <div style={s('display:flex;gap:6px;margin-top:6px')}>
             <span style={s('font-size:10px;font-weight:700;color:var(--accent-ink);background:var(--accent);padding:2px 7px;border-radius:6px')}>⚡ 23-day streak</span>
             <span style={s('font-size:10px;font-weight:700;color:var(--text2);background:var(--bg3);border:1px solid var(--line);padding:2px 7px;border-radius:6px')}>Rank #2</span>
           </div>
+        </div>
+        <div className="ctl" onClick={() => actions?.go('settings')} style={s('width:38px;height:38px;border-radius:12px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;flex:none;align-self:flex-start')}>
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
+        </div>
+      </div>
+
+      {/* quick actions */}
+      <div style={s('display:flex;gap:9px;margin-top:14px')}>
+        <div className="ctl" onClick={() => actions?.openAthlete('dana')} style={s('flex:1;display:flex;align-items:center;justify-content:center;gap:7px;background:var(--bg2);border:1px solid var(--line);border-radius:13px;padding:11px;font-size:12.5px;font-weight:700;color:var(--text2)')}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
+          Public profile
+        </div>
+        <div className="ctl" onClick={() => actions?.go('activities')} style={s('flex:1;display:flex;align-items:center;justify-content:center;gap:7px;background:var(--bg2);border:1px solid var(--line);border-radius:13px;padding:11px;font-size:12.5px;font-weight:700;color:var(--text2)')}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4" /></svg>
+          My activities
         </div>
       </div>
 

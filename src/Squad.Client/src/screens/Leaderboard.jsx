@@ -33,7 +33,7 @@ export default function Leaderboard({ vm, state, actions }) {
       {/* rows */}
       <div style={s('display:flex;flex-direction:column;gap:8px;margin-top:6px')}>
         {vm.lbRows.map((r) => (
-          <div key={r.name} style={s(`${r.rowStyle};border-radius:14px;padding:10px 12px;display:flex;align-items:center;gap:11px`)}>
+          <div key={r.name} className="ctl" onClick={() => r.id && actions.openAthlete(r.id)} style={s(`${r.rowStyle};border-radius:14px;padding:10px 12px;display:flex;align-items:center;gap:11px`)}>
             <div className="mono" style={s(`width:18px;text-align:center;font-size:14px;font-weight:700;color:${r.rankColor}`)}>{r.rank}</div>
             <div style={s(`width:36px;height:36px;border-radius:11px;background:${r.color};flex:none;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#0c0e11`)}>{r.initials}</div>
             <div style={s('flex:1;min-width:0')}>

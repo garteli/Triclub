@@ -165,3 +165,64 @@ export const rideBase = [
   { name: 'Maya', initials: 'MK', color: '#c68bff', bk: 32, bh: 149, dropped: false },
   { name: 'Yoav', initials: 'YS', color: '#ff6f61', bk: 29, bh: 171, dropped: true },
 ];
+
+// ---- Discover / groups (nearby clubs) ----
+export const nearbyGroups = [
+  { id: 'kaza',    name: 'Kaza Tri Club',   loc: 'Tiberias · 4 km',   members: 8,  disc: 'Triathlon', level: 'All levels',   price: '₪120', per: '/mo', kind: 'member', rating: '4.9', color: '#ff6a2c', member: true },
+  { id: 'galilee', name: 'Galilee Cycling',  loc: 'Kfar Tavor · 12 km', members: 24, disc: 'Cycling',   level: 'Intermediate+', price: '₪90',  per: '/mo', kind: 'member', rating: '4.7', color: '#37c0ff' },
+  { id: 'dawn',    name: 'Dawn Patrol',      loc: 'Afula · 18 km',      members: 15, disc: 'Cycling',   level: 'Advanced',      price: 'Free', per: '',    kind: 'free',   rating: '4.8', color: '#4fe08b' },
+  { id: 'swimfit', name: 'SwimFit Masters',  loc: 'Nazareth · 9 km',    members: 31, disc: 'Swim',      level: 'All levels',    price: '₪75',  per: '/mo', kind: 'member', rating: '4.6', color: '#5a86ff' },
+  { id: 'summit',  name: 'Summit Coached',   loc: 'Haifa · 30 km',      members: 12, disc: 'Triathlon', level: 'Race focus',    price: '₪450', per: '/mo', kind: 'coach',  rating: '5.0', color: '#c68bff' },
+];
+
+// ---- Join requests (coach/manager view) ----
+export const applicants = [
+  { id: 'omer',  name: 'Omer Katz',       initials: 'OK', color: '#37c0ff', when: '2h ago', ftp: '262', wkg: '3.8', weekly: '9.2h',  longest: '118 km', streak: '14', css: '1:41', avgHr: '148', races: '3',  fit: 'Strong fit', fitKind: 'good', note: 'Rides 4×/week, targeting Tiberias 70.3. Solid endurance base, keeps Z2 disciplined.' },
+  { id: 'lena',  name: 'Lena Vardi',      initials: 'LV', color: '#c68bff', when: '5h ago', ftp: '198', wkg: '3.1', weekly: '4.1h',  longest: '54 km',  streak: '5',  css: '2:02', avgHr: '161', races: '0',  fit: 'Borderline', fitKind: 'warn', note: 'Newer to structured training — may struggle on the Saturday long ride pace. Worth a chat.' },
+  { id: 'yaron', name: 'Yaron Ben-David', initials: 'YB', color: '#4fe08b', when: '1d ago', ftp: '301', wkg: '4.4', weekly: '12.5h', longest: '184 km', streak: '28', css: '1:33', avgHr: '142', races: '11', fit: 'Strong fit', fitKind: 'good', note: 'Cat 2 road racer, extremely consistent. Would push the front group.' },
+];
+
+// ---- Messages / chat thread (with the coach) ----
+export const chatThread = [
+  { me: false, from: 'Coach Ronen', text: 'Hi Omer — saw your join request. Your numbers look great. What are your goals this block?', time: '09:12' },
+  { me: true,                       text: 'Thanks! Building toward Tiberias 70.3 in the autumn. Want structure + a group for the long rides.', time: '09:15' },
+  { me: false, from: 'Coach Ronen', text: 'Perfect fit. Saturday long ride rolls at 30–32 kph avg — comfortable?', time: '09:16' },
+  { me: true,                       text: "Yep, that's my endurance pace. Ready to commit to the membership.", time: '09:18' },
+];
+
+// ---- per-athlete profile detail (keyed by member id) ----
+// Merged at view-model time with `members` (name/initials/color/pct) and
+// `leaderboardData` (streak/discipline loads) to build a full athlete profile.
+export const athleteExtra = {
+  dana: { club: 'Kaza Tri Club', ageGroup: '30–34', sport: 'Triathlon', level: 'Intermediate', ftp: 271, weekly: '9.2h', bio: 'Chasing a sub-5:30 at Tiberias 70.3. Bike is my strength; putting the work into the run this block.' },
+  noa:  { club: 'Kaza Tri Club', ageGroup: '25–29', sport: 'Triathlon', level: 'Advanced',     ftp: 248, weekly: '12.4h', bio: 'Threshold junkie, always on the front of the group ride. Sub-4:45 70.3 goal.' },
+  adam: { club: 'Kaza Tri Club', ageGroup: '35–39', sport: 'Cycling',   level: 'Intermediate', ftp: 289, weekly: '8.9h',  bio: 'Ex-roadie turned triathlete. Big engine, learning to swim straight.' },
+  maya: { club: 'Kaza Tri Club', ageGroup: '30–34', sport: 'Triathlon', level: 'Intermediate', ftp: 232, weekly: '9.4h',  bio: 'Strength & core first, endurance second. Consistency is my superpower.' },
+  roi:  { club: 'Kaza Tri Club', ageGroup: '40–44', sport: 'Running',   level: 'Advanced',     ftp: 254, weekly: '8.7h',  bio: 'Runner at heart. 2:58 marathon, now chasing a first half-iron.' },
+  yoav: { club: 'Kaza Tri Club', ageGroup: '25–29', sport: 'Triathlon', level: 'New to it',    ftp: 198, weekly: '5.6h',  bio: 'First season in the sport. Building the base, loving the squad.' },
+  itai: { club: 'Kaza Tri Club', ageGroup: '45–49', sport: 'Swimming',  level: 'Intermediate', ftp: 186, weekly: '5.1h',  bio: 'Masters swimmer easing back into bike + run after a break.' },
+  tal:  { club: 'Kaza Tri Club', ageGroup: '30–34', sport: 'Triathlon', level: 'Advanced',     ftp: 263, weekly: '10.2h', bio: 'Smooth swimmer, steady all-rounder. Podium at every local sprint.' },
+};
+
+// ---- notifications (bell) ----
+export const notifications = [
+  { id: 1, icon: 'clipboard', color: 'var(--accent)', actor: 'Omer Katz',        text: 'applied to join Kaza Tri Club',                 time: '2h ago', unread: true,  target: 'requests' },
+  { id: 2, icon: 'heart',     color: 'var(--run)',    actor: 'Noa',              text: 'and 4 others reacted to your threshold ride',   time: '3h ago', unread: true,  athlete: 'noa' },
+  { id: 3, icon: 'chat',      color: 'var(--swim)',   actor: 'Coach Ronen',      text: 'left a note: “Hold the last interval — don’t fade.”', time: '5h ago', unread: true,  target: 'chat' },
+  { id: 4, icon: 'trophy',    color: 'var(--bike)',   actor: 'New personal best', text: 'your FTP is up to 271W — nice work! 🎉',        time: '1d ago', unread: false, target: 'profile' },
+  { id: 5, icon: 'bike',      color: 'var(--good)',   actor: 'Tal',              text: 'crushed a technique swim set',                  time: '1d ago', unread: false, athlete: 'tal' },
+  { id: 6, icon: 'calendar',  color: 'var(--gym)',    actor: 'Tuesday Threshold', text: 'group ride rolls out tomorrow at 06:00',       time: '2d ago', unread: false, target: 'ride' },
+];
+
+// ---- activities (Strava-style: your own + squad, browsable + analysable) ----
+// Summary fields drive the list cards and the detail header/metrics. The deep
+// analysis (splits/zones/power/laps) reuses the shared demo arrays above.
+export const activities = [
+  { id: 'a1', athleteId: 'dana', title: 'Sunday Long Ride',   sport: 'Bike', when: 'Sun 11 · 08:12', location: 'Kaza reservoir loop', dist: '84.2', distU: 'km', moving: '3:04', load: 142, avgSpeed: '27.4', speedU: 'kph', elev: '1,050', avgHr: 148, fire: 12, strong: 5, clap: 3, comments: 2, achievements: 3 },
+  { id: 'a2', athleteId: 'noa',  title: 'Threshold Ride',     sport: 'Bike', when: '18m ago',       location: 'Tabor foothills',    dist: '42.1', distU: 'km', moving: '1:14', load: 82,  avgSpeed: '34.1', speedU: 'kph', elev: '520',   avgHr: 162, fire: 6,  strong: 2, clap: 1, comments: 1, achievements: 1 },
+  { id: 'a3', athleteId: 'roi',  title: 'Easy Run',           sport: 'Run',  when: '1h ago',        location: 'Riverside path',     dist: '8.4',  distU: 'km', moving: '41:00', load: 38, avgSpeed: '4:52', speedU: '/km', elev: '75',    avgHr: 139, fire: 3,  strong: 0, clap: 1, comments: 0, achievements: 0 },
+  { id: 'a4', athleteId: 'tal',  title: 'Technique Swim',     sport: 'Swim', when: '3h ago',        location: 'Galilee pool',       dist: '2,400', distU: 'm', moving: '48:00', load: 44, avgSpeed: '1:46', speedU: '/100', elev: '0',   avgHr: 132, fire: 9,  strong: 1, clap: 2, comments: 0, achievements: 1 },
+  { id: 'a5', athleteId: 'maya', title: 'Strength + Core',    sport: 'Gym',  when: '5h ago',        location: 'Home gym',           dist: '0',    distU: '',   moving: '52:00', load: 36, avgSpeed: '—',    speedU: '',    elev: '0',     avgHr: 118, fire: 4,  strong: 3, clap: 0, comments: 0, achievements: 0 },
+  { id: 'a6', athleteId: 'dana', title: 'Brick — Bike + Run', sport: 'Bike', when: 'Thu 8 · 17:30', location: 'Kfar Tavor',         dist: '46.0', distU: 'km', moving: '1:52', load: 96,  avgSpeed: '24.6', speedU: 'kph', elev: '610',   avgHr: 151, fire: 8,  strong: 4, clap: 2, comments: 1, achievements: 2 },
+  { id: 'a7', athleteId: 'adam', title: 'Hill Repeats',       sport: 'Bike', when: 'Wed 7 · 06:40', location: 'Haifa ridge',        dist: '38.5', distU: 'km', moving: '1:38', load: 88,  avgSpeed: '23.5', speedU: 'kph', elev: '890',   avgHr: 156, fire: 5,  strong: 2, clap: 0, comments: 0, achievements: 1 },
+];

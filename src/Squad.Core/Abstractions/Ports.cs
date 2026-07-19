@@ -48,6 +48,31 @@ public interface ILeaderboardService
     Task<IReadOnlyList<LeaderboardRow>> GetWeeklyAsync(Guid squadId, Guid? me, DateTimeOffset asOf, CancellationToken ct);
 }
 
+/// <summary>Recent committed activities for a squad — the initial feed load the hub then tops up live.</summary>
+public interface IFeedReadService
+{
+    Task<IReadOnlyList<FeedActivityRow>> GetRecentAsync(Guid squadId, int take, CancellationToken ct);
+}
+
+/// <summary>Raw joined row (Activity + Athlete display) the host maps into an ActivityFeedItem.</summary>
+public sealed record FeedActivityRow(
+    Guid Id, Guid AthleteId, string AthleteName, string Initials, string AvatarColor,
+    int Sport, DateTimeOffset StartUtc, int MovingTimeSec,
+    double? DistanceMeters, double? TrainingLoad, double? AvgHeartRate);
+
+/// <summary>Recent activities for a squad — the Activities list (with full summary metrics for the detail view).</summary>
+public interface IActivityReadService
+{
+    Task<IReadOnlyList<ActivitySummaryRow>> GetForSquadAsync(Guid squadId, int take, CancellationToken ct);
+}
+
+/// <summary>An activity summary joined to athlete display fields; drives both the list card and the detail metrics.</summary>
+public sealed record ActivitySummaryRow(
+    Guid Id, Guid AthleteId, string AthleteName, string Initials, string AvatarColor,
+    int Sport, DateTimeOffset StartUtc, int MovingTimeSec, int ElapsedTimeSec,
+    double? DistanceMeters, double? ElevationGainM, double? AvgHeartRate,
+    double? AvgPowerWatts, double? TrainingLoad, double? Calories);
+
 /// <summary>Last-known live-ride position per rider. In-memory/single-instance; Redis to scale out.</summary>
 public interface IRideSessionState
 {

@@ -12,6 +12,11 @@
     <ProjectReference Include="..\Squad.Infrastructure\Squad.Infrastructure.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.11" />
+    <PackageReference Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" Version="8.0.1" />
+  </ItemGroup>
+
   <!-- The React app (Squad.Client) builds into wwwroot; served as static files. -->
 
 </Project>

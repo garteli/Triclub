@@ -11,11 +11,11 @@ const Chevron = ({ stroke = 'var(--accent)', w = 18 }) => (
   <svg width={w} height={w} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2.4" strokeLinecap="round"><path d="M9 6l6 6-6 6" /></svg>
 );
 
-function SquadRail({ squad, rtl }) {
+function SquadRail({ squad, rtl, onOpen }) {
   return (
     <div className="hscroll" style={s(`display:flex;gap:11px;overflow-x:auto;padding:2px 18px 6px;margin:0 -18px;${rtl ? 'flex-direction:row-reverse' : ''}`)}>
       {squad.map((m) => (
-        <div key={m.id} style={s('flex:none;width:78px;background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:12px 8px;text-align:center')}>
+        <div key={m.id} className="ctl" onClick={() => onOpen?.(m.id)} style={s('flex:none;width:78px;background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:12px 8px;text-align:center')}>
           <div style={s('position:relative;width:52px;height:52px;margin:0 auto')}>
             <svg width="52" height="52" viewBox="0 0 52 52" style={{ transform: 'rotate(-90deg)' }}>
               <circle cx="26" cy="26" r="22" fill="none" stroke="var(--bg4)" strokeWidth="4" />
@@ -32,7 +32,7 @@ function SquadRail({ squad, rtl }) {
   );
 }
 
-function DashboardEN({ vm, state, go }) {
+function DashboardEN({ vm, state, go, openAthlete, openActivity }) {
   const dashB = state.dashVar === 'b';
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .4s ease')}>
@@ -43,11 +43,14 @@ function DashboardEN({ vm, state, go }) {
           <div style={s('font-size:23px;font-weight:700;letter-spacing:-.6px;line-height:1.05')}>Kaza Tri Club</div>
         </div>
         <div style={s('display:flex;align-items:center;gap:10px')}>
-          <div style={s('width:38px;height:38px;border-radius:12px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;position:relative')}>
+          <div className="ctl" onClick={() => go('discover')} style={s('width:38px;height:38px;border-radius:12px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center')}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M15.5 8.5l-2 5-5 2 2-5z" /></svg>
+          </div>
+          <div className="ctl" onClick={() => go('notifs')} style={s('width:38px;height:38px;border-radius:12px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;position:relative')}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
             <div style={s('position:absolute;top:8px;right:9px;width:7px;height:7px;border-radius:50%;background:var(--accent);border:1.5px solid var(--bg2)')} />
           </div>
-          <div style={s('width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,#ff6f61,#ffb84d);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff')}>DL</div>
+          <div className="ctl" onClick={() => go('profile')} style={s('width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,#ff6f61,#ffb84d);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff')}>DL</div>
         </div>
       </div>
 
@@ -144,16 +147,16 @@ function DashboardEN({ vm, state, go }) {
         <div style={s('font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:1.4px;font-weight:600')}>Domestique Club this week</div>
         <div className="ctl" onClick={() => go('lb')} style={s('font-size:11.5px;color:var(--accent);font-weight:600')}>Leaderboard →</div>
       </div>
-      <SquadRail squad={vm.squad} />
+      <SquadRail squad={vm.squad} onOpen={openAthlete} />
 
       {/* team feed */}
       <div style={s('display:flex;justify-content:space-between;align-items:baseline;margin:20px 2px 12px')}>
         <div style={s('font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:1.4px;font-weight:600')}>Domestique Club activity</div>
-        <div className="ctl" onClick={() => go('feed')} style={s('font-size:11.5px;color:var(--accent);font-weight:600')}>See all →</div>
+        <div className="ctl" onClick={() => go('activities')} style={s('font-size:11.5px;color:var(--accent);font-weight:600')}>See all →</div>
       </div>
       <div style={s('display:flex;flex-direction:column;gap:10px')}>
         {vm.feed.map((f) => (
-          <div key={f.id} className="ctl" onClick={() => go('feed')} style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:13px 14px;display:flex;gap:12px;align-items:center')}>
+          <div key={f.id} className="ctl" onClick={() => (f.activityId ? openActivity(f.activityId) : go('activities'))} style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:13px 14px;display:flex;gap:12px;align-items:center')}>
             <div style={s(`width:40px;height:40px;border-radius:12px;background:${f.color};flex:none;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#0c0e11`)}>{f.initials}</div>
             <div style={s('flex:1;min-width:0')}>
               <div style={s('font-size:13px;line-height:1.3')}><span style={s('font-weight:600')}>{f.name}</span> <span style={s('color:var(--text2)')}>{f.action}</span></div>
@@ -171,7 +174,7 @@ function DashboardEN({ vm, state, go }) {
   );
 }
 
-function DashboardHE({ vm, go }) {
+function DashboardHE({ vm, go, openAthlete, openActivity }) {
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .4s ease;text-align:right')}>
       <div style={s('display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-direction:row-reverse')}>
@@ -180,11 +183,11 @@ function DashboardHE({ vm, go }) {
           <div style={s('font-size:23px;font-weight:700;letter-spacing:-.3px;line-height:1.05')}>מועדון קזא טרייתלון</div>
         </div>
         <div style={s('display:flex;align-items:center;gap:10px;flex-direction:row-reverse')}>
-          <div style={s('width:38px;height:38px;border-radius:12px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;position:relative')}>
+          <div className="ctl" onClick={() => go('notifs')} style={s('width:38px;height:38px;border-radius:12px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;position:relative')}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
             <div style={s('position:absolute;top:8px;right:9px;width:7px;height:7px;border-radius:50%;background:var(--accent);border:1.5px solid var(--bg2)')} />
           </div>
-          <div style={s('width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,#ff6f61,#ffb84d);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff')}>דל</div>
+          <div className="ctl" onClick={() => go('profile')} style={s('width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,#ff6f61,#ffb84d);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff')}>דל</div>
         </div>
       </div>
 
@@ -231,12 +234,12 @@ function DashboardHE({ vm, go }) {
         <div style={s('font-size:12px;color:var(--text3);font-weight:600')}>המועדון השבוע</div>
         <div className="ctl" onClick={() => go('lb')} style={s('font-size:11.5px;color:var(--accent);font-weight:600')}>← טבלה</div>
       </div>
-      <SquadRail squad={vm.squad} rtl />
+      <SquadRail squad={vm.squad} rtl onOpen={openAthlete} />
 
       <div style={s('font-size:12px;color:var(--text3);font-weight:600;margin:20px 2px 12px')}>פעילות המועדון</div>
       <div style={s('display:flex;flex-direction:column;gap:10px')}>
         {vm.feed.map((f) => (
-          <div key={f.id} style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:13px 14px;display:flex;gap:12px;align-items:center;flex-direction:row-reverse;text-align:right')}>
+          <div key={f.id} className="ctl" onClick={() => (f.activityId ? openActivity(f.activityId) : go('activities'))} style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:13px 14px;display:flex;gap:12px;align-items:center;flex-direction:row-reverse;text-align:right')}>
             <div style={s(`width:40px;height:40px;border-radius:12px;background:${f.color};flex:none;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#0c0e11`)}>{f.he}</div>
             <div style={s('flex:1;min-width:0')}>
               <div style={s('font-size:13px;line-height:1.3')}><span style={s('font-weight:600')}>{f.nameHe}</span> <span style={s('color:var(--text2)')}>{f.actionHe}</span></div>
@@ -251,6 +254,6 @@ function DashboardHE({ vm, go }) {
 
 export default function Dashboard({ vm, state, actions }) {
   return state.lang === 'he'
-    ? <DashboardHE vm={vm} go={actions.go} />
-    : <DashboardEN vm={vm} state={state} go={actions.go} />;
+    ? <DashboardHE vm={vm} go={actions.go} openAthlete={actions.openAthlete} openActivity={actions.openActivity} />
+    : <DashboardEN vm={vm} state={state} go={actions.go} openAthlete={actions.openAthlete} openActivity={actions.openActivity} />;
 }

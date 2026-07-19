@@ -8,8 +8,12 @@ const dockSeg = (active) =>
 const menuBase = 'padding:7px 10px;border-radius:9px;font-size:12px;font-weight:500;';
 
 const screenMenuDef = [
+  ['welcome', 'Welcome · sign-up'], ['register', 'Register athlete'], ['newgroup', 'Register a group'],
   ['dash', 'Domestique Club Dashboard'], ['ride', 'Live Group Ride'], ['plan', 'Plan / Calendar'],
-  ['lb', 'Leaderboard'], ['feed', 'Activity + Feed'], ['seg', 'Segments'], ['coach', 'AI Coach'], ['profile', 'Profile'],
+  ['discover', 'Discover Groups'], ['group', 'Group Profile'], ['requests', 'Join Requests · coach'], ['chat', 'Messages'],
+  ['activities', 'Activities'], ['feed', 'Activity detail'],
+  ['lb', 'Leaderboard'], ['seg', 'Segments'], ['coach', 'AI Coach'], ['profile', 'Profile'],
+  ['athlete', 'Athlete profile'], ['editprofile', 'Edit profile'], ['notifs', 'Notifications'], ['settings', 'Settings'],
 ];
 
 const label = 'color:#5f6976;text-transform:uppercase;letter-spacing:1.4px;font-size:9.5px;margin-bottom:8px;font-weight:600';
