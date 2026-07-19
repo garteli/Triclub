@@ -19,10 +19,14 @@ npx cap sync
 ```
 
 `capacitor.config.json` is already in this folder (appId `com.triclub.app`, appName
-`Domestique Club`, `webDir` points at the Vite output). `server.url` points the native
-shell at the deployed Azure site, so on device the SPA + its `/api` calls run same-origin
-against the real backend — front-end changes ship by redeploying the SPA (no new native
-build needed). After every web build, run `npx cap copy`.
+`Domestique Club`, `webDir` points at the Vite output). The SPA is **bundled into the
+native shell** (no `server.url`), so it loads from `capacitor://localhost` and works
+offline-first. Because the app origin is then local, root-relative `/api` and `/hubs`
+requests are pointed at the deployed backend by `src/lib/apiBase.js` (`API_BASE`) — a
+fetch shim rewrites `fetch('/api/…')`, and the SignalR hooks + the XHR upload use
+`API_BASE`/`apiUrl(…)` explicitly. On web, `API_BASE` is empty and everything stays
+same-origin. Front-end changes now require a new native build (`npm run build` →
+`npx cap sync` → TestFlight); update `API_BASE` in `apiBase.js` if the backend moves.
 
 ## 2. iOS — `ios/App/App/Info.plist`
 
@@ -217,10 +221,14 @@ Nothing extra is needed for the web build. For the **native** build, provide:
   returns it so the native SDK initializes at runtime (no client rebuild for the value).
 
 ### 2. Apple — enable Sign in with Apple
-- Apple Developer → Identifiers → App ID `com.triclub.app` → enable **Sign in with Apple**;
-  regenerate the provisioning profile used by CI so it carries the entitlement.
-- Xcode (App target) → Signing & Capabilities → **+ Sign in with Apple** (creates
-  `App.entitlements` with `com.apple.developer.applesignin`). Commit that file.
+- `ios/App/App/App.entitlements` (with `com.apple.developer.applesignin` = `Default`) is
+  **already committed** and wired into the App target (`CODE_SIGN_ENTITLEMENTS`, both
+  Debug/Release). Native ASAuthorization needs it — without the entitlement the Apple
+  button hangs at "Signing in…".
+- Apple Developer → Identifiers → App ID `com.triclub.app` → enable **Sign in with Apple**,
+  then **regenerate the `triclub` distribution provisioning profile** so it carries the
+  entitlement, and update the `IOS_PROVISION_PROFILE_BASE64` secret. (A profile that lacks
+  the entitlement makes the signed archive fail at build time — this step is required.)
 - App Service settings → **`Auth__Apple__BundleId`** = `com.triclub.app` (the audience of a
   native Apple id_token is the bundle id, not the web Services ID). The backend accepts both.
 

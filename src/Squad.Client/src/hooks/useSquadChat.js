@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as signalR from '@microsoft/signalr';
+import { API_BASE } from '../lib/apiBase.js';
 
 // Squad group chat: loads history from /api/messages, then subscribes to the chat
 // hub for live messages (the POST fans out to the squad group, so the sender's own
 // message arrives back over the hub — deduped by id). send() just POSTs; the echo appends.
-export function useSquadChat({ getToken, enabled = true, hubUrl = '/hubs/chat', apiUrl = '/api/messages' } = {}) {
+export function useSquadChat({ getToken, enabled = true, hubUrl = API_BASE + '/hubs/chat', apiUrl = '/api/messages' } = {}) {
   const [messages, setMessages] = useState([]);
   const [status, setStatus] = useState('connecting'); // 'connecting' | 'live' | 'offline'
 
