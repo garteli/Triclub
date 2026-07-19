@@ -212,7 +212,8 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <ControlDock state={state} actions={actions} />
+      {/* Dev-only prototype harness (screen switcher / theme toggles); never shipped. */}
+      {import.meta.env.DEV && <ControlDock state={state} actions={actions} />}
       <Phone theme={state.theme} accent={state.accent} lang={state.lang} dir={dir} screen={state.screen} go={actions.go}>
         <Screen vm={vm} state={state} actions={actions} live={live} tick={t} livePages={livePages}
           getToken={getToken} onDataChanged={() => setRefreshSignal((n) => n + 1)}

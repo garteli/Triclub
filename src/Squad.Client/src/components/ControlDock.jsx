@@ -33,7 +33,7 @@ function Swatch({ color, title, active, onClick }) {
 export default function ControlDock({ state, actions }) {
   const { theme, lang, accent, screen, dashVar, rideVar } = state;
   return (
-    <div style={s('position:sticky;top:40px;width:230px;flex:none;display:flex;flex-direction:column;gap:18px;color:#c8ccd2;font-size:12.5px')}>
+    <div className="dock" style={s('position:sticky;top:40px;width:230px;flex:none;display:flex;flex-direction:column;gap:18px;color:#c8ccd2;font-size:12.5px')}>
       {/* brand */}
       <div style={s('display:flex;align-items:center;gap:9px')}>
         <div style={s('width:30px;height:30px;border-radius:9px;background:#d6ff3f;display:flex;align-items:center;justify-content:center;font-weight:700;color:#141a05;font-size:15px')}>S</div>

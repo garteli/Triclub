@@ -7,7 +7,7 @@
 
 body {
   margin: 0;
-  background: #07080a;
+  background: #0c0e11;
   font-family: 'Space Grotesk', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
@@ -17,7 +17,7 @@ body {
   font-feature-settings: 'tnum' 1;
 }
 
-/* ---- phone-scoped design tokens ---- */
+/* ---- app viewport + phone-scoped design tokens ---- */
 .phone {
   --bg: #0c0e11; --bg2: #14171d; --bg3: #1a1e25; --bg4: #232833;
   --line: rgba(255, 255, 255, .07); --line2: rgba(255, 255, 255, .14);
@@ -26,6 +26,16 @@ body {
   --good: #4fe08b; --warn: #ffc24d; --bad: #ff5d5d; --behind: #ff9a4c;
   --swim: #37c0ff; --bike: #ffce4a; --run: #ff6f61; --gym: #c68bff;
   --shadow: 0 20px 50px -20px rgba(0, 0, 0, .7);
+
+  /* Fill the screen: full-width on phones, a centered column on larger screens. */
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  height: 100dvh;
+  margin: 0 auto;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
 }
 
 .phone[data-theme="light"] {
@@ -58,13 +68,18 @@ body {
 .nav-btn { cursor: pointer; transition: color .15s; }
 .ctl { cursor: pointer; transition: all .15s; }
 
-/* app shell background gradient, from the prototype's outer wrapper */
+/* app shell — fills the viewport, centers the app column. */
 .app-shell {
-  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
-  gap: 34px;
   justify-content: center;
+  align-items: stretch;
+  background: #0c0e11;
+}
+
+/* Dev-only prototype harness (ControlDock) sits beside the app on wide screens. */
+.app-shell:has(.dock) {
+  gap: 34px;
   align-items: flex-start;
-  padding: 40px 30px 80px;
-  background: radial-gradient(1200px 600px at 30% -10%, #12151b 0%, #07080a 60%);
+  padding: 24px;
 }
