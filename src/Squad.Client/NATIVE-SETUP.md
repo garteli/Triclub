@@ -18,8 +18,11 @@ npx cap add android
 npx cap sync
 ```
 
-`capacitor.config.json` is already in this folder (appId `club.kaza.squad`, `webDir`
-points at the Vite output). After every web build, run `npx cap copy`.
+`capacitor.config.json` is already in this folder (appId `com.triclub.app`, appName
+`Domestique Club`, `webDir` points at the Vite output). `server.url` points the native
+shell at the deployed Azure site, so on device the SPA + its `/api` calls run same-origin
+against the real backend — front-end changes ship by redeploying the SPA (no new native
+build needed). After every web build, run `npx cap copy`.
 
 ## 2. iOS — `ios/App/App/Info.plist`
 
