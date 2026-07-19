@@ -96,8 +96,13 @@ export default function App() {
   }, [session?.token, refreshSignal]);
 
   const vm = useMemo(
-    () => buildViewModel(state, t, { feedItems: liveFeed, leaderboardRows: liveLeaderboard, activityItems: liveActivities, profile, squads: liveSquads, plan: livePlan, planSummary: livePlanSummary }),
-    [state, t, liveFeed, liveLeaderboard, liveActivities, profile, liveSquads, livePlan, livePlanSummary],
+    () => buildViewModel(state, t, {
+      feedItems: liveFeed, leaderboardRows: liveLeaderboard, activityItems: liveActivities,
+      profile, squads: liveSquads, plan: livePlan, planSummary: livePlanSummary,
+      // The athlete's active squad name (for the dashboard header).
+      squadName: authed ? liveSquads.find((sq) => sq.id === squadId)?.name : undefined,
+    }),
+    [state, t, liveFeed, liveLeaderboard, liveActivities, profile, liveSquads, livePlan, livePlanSummary, authed, squadId],
   );
 
   // After joining/creating a squad the athlete's active SquadId changes server-side;

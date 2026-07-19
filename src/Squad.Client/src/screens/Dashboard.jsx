@@ -40,7 +40,7 @@ function DashboardEN({ vm, state, go, openAthlete, openActivity }) {
       <div style={s('display:flex;align-items:center;justify-content:space-between;margin-bottom:18px')}>
         <div>
           <div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.6px;font-weight:600')}>Domestique Club</div>
-          <div style={s('font-size:23px;font-weight:700;letter-spacing:-.6px;line-height:1.05')}>Kaza Tri Club</div>
+          <div style={s('font-size:23px;font-weight:700;letter-spacing:-.6px;line-height:1.05')}>{vm.squadName || 'Your squad'}</div>
         </div>
         <div style={s('display:flex;align-items:center;gap:10px')}>
           <div className="ctl" onClick={() => go('discover')} style={s('width:38px;height:38px;border-radius:12px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center')}>
@@ -50,7 +50,7 @@ function DashboardEN({ vm, state, go, openAthlete, openActivity }) {
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
             <div style={s('position:absolute;top:8px;right:9px;width:7px;height:7px;border-radius:50%;background:var(--accent);border:1.5px solid var(--bg2)')} />
           </div>
-          <div className="ctl" onClick={() => go('profile')} style={s('width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,#ff6f61,#ffb84d);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff')}>DL</div>
+          <div className="ctl" onClick={() => go('profile')} style={s(`width:38px;height:38px;border-radius:12px;background:${vm.me.color || 'linear-gradient(135deg,#ff6f61,#ffb84d)'};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:${vm.me.color ? '#0c0e11' : '#fff'}`)}>{vm.me.initials || '·'}</div>
         </div>
       </div>
 
@@ -180,14 +180,14 @@ function DashboardHE({ vm, go, openAthlete, openActivity }) {
       <div style={s('display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-direction:row-reverse')}>
         <div>
           <div style={s('font-size:11px;color:var(--text3);letter-spacing:.5px;font-weight:600')}>המועדון</div>
-          <div style={s('font-size:23px;font-weight:700;letter-spacing:-.3px;line-height:1.05')}>מועדון קזא טרייתלון</div>
+          <div style={s('font-size:23px;font-weight:700;letter-spacing:-.3px;line-height:1.05')}>{vm.squadName || 'המועדון שלך'}</div>
         </div>
         <div style={s('display:flex;align-items:center;gap:10px;flex-direction:row-reverse')}>
           <div className="ctl" onClick={() => go('notifs')} style={s('width:38px;height:38px;border-radius:12px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;position:relative')}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
             <div style={s('position:absolute;top:8px;right:9px;width:7px;height:7px;border-radius:50%;background:var(--accent);border:1.5px solid var(--bg2)')} />
           </div>
-          <div className="ctl" onClick={() => go('profile')} style={s('width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,#ff6f61,#ffb84d);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff')}>דל</div>
+          <div className="ctl" onClick={() => go('profile')} style={s(`width:38px;height:38px;border-radius:12px;background:${vm.me.color || 'linear-gradient(135deg,#ff6f61,#ffb84d)'};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:${vm.me.color ? '#0c0e11' : '#fff'}`)}>{vm.me.initials || '·'}</div>
         </div>
       </div>
 
