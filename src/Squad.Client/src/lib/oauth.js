@@ -57,6 +57,12 @@ function loadScript(src) {
 // `cfg` is the full /api/auth/config object.
 export async function getGoogleIdToken(cfg) {
   if (isNative()) {
+    // The native Google SDK can't initialize without an iOS OAuth client id. If the
+    // backend hasn't published one (Auth__Google__iOSClientId app setting), fail loudly
+    // instead of letting the native login promise hang at "Signing in…".
+    if (!cfg?.google?.iosClientId) {
+      throw new Error('Google sign-in isn’t set up for the app yet (missing iOS client id).');
+    }
     const SocialLogin = await nativeSocialLogin(cfg);
     const res = await SocialLogin.login({ provider: 'google', options: { scopes: ['email', 'profile'] } });
     const idToken = res?.result?.idToken;

@@ -221,10 +221,14 @@ Nothing extra is needed for the web build. For the **native** build, provide:
   returns it so the native SDK initializes at runtime (no client rebuild for the value).
 
 ### 2. Apple — enable Sign in with Apple
-- Apple Developer → Identifiers → App ID `com.triclub.app` → enable **Sign in with Apple**;
-  regenerate the provisioning profile used by CI so it carries the entitlement.
-- Xcode (App target) → Signing & Capabilities → **+ Sign in with Apple** (creates
-  `App.entitlements` with `com.apple.developer.applesignin`). Commit that file.
+- `ios/App/App/App.entitlements` (with `com.apple.developer.applesignin` = `Default`) is
+  **already committed** and wired into the App target (`CODE_SIGN_ENTITLEMENTS`, both
+  Debug/Release). Native ASAuthorization needs it — without the entitlement the Apple
+  button hangs at "Signing in…".
+- Apple Developer → Identifiers → App ID `com.triclub.app` → enable **Sign in with Apple**,
+  then **regenerate the `triclub` distribution provisioning profile** so it carries the
+  entitlement, and update the `IOS_PROVISION_PROFILE_BASE64` secret. (A profile that lacks
+  the entitlement makes the signed archive fail at build time — this step is required.)
 - App Service settings → **`Auth__Apple__BundleId`** = `com.triclub.app` (the audience of a
   native Apple id_token is the bundle id, not the web Services ID). The backend accepts both.
 
