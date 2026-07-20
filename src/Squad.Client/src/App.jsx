@@ -16,6 +16,8 @@ import { createSquad, joinSquad } from './lib/squads.js';
 import { buildViewModel } from './lib/viewModel.js';
 import { loadSession, saveSession, clearSession, enrollBiometric, fetchMe, getProfile } from './lib/auth.js';
 import { loadPrefs, savePrefs } from './lib/prefs.js';
+import { loadNav, saveNav, restorableScreen } from './lib/navState.js';
+import { loadDraft, draftMode } from './lib/rideDraft.js';
 import { uploadAvatar, deleteAvatar } from './lib/avatar.js';
 import { fetchAuthedObjectUrl, bustAuthedImage } from './lib/authedImage.js';
 import ControlDock from './components/ControlDock.jsx';
@@ -82,7 +84,28 @@ export default function App() {
     // Hydrate device-scoped preferences (units / notifications / privacy). The
     // profile photo now lives in blob storage — it's fetched from the API once the
     // session is confirmed (see the avatar effect below), not restored from disk.
-    return { ...initialState, ...loadPrefs(), avatar: null, session, screen: session ? 'dash' : 'welcome' };
+    const base = { ...initialState, ...loadPrefs(), avatar: null, session };
+    if (!session) return { ...base, screen: 'welcome' };
+
+    // Restore the last screen + the selections it depends on, so a refresh returns the
+    // athlete to where they were rather than the dashboard.
+    const nav = loadNav();
+    const merged = {
+      ...base,
+      screen: restorableScreen(nav, screens) || 'dash',
+      rideState: nav?.rideState === 'active' ? 'active' : 'lobby',
+      selGroup: nav?.selGroup ?? base.selGroup,
+      selActivity: nav?.selActivity ?? base.selActivity,
+      selMember: nav?.selMember ?? base.selMember,
+    };
+
+    // If a ride was recording (or finished-but-unsaved) when the page reloaded, land on the
+    // ride screen so the recovered recording / save card is visible (the recorder hook
+    // restores the actual buffers — see useRideRecorder + lib/rideDraft.js).
+    const how = draftMode(loadDraft());
+    if (how === 'recover') { merged.screen = 'ride'; merged.rideState = 'lobby'; }
+    else if (how === 'resume') { merged.screen = 'ride'; }
+    return merged;
   });
   const t = useTick();
 
@@ -288,13 +311,28 @@ export default function App() {
   const rideActive = onRide && state.rideState === 'active';
   const sensors = useSensors();
   const liveRide = useLiveRide(squadId, { getToken, meId: session?.athleteId, enabled: onRide && !!squadId });
-  const recorder = useRideRecorder({ pushTelemetry: liveRide.pushTelemetry, sensors, getToken, onSaved: () => setRefreshSignal((n) => n + 1) });
+  const recorder = useRideRecorder({ pushTelemetry: liveRide.pushTelemetry, sensors, getToken, onSaved: () => setRefreshSignal((n) => n + 1), enabled: authed });
   const tel = useRideTelemetry({ t, active: rideActive, riders: liveRide.riders, recorder, sensors });
 
   // Garmin Edge–style live-ride pages (configurable fields, auto-rotate, edit).
   const livePages = useLivePages(t, rideActive);
 
   const live = { riders: liveRide.riders, status: liveRide.status, pushTelemetry: liveRide.pushTelemetry, recorder, sensors, tel, livePages };
+
+  // Remember the last screen + selections so a refresh returns here (see lib/navState.js).
+  // Only while signed in — a logged-out location isn't worth restoring.
+  useEffect(() => {
+    if (state.session) saveNav(state);
+  }, [state.session, state.screen, state.rideState, state.selGroup, state.selActivity, state.selMember]);
+
+  // A recovered ride (recorder restored a finished/stale draft as a pending save card on
+  // boot) must be shown on the ride lobby, where the save/discard card lives.
+  useEffect(() => {
+    if (recorder.pending) {
+      setState((s) => (s.screen === 'ride' && s.rideState === 'lobby' ? s : { ...s, screen: 'ride', rideState: 'lobby' }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recorder.pending]);
 
   const Screen = screens[state.screen] || Dashboard;
   const dir = state.lang === 'he' ? 'rtl' : 'ltr';
@@ -304,7 +342,7 @@ export default function App() {
       {/* Dev-only prototype harness (screen switcher / theme toggles); never shipped. */}
       {import.meta.env.DEV && <ControlDock state={state} actions={actions} />}
       <Phone theme={state.theme} accent={state.accent} lang={state.lang} dir={dir} screen={state.screen} go={actions.go}
-        onRefresh={authed ? onRefresh : undefined}>
+        onRefresh={authed ? onRefresh : undefined} recording={recorder.recording}>
         <Screen vm={vm} state={state} actions={actions} live={live} tick={t} livePages={livePages}
           getToken={getToken} onDataChanged={() => setRefreshSignal((n) => n + 1)}
           profile={profile} onProfileSaved={setProfile}

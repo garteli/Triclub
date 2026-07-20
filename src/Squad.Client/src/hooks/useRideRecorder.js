@@ -4,6 +4,7 @@ import { createWebLocationSource } from '../lib/locationSource.web.js';
 import { apiUrl } from '../lib/apiBase.js';
 import { encodeFitActivity, FitSport } from '../lib/fitEncoder.js';
 import { uploadActivityPhoto } from '../lib/photos.js';
+import { loadDraft, saveDraft, clearDraft, draftMode } from '../lib/rideDraft.js';
 
 function isNativePlatform() {
   return !!(typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.());
@@ -38,7 +39,7 @@ async function uploadFit(bytes, token) {
 // streams through pushTelemetry (live hub) AND is accumulated at full resolution so the
 // finished ride can be encoded as a real Garmin .fit and uploaded through the same
 // ingest path as a Garmin file (see lib/fitEncoder.js).
-export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, sport = FitSport.cycling, throttleMs = 1000 } = {}) {
+export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, enabled = true, sport = FitSport.cycling, throttleMs = 1000 } = {}) {
   const [recording, setRecording] = useState(false);
   const [paused, setPaused] = useState(false);       // web: backgrounded / screen locked
   const [distanceKm, setDistanceKm] = useState(0);
@@ -153,26 +154,33 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, spo
     }
   }, [pushTelemetry, sensors, throttleMs]);
 
+  // Open the location source (native background source or web watch + Wake Lock) and begin
+  // feeding onSample. Shared by a fresh start() and by resuming a recording after a reload.
+  const openSource = useCallback(async () => {
+    if (isNativePlatform()) {
+      const { createNativeLocationSource } = await import('../lib/locationSource.native.js');
+      source.current = await createNativeLocationSource();
+      setMode('native');
+    } else {
+      source.current = createWebLocationSource();
+      setMode('web');
+      await acquireWakeLock(); // keep the screen alive so the foreground watch survives
+    }
+    source.current.start(onSample, (err) => setError(err?.message || 'Location error'));
+  }, [onSample, acquireWakeLock]);
+
   const start = useCallback(async () => {
     setError(null);
     setPending(null); setSaveState('idle'); setSaveError(null); setPhotos([]);
     resetCapture(); setDistanceKm(0);
+    clearDraft(); // a fresh ride supersedes any recovered draft
     try {
-      if (isNativePlatform()) {
-        const { createNativeLocationSource } = await import('../lib/locationSource.native.js');
-        source.current = await createNativeLocationSource();
-        setMode('native');
-      } else {
-        source.current = createWebLocationSource();
-        setMode('web');
-        await acquireWakeLock(); // keep the screen alive so the foreground watch survives
-      }
-      source.current.start(onSample, (err) => setError(err?.message || 'Location error'));
+      await openSource();
       setRecording(true);
     } catch (e) {
       setError(e?.message || 'Could not start recording');
     }
-  }, [onSample, acquireWakeLock]);
+  }, [openSource]);
 
   // Build the summary the FIT session/lap carry from the running aggregates.
   const buildSummary = () => {
@@ -240,6 +248,7 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, spo
       setSaveState('saved');
       samples.current = [];
       setPhotos([]);
+      clearDraft(); // uploaded — no longer recoverable
       if (result?.status !== 'already-received') onSaved?.();
     } catch (e) {
       setSaveState('error');
@@ -249,8 +258,77 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, spo
 
   const discardRide = useCallback(() => {
     samples.current = []; agg.current = null;
+    clearDraft();
     setPending(null); setSaveState('idle'); setSaveError(null); setDistanceKm(0); setPhotos([]);
   }, []);
+
+  // Restore a persisted ride once on boot (see lib/rideDraft.js). A fresh in-progress ride
+  // resumes recording (re-arms the GPS + Wake Lock and keeps appending to the same buffer);
+  // a stale or already-stopped one comes back as a pending save/discard card so nothing is
+  // lost. Runs once the recorder is enabled (i.e. signed in) — never when signed out.
+  const restoredRef = useRef(false);
+  useEffect(() => {
+    if (restoredRef.current || !enabled) return;
+    restoredRef.current = true;
+    const draft = loadDraft();
+    const how = draftMode(draft);
+    if (!how) return;
+    samples.current = draft.samples || [];
+    agg.current = draft.agg || null;
+    distMeters.current = draft.distMeters || 0;
+    prevCoord.current = draft.prevCoord || null;
+    lastPush.current = 0;
+    setDistanceKm((draft.distMeters || 0) / 1000);
+    if (how === 'resume') {
+      setRecording(true);
+      openSource().catch((e) => setError(e?.message || 'Could not resume recording after reload'));
+    } else {
+      setPending(draft.pending || {
+        startMs: agg.current?.startMs ?? null,
+        endMs: agg.current?.lastTs ?? null,
+        sport: draft.sport ?? sport,
+        sampleCount: samples.current.length,
+        summary: buildSummary(),
+      });
+      setSaveState('idle'); setSaveError(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled]);
+
+  // Mirror the ride to storage so a refresh/crash can recover it. While recording we flush
+  // periodically (crash safety) and, crucially, on pagehide/visibility-hidden so the very
+  // latest buffer is captured right before a reload. A stopped-but-unsaved ride is persisted
+  // once (it no longer changes). Cleared on save/discard/fresh-start elsewhere.
+  useEffect(() => {
+    if (!enabled) return undefined;
+    const snapshot = (isRecording) => ({
+      savedAt: Date.now(),
+      recording: isRecording,
+      mode,
+      sport,
+      distMeters: distMeters.current,
+      prevCoord: prevCoord.current,
+      agg: agg.current,
+      samples: samples.current,
+      pending: isRecording ? null : pending,
+    });
+    if (recording) {
+      const flush = () => saveDraft(snapshot(true));
+      flush();
+      const id = setInterval(flush, 8000);
+      const onHide = () => { if (document.hidden) flush(); };
+      const onPageHide = () => flush();
+      document.addEventListener('visibilitychange', onHide);
+      window.addEventListener('pagehide', onPageHide);
+      return () => {
+        clearInterval(id);
+        document.removeEventListener('visibilitychange', onHide);
+        window.removeEventListener('pagehide', onPageHide);
+      };
+    }
+    if (pending && saveState !== 'saved') saveDraft(snapshot(false));
+    return undefined;
+  }, [enabled, recording, pending, mode, sport, saveState]);
 
   // Web only: surface the background limitation honestly. The Wake Lock is dropped
   // when the page hides, so re-arm it on return and flag the gap while hidden.

@@ -92,9 +92,10 @@ function Active({ actions, live }) {
   const you = (live?.riders || []).find((r) => r.you) || null;
   const dist = tel?.dist ?? (you ? parseFloat(you.dist) : null);
   const recording = !!live?.recorder?.recording;
+  const editing = !!live?.livePages?.editFields;
 
   return (
-    <div className="live-active">
+    <div className={'live-active' + (editing ? ' editing' : '')}>
       {/* timer header */}
       <div style={s('display:flex;align-items:center;justify-content:space-between;padding:2px 18px 12px')}>
         <div style={s('display:flex;align-items:center;gap:9px')}>
