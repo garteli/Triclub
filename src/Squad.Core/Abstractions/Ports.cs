@@ -36,7 +36,9 @@ public interface IActivityFanout
     Task OnActivityCommittedAsync(Activity activity, CancellationToken ct);
 }
 
-public sealed record AthleteProfile(Guid Id, string Name, string Initials, string AvatarColor, Guid SquadId);
+// AvatarUrl: proxy path to the athlete's avatar photo (null when they have none → initials).
+public sealed record AthleteProfile(
+    Guid Id, string Name, string Initials, string AvatarColor, Guid SquadId, string? AvatarUrl = null);
 
 public interface IAthleteDirectory
 {
@@ -58,7 +60,9 @@ public interface IFeedReadService
 public sealed record FeedActivityRow(
     Guid Id, Guid AthleteId, string AthleteName, string Initials, string AvatarColor,
     int Sport, DateTimeOffset StartUtc, int MovingTimeSec,
-    double? DistanceMeters, double? TrainingLoad, double? AvgHeartRate);
+    double? DistanceMeters, double? TrainingLoad, double? AvgHeartRate,
+    // Proxy path to the athlete's avatar photo (null when they have none → initials).
+    string? AvatarUrl = null);
 
 /// <summary>Recent activities for a squad — the Activities list (with full summary metrics for the detail view).</summary>
 public interface IActivityReadService
@@ -75,7 +79,9 @@ public sealed record ActivitySummaryRow(
     Guid Id, Guid AthleteId, string AthleteName, string Initials, string AvatarColor,
     int Sport, DateTimeOffset StartUtc, int MovingTimeSec, int ElapsedTimeSec,
     double? DistanceMeters, double? ElevationGainM, double? AvgHeartRate,
-    double? AvgPowerWatts, double? TrainingLoad, double? Calories);
+    double? AvgPowerWatts, double? TrainingLoad, double? Calories,
+    // Proxy path to the athlete's avatar photo (null when they have none → initials).
+    string? AvatarUrl = null);
 
 /// <summary>Last-known live-ride position per rider. In-memory/single-instance; Redis to scale out.</summary>
 public interface IRideSessionState

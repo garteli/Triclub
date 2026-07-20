@@ -20,12 +20,29 @@ public sealed class SqlProfileService(string connectionString) : IProfileService
     {
         const string sql = """
             SELECT Id, DisplayName AS Name, Initials, AvatarColor, Email, SquadId,
-                   Club, AgeGroup, PrimarySport, Level, Ftp, WeeklyHours, Bio
+                   Club, AgeGroup, PrimarySport, Level, Ftp, WeeklyHours, Bio,
+                   CASE WHEN AvatarBlob IS NOT NULL
+                        THEN '/api/images/avatars/' + LOWER(CONVERT(varchar(36), Id)) END AS AvatarUrl
             FROM dbo.Athlete WHERE Id = @athleteId;
             """;
         await using var conn = new SqlConnection(connectionString);
         return await conn.QuerySingleOrDefaultAsync<ProfileDetail>(
             new CommandDefinition(sql, new { athleteId }, cancellationToken: ct));
+    }
+
+    public async Task<string?> GetAvatarBlobAsync(Guid athleteId, CancellationToken ct)
+    {
+        const string sql = "SELECT AvatarBlob FROM dbo.Athlete WHERE Id = @athleteId;";
+        await using var conn = new SqlConnection(connectionString);
+        return await conn.ExecuteScalarAsync<string?>(
+            new CommandDefinition(sql, new { athleteId }, cancellationToken: ct));
+    }
+
+    public async Task SetAvatarBlobAsync(Guid athleteId, string? blobName, CancellationToken ct)
+    {
+        const string sql = "UPDATE dbo.Athlete SET AvatarBlob = @blobName WHERE Id = @athleteId;";
+        await using var conn = new SqlConnection(connectionString);
+        await conn.ExecuteAsync(new CommandDefinition(sql, new { athleteId, blobName }, cancellationToken: ct));
     }
 
     public async Task UpdateAsync(Guid athleteId, string? name, string? initials, ProfileUpdate f, CancellationToken ct)

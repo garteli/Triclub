@@ -15,24 +15,24 @@ public static class FeedCard
     public static ActivityFeedItem From(Activity a, AthleteProfile p) => Build(
         a.Id, a.AthleteId, p.Name, p.Initials, p.AvatarColor,
         a.Sport, a.StartUtc, (int)a.MovingTime.TotalSeconds,
-        a.DistanceMeters, a.TrainingLoad, a.AvgHeartRate, reacts: 0);
+        a.DistanceMeters, a.TrainingLoad, a.AvgHeartRate, reacts: 0, avatarUrl: p.AvatarUrl);
 
     /// <summary>From a joined read row (initial feed load path).</summary>
     public static ActivityFeedItem From(FeedActivityRow r) => Build(
         r.Id, r.AthleteId, r.AthleteName, r.Initials, r.AvatarColor,
         (ActivitySport)r.Sport, r.StartUtc, r.MovingTimeSec,
-        r.DistanceMeters, r.TrainingLoad, r.AvgHeartRate, reacts: 0);
+        r.DistanceMeters, r.TrainingLoad, r.AvgHeartRate, reacts: 0, avatarUrl: r.AvatarUrl);
 
     /// <summary>From an activity summary row (athlete-profile recent-activity list).</summary>
     public static ActivityFeedItem From(ActivitySummaryRow r) => Build(
         r.Id, r.AthleteId, r.AthleteName, r.Initials, r.AvatarColor,
         (ActivitySport)r.Sport, r.StartUtc, r.MovingTimeSec,
-        r.DistanceMeters, r.TrainingLoad, r.AvgHeartRate, reacts: 0);
+        r.DistanceMeters, r.TrainingLoad, r.AvgHeartRate, reacts: 0, avatarUrl: r.AvatarUrl);
 
     private static ActivityFeedItem Build(
         Guid id, Guid athleteId, string name, string initials, string color,
         ActivitySport sport, DateTimeOffset startUtc, int movingTimeSec,
-        double? distanceMeters, double? trainingLoad, double? avgHeartRate, int reacts)
+        double? distanceMeters, double? trainingLoad, double? avgHeartRate, int reacts, string? avatarUrl = null)
     {
         var (icon, disc, verb) = sport switch
         {
@@ -56,6 +56,7 @@ public static class FeedCard
             Metric = BuildMetric(movingTimeSec, trainingLoad, avgHeartRate),
             StartUtc = startUtc,
             Reacts = reacts,
+            AvatarUrl = avatarUrl,
         };
     }
 

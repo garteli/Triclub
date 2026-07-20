@@ -32,7 +32,9 @@ public sealed class SqlActivityReadService(string connectionString) : IActivityR
                    CAST(a.AvgHeartRate   AS float) AS AvgHeartRate,
                    CAST(a.AvgPowerWatts  AS float) AS AvgPowerWatts,
                    CAST(a.TrainingLoad   AS float) AS TrainingLoad,
-                   CAST(a.Calories       AS float) AS Calories
+                   CAST(a.Calories       AS float) AS Calories,
+                   CASE WHEN ath.AvatarBlob IS NOT NULL
+                        THEN '/api/images/avatars/' + LOWER(CONVERT(varchar(36), a.AthleteId)) END AS AvatarUrl
             FROM dbo.Activity a
             JOIN dbo.Athlete ath ON ath.Id = a.AthleteId
             WHERE ath.SquadId = @squadId

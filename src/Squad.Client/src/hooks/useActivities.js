@@ -52,6 +52,7 @@ export function mapActivity(r) {
     athleteName: r.athleteName,
     initials: r.initials,
     color: r.avatarColor,
+    avatarUrl: r.avatarUrl ?? null,
     isMe: !!r.isMe,
     title: TITLES[sport] || 'Session',
     sport,

@@ -50,7 +50,9 @@ public enum ExternalProvider { Google, Apple }
 /// <summary>The signed-in athlete's editable profile (identity + training fields).</summary>
 public sealed record ProfileDetail(
     Guid Id, string Name, string Initials, string AvatarColor, string? Email, Guid SquadId,
-    string? Club, string? AgeGroup, string? PrimarySport, string? Level, int? Ftp, string? WeeklyHours, string? Bio);
+    string? Club, string? AgeGroup, string? PrimarySport, string? Level, int? Ftp, string? WeeklyHours, string? Bio,
+    // Proxy path to the athlete's avatar photo (null when they have none → initials).
+    string? AvatarUrl = null);
 
 /// <summary>A profile edit. Null fields are left unchanged; the host recomputes Initials if Name changes.</summary>
 public sealed record ProfileUpdate(
@@ -61,6 +63,11 @@ public interface IProfileService
 {
     Task<ProfileDetail?> GetAsync(Guid athleteId, CancellationToken ct);
     Task UpdateAsync(Guid athleteId, string? name, string? initials, ProfileUpdate fields, CancellationToken ct);
+
+    /// <summary>The athlete's current avatar blob name, or null if they have no photo.</summary>
+    Task<string?> GetAvatarBlobAsync(Guid athleteId, CancellationToken ct);
+    /// <summary>Set (or clear, when null) the athlete's avatar blob name.</summary>
+    Task SetAvatarBlobAsync(Guid athleteId, string? blobName, CancellationToken ct);
 }
 
 // ----- Squads / groups -----

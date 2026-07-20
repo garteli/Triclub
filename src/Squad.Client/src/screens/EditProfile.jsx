@@ -37,7 +37,17 @@ export default function EditProfile({ vm, actions, getToken, onProfileSaved }) {
   };
 
   const closeEditor = () => { editing?.close?.(); setEditing(null); };
-  const applyPhoto = (dataUrl) => { actions.setAvatar(dataUrl); closeEditor(); };
+  const applyPhoto = async (dataUrl) => {
+    closeEditor();
+    setPhotoError('');
+    try { await actions.setAvatar(dataUrl); }
+    catch { setPhotoError('Could not upload your photo. Please try again.'); }
+  };
+  const removePhoto = async () => {
+    setPhotoError('');
+    try { await actions.setAvatar(null); }
+    catch { setPhotoError('Could not remove your photo. Please try again.'); }
+  };
 
   const save = async () => {
     setError(''); setBusy(true);
@@ -77,7 +87,7 @@ export default function EditProfile({ vm, actions, getToken, onProfileSaved }) {
         <input ref={fileRef} type="file" accept="image/*" onChange={pickPhoto} style={s('display:none')} />
         <div style={s('display:flex;gap:14px;align-items:center;margin-top:10px')}>
           <div className="ctl" onClick={() => fileRef.current?.click()} style={s('font-size:12px;font-weight:600;color:var(--accent)')}>{m.photo ? 'Change photo' : 'Add photo'}</div>
-          {m.photo && <div className="ctl" onClick={() => actions.setAvatar(null)} style={s('font-size:12px;font-weight:600;color:var(--text3)')}>Remove</div>}
+          {m.photo && <div className="ctl" onClick={removePhoto} style={s('font-size:12px;font-weight:600;color:var(--text3)')}>Remove</div>}
         </div>
         {photoError && <div style={s('font-size:11.5px;color:var(--bad);margin-top:8px;text-align:center')}>{photoError}</div>}
       </div>

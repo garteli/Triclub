@@ -17,6 +17,8 @@ public sealed record ActivityFeedItem
     public string Metric { get; init; } = "";
     public DateTimeOffset StartUtc { get; init; }
     public int Reacts { get; init; }
+    /// <summary>Proxy path to the athlete's avatar photo (null when they have none → initials).</summary>
+    public string? AvatarUrl { get; init; }
 }
 
 // ----- Leaderboard -----
@@ -39,6 +41,8 @@ public sealed record LeaderboardRow
     public double BikeLoad { get; init; }
     public double RunLoad { get; init; }
     public int Move { get; init; }
+    /// <summary>Proxy path to the athlete's avatar photo (null when they have none → initials).</summary>
+    public string? AvatarUrl { get; init; }
 }
 
 // ----- Live ride -----

@@ -39,6 +39,7 @@ export function buildViewModel(state, t, opts = {}) {
           const pct = Math.min(100, Math.round(((r.load || 0) / maxLoad) * 100));
           return {
             id: r.athleteId, name: r.you ? 'You' : r.name, initials: r.initials, color: r.color,
+            avatarUrl: r.avatarUrl ?? null,
             pct, status: pct >= 85 ? 'crushing' : pct >= 45 ? 'ontrack' : 'behind',
           };
         });
@@ -255,6 +256,7 @@ export function buildViewModel(state, t, opts = {}) {
         reacts: f.reacts ?? 0,
         athleteId: f.athleteId,
         activityId: null,
+        avatarUrl: f.avatarUrl ?? null,
       }))
     : null;
 

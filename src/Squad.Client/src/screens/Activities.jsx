@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { s } from '../lib/style.js';
 import EmptyState from '../components/EmptyState.jsx';
+import AuthedAvatar from '../components/AuthedAvatar.jsx';
 
-function Card({ a, onOpen, onAthlete }) {
+function Card({ a, onOpen, onAthlete, token }) {
   const stats = a.sport === 'Gym'
     ? [[a.moving, 'Time'], [String(a.load), 'Load'], [String(a.avgHr), 'Avg HR']]
     : [[a.dist + (a.distU ? ' ' + a.distU : ''), 'Distance'], [a.moving, 'Moving'], [String(a.load), 'Load']];
@@ -10,7 +11,9 @@ function Card({ a, onOpen, onAthlete }) {
     <div className="ctl" onClick={() => onOpen(a.id)} style={s('background:var(--bg2);border:1px solid var(--line);border-radius:18px;padding:14px')}>
       {/* athlete row */}
       <div style={s('display:flex;align-items:center;gap:11px')}>
-        <div className="ctl" onClick={(e) => { e.stopPropagation(); onAthlete(a.athleteId); }} style={s(`width:40px;height:40px;border-radius:12px;background:${a.color};flex:none;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#0c0e11`)}>{a.initials}</div>
+        <div className="ctl" onClick={(e) => { e.stopPropagation(); onAthlete(a.athleteId); }} style={s('flex:none')}>
+          <AuthedAvatar avatarUrl={a.avatarUrl} token={token} initials={a.initials} color={a.color} size={40} radius={12} fontSize={14} />
+        </div>
         <div style={s('flex:1;min-width:0')}>
           <div style={s('font-size:13.5px;font-weight:700')}>{a.athleteName}</div>
           <div style={s('font-size:11px;color:var(--text3)')}>{a.when} · {a.location}</div>
@@ -40,8 +43,9 @@ function Card({ a, onOpen, onAthlete }) {
   );
 }
 
-export default function Activities({ vm, actions }) {
+export default function Activities({ vm, actions, getToken }) {
   const [tab, setTab] = useState('squad');
+  const token = getToken?.() ?? null;
   const list = tab === 'you' ? vm.myActivities : vm.activities;
   const tabs = [['squad', 'Squad'], ['you', 'You']];
   return (
@@ -65,7 +69,7 @@ export default function Activities({ vm, actions }) {
       <div style={s('display:flex;flex-direction:column;gap:12px;margin-top:16px')}>
         {list.length === 0
           ? <EmptyState icon="🚴" title={tab === 'you' ? 'No activities yet' : 'No squad activity yet'} sub={tab === 'you' ? 'Record a ride or sync from Apple Health and it shows up here.' : 'When your teammates train, their activities appear here.'} />
-          : list.map((a) => <Card key={a.id} a={a} onOpen={actions.openActivity} onAthlete={actions.openAthlete} />)}
+          : list.map((a) => <Card key={a.id} a={a} onOpen={actions.openActivity} onAthlete={actions.openAthlete} token={token} />)}
       </div>
     </div>
   );

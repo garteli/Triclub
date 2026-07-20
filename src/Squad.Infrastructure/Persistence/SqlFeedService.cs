@@ -29,7 +29,9 @@ public sealed class SqlFeedService(string connectionString) : IFeedReadService
                    CAST(a.Sport AS int) AS Sport, a.StartUtc, a.MovingTimeSec,
                    CAST(a.DistanceMeters AS float) AS DistanceMeters,
                    CAST(a.TrainingLoad  AS float) AS TrainingLoad,
-                   CAST(a.AvgHeartRate  AS float) AS AvgHeartRate
+                   CAST(a.AvgHeartRate  AS float) AS AvgHeartRate,
+                   CASE WHEN ath.AvatarBlob IS NOT NULL
+                        THEN '/api/images/avatars/' + LOWER(CONVERT(varchar(36), a.AthleteId)) END AS AvatarUrl
             FROM dbo.Activity a
             JOIN dbo.Athlete ath ON ath.Id = a.AthleteId
             WHERE ath.SquadId = @squadId

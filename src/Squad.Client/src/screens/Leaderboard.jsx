@@ -1,7 +1,9 @@
 import { s } from '../lib/style.js';
 import EmptyState from '../components/EmptyState.jsx';
+import AuthedAvatar from '../components/AuthedAvatar.jsx';
 
-export default function Leaderboard({ vm, state, actions }) {
+export default function Leaderboard({ vm, state, actions, getToken }) {
+  const token = getToken?.() ?? null;
   // Real days until the weekly board resets (next Monday). Mon=0..Sun=6.
   const dayIdx = (new Date().getDay() + 6) % 7;
   const daysToReset = 7 - dayIdx;
@@ -29,7 +31,9 @@ export default function Leaderboard({ vm, state, actions }) {
         {vm.podium.map((p) => (
           <div key={p.name} style={s('flex:1;text-align:center')}>
             <div style={s(`position:relative;width:${p.podSize};height:${p.podSize};margin:0 auto 8px`)}>
-              <div style={s(`width:100%;height:100%;border-radius:50%;background:${p.color};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:${p.podFont};color:#0c0e11;border:2.5px solid ${p.podBorder}`)}>{p.initials}</div>
+              <div style={s(`width:100%;height:100%;border-radius:50%;overflow:hidden;border:2.5px solid ${p.podBorder}`)}>
+                <AuthedAvatar avatarUrl={p.avatarUrl} token={token} initials={p.initials} color={p.color} size={parseInt(p.podSize, 10)} radius={parseInt(p.podSize, 10)} fontSize={parseInt(p.podFont, 10)} />
+              </div>
               <div style={s(`position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);width:20px;height:20px;border-radius:50%;z-index:2;background:${p.podBadgeBg};color:${p.podBadgeColor};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;border:2px solid var(--bg)`)}>{p.rank}</div>
             </div>
             <div style={s('font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>{p.name}</div>
@@ -44,7 +48,8 @@ export default function Leaderboard({ vm, state, actions }) {
         {vm.lbRows.map((r) => (
           <div key={r.name} className="ctl" onClick={() => r.id && actions.openAthlete(r.id)} style={s(`${r.rowStyle};border-radius:14px;padding:10px 12px;display:flex;align-items:center;gap:11px`)}>
             <div className="mono" style={s(`width:18px;text-align:center;font-size:14px;font-weight:700;color:${r.rankColor}`)}>{r.rank}</div>
-            <div style={s(`width:36px;height:36px;border-radius:11px;background:${r.color};flex:none;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#0c0e11`)}>{r.initials}</div>
+            <AuthedAvatar avatarUrl={r.avatarUrl} token={token} initials={r.initials} color={r.color} size={36} radius={11} fontSize={12} />
+
             <div style={s('flex:1;min-width:0')}>
               <div style={s('display:flex;align-items:center;gap:6px')}><span style={s('font-size:13.5px;font-weight:600')}>{r.name}</span><span style={s('font-size:12px')}>{r.badge}</span></div>
               <div style={s('height:4px;background:var(--bg4);border-radius:3px;margin-top:5px;overflow:hidden')}><div style={s(`height:100%;width:${r.barPct}%;background:${r.barColor};border-radius:3px`)} /></div>

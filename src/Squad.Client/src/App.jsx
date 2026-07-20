@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTick } from './hooks/useTick.js';
 import { useLiveRide } from './hooks/useLiveRide.js';
 import { useSensors } from './hooks/useSensors.js';
@@ -15,7 +15,8 @@ import { createSquad, joinSquad } from './lib/squads.js';
 import { buildViewModel } from './lib/viewModel.js';
 import { loadSession, saveSession, clearSession, enrollBiometric, fetchMe, getProfile } from './lib/auth.js';
 import { loadPrefs, savePrefs } from './lib/prefs.js';
-import { loadAvatar, saveAvatar } from './lib/avatar.js';
+import { uploadAvatar, deleteAvatar } from './lib/avatar.js';
+import { fetchAuthedObjectUrl, bustAuthedImage } from './lib/authedImage.js';
 import ControlDock from './components/ControlDock.jsx';
 import Phone from './components/Phone.jsx';
 import Dashboard from './screens/Dashboard.jsx';
@@ -76,9 +77,10 @@ export default function App() {
   // the app; otherwise start on the logged-out Welcome screen.
   const [state, setState] = useState(() => {
     const session = loadSession();
-    // Hydrate device-scoped preferences (units / notifications / privacy) and the
-    // locally-stored profile photo so both reflect saved choices on boot.
-    return { ...initialState, ...loadPrefs(), avatar: loadAvatar(session?.athleteId), session, screen: session ? 'dash' : 'welcome' };
+    // Hydrate device-scoped preferences (units / notifications / privacy). The
+    // profile photo now lives in blob storage — it's fetched from the API once the
+    // session is confirmed (see the avatar effect below), not restored from disk.
+    return { ...initialState, ...loadPrefs(), avatar: null, session, screen: session ? 'dash' : 'welcome' };
   });
   const t = useTick();
 
@@ -88,6 +90,12 @@ export default function App() {
   const squadId = session?.squadId;
   const getToken = useCallback(() => session?.token ?? null, [session]);
   const [refreshSignal, setRefreshSignal] = useState(0);
+
+  // Latest session for the (deps-[]) actions closure — so setAvatar can read the
+  // current token without rebuilding the whole actions object.
+  const sessionRef = useRef(session);
+  useEffect(() => { sessionRef.current = session; });
+  const myAvatarUrl = session?.athleteId ? `/api/images/avatars/${String(session.athleteId).toLowerCase()}` : null;
 
   const { feed: liveFeed, status: feedStatus } = useSquadFeed({
     getToken,
@@ -108,6 +116,18 @@ export default function App() {
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.token, refreshSignal]);
+
+  // The signed-in athlete's own avatar, fetched from blob storage (via the authed
+  // image proxy) once the session is present. Null (→ initials) when they have none.
+  useEffect(() => {
+    if (!authed || !myAvatarUrl) { setState((s) => (s.avatar ? { ...s, avatar: null } : s)); return; }
+    let cancelled = false;
+    fetchAuthedObjectUrl(myAvatarUrl, session.token)
+      .then((url) => { if (!cancelled && url) setState((s) => ({ ...s, avatar: url })); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authed, myAvatarUrl, session?.token]);
 
   const vm = useMemo(
     () => buildViewModel(state, t, {
@@ -157,8 +177,18 @@ export default function App() {
     setTemp: (temp) => setState((s) => savePrefs({ ...s, temp })),
     setNotif: (key, value) => setState((s) => savePrefs({ ...s, notif: { ...s.notif, [key]: value } })),
     setPrivacy: (key, value) => setState((s) => savePrefs({ ...s, privacy: { ...s.privacy, [key]: value } })),
-    // profile photo (client-side; persisted per athlete in localStorage)
-    setAvatar: (dataUrl) => setState((s) => { saveAvatar(s.session?.athleteId, dataUrl); return { ...s, avatar: dataUrl || null }; }),
+    // profile photo — optimistic local update, then persist to blob storage. The
+    // cropped JPEG data URL renders immediately; the upload syncs it across devices
+    // and busts any cached teammate-view of this avatar so it refreshes. Returns a
+    // promise so callers (EditProfile) can surface an upload failure.
+    setAvatar: async (dataUrl) => {
+      setState((s) => ({ ...s, avatar: dataUrl || null }));
+      const sess = sessionRef.current;
+      const token = sess?.token ?? null;
+      const url = sess?.athleteId ? `/api/images/avatars/${String(sess.athleteId).toLowerCase()}` : null;
+      if (dataUrl) await uploadAvatar(token, dataUrl); else await deleteAvatar(token);
+      if (url) bustAuthedImage(url);
+    },
     openLink: (url) => { try { window.open(url, '_blank', 'noopener'); } catch { /* ignore */ } },
     copyDiagnostics: () => { try { navigator.clipboard?.writeText('Domestique Team 1.0.0 (build 100)'); } catch { /* ignore */ } },
     exportData: () => { try { window.open('https://domestique.team/account/export', '_blank', 'noopener'); } catch { /* ignore */ } },

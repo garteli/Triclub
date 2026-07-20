@@ -3,6 +3,7 @@ import { haversineMeters, mpsToKph } from '../lib/geo.js';
 import { createWebLocationSource } from '../lib/locationSource.web.js';
 import { apiUrl } from '../lib/apiBase.js';
 import { encodeFitActivity, FitSport } from '../lib/fitEncoder.js';
+import { uploadActivityPhoto } from '../lib/photos.js';
 
 function isNativePlatform() {
   return !!(typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.());
@@ -49,6 +50,17 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, spo
   const [pending, setPending] = useState(null);      // { startMs, endMs, sport, sampleCount, summary }
   const [saveState, setSaveState] = useState('idle'); // idle | saving | saved | error
   const [saveError, setSaveError] = useState(null);
+
+  // Photos snapped during the ride (or on the summary card). Each: { id, dataUrl,
+  // capturedUtc }. Uploaded on save and attached to the resulting activity by time
+  // window (the .fit becomes an Activity asynchronously, so there's no id yet).
+  const [photos, setPhotos] = useState([]);
+  const addPhoto = useCallback((dataUrl) => {
+    if (!dataUrl) return;
+    const id = (globalThis.crypto?.randomUUID?.() ?? `p-${Date.now()}-${Math.random()}`);
+    setPhotos((ps) => [...ps, { id, dataUrl, capturedUtc: Date.now() }]);
+  }, []);
+  const removePhoto = useCallback((id) => setPhotos((ps) => ps.filter((p) => p.id !== id)), []);
 
   const source = useRef(null);
   const wakeLock = useRef(null);
@@ -143,7 +155,7 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, spo
 
   const start = useCallback(async () => {
     setError(null);
-    setPending(null); setSaveState('idle'); setSaveError(null);
+    setPending(null); setSaveState('idle'); setSaveError(null); setPhotos([]);
     resetCapture(); setDistanceKm(0);
     try {
       if (isNativePlatform()) {
@@ -212,18 +224,32 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, spo
       });
       const token = getToken ? await getToken() : null;
       const result = await uploadFit(bytes, token);
+
+      // Upload any photos taken during the ride. They carry a real capture time,
+      // clamped into the ride's [start, end] window so the backend resolves them to
+      // this activity. Best-effort: a photo failure doesn't fail the ride save.
+      if (photos.length) {
+        const startMs = pending.startMs ?? 0;
+        const endMs = pending.endMs ?? Date.now();
+        for (const ph of photos) {
+          const capturedUtc = Math.min(Math.max(ph.capturedUtc, startMs), endMs);
+          try { await uploadActivityPhoto(token, ph.dataUrl, { capturedUtc }); } catch { /* ignore */ }
+        }
+      }
+
       setSaveState('saved');
       samples.current = [];
+      setPhotos([]);
       if (result?.status !== 'already-received') onSaved?.();
     } catch (e) {
       setSaveState('error');
       setSaveError(e?.message || 'Could not save the ride.');
     }
-  }, [pending, getToken, onSaved]);
+  }, [pending, getToken, onSaved, photos]);
 
   const discardRide = useCallback(() => {
     samples.current = []; agg.current = null;
-    setPending(null); setSaveState('idle'); setSaveError(null); setDistanceKm(0);
+    setPending(null); setSaveState('idle'); setSaveError(null); setDistanceKm(0); setPhotos([]);
   }, []);
 
   // Web only: surface the background limitation honestly. The Wake Lock is dropped
@@ -249,5 +275,6 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, spo
   return {
     recording, paused, distanceKm, lastFix, error, mode, start, stop,
     pending, saveState, saveError, saveRide, discardRide,
+    photos, addPhoto, removePhoto,
   };
 }

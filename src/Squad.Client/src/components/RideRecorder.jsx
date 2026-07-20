@@ -1,6 +1,31 @@
+import { useRef, useState } from 'react';
 import { s } from '../lib/style.js';
+import { downscaleToJpeg, captureNativePhoto, isNativePlatform } from '../lib/photos.js';
 
 const radarLabel = (r) => (!r ? '—' : r.level > 0 ? `${r.closestM ?? '?'}m` : 'clear');
+
+// Thumbnails of photos captured this ride (local data URLs), each removable.
+function PhotoStrip({ photos, onRemove }) {
+  if (!photos?.length) return null;
+  return (
+    <div style={s('display:flex;gap:8px;flex-wrap:wrap;margin-top:12px')}>
+      {photos.map((p) => (
+        <div key={p.id} style={{ ...s('position:relative;width:58px;height:58px;border-radius:10px;border:1px solid var(--line);flex:none'), backgroundImage: `url("${p.dataUrl}")`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
+          <div className="ctl" onClick={() => onRemove(p.id)} style={s('position:absolute;top:-7px;right:-7px;width:20px;height:20px;border-radius:50%;background:var(--bad);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;border:2px solid var(--bg);line-height:1')}>×</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function AddPhotoButton({ onClick, busy }) {
+  return (
+    <div className="ctl" onClick={busy ? undefined : onClick} style={s(`display:flex;align-items:center;justify-content:center;gap:7px;margin-top:12px;padding:11px;border-radius:12px;background:var(--bg3);border:1px solid var(--line);font-size:13px;font-weight:600;color:var(--text);opacity:${busy ? 0.6 : 1}`)}>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></svg>
+      {busy ? 'Adding…' : 'Add photo'}
+    </div>
+  );
+}
 
 function SensorChip({ label, kind, status, value, connect, disconnect }) {
   const on = status === 'connected';
@@ -37,7 +62,7 @@ function Stat({ value, unit, label }) {
 
 // Post-ride summary: encode the captured ride as a real Garmin .fit and upload it
 // through the same ingest as a Garmin file. Shown after Stop, before anything is saved.
-function RideSummary({ pending, saveState, saveError, saveRide, discardRide }) {
+function RideSummary({ pending, saveState, saveError, saveRide, discardRide, photoUI }) {
   const { summary: sm, sampleCount } = pending;
   const empty = sampleCount === 0;
   const saved = saveState === 'saved';
@@ -66,6 +91,8 @@ function RideSummary({ pending, saveState, saveError, saveRide, discardRide }) {
             {sm.calories != null && <Stat value={sm.calories} unit="kcal" label="Energy" />}
           </div>
           <div style={s('font-size:10px;color:var(--text3);margin-top:10px')}>{sampleCount.toLocaleString()} points · exports as a Garmin <span className="mono">.fit</span></div>
+          {/* Photos — add before saving; uploaded + attached to this ride on save. */}
+          {!saved && photoUI}
         </>
       )}
 
@@ -95,16 +122,61 @@ function RideSummary({ pending, saveState, saveError, saveRide, discardRide }) {
 // going to the ride hub.
 export default function RideRecorder({ recorder, sensors, streaming }) {
   const { recording, paused, distanceKm, lastFix, error, mode, start, stop,
-          pending, saveState, saveError, saveRide, discardRide } = recorder;
+          pending, saveState, saveError, saveRide, discardRide,
+          photos, addPhoto, removePhoto } = recorder;
   const radar = sensors.metrics.radar;
+
+  // Photo capture: native uses the camera plugin; web opens the file/camera input.
+  const fileRef = useRef(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoErr, setPhotoErr] = useState('');
+
+  const capture = async () => {
+    setPhotoErr('');
+    if (isNativePlatform()) {
+      setPhotoBusy(true);
+      try { const d = await captureNativePhoto(); if (d) addPhoto(d); }
+      catch { setPhotoErr('Could not capture a photo.'); }
+      finally { setPhotoBusy(false); }
+    } else {
+      fileRef.current?.click();
+    }
+  };
+  const onPick = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-selecting the same file
+    if (!file) return;
+    setPhotoBusy(true); setPhotoErr('');
+    try { addPhoto(await downscaleToJpeg(file)); }
+    catch (err) { setPhotoErr(err.message || 'Could not use that image.'); }
+    finally { setPhotoBusy(false); }
+  };
+
+  const photoUI = (
+    <>
+      <PhotoStrip photos={photos} onRemove={removePhoto} />
+      <AddPhotoButton onClick={capture} busy={photoBusy} />
+      {photoErr && <div style={s('font-size:11px;color:var(--bad);margin-top:8px')}>{photoErr}</div>}
+    </>
+  );
+
+  // The hidden input must live outside the pending/recording branches so it exists
+  // in both states (add photos while recording AND on the summary card).
+  const input = <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={onPick} style={s('display:none')} />;
 
   // After Stop, a finished ride awaits the save/discard decision — show its summary.
   if (pending) {
-    return <RideSummary pending={pending} saveState={saveState} saveError={saveError} saveRide={saveRide} discardRide={discardRide} />;
+    return (
+      <>
+        {input}
+        <RideSummary pending={pending} saveState={saveState} saveError={saveError} saveRide={saveRide} discardRide={discardRide} photoUI={photoUI} />
+      </>
+    );
   }
 
   return (
     <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:14px;margin-top:14px')}>
+      {input}
       <div style={s('display:flex;align-items:center;justify-content:space-between')}>
         <div style={s('display:flex;align-items:center;gap:8px')}>
           <Dot color={recording ? (paused ? 'var(--warn)' : 'var(--bad)') : 'var(--text3)'} pulse={recording && !paused} />
@@ -151,6 +223,9 @@ export default function RideRecorder({ recorder, sensors, streaming }) {
         </div>
       )}
       {error && <div style={s('font-size:11px;color:var(--bad);margin-top:10px')}>{error}</div>}
+
+      {/* Snap photos during the ride — uploaded + attached when you save. */}
+      {recording && photoUI}
 
       <div
         className="ctl"

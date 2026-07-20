@@ -17,6 +17,7 @@
     <!-- Enables passwordless SQL auth (connection string 'Authentication=Active Directory Default'):
          az-CLI / managed-identity credentials instead of a password in config. -->
     <PackageReference Include="Azure.Identity" Version="1.13.1" />
+    <PackageReference Include="Azure.Storage.Blobs" Version="12.22.2" />
     <PackageReference Include="Dapper" Version="2.1.44" />
   </ItemGroup>
 </Project>

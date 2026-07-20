@@ -1,4 +1,6 @@
+using System.IO;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Squad.Core;
 
 namespace Squad.Infrastructure;
@@ -10,7 +12,10 @@ public static class InfrastructureServiceCollectionExtensions
     /// The SignalR fan-out (IActivityFanout) is registered by the Web host, since it
     /// depends on the hub. Adding a collection surface = one more ISourceAdapter line.
     /// </summary>
-    public static IServiceCollection AddSquadInfrastructure(this IServiceCollection services, string sqlConnectionString)
+    /// <param name="storageConnectionString">Azure Storage connection string for image blobs.
+    /// When null/empty, images fall back to the local filesystem (dev/no-storage-account).</param>
+    public static IServiceCollection AddSquadInfrastructure(
+        this IServiceCollection services, string sqlConnectionString, string? storageConnectionString = null)
     {
         // Collection-surface adapters (resolved by Source in the worker).
         services.AddSingleton<ISourceAdapter, FitUploadAdapter>();
@@ -36,6 +41,15 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IFollowService>(_ => new SqlFollowService(sqlConnectionString));
         services.AddScoped<INotificationService>(_ => new SqlNotificationService(sqlConnectionString));
         services.AddScoped<IPlanService>(_ => new SqlPlanService(sqlConnectionString));
+        services.AddScoped<IActivityPhotoService>(_ => new SqlActivityPhotoService(sqlConnectionString));
+
+        // Image blobs: Azure Blob Storage in prod (connection string set), else the
+        // local filesystem fallback under {ContentRoot}/App_Data/images for dev.
+        if (!string.IsNullOrWhiteSpace(storageConnectionString))
+            services.AddSingleton<IImageStore>(_ => new AzureBlobImageStore(storageConnectionString));
+        else
+            services.AddSingleton<IImageStore>(sp => new FileSystemImageStore(
+                Path.Combine(sp.GetRequiredService<IHostEnvironment>().ContentRootPath, "App_Data", "images")));
 
         // Live-ride relay state (ephemeral).
         services.AddSingleton<IRideSessionState, InMemoryRideSessionState>();

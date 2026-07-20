@@ -68,6 +68,7 @@ public sealed class SqlLeaderboardService(string connectionString) : ILeaderboar
                 RunLoad = agg?.RunLoad ?? 0,
                 Streak = days.TryGetValue(r.Id, out var set) ? Streak(set, today) : 0,
                 Move = move,
+                AvatarUrl = r.AvatarUrl,
             };
         })
         .OrderByDescending(r => r.Load) // default ordering; client re-sorts per tab
@@ -106,7 +107,9 @@ public sealed class SqlLeaderboardService(string connectionString) : ILeaderboar
     }
 
     private const string RosterSql = """
-        SELECT Id, DisplayName AS Name, Initials, AvatarColor AS Color
+        SELECT Id, DisplayName AS Name, Initials, AvatarColor AS Color,
+               CASE WHEN AvatarBlob IS NOT NULL
+                    THEN '/api/images/avatars/' + LOWER(CONVERT(varchar(36), Id)) END AS AvatarUrl
         FROM dbo.Athlete WHERE SquadId = @squadId;
         """;
 
@@ -135,7 +138,7 @@ public sealed class SqlLeaderboardService(string connectionString) : ILeaderboar
         WHERE ath.SquadId = @squadId AND a.StartUtc >= @since;
         """;
 
-    private sealed record RosterRow(Guid Id, string Name, string Initials, string Color);
+    private sealed record RosterRow(Guid Id, string Name, string Initials, string Color, string? AvatarUrl);
     private sealed record Agg(Guid AthleteId, double Load, double VolumeHours, double SwimLoad, double BikeLoad, double RunLoad);
     private sealed record DayRow(Guid AthleteId, DateTime Dt);
 }

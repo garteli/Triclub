@@ -50,7 +50,7 @@ public static class ActivityQueryEndpoints
             r.Id, r.AthleteId, r.AthleteName, r.Initials, r.AvatarColor,
             r.Sport, r.StartUtc, r.MovingTimeSec, r.ElapsedTimeSec,
             r.DistanceMeters, r.ElevationGainM, r.AvgHeartRate,
-            r.AvgPowerWatts, r.TrainingLoad, r.Calories,
+            r.AvgPowerWatts, r.TrainingLoad, r.Calories, r.AvatarUrl,
             isMe = r.AthleteId == athleteId,
         });
         return Results.Ok(result);

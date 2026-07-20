@@ -1,29 +1,44 @@
-// Profile photo handling — client-side only.
+// Profile photo handling.
 //
-// The backend profile has no photo field (identity is name/initials/avatarColor),
-// so a chosen photo is cropped to a square, downscaled to a small JPEG data URL and
-// persisted in localStorage keyed by athlete id. It's hydrated into App state on
-// boot and rendered by <Avatar> wherever the signed-in athlete's avatar appears.
-// Swap saveAvatar/loadAvatar for a real POST /api/profile/photo (blob storage) to
-// make it sync across devices.
+// A chosen photo is cropped to a square and downscaled to a small JPEG (below),
+// then uploaded to blob storage via the backend (POST /api/profile/photo) so it
+// syncs across devices and is visible to teammates. The blobs are private; every
+// read goes through the authenticated proxy GET /api/images/avatars/{id} (see
+// lib/authedImage.js), rendered by <Avatar> wherever an avatar appears.
 
-const keyFor = (id) => `squad.avatar.${id || 'me'}`;
-
-export function loadAvatar(id) {
-  try {
-    return localStorage.getItem(keyFor(id)) || null;
-  } catch {
-    return null;
-  }
+// Convert a data: URL (data:image/jpeg;base64,…) into a Blob for multipart upload.
+export function dataUrlToBlob(dataUrl) {
+  const [meta, b64] = dataUrl.split(',');
+  const mime = /:(.*?);/.exec(meta)?.[1] || 'image/jpeg';
+  const bin = atob(b64);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], { type: mime });
 }
 
-// Persist (or clear, when dataUrl is falsy) the athlete's photo. Returns the value.
-export function saveAvatar(id, dataUrl) {
-  try {
-    if (dataUrl) localStorage.setItem(keyFor(id), dataUrl);
-    else localStorage.removeItem(keyFor(id));
-  } catch { /* storage unavailable / quota */ }
-  return dataUrl || null;
+// Upload the athlete's cropped avatar (a JPEG data URL from the reposition editor)
+// to blob storage. Returns the proxy avatarUrl the server persisted.
+export async function uploadAvatar(token, dataUrl) {
+  const fd = new FormData();
+  fd.append('file', dataUrlToBlob(dataUrl), 'avatar.jpg');
+  const res = await fetch('/api/profile/photo', {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    body: fd,
+  });
+  if (!res.ok) throw new Error(`Avatar upload failed (${res.status})`);
+  const body = await res.json().catch(() => ({}));
+  return body.avatarUrl || null;
+}
+
+// Remove the athlete's avatar (back to initials).
+export async function deleteAvatar(token) {
+  const res = await fetch('/api/profile/photo', {
+    method: 'DELETE',
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+  if (!res.ok && res.status !== 204) throw new Error(`Avatar remove failed (${res.status})`);
+  return true;
 }
 
 // Decode a File to something drawable, using createImageBitmap when available and

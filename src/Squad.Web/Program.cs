@@ -9,7 +9,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 // ---- ingest + persistence + live-ride state ----
 var sqlConnection = builder.Configuration.GetConnectionString("Sql") ?? "";
-builder.Services.AddSquadInfrastructure(sqlConnection);
+var storageConnection = builder.Configuration.GetConnectionString("Storage");
+builder.Services.AddSquadInfrastructure(sqlConnection, storageConnection);
 
 // ---- realtime (feed + live ride) ----
 builder.Services.AddSignalR();
@@ -108,6 +109,7 @@ app.MapGet("/api/health", () => Results.Ok(new { status = "ok", app = "Domestiqu
 
 app.MapAuth();             // POST /api/auth/{register,login,google,apple}  GET /api/auth/{config,me}
 app.MapProfile();          // GET/PUT /api/profile
+app.MapImages();           // avatars + activity photos (upload + authenticated read proxy)
 app.MapActivityIntake();   // POST /api/activities/upload  +  /api/activities/native/{source}
 app.MapActivityQuery();    // GET  /api/activities
 app.MapSquads();           // GET/POST /api/squads (+ /{id}, /{id}/join)

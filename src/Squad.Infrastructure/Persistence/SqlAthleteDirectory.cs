@@ -20,7 +20,9 @@ public sealed class SqlAthleteDirectory(string connectionString) : IAthleteDirec
         // Column aliases map to AthleteProfile's constructor params. Adjust the
         // source column names if your Athlete table differs (see Sql/RawActivity.sql).
         const string sql = """
-            SELECT Id, DisplayName AS Name, Initials, AvatarColor, SquadId
+            SELECT Id, DisplayName AS Name, Initials, AvatarColor, SquadId,
+                   CASE WHEN AvatarBlob IS NOT NULL
+                        THEN '/api/images/avatars/' + LOWER(CONVERT(varchar(36), Id)) END AS AvatarUrl
             FROM dbo.Athlete
             WHERE Id = @athleteId;
             """;
