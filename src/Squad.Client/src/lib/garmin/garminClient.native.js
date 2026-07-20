@@ -8,7 +8,8 @@
 // Garmin's SSO (2-step verification, Cloudflare challenges) to periodically force the
 // WebView-login fallback. This is the fragile part flagged in the design discussion.
 //
-//   login()          email+password  → { oauth1, oauth2, savedAt }   (the persisted session)
+//   login()          email+password  → { kind:'session', session } | { kind:'mfa', csrf }
+//   completeMfa()    code + csrf      → session   (finish a 2-step verification login)
 //   ensureBearer()   session          → session with a fresh OAuth2 bearer (refreshes if stale)
 //   listActivities() session          → [activitySummary]            (newest first)
 //   downloadOriginal(session, id)     → { name, bytes }              (a .zip of the source .fit)
@@ -35,12 +36,8 @@ const SIGNIN_PARAMS = {
   redirectAfterAccountLoginUrl: EMBED,
   redirectAfterAccountCreationUrl: EMBED,
 };
-
-// Thrown when Garmin demands a 2-step verification code — the raw HTTP flow can't
-// complete it non-interactively; the caller should fall back to WebView login.
-export class GarminMfaRequired extends Error {
-  constructor(msg) { super(msg); this.name = 'GarminMfaRequired'; }
-}
+// Where a 2-step verification code is submitted (garth's loginEnterMfaCode form target).
+const VERIFY_MFA = `${SSO}/verifyMFA/loginEnterMfaCode`;
 
 let _consumer = null;
 async function consumer() {
@@ -82,15 +79,40 @@ export async function login({ username, password }) {
     data: formEncode({ username, password, embed: 'true', _csrf: csrf }),
   });
   const html = String(post.data ?? '');
-  const ticket = (html.match(/embed\?ticket=([^"]+)"/) || [])[1];
-  if (!ticket) {
-    if (/verificationCode|mfa-code|VERIFICATION/i.test(html)) {
-      throw new GarminMfaRequired('Garmin needs a 2-step verification code. Use the in-app WebView login for MFA accounts.');
-    }
-    throw new Error('Garmin SSO: login returned no ticket (wrong email/password, or the SSO flow changed).');
-  }
+  const ticket = firstTicket(html);
+  if (ticket) return { kind: 'session', session: await exchangeTicket(ticket) };
 
+  // No ticket → either a 2-step verification code is required, or the credentials were wrong.
+  // The MFA page carries its own fresh CSRF; completeMfa() posts the code back with it. The
+  // session cookies set above persist automatically in CapacitorHttp's native cookie jar, so
+  // the follow-up POST stays in the same SSO session with no extra plumbing.
+  if (/verifyMFA|mfa-code|verification/i.test(html)) {
+    const mfaCsrf = (html.match(/name="_csrf"\s+value="([^"]+)"/) || [])[1] || csrf;
+    return { kind: 'mfa', csrf: mfaCsrf };
+  }
+  throw new Error('Garmin SSO: login returned no ticket (wrong email/password, or the SSO flow changed).');
+}
+
+// Finish a 2-step login: submit the verification code (with the CSRF from login()'s
+// { kind:'mfa' } result) and exchange the resulting ticket for a session.
+export async function completeMfa({ code, csrf }) {
+  const res = await CapacitorHttp.request({
+    url: VERIFY_MFA, method: 'POST', params: SIGNIN_PARAMS,
+    headers: {
+      'User-Agent': UA,
+      'Content-Type': 'application/x-www-form-urlencoded',
+      referer: `${SSO}/signin`,
+    },
+    data: formEncode({ 'mfa-code': String(code).trim(), embed: 'true', _csrf: csrf, fromPage: 'setupEnterMfaCode' }),
+  });
+  const ticket = firstTicket(String(res.data ?? ''));
+  if (!ticket) throw new Error('Garmin: verification code rejected (wrong or expired — request a new one).');
   return exchangeTicket(ticket);
+}
+
+// Pull the SSO service ticket out of the embed redirect in a response body.
+function firstTicket(html) {
+  return (html.match(/embed\?ticket=([^"&]+)/) || [])[1] || null;
 }
 
 // Swap an SSO service ticket for a full session (OAuth1 token + OAuth2 bearer). Shared by

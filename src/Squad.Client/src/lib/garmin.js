@@ -43,20 +43,51 @@ export async function garminHasSession() {
   return store.hasSession();
 }
 
-// Interactive login. Persists the session (OAuth1 + OAuth2) to the secure store.
-// Pass rememberCredentials:true to ALSO stash username/password for silent re-auth when
-// the OAuth1 token eventually expires — opt-in, non-MFA accounts only (see the store).
+// Pending 2-step verification between garminLogin() → garminSubmitMfa(). Holds only the
+// CSRF + the remember-me choice; the SSO session itself lives in CapacitorHttp's native
+// cookie jar, so the follow-up code submission stays in the same login. Module-scoped, so a
+// login and its code entry must happen in one app run (fine — it's seconds apart).
+let _pendingMfa = null;
+
+// Interactive login. On success persists the session (OAuth1 + OAuth2) and returns
+// { ok:true }. If Garmin demands a 2-step code, returns { mfa:true } WITHOUT persisting —
+// the caller then collects the code and calls garminSubmitMfa().
+// rememberCredentials stashes username/password for silent re-auth when the OAuth1 token
+// eventually expires — opt-in, and only meaningful on non-MFA accounts (see the store).
 export async function garminLogin({ username, password, rememberCredentials = false }) {
   if (!garminAvailable()) throw new Error('Garmin sign-in is only available in the mobile app.');
   const [client, store] = await Promise.all([
     import('./garmin/garminClient.native.js'),
     import('./garmin/garminStore.native.js'),
   ]);
-  const session = await client.login({ username, password });
-  await store.saveSession(session);
+  const result = await client.login({ username, password });
+  if (result.kind === 'mfa') {
+    _pendingMfa = { csrf: result.csrf, username, password, rememberCredentials };
+    return { mfa: true };
+  }
+  await store.saveSession(result.session);
   if (rememberCredentials) await store.saveCredentials(username, password);
   return { ok: true };
 }
+
+// Finish a 2-step login started by garminLogin() (which returned { mfa:true }). We do NOT
+// persist credentials here even if rememberCredentials was set: an MFA account can't be
+// re-authed silently anyway, so a stored password would be a liability with no benefit.
+export async function garminSubmitMfa({ code }) {
+  if (!garminAvailable()) throw new Error('Garmin sign-in is only available in the mobile app.');
+  if (!_pendingMfa) throw new Error('No pending Garmin verification — start sign-in again.');
+  const [client, store] = await Promise.all([
+    import('./garmin/garminClient.native.js'),
+    import('./garmin/garminStore.native.js'),
+  ]);
+  const session = await client.completeMfa({ code, csrf: _pendingMfa.csrf });
+  await store.saveSession(session);
+  _pendingMfa = null;
+  return { ok: true };
+}
+
+export function garminMfaPending() { return !!_pendingMfa; }
+export function garminCancelMfa() { _pendingMfa = null; }
 
 // WebView login — the robust fallback for 2-step-verification / Cloudflare accounts. Opens
 // Garmin's real login page (garmin/garminWebLogin.native.js); we never handle the password.

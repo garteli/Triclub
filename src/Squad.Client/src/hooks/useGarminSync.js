@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  garminAvailable, garminHasSession, garminLogin, garminLoginWebView, garminLogout, syncGarmin,
+  garminAvailable, garminHasSession, garminLogin, garminSubmitMfa, garminCancelMfa,
+  garminLoginWebView, garminLogout, syncGarmin,
 } from '../lib/garmin.js';
 
 // Drives Garmin Connect: login/logout, "is a session persisted?", a run() sync trigger,
@@ -17,6 +18,7 @@ export function useGarminSync({ getToken, onDataChanged, syncOnLaunch = false } 
   const [progress, setProgress] = useState(null);        // { done, total, queued, duplicates, failed }
   const [summary, setSummary] = useState(null);
   const [error, setError] = useState(null);
+  const [mfaPending, setMfaPending] = useState(false); // awaiting a 2-step verification code
   const launchedRef = useRef(false);
 
   // Reflect persisted-session state on mount.
@@ -47,21 +49,54 @@ export function useGarminSync({ getToken, onDataChanged, syncOnLaunch = false } 
 
   const login = useCallback(async ({ username, password, rememberCredentials } = {}) => {
     setError(null);
-    await garminLogin({ username, password, rememberCredentials });
-    setConnected(true);
-    return run({ force: false });
+    try {
+      const res = await garminLogin({ username, password, rememberCredentials });
+      if (res?.mfa) { setMfaPending(true); return; } // caller shows the code step
+      setConnected(true);
+      return run({ force: false });
+    } catch (err) {
+      setError(err.message || 'Garmin sign-in failed.');
+      setStatus('error');
+    }
   }, [run]);
+
+  // Submit the 2-step verification code to finish a login that returned mfa:true.
+  const submitMfa = useCallback(async (code) => {
+    setError(null);
+    try {
+      await garminSubmitMfa({ code });
+      setMfaPending(false);
+      setConnected(true);
+      return run({ force: false });
+    } catch (err) {
+      setError(err.message || 'Verification failed.');
+      setStatus('error');
+    }
+  }, [run]);
+
+  // Abandon a pending 2-step login (user hit cancel).
+  const cancelMfa = useCallback(() => {
+    garminCancelMfa();
+    setMfaPending(false);
+  }, []);
 
   const loginWebView = useCallback(async () => {
     setError(null);
-    await garminLoginWebView();
-    setConnected(true);
-    return run({ force: false });
+    try {
+      await garminLoginWebView();
+      setConnected(true);
+      return run({ force: false });
+    } catch (err) {
+      setError(err.message || 'Garmin sign-in failed.');
+      setStatus('error');
+    }
   }, [run]);
 
   const logout = useCallback(async () => {
     await garminLogout();
+    garminCancelMfa();
     setConnected(false);
+    setMfaPending(false);
     setStatus('idle');
     setSummary(null);
     setProgress(null);
@@ -74,5 +109,8 @@ export function useGarminSync({ getToken, onDataChanged, syncOnLaunch = false } 
     run({ force: false });
   }, [available, syncOnLaunch, connected, run]);
 
-  return { available, connected, status, progress, summary, error, run, login, loginWebView, logout };
+  return {
+    available, connected, status, progress, summary, error, mfaPending,
+    run, login, submitMfa, cancelMfa, loginWebView, logout,
+  };
 }

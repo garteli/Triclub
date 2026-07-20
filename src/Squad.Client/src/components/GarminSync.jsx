@@ -14,13 +14,16 @@ const GarminGlyph = () => (
 // state (the login can't run in a browser — CORS); on the native build it drives a real
 // Garmin Connect login + history sync through the same ingest pipeline as .fit uploads.
 export default function GarminSync({ getToken, onDataChanged }) {
-  const { available, connected, status, progress, summary, error, run, login, loginWebView, logout } =
-    useGarminSync({ getToken, onDataChanged });
+  const {
+    available, connected, status, progress, summary, error, mfaPending,
+    run, login, submitMfa, cancelMfa, loginWebView, logout,
+  } = useGarminSync({ getToken, onDataChanged });
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(false);
-  const [busy, setBusy] = useState(false); // login in flight (headless or webview)
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false); // login/verify in flight
   const syncing = status === 'syncing';
 
   const doLogin = async (kind) => {
@@ -34,6 +37,13 @@ export default function GarminSync({ getToken, onDataChanged }) {
     }
   };
 
+  const doVerify = async () => {
+    if (busy || !code.trim()) return;
+    setBusy(true);
+    try { await submitMfa(code.trim()); setCode(''); }
+    catch { /* error surfaced via hook state */ } finally { setBusy(false); }
+  };
+
   const field = 'width:100%;box-sizing:border-box;font-size:14px;padding:11px 12px;border-radius:11px;border:1px solid var(--line2);background:var(--bg);color:var(--text);outline:none';
   const btn = (bg, ink) => `text-align:center;font-size:14px;font-weight:700;padding:12px 0;border-radius:12px;cursor:pointer;color:${ink};background:${bg};transition:opacity .15s`;
 
@@ -45,7 +55,9 @@ export default function GarminSync({ getToken, onDataChanged }) {
           <div style={s('flex:1;min-width:0')}>
             <div style={s('font-size:14.5px;font-weight:700')}>Garmin Connect</div>
             <div style={s('font-size:11.5px;color:var(--text3)')}>
-              {connected ? 'Connected — syncs automatically on launch' : 'Sign in once to import your activities'}
+              {mfaPending ? 'Enter your 2-step verification code'
+                : connected ? 'Connected — syncs automatically on launch'
+                : 'Sign in once to import your activities'}
             </div>
           </div>
         </div>
@@ -54,6 +66,34 @@ export default function GarminSync({ getToken, onDataChanged }) {
           <div style={s('font-size:11.5px;color:var(--text3);margin-top:12px;line-height:1.5')}>
             Garmin sign-in runs on your phone, so this works in the <b>Domestique Team mobile app</b> — not the web version. Install the app and open this screen there to connect.
           </div>
+        ) : mfaPending ? (
+          // ---- 2-step verification: enter the code Garmin just sent ----
+          <>
+            <div style={s('font-size:11.5px;color:var(--text2);margin-top:12px;line-height:1.5')}>
+              Garmin sent a verification code to your email or authenticator. Enter it to finish signing in.
+            </div>
+            <input
+              type="text" inputMode="numeric" autoComplete="one-time-code" placeholder="Verification code"
+              value={code} onChange={(e) => setCode(e.target.value)} disabled={busy}
+              onKeyDown={(e) => e.key === 'Enter' && doVerify()}
+              style={s(`${field};margin-top:11px;letter-spacing:2px;text-align:center;font-weight:700`)}
+            />
+            <div
+              role="button" tabIndex={0}
+              onClick={doVerify}
+              style={s(`margin-top:11px;${btn('var(--accent)', 'var(--accent-ink)')};opacity:${busy || !code.trim() ? 0.6 : 1}`)}
+            >
+              {busy ? 'Verifying…' : 'Verify & connect'}
+            </div>
+            <div
+              role="button" tabIndex={0}
+              onClick={() => !busy && (cancelMfa(), setCode(''))}
+              style={s('text-align:center;font-size:12px;font-weight:600;color:var(--text3);margin-top:12px;cursor:pointer')}
+            >
+              Cancel
+            </div>
+            {status === 'error' && <div style={s('font-size:11.5px;color:var(--bad);margin-top:11px;text-align:center')}>{error}</div>}
+          </>
         ) : connected ? (
           // ---- connected: sync + disconnect ----
           <>
