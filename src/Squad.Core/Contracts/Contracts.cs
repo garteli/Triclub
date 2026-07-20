@@ -19,6 +19,12 @@ public sealed record ActivityFeedItem
     public int Reacts { get; init; }
     /// <summary>Proxy path to the athlete's avatar photo (null when they have none → initials).</summary>
     public string? AvatarUrl { get; init; }
+    /// <summary>Total kudos on this activity.</summary>
+    public int Kudos { get; init; }
+    /// <summary>Total comments on this activity.</summary>
+    public int Comments { get; init; }
+    /// <summary>Whether the athlete who requested this card has kudoed the activity.</summary>
+    public bool IKudoed { get; init; }
 }
 
 // ----- Leaderboard -----

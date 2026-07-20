@@ -29,7 +29,7 @@ public static class FeedEndpoints
         var profile = await directory.GetAsync(athleteId, ct);
         if (profile is null) return Results.Unauthorized();
 
-        var rows = await feed.GetRecentAsync(profile.SquadId, take, ct);
+        var rows = await feed.GetRecentAsync(profile.SquadId, athleteId, take, ct);
         var cards = rows.Select(FeedCard.From).ToList();
         return Results.Ok(cards);
     }

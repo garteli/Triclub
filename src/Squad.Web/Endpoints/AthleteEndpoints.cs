@@ -37,7 +37,7 @@ public static class AthleteEndpoints
         var rank = row is null ? 0 : board.ToList().FindIndex(r => r.AthleteId == id) + 1;
 
         // Their recent activity (filter the squad feed to this athlete).
-        var squadActs = await activities.GetForSquadAsync(p.SquadId, 60, ct);
+        var squadActs = await activities.GetForSquadAsync(p.SquadId, me, 60, ct);
         var recent = squadActs.Where(a => a.AthleteId == id).Take(5).Select(FeedCard.From).ToList();
 
         var isMe = id == me;

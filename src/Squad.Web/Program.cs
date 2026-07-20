@@ -10,7 +10,9 @@ var builder = WebApplication.CreateBuilder(args);
 // ---- ingest + persistence + live-ride state ----
 var sqlConnection = builder.Configuration.GetConnectionString("Sql") ?? "";
 var storageConnection = builder.Configuration.GetConnectionString("Storage");
-builder.Services.AddSquadInfrastructure(sqlConnection, storageConnection);
+// The club's default cut of each tracked ride payment, in basis points (1000 = 10%).
+var clubFeeBps = builder.Configuration.GetValue<int?>("Payments:ClubFeeBps") ?? 1000;
+builder.Services.AddSquadInfrastructure(sqlConnection, storageConnection, clubFeeBps);
 
 // ---- realtime (feed + live ride) ----
 builder.Services.AddSignalR();
@@ -112,8 +114,10 @@ app.MapProfile();          // GET/PUT /api/profile
 app.MapImages();           // avatars + activity photos (upload + authenticated read proxy)
 app.MapActivityIntake();   // POST /api/activities/upload  +  /api/activities/native/{source}
 app.MapActivityQuery();    // GET  /api/activities
+app.MapInteractions();     // kudos + comments on /api/activities/{id}
 app.MapHealthDaily();      // POST/GET /api/health/daily (Apple Health wellness)
 app.MapSquads();           // GET/POST /api/squads (+ /{id}, /{id}/join)
+app.MapPayments();         // ride-payment ledger: /api/payments (+ /mine, /squad/{id}, /{id}/paid, /{id}/waive)
 app.MapLeaderboard();      // GET  /api/squads/{squadId}/leaderboard
 app.MapFeed();             // GET  /api/feed
 app.MapAthletes();         // GET /api/athletes/{id} (+ follow/unfollow)

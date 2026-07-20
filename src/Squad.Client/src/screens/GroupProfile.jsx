@@ -7,12 +7,13 @@ const Back = ({ onClick }) => (
   </div>
 );
 
-export default function GroupProfile({ vm, actions, onJoinSquad }) {
+export default function GroupProfile({ vm, actions, onJoinSquad, payments, meId }) {
   const g = vm.selGroupData;
   const a = vm.applyState;
   // Live mode: real squads from the API (onJoinSquad wired). The mock apply→pay
   // state machine below is only used in the no-session prototype.
   const live = !!onJoinSquad;
+  const isOwner = live && !!meId && !!g.owner && String(g.owner).toLowerCase() === String(meId).toLowerCase();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const join = async () => {
@@ -92,6 +93,26 @@ export default function GroupProfile({ vm, actions, onJoinSquad }) {
             </>
           );
         })()}
+
+        {/* ride-payment ledger entry points (live) */}
+        {live && payments && isOwner && (
+          <div className="ctl" onClick={actions.openLedger} style={s('display:flex;align-items:center;gap:11px;background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:12px 13px;margin-top:12px')}>
+            <div style={s('width:36px;height:36px;border-radius:11px;background:var(--accent-dim);flex:none;display:flex;align-items:center;justify-content:center')}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round"><path d="M3 10h18M7 15h4" /><rect x="3" y="5" width="18" height="14" rx="2.5" /></svg>
+            </div>
+            <div style={s('flex:1')}><div style={s('font-size:13px;font-weight:700')}>Manage ride payments</div><div style={s('font-size:11px;color:var(--text2)')}>Ledger, club cut &amp; what's outstanding</div></div>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.4" strokeLinecap="round"><path d="M9 6l6 6-6 6" /></svg>
+          </div>
+        )}
+        {live && payments && !isOwner && (
+          <div className="ctl" onClick={actions.openRecordPay} style={s('display:flex;align-items:center;gap:11px;background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:12px 13px;margin-top:12px')}>
+            <div style={s('width:36px;height:36px;border-radius:11px;background:var(--bg4);flex:none;display:flex;align-items:center;justify-content:center')}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round"><rect x="3" y="5" width="18" height="14" rx="2.5" /><path d="M3 10h18" /></svg>
+            </div>
+            <div style={s('flex:1')}><div style={s('font-size:13px;font-weight:700')}>Record a payment</div><div style={s('font-size:11px;color:var(--text2)')}>Log what you paid the coach for a ride</div></div>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.4" strokeLinecap="round"><path d="M9 6l6 6-6 6" /></svg>
+          </div>
+        )}
 
         {/* apply / status (mock prototype only) */}
         {!live && a.notApplied && (
