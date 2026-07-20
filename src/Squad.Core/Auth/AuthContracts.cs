@@ -157,6 +157,12 @@ public sealed record PlannedWorkoutRow(
 public sealed record PlannedWorkoutWrite(
     DateTime Date, string Discipline, string Title, string? Sub, int DurationMin, int Load);
 
+/// <summary>A coach's saved plan in list form (no doc body).</summary>
+public sealed record CoachPlanSummary(Guid Id, string Name, DateTimeOffset UpdatedUtc);
+
+/// <summary>A coach's saved plan with its full JSON doc.</summary>
+public sealed record CoachPlanDoc(Guid Id, string Name, string Doc, DateTimeOffset UpdatedUtc);
+
 public interface IPlanService
 {
     /// <summary>The athlete's plan for the Monday..Sunday week containing <paramref name="weekStart"/>,
@@ -168,6 +174,17 @@ public interface IPlanService
     /// squad OWNED by <paramref name="coachId"/> are written. Returns how many athletes got the plan.</summary>
     Task<int> PublishAsync(Guid coachId, IReadOnlyList<Guid> athleteIds, DateTime spanStart, DateTime spanEnd,
         IReadOnlyList<PlannedWorkoutWrite> workouts, CancellationToken ct);
+
+    // ----- a coach's saved plans (their own working copies) -----
+    /// <summary>List a coach's saved plans, most-recently-updated first.</summary>
+    Task<IReadOnlyList<CoachPlanSummary>> ListPlansAsync(Guid ownerId, CancellationToken ct);
+    /// <summary>Load one plan the coach owns (null if not found / not theirs).</summary>
+    Task<CoachPlanDoc?> GetPlanAsync(Guid ownerId, Guid planId, CancellationToken ct);
+    /// <summary>Create (planId null) or update a plan the coach owns; returns its id (null if the
+    /// update targets a plan they don't own).</summary>
+    Task<Guid?> SavePlanAsync(Guid ownerId, Guid? planId, string name, string doc, Guid? squadId, CancellationToken ct);
+    /// <summary>Delete a plan the coach owns; returns whether a row was removed.</summary>
+    Task<bool> DeletePlanAsync(Guid ownerId, Guid planId, CancellationToken ct);
 }
 
 /// <summary>Result of verifying a provider id_token: the identity, or a diagnostic error reason.</summary>
