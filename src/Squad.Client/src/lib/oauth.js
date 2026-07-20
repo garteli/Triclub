@@ -14,6 +14,21 @@ import { Capacitor } from '@capacitor/core';
 
 const isNative = () => { try { return Capacitor.isNativePlatform(); } catch { return false; } };
 
+// The native social-login plugin must be compiled into the app binary (pod/gradle).
+// If the installed build predates it, Capacitor throws "…not implemented on ios".
+// Translate that into an actionable message instead of leaking the raw plugin error.
+const PLUGIN_MISSING = 'Google & Apple sign-in need the latest app version. Please update from the App Store, or use “Create account”.';
+const isPluginMissing = (e) => /not implemented|unimplemented|not available|no such module/i.test((e && (e.message || String(e))) || '');
+async function nativeLogin(cfg, opts) {
+  try {
+    const { SocialLogin } = await nativeSocialLogin(cfg);
+    return await SocialLogin.login(opts);
+  } catch (e) {
+    if (isPluginMissing(e)) throw new Error(PLUGIN_MISSING);
+    throw e;
+  }
+}
+
 // --- native SDK (Capacitor) — initialized once from /api/auth/config values ---
 let _nativeReady;
 // NB: returns the plugin **wrapped in an object**, never bare. Capacitor plugin
@@ -56,6 +71,16 @@ function loadScript(src) {
   return p;
 }
 
+// A sign-in must never leave the UI spinning forever: if the native sheet or the web
+// One-Tap prompt neither resolves nor rejects, reject after `ms` so the caller can
+// clear its busy state and let the user retry (or fall back to email).
+const SIGNIN_TIMEOUT_MS = 60000;
+function withTimeout(promise, ms, msg) {
+  let timer;
+  const guard = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(msg)), ms); });
+  return Promise.race([promise, guard]).finally(() => clearTimeout(timer));
+}
+
 // --- Google ---
 // Native: @capgo native Google SDK. Web: Google Identity Services
 // (https://accounts.google.com/gsi/client → window.google.accounts.id).
@@ -63,13 +88,14 @@ function loadScript(src) {
 export async function getGoogleIdToken(cfg) {
   if (isNative()) {
     // The native Google SDK can't initialize without an iOS OAuth client id. If the
-    // backend hasn't published one (Auth__Google__iOSClientId app setting), fail loudly
-    // instead of letting the native login promise hang at "Signing in…".
+    // backend hasn't published one (Auth__Google__iOSClientId app setting), fail fast
+    // instead of waiting out the timeout at "Signing in…".
     if (!cfg?.google?.iosClientId) {
       throw new Error('Google sign-in isn’t set up for the app yet (missing iOS client id).');
     }
-    const { SocialLogin } = await nativeSocialLogin(cfg);
-    const res = await SocialLogin.login({ provider: 'google', options: { scopes: ['email', 'profile'] } });
+    const res = await withTimeout(
+      nativeLogin(cfg, { provider: 'google', options: { scopes: ['email', 'profile'] } }),
+      SIGNIN_TIMEOUT_MS, 'Google sign-in timed out — please try again.');
     const idToken = res?.result?.idToken;
     if (!idToken) throw new Error('Google sign-in did not return a token.');
     return idToken;
@@ -79,7 +105,7 @@ export async function getGoogleIdToken(cfg) {
   const id = window.google?.accounts?.id;
   if (!id) throw new Error('Google sign-in failed to load.');
 
-  return new Promise((resolve, reject) => {
+  return withTimeout(new Promise((resolve, reject) => {
     id.initialize({
       client_id: clientId,
       callback: (resp) => {
@@ -96,7 +122,7 @@ export async function getGoogleIdToken(cfg) {
         reject(new Error('Google sign-in was dismissed. Try email, or check pop-up settings.'));
       }
     });
-  });
+  }), SIGNIN_TIMEOUT_MS, 'Google sign-in timed out — please try again.');
 }
 
 // --- Apple ---
@@ -105,8 +131,9 @@ export async function getGoogleIdToken(cfg) {
 // `cfg` is the full /api/auth/config object.
 export async function getAppleIdToken(cfg) {
   if (isNative()) {
-    const { SocialLogin } = await nativeSocialLogin(cfg);
-    const res = await SocialLogin.login({ provider: 'apple', options: { scopes: ['email', 'name'] } });
+    const res = await withTimeout(
+      nativeLogin(cfg, { provider: 'apple', options: { scopes: ['email', 'name'] } }),
+      SIGNIN_TIMEOUT_MS, 'Apple sign-in timed out — please try again.');
     const idToken = res?.result?.idToken;
     if (!idToken) throw new Error('Apple sign-in did not return a token.');
     return idToken;

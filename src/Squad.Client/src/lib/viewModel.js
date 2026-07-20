@@ -22,7 +22,6 @@ function timeAgo(iso) {
 
 const SPORT_COLOR = { Bike: 'var(--bike)', Run: 'var(--run)', Swim: 'var(--swim)', Gym: 'var(--gym)' };
 const SPORT_ICON = { Bike: '🚴', Run: '🏃', Swim: '🏊', Gym: '🏋️' };
-import { deriveRideRiders, formatTimer, gapMeters } from './derive.js';
 import { activityAnalysis } from './activityAnalysis.js';
 
 // Builds everything the screens need for a given (state, tick). This is the
@@ -55,11 +54,6 @@ export function buildViewModel(state, t, opts = {}) {
   const squadOnTrack = squadSource.filter((m) => m.status !== 'behind').length;
   const squadTotal = squadSource.length;
 
-  // ---- live ride (time-driven) ----
-  const rideRiders = deriveRideRiders(t);
-  const you = rideRiders[0];
-  const rideTimer = formatTimer(t);
-  const gap = gapMeters(t);
 
   // ---- plan week ---- (live plan from opts.plan overrides the seed)
   const planSource = opts.plan?.length ? opts.plan : planWeek;
@@ -255,7 +249,7 @@ export function buildViewModel(state, t, opts = {}) {
       }))
     : null;
 
-  const danaExtra = athleteExtra.dana;
+  const danaExtra = athleteExtra.dana || {};
   // Real signed-in profile (opts.profile) wins; unedited client state (me) overlays;
   // the mock Dana defaults are only a fallback for the no-session prototype.
   const p = opts.profile;
@@ -270,13 +264,14 @@ export function buildViewModel(state, t, opts = {}) {
     bio: me.bio ?? p.bio ?? '',
     initials: p.initials || '', color: p.avatarColor, photo: opts.avatar || null,
   } : {
-    name: me.name || 'Dana Levi', club: me.club || danaExtra.club, ageGroup: me.ageGroup || danaExtra.ageGroup,
-    sport: me.sport || danaExtra.sport, level: me.level || danaExtra.level,
-    ftp: me.ftp ?? danaExtra.ftp, weekly: me.weekly || danaExtra.weekly, bio: me.bio || danaExtra.bio, initials: 'DL',
+    name: me.name || '', club: me.club || danaExtra.club || '', ageGroup: me.ageGroup || danaExtra.ageGroup || '',
+    sport: me.sport || danaExtra.sport || 'Triathlon', level: me.level || danaExtra.level || '',
+    ftp: me.ftp ?? danaExtra.ftp ?? '', weekly: me.weekly || danaExtra.weekly || '', bio: me.bio || danaExtra.bio || '', initials: me.initials || '',
     photo: opts.avatar || null,
   };
   const athlete = (() => {
-    const m = members.find((x) => x.id === selMember) || members[1];
+    const m = members.find((x) => x.id === selMember) || members[0];
+    if (!m) return null;
     const extra = athleteExtra[m.id] || {};
     const lb = lbById[m.id] || {};
     const isMe = m.id === 'dana';
@@ -330,6 +325,7 @@ export function buildViewModel(state, t, opts = {}) {
   const selActivity = state.selActivity || 'a1';
   const activityDetail = (() => {
     const a = activities.find((x) => x.id === selActivity) || activities[0];
+    if (!a) return null;
     const metricCards = [
       [a.dist, a.distU, 'Distance', null],
       [a.moving, '', 'Moving', null],
@@ -341,8 +337,13 @@ export function buildViewModel(state, t, opts = {}) {
     return { ...a, metricCards, analysis: activityAnalysis(a) };
   })();
 
+  const now = new Date();
+  const todayLabel = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][now.getDay()];
+  const todayLabelHe = ['יום א׳', 'יום ב׳', 'יום ג׳', 'יום ד׳', 'יום ה׳', 'יום ו׳', 'שבת'][now.getDay()];
+
   return {
     squad, squadOnTrack, squadTotal,
+    todayLabel, todayLabelHe,
     squadName: opts.squadName || null,
     feed: liveFeedRows ?? feedRows,
     activities, myActivities, activityDetail,
@@ -352,7 +353,6 @@ export function buildViewModel(state, t, opts = {}) {
     noApplicantOpen: !selApplicant, applicantOpen: !!selApplicant,
     applicantPending: !!selApplicant && (reqStatus[selApplicant] || 'pending') === 'pending',
     chatThread,
-    rideRiders, you, rideTimer, gapMeters: gap, joinedCount: rideRiders.length,
     plan, wkDetail, monthCells,
     planSummary: opts.planSummary
       ? {

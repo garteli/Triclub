@@ -1,29 +1,41 @@
 // ---------------------------------------------------------------------------
-//  Static demo data — ported 1:1 from the Claude Design prototype's Component
-//  class. In a production app these would come from the .NET API; kept inline
-//  here so the UI renders identically to the handoff out of the box.
+//  Client constants. The demo/seed content has been removed — screens now render
+//  real data from the .NET API (squad, feed, activities, leaderboard, plan,
+//  groups) or an empty state when there is none. What remains here is structural
+//  (nav, icons, status colours) and the workout-detail templates. The live ride now
+//  runs on real telemetry (useLiveRide + recorder + sensors), so no simulator remains.
 // ---------------------------------------------------------------------------
 
-export const members = [
-  { id: 'dana', name: 'You (Dana)', nameHe: 'דנה (את)', initials: 'DL', he: 'דל', color: '#d6ff3f', status: 'crushing', pct: 96 },
-  { id: 'noa',  name: 'Noa',  nameHe: 'נועה', initials: 'NR', he: 'נע', color: '#ff9a4c', status: 'crushing', pct: 100 },
-  { id: 'adam', name: 'Adam', nameHe: 'אדם', initials: 'AB', he: 'אד', color: '#37c0ff', status: 'ontrack', pct: 72 },
-  { id: 'maya', name: 'Maya', nameHe: 'מאיה', initials: 'MK', he: 'מא', color: '#c68bff', status: 'ontrack', pct: 64 },
-  { id: 'roi',  name: 'Roi',  nameHe: 'רועי', initials: 'RG', he: 'רו', color: '#4fe08b', status: 'ontrack', pct: 80 },
-  { id: 'yoav', name: 'Yoav', nameHe: 'יואב', initials: 'YS', he: 'יו', color: '#ff6f61', status: 'behind', pct: 38 },
-  { id: 'itai', name: 'Itai', nameHe: 'איתי', initials: 'IT', he: 'אי', color: '#ffce4a', status: 'behind', pct: 28 },
-  { id: 'tal',  name: 'Tal',  nameHe: 'טל', initials: 'TV', he: 'טל', color: '#5a86ff', status: 'crushing', pct: 92 },
-];
+// Squad members / feed / leaderboard / activities / groups / requests / chat /
+// notifications / per-athlete profiles all come from the API now. Empty defaults
+// so the prototype (and any not-yet-wired screen) shows an empty state, not fakes.
+export const members = [];
+export const feed = [];
+export const leaderboardData = [];
+export const activities = [];
+export const nearbyGroups = [];
+export const applicants = [];
+export const chatThread = [];
+export const notifications = [];
+export const athleteExtra = {};
+
+// Training plan comes from the API (usePlan). Empty until the athlete has one.
+export const planWeek = [];
+
+// Per-activity analysis + profile stats (charts, PRs, zones, laps, segments,
+// coach insights) are populated from real activity data; empty until then.
+export const coachInsights = [];
+export const activitySplits = [];
+export const hrZones = [];
+export const laps = [];
+export const powerCurve = [];
+export const achievements = [];
+export const segmentRows = [];
+export const segEfforts = [];
+export const pbs = [];
 
 export const statusColor = (s) => (s === 'crushing' ? 'var(--good)' : s === 'behind' ? 'var(--behind)' : 'var(--warn)');
 export const ringColor   = (s) => (s === 'crushing' ? 'var(--good)' : s === 'behind' ? 'var(--behind)' : 'var(--accent)');
-
-export const feed = [
-  { id: 1, name: 'Noa',  nameHe: 'נועה', he: 'נע', initials: 'NR', color: '#ff9a4c', action: 'crushed a threshold ride',      actionHe: 'סיימה אימון סף חזק',    metric: '42.1km · 1:14 · 82 TSS', time: '18m ago', timeHe: 'לפני 18 דק׳', reacts: 6, icon: '🚴', discColor: '#ffce4a' },
-  { id: 2, name: 'Roi',  nameHe: 'רועי', he: 'רו', initials: 'RG', color: '#4fe08b', action: 'logged an easy run',            actionHe: 'רשם ריצה קלה',          metric: '8.4km · 4:52 /km',       time: '1h ago',  timeHe: 'לפני שעה',   reacts: 3, icon: '🏃', discColor: '#ff6f61' },
-  { id: 3, name: 'Tal',  nameHe: 'טל',  he: 'טל', initials: 'TV', color: '#5a86ff', action: 'swam a technique set',         actionHe: 'שחה סט טכניקה',        metric: '2,400m · 1:46 /100',     time: '3h ago',  timeHe: 'לפני 3 שע׳', reacts: 9, icon: '🏊', discColor: '#37c0ff' },
-  { id: 4, name: 'Maya', nameHe: 'מאיה', he: 'מא', initials: 'MK', color: '#c68bff', action: 'did a strength + core session', actionHe: 'סיימה אימון כוח וליבה', metric: '0:52 · TRX + weights',   time: '5h ago',  timeHe: 'לפני 5 שע׳', reacts: 4, icon: '🏋️', discColor: '#c68bff' },
-];
 
 // bottom-nav icon markup
 export const navIcons = {
@@ -42,41 +54,31 @@ export const navDef = [
   { id: 'coach', label: { en: 'Coach AI', he: 'מאמן' },    icon: navIcons.coach },
 ];
 
-export const planWeek = [
-  { day: 'Mon', date: '12', disc: 'gym',  wk: 'yoga',    title: 'Mobility · Yoga',   sub: 'Vinyasa flow + hips',    dur: '0:45', load: '18',  status: 'done',    color: 'var(--gym)' },
-  { day: 'Tue', date: '13', disc: 'bike', wk: 'bike',    title: 'Bike · Threshold',  sub: '3 × 12′ @ FTP',          dur: '1:15', load: '78',  status: 'today',   color: 'var(--bike)' },
-  { day: 'Wed', date: '14', disc: 'swim', wk: 'swim',    title: 'Swim · Technique',  sub: '8 × 100 drills',         dur: '1:00', load: '45',  status: 'planned', color: 'var(--swim)' },
-  { day: 'Thu', date: '15', disc: 'run',  wk: 'run',     title: 'Run · Tempo',       sub: '20′ @ threshold',        dur: '0:50', load: '62',  status: 'planned', color: 'var(--run)' },
-  { day: 'Fri', date: '16', disc: 'gym',  wk: 'gym',     title: 'Gym · Strength',    sub: 'TRX + weights + core',   dur: '0:55', load: '40',  status: 'planned', color: 'var(--gym)' },
-  { day: 'Sat', date: '17', disc: 'bike', wk: 'bike',    title: 'Long ride',         sub: 'Endurance · Z2',         dur: '3:00', load: '150', status: 'planned', color: 'var(--bike)' },
-  { day: 'Sun', date: '18', disc: 'gym',  wk: 'pilates', title: 'Core · Pilates',    sub: 'Reformer + planks',      dur: '0:40', load: '22',  status: 'planned', color: 'var(--gym)' },
-];
-
 export const workoutDefs = {
-  bike: { disc: 'bike', color: 'var(--bike)', title: 'Bike · Threshold', meta: 'Tue 13 · Key session · Zone 4',
+  bike: { disc: 'bike', color: 'var(--bike)', title: 'Bike · Threshold', meta: 'Key session · Zone 4',
     stats: [['1:15', 'Time'], ['42km', 'Dist'], ['78', 'Load'], ['85%', 'IF']],
     blocks: [['Warm-up', '15′ progressive · Z1→Z2', '55-65%', 26], ['3 × 12′ threshold', '4′ easy between · cadence 90+', '98-102%', 40], ['Cool-down', '10′ spin · Z1', '<55%', 22]],
-    note: 'Target power should feel like a hard 20-min effort you could just hold. If you fade on rep 3, note it and we adjust FTP next test.' },
-  gym: { disc: 'gym', color: 'var(--gym)', title: 'Gym · Strength', meta: 'Fri 16 · TRX + weights + core',
+    note: 'Target power should feel like a hard 20-min effort you could just hold.' },
+  gym: { disc: 'gym', color: 'var(--gym)', title: 'Gym · Strength', meta: 'TRX + weights + core',
     stats: [['0:55', 'Time'], ['6', 'Exercises'], ['40', 'Load'], ['3', 'Rounds']],
     blocks: [['Activation', '5′ band work + mobility', 'Warm-up', 18], ['TRX circuit', 'Rows, pistol, atomic push-up · 3 rounds', 'Bodyweight', 34], ['Weights', 'Trap-bar DL + split squat · 4×6', 'Heavy', 44], ['Core + Pilates', 'Planks, dead-bug, leg lowers', 'Stability', 30], ['Yoga cool-down', '5′ breath + hip openers', 'Mobility', 18]],
-    note: 'Triathlete-specific strength — heavy but low volume to protect the endurance work. Quality reps over fatigue. Keep 2 in reserve on the lifts.' },
-  yoga: { disc: 'gym', color: 'var(--gym)', title: 'Mobility · Yoga', meta: 'Mon 12 · Recovery flow',
+    note: 'Triathlete-specific strength — heavy but low volume to protect the endurance work.' },
+  yoga: { disc: 'gym', color: 'var(--gym)', title: 'Mobility · Yoga', meta: 'Recovery flow',
     stats: [['0:45', 'Time'], ['18', 'Load'], ['Z1', 'Effort'], ['✓', 'Done']],
     blocks: [['Breath + centering', '3′ box breathing', 'Calm', 16], ['Vinyasa flow', 'Sun salutations · slow', 'Flow', 34], ['Hip + hamstring', 'Pigeon, lizard, folds', 'Deep', 28], ['Savasana', '5′ full relaxation', 'Reset', 16]],
-    note: 'Recovery day — this is training, not filler. Down-regulate the nervous system after yesterday\u2019s load. No pushing into pain.' },
-  pilates: { disc: 'gym', color: 'var(--gym)', title: 'Core · Pilates', meta: 'Sun 18 · Reformer + mat',
+    note: 'Recovery day — down-regulate the nervous system. No pushing into pain.' },
+  pilates: { disc: 'gym', color: 'var(--gym)', title: 'Core · Pilates', meta: 'Reformer + mat',
     stats: [['0:40', 'Time'], ['22', 'Load'], ['5', 'Blocks'], ['Core', 'Focus']],
     blocks: [['Warm-up', 'Pelvic tilts + breathing', 'Prep', 16], ['Reformer series', 'Footwork, long-stretch, teaser', 'Control', 36], ['Plank complex', 'Front + side · 3 rounds', 'Stability', 30], ['Leg lowers + dead-bug', 'Anti-extension', 'Deep core', 26], ['Stretch', 'Spine + hip flexors', 'Mobility', 16]],
-    note: 'Core stability transfers straight to your bike and run posture. Move slow, brace, and own every rep. Breathe out on effort.' },
-  swim: { disc: 'swim', color: 'var(--swim)', title: 'Swim · Technique', meta: 'Wed 14 · Drills + form',
+    note: 'Core stability transfers straight to your bike and run posture.' },
+  swim: { disc: 'swim', color: 'var(--swim)', title: 'Swim · Technique', meta: 'Drills + form',
     stats: [['1:00', 'Time'], ['2.4km', 'Dist'], ['45', 'Load'], ['Z2', 'Effort']],
     blocks: [['Warm-up', '400m easy + 4×50 drill', 'Easy', 22], ['8 × 100 technique', 'Catch-up, single-arm, scull', 'Form', 38], ['Cool-down', '200m easy', 'Recover', 18]],
-    note: 'Technique day — this is your limiter. Slow down and feel the catch. Rushing the drills defeats the point.' },
-  run: { disc: 'run', color: 'var(--run)', title: 'Run · Tempo', meta: 'Thu 15 · Threshold',
+    note: 'Technique day — slow down and feel the catch.' },
+  run: { disc: 'run', color: 'var(--run)', title: 'Run · Tempo', meta: 'Threshold',
     stats: [['0:50', 'Time'], ['9km', 'Dist'], ['62', 'Load'], ['Z3-4', 'Effort']],
     blocks: [['Warm-up', '12′ easy + strides', 'Easy', 22], ['20′ tempo', 'Comfortably hard · threshold', 'Z4', 40], ['Cool-down', '10′ easy jog', 'Recover', 20]],
-    note: 'Hold an even effort — don\u2019t start too hot. You should be able to say a few words but not chat.' },
+    note: 'Hold an even effort — don’t start too hot.' },
 };
 
 // discipline icon markup (used in the plan week rows)
@@ -90,139 +92,3 @@ const discPaths = {
 export const discIcon = (d) =>
   '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
   (discPaths[d] || discPaths.rest) + '</svg>';
-
-export const leaderboardData = [
-  { name: 'Noa',        initials: 'NR', color: '#ff9a4c', load: 902, vol: '12.4h', streak: 31, swim: 88, bike: 94, run: 79, move: 1,  badge: '🔥' },
-  { name: 'You (Dana)', initials: 'DL', color: '#d6ff3f', load: 812, vol: '11.1h', streak: 23, swim: 71, bike: 96, run: 74, move: 2,  badge: '⚡', you: true },
-  { name: 'Tal',        initials: 'TV', color: '#5a86ff', load: 770, vol: '10.2h', streak: 18, swim: 90, bike: 78, run: 82, move: 0,  badge: '🏊' },
-  { name: 'Roi',        initials: 'RG', color: '#4fe08b', load: 588, vol: '8.7h',  streak: 15, swim: 64, bike: 80, run: 91, move: -1, badge: '🏃' },
-  { name: 'Maya',       initials: 'MK', color: '#c68bff', load: 705, vol: '9.4h',  streak: 9,  swim: 76, bike: 72, run: 70, move: 3,  badge: '' },
-  { name: 'Adam',       initials: 'AB', color: '#37c0ff', load: 640, vol: '8.9h',  streak: 12, swim: 80, bike: 74, run: 66, move: -2, badge: '' },
-  { name: 'Yoav',       initials: 'YS', color: '#ff6f61', load: 410, vol: '5.6h',  streak: 3,  swim: 58, bike: 70, run: 62, move: -1, badge: '' },
-  { name: 'Itai',       initials: 'IT', color: '#ffce4a', load: 380, vol: '5.1h',  streak: 0,  swim: 60, bike: 64, run: 55, move: 0,  badge: '' },
-];
-
-export const coachInsights = [
-  { sev: 'high', sevLabel: 'Watch',       color: 'var(--bad)',  icon: '💤', title: 'Under-recovery flag',       body: 'Your HRV is down 14% over 4 days and sleep averaged 6h05. Two hard sessions back-to-back likely outran recovery.', action: 'Swap Thu tempo → easy Z2',      metric: 'HRV 48ms · −14%' },
-  { sev: 'med',  sevLabel: 'Opportunity', color: 'var(--swim)', icon: '🏊', title: 'Swim is your limiter',       body: 'Your swim CSS pace ranks 6th in the squad while your bike is 1st. 2 technique sessions/week would close the gap fastest.', action: 'Add a Wed technique swim',    metric: '1:52 /100m · squad avg 1:44' },
-  { sev: 'med',  sevLabel: 'Balance',     color: 'var(--warn)', icon: '⚖️', title: 'Load skewed to the bike',    body: '68% of last month\u2019s load came from cycling. Run volume is trending down and injury risk rises with sudden spikes.', action: 'Cap bike, +10% run over 2 wks', metric: 'Bike 68% · Run 19% · Swim 13%' },
-  { sev: 'low',  sevLabel: 'On track',    color: 'var(--good)', icon: '✅', title: 'Consistency streak strong',  body: '23-day streak — top 3 in the squad. You\u2019ve hit 96% of planned sessions this block. Keep protecting the easy days.', action: 'Keep it up',                  metric: '96% adherence · 23-day streak' },
-];
-
-export const activitySplits = [5.2, 4.9, 4.7, 4.6, 4.8, 4.5, 4.4, 4.6, 4.3, 4.5];
-
-export const hrZones = [
-  { z: 'Z1', label: 'Recovery',  pct: 8,  color: '#8b93a0' },
-  { z: 'Z2', label: 'Endurance', pct: 34, color: 'var(--good)' },
-  { z: 'Z3', label: 'Tempo',     pct: 28, color: 'var(--bike)' },
-  { z: 'Z4', label: 'Threshold', pct: 22, color: 'var(--behind)' },
-  { z: 'Z5', label: 'VO2 max',   pct: 8,  color: 'var(--bad)' },
-];
-
-export const laps = [
-  { n: 1, dist: '10.0', time: '21:14', speed: '28.3', hr: 141, pw: 242, best: false },
-  { n: 2, dist: '10.0', time: '22:02', speed: '27.2', hr: 146, pw: 236, best: false },
-  { n: 3, dist: '10.0', time: '20:48', speed: '28.8', hr: 151, pw: 258, best: true },
-  { n: 4, dist: '10.0', time: '21:36', speed: '27.8', hr: 149, pw: 249, best: false },
-  { n: 5, dist: '14.2', time: '32:20', speed: '26.3', hr: 153, pw: 244, best: false },
-];
-
-export const powerCurve = [
-  { t: '5s', w: 842 }, { t: '30s', w: 612 }, { t: '1m', w: 498 }, { t: '5m', w: 341 }, { t: '20m', w: 288 }, { t: '60m', w: 262 },
-];
-
-export const achievements = [
-  { icon: '🥈', title: '2nd overall',   sub: 'Sunday Long Ride · squad' },
-  { icon: '👑', title: 'Local Legend',  sub: 'Kaza Dam Climb · 42 efforts' },
-  { icon: '⚡', title: '3 PRs',         sub: '20-min & 60-min power, longest ride' },
-];
-
-export const segmentRows = [
-  { rank: 1, name: 'Noa',        initials: 'NR', color: '#ff9a4c', time: '6:42', speed: '21.5', crown: true },
-  { rank: 2, name: 'You (Dana)', initials: 'DL', color: '#d6ff3f', time: '6:58', speed: '20.7', you: true },
-  { rank: 3, name: 'Tal',        initials: 'TV', color: '#5a86ff', time: '7:11', speed: '20.0' },
-  { rank: 4, name: 'Roi',        initials: 'RG', color: '#4fe08b', time: '7:24', speed: '19.4' },
-  { rank: 5, name: 'Adam',       initials: 'AB', color: '#37c0ff', time: '7:38', speed: '18.8' },
-  { rank: 6, name: 'Maya',       initials: 'MK', color: '#c68bff', time: '7:52', speed: '18.3' },
-];
-
-export const segEfforts = [72, 68, 70, 66, 64, 67, 63, 60, 62, 58];
-
-export const pbs = [
-  { label: 'FTP',          value: '271',   unit: 'W',  delta: '+8',    color: 'var(--bike)' },
-  { label: '5K run',       value: '19:42', unit: '',   delta: '−0:18', color: 'var(--run)' },
-  { label: '1K swim',      value: '16:20', unit: '',   delta: '−0:34', color: 'var(--swim)' },
-  { label: 'Longest ride', value: '134',   unit: 'km', delta: 'PB',    color: 'var(--bike)' },
-];
-
-// riders used by the live-ride telemetry loop
-export const rideBase = [
-  { name: 'You',  initials: 'DL', color: '#d6ff3f', bk: 34, bh: 158, you: true, dropped: false },
-  { name: 'Noa',  initials: 'NR', color: '#ff9a4c', bk: 35, bh: 162, dropped: false },
-  { name: 'Tal',  initials: 'TV', color: '#5a86ff', bk: 34, bh: 151, dropped: false },
-  { name: 'Roi',  initials: 'RG', color: '#4fe08b', bk: 33, bh: 147, dropped: false },
-  { name: 'Adam', initials: 'AB', color: '#37c0ff', bk: 33, bh: 155, dropped: false },
-  { name: 'Maya', initials: 'MK', color: '#c68bff', bk: 32, bh: 149, dropped: false },
-  { name: 'Yoav', initials: 'YS', color: '#ff6f61', bk: 29, bh: 171, dropped: true },
-];
-
-// ---- Discover / groups (nearby clubs) ----
-export const nearbyGroups = [
-  { id: 'kaza',    name: 'Kaza Tri Club',   loc: 'Tiberias · 4 km',   members: 8,  disc: 'Triathlon', level: 'All levels',   price: '₪120', per: '/mo', kind: 'member', rating: '4.9', color: '#ff6a2c', member: true },
-  { id: 'galilee', name: 'Galilee Cycling',  loc: 'Kfar Tavor · 12 km', members: 24, disc: 'Cycling',   level: 'Intermediate+', price: '₪90',  per: '/mo', kind: 'member', rating: '4.7', color: '#37c0ff' },
-  { id: 'dawn',    name: 'Dawn Patrol',      loc: 'Afula · 18 km',      members: 15, disc: 'Cycling',   level: 'Advanced',      price: 'Free', per: '',    kind: 'free',   rating: '4.8', color: '#4fe08b' },
-  { id: 'swimfit', name: 'SwimFit Masters',  loc: 'Nazareth · 9 km',    members: 31, disc: 'Swim',      level: 'All levels',    price: '₪75',  per: '/mo', kind: 'member', rating: '4.6', color: '#5a86ff' },
-  { id: 'summit',  name: 'Summit Coached',   loc: 'Haifa · 30 km',      members: 12, disc: 'Triathlon', level: 'Race focus',    price: '₪450', per: '/mo', kind: 'coach',  rating: '5.0', color: '#c68bff' },
-];
-
-// ---- Join requests (coach/manager view) ----
-export const applicants = [
-  { id: 'omer',  name: 'Omer Katz',       initials: 'OK', color: '#37c0ff', when: '2h ago', ftp: '262', wkg: '3.8', weekly: '9.2h',  longest: '118 km', streak: '14', css: '1:41', avgHr: '148', races: '3',  fit: 'Strong fit', fitKind: 'good', note: 'Rides 4×/week, targeting Tiberias 70.3. Solid endurance base, keeps Z2 disciplined.' },
-  { id: 'lena',  name: 'Lena Vardi',      initials: 'LV', color: '#c68bff', when: '5h ago', ftp: '198', wkg: '3.1', weekly: '4.1h',  longest: '54 km',  streak: '5',  css: '2:02', avgHr: '161', races: '0',  fit: 'Borderline', fitKind: 'warn', note: 'Newer to structured training — may struggle on the Saturday long ride pace. Worth a chat.' },
-  { id: 'yaron', name: 'Yaron Ben-David', initials: 'YB', color: '#4fe08b', when: '1d ago', ftp: '301', wkg: '4.4', weekly: '12.5h', longest: '184 km', streak: '28', css: '1:33', avgHr: '142', races: '11', fit: 'Strong fit', fitKind: 'good', note: 'Cat 2 road racer, extremely consistent. Would push the front group.' },
-];
-
-// ---- Messages / chat thread (with the coach) ----
-export const chatThread = [
-  { me: false, from: 'Coach Ronen', text: 'Hi Omer — saw your join request. Your numbers look great. What are your goals this block?', time: '09:12' },
-  { me: true,                       text: 'Thanks! Building toward Tiberias 70.3 in the autumn. Want structure + a group for the long rides.', time: '09:15' },
-  { me: false, from: 'Coach Ronen', text: 'Perfect fit. Saturday long ride rolls at 30–32 kph avg — comfortable?', time: '09:16' },
-  { me: true,                       text: "Yep, that's my endurance pace. Ready to commit to the membership.", time: '09:18' },
-];
-
-// ---- per-athlete profile detail (keyed by member id) ----
-// Merged at view-model time with `members` (name/initials/color/pct) and
-// `leaderboardData` (streak/discipline loads) to build a full athlete profile.
-export const athleteExtra = {
-  dana: { club: 'Kaza Tri Club', ageGroup: '30–34', sport: 'Triathlon', level: 'Intermediate', ftp: 271, weekly: '9.2h', bio: 'Chasing a sub-5:30 at Tiberias 70.3. Bike is my strength; putting the work into the run this block.' },
-  noa:  { club: 'Kaza Tri Club', ageGroup: '25–29', sport: 'Triathlon', level: 'Advanced',     ftp: 248, weekly: '12.4h', bio: 'Threshold junkie, always on the front of the group ride. Sub-4:45 70.3 goal.' },
-  adam: { club: 'Kaza Tri Club', ageGroup: '35–39', sport: 'Cycling',   level: 'Intermediate', ftp: 289, weekly: '8.9h',  bio: 'Ex-roadie turned triathlete. Big engine, learning to swim straight.' },
-  maya: { club: 'Kaza Tri Club', ageGroup: '30–34', sport: 'Triathlon', level: 'Intermediate', ftp: 232, weekly: '9.4h',  bio: 'Strength & core first, endurance second. Consistency is my superpower.' },
-  roi:  { club: 'Kaza Tri Club', ageGroup: '40–44', sport: 'Running',   level: 'Advanced',     ftp: 254, weekly: '8.7h',  bio: 'Runner at heart. 2:58 marathon, now chasing a first half-iron.' },
-  yoav: { club: 'Kaza Tri Club', ageGroup: '25–29', sport: 'Triathlon', level: 'New to it',    ftp: 198, weekly: '5.6h',  bio: 'First season in the sport. Building the base, loving the squad.' },
-  itai: { club: 'Kaza Tri Club', ageGroup: '45–49', sport: 'Swimming',  level: 'Intermediate', ftp: 186, weekly: '5.1h',  bio: 'Masters swimmer easing back into bike + run after a break.' },
-  tal:  { club: 'Kaza Tri Club', ageGroup: '30–34', sport: 'Triathlon', level: 'Advanced',     ftp: 263, weekly: '10.2h', bio: 'Smooth swimmer, steady all-rounder. Podium at every local sprint.' },
-};
-
-// ---- notifications (bell) ----
-export const notifications = [
-  { id: 1, icon: 'clipboard', color: 'var(--accent)', actor: 'Omer Katz',        text: 'applied to join Kaza Tri Club',                 time: '2h ago', unread: true,  target: 'requests' },
-  { id: 2, icon: 'heart',     color: 'var(--run)',    actor: 'Noa',              text: 'and 4 others reacted to your threshold ride',   time: '3h ago', unread: true,  athlete: 'noa' },
-  { id: 3, icon: 'chat',      color: 'var(--swim)',   actor: 'Coach Ronen',      text: 'left a note: “Hold the last interval — don’t fade.”', time: '5h ago', unread: true,  target: 'chat' },
-  { id: 4, icon: 'trophy',    color: 'var(--bike)',   actor: 'New personal best', text: 'your FTP is up to 271W — nice work! 🎉',        time: '1d ago', unread: false, target: 'profile' },
-  { id: 5, icon: 'bike',      color: 'var(--good)',   actor: 'Tal',              text: 'crushed a technique swim set',                  time: '1d ago', unread: false, athlete: 'tal' },
-  { id: 6, icon: 'calendar',  color: 'var(--gym)',    actor: 'Tuesday Threshold', text: 'group ride rolls out tomorrow at 06:00',       time: '2d ago', unread: false, target: 'ride' },
-];
-
-// ---- activities (Strava-style: your own + squad, browsable + analysable) ----
-// Summary fields drive the list cards and the detail header/metrics. The deep
-// analysis (splits/zones/power/laps) reuses the shared demo arrays above.
-export const activities = [
-  { id: 'a1', athleteId: 'dana', title: 'Sunday Long Ride',   sport: 'Bike', when: 'Sun 11 · 08:12', location: 'Kaza reservoir loop', dist: '84.2', distU: 'km', moving: '3:04', load: 142, avgSpeed: '27.4', speedU: 'kph', elev: '1,050', avgHr: 148, fire: 12, strong: 5, clap: 3, comments: 2, achievements: 3 },
-  { id: 'a2', athleteId: 'noa',  title: 'Threshold Ride',     sport: 'Bike', when: '18m ago',       location: 'Tabor foothills',    dist: '42.1', distU: 'km', moving: '1:14', load: 82,  avgSpeed: '34.1', speedU: 'kph', elev: '520',   avgHr: 162, fire: 6,  strong: 2, clap: 1, comments: 1, achievements: 1 },
-  { id: 'a3', athleteId: 'roi',  title: 'Easy Run',           sport: 'Run',  when: '1h ago',        location: 'Riverside path',     dist: '8.4',  distU: 'km', moving: '41:00', load: 38, avgSpeed: '4:52', speedU: '/km', elev: '75',    avgHr: 139, fire: 3,  strong: 0, clap: 1, comments: 0, achievements: 0 },
-  { id: 'a4', athleteId: 'tal',  title: 'Technique Swim',     sport: 'Swim', when: '3h ago',        location: 'Galilee pool',       dist: '2,400', distU: 'm', moving: '48:00', load: 44, avgSpeed: '1:46', speedU: '/100', elev: '0',   avgHr: 132, fire: 9,  strong: 1, clap: 2, comments: 0, achievements: 1 },
-  { id: 'a5', athleteId: 'maya', title: 'Strength + Core',    sport: 'Gym',  when: '5h ago',        location: 'Home gym',           dist: '0',    distU: '',   moving: '52:00', load: 36, avgSpeed: '—',    speedU: '',    elev: '0',     avgHr: 118, fire: 4,  strong: 3, clap: 0, comments: 0, achievements: 0 },
-  { id: 'a6', athleteId: 'dana', title: 'Brick — Bike + Run', sport: 'Bike', when: 'Thu 8 · 17:30', location: 'Kfar Tavor',         dist: '46.0', distU: 'km', moving: '1:52', load: 96,  avgSpeed: '24.6', speedU: 'kph', elev: '610',   avgHr: 151, fire: 8,  strong: 4, clap: 2, comments: 1, achievements: 2 },
-  { id: 'a7', athleteId: 'adam', title: 'Hill Repeats',       sport: 'Bike', when: 'Wed 7 · 06:40', location: 'Haifa ridge',        dist: '38.5', distU: 'km', moving: '1:38', load: 88,  avgSpeed: '23.5', speedU: 'kph', elev: '890',   avgHr: 156, fire: 5,  strong: 2, clap: 0, comments: 0, achievements: 1 },
-];

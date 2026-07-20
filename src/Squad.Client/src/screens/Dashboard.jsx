@@ -1,4 +1,4 @@
-import { s } from '../lib/style.js';
+import { s, html } from '../lib/style.js';
 import Avatar from '../components/Avatar.jsx';
 
 const BikeIcon = ({ size = 26, stroke = 'var(--bike)' }) => (
@@ -13,6 +13,13 @@ const Chevron = ({ stroke = 'var(--accent)', w = 18 }) => (
 );
 
 function SquadRail({ squad, rtl, onOpen }) {
+  if (!squad.length) {
+    return (
+      <div style={s('margin:2px 0 6px;padding:16px;border:1px dashed var(--line2);border-radius:16px;text-align:center;font-size:12.5px;color:var(--text3);line-height:1.5')}>
+        No teammates training yet — invite your club and their weekly progress shows up here.
+      </div>
+    );
+  }
   return (
     <div className="hscroll" style={s(`display:flex;gap:11px;overflow-x:auto;padding:2px 18px 6px;margin:0 -18px;${rtl ? 'flex-direction:row-reverse' : ''}`)}>
       {squad.map((m) => (
@@ -88,60 +95,47 @@ function DashboardEN({ vm, state, go, openAthlete, openActivity }) {
         </div>
       )}
 
-      {/* VARIANT A: block banner + today hero */}
-      {!dashB && (
-        <>
-          <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:20px;padding:16px 17px;margin-bottom:14px;position:relative;overflow:hidden')}>
-            <div style={s('position:absolute;right:-30px;top:-30px;width:120px;height:120px;border-radius:50%;background:var(--accent-dim);filter:blur(6px)')} />
-            <div style={s('display:flex;justify-content:space-between;align-items:flex-start;position:relative')}>
-              <div>
-                <div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.4px;font-weight:600')}>Current block</div>
-                <div style={s('font-size:18px;font-weight:700;letter-spacing:-.3px')}>Base · Endurance</div>
-              </div>
-              <div style={s('text-align:right')}>
-                <div className="mono" style={s('font-size:11px;color:var(--text2)')}>WK <span style={s('color:var(--accent);font-weight:700')}>03</span> / 12</div>
-                <div style={s('font-size:10.5px;color:var(--text3);margin-top:2px')}>Tiberias 70.3 · <span style={s('color:var(--text)')}>42d</span></div>
-              </div>
-            </div>
-            <div style={s('height:7px;border-radius:4px;background:var(--bg4);margin-top:13px;overflow:hidden;position:relative')}>
-              <div style={s('position:absolute;inset:0;width:25%;background:linear-gradient(90deg,var(--accent),color-mix(in srgb,var(--accent) 60%, #fff));border-radius:4px')} />
-              <div style={s('position:absolute;left:25%;top:-2px;width:2px;height:11px;background:var(--text);opacity:.5')} />
-            </div>
-          </div>
-
-          <div style={s('font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:1.4px;font-weight:600;margin:20px 2px 10px')}>Today · Tue</div>
-          <div style={s('background:linear-gradient(160deg,var(--bg3),var(--bg2));border:1px solid var(--line);border-radius:22px;padding:0;overflow:hidden;position:relative')}>
-            <div style={s('height:4px;background:var(--bike)')} />
-            <div style={s('padding:17px 18px 18px')}>
-              <div style={s('display:flex;justify-content:space-between;align-items:flex-start')}>
-                <div style={s('display:flex;gap:12px;align-items:center')}>
-                  <div style={s('width:46px;height:46px;border-radius:14px;background:color-mix(in srgb,var(--bike) 18%, transparent);display:flex;align-items:center;justify-content:center')}><BikeIcon /></div>
-                  <div>
-                    <div style={s('font-size:19px;font-weight:700;letter-spacing:-.4px')}>Bike · Threshold</div>
-                    <div style={s('font-size:13px;color:var(--text2)')}>3 × 12′ @ FTP · Zone 4</div>
+      {/* VARIANT A: today hero — driven by the real plan (empty state when none) */}
+      {!dashB && (() => {
+        const todayWk = vm.plan.find((p) => p.status === 'today');
+        return (
+          <>
+            <div style={s('font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:1.4px;font-weight:600;margin:4px 2px 10px')}>Today · {vm.todayLabel}</div>
+            {todayWk ? (
+              <div style={s('background:linear-gradient(160deg,var(--bg3),var(--bg2));border:1px solid var(--line);border-radius:22px;padding:0;overflow:hidden;position:relative')}>
+                <div style={s(`height:4px;background:${todayWk.color}`)} />
+                <div style={s('padding:17px 18px 18px')}>
+                  <div style={s('display:flex;justify-content:space-between;align-items:flex-start')}>
+                    <div style={s('display:flex;gap:12px;align-items:center')}>
+                      <div style={s(`width:46px;height:46px;border-radius:14px;background:color-mix(in srgb,${todayWk.color} 18%, transparent);color:${todayWk.color};display:flex;align-items:center;justify-content:center`)} dangerouslySetInnerHTML={html(todayWk.iconHtml)} />
+                      <div>
+                        <div style={s('font-size:19px;font-weight:700;letter-spacing:-.4px')}>{todayWk.title}</div>
+                        {todayWk.sub && <div style={s('font-size:13px;color:var(--text2)')}>{todayWk.sub}</div>}
+                      </div>
+                    </div>
+                    <div style={s('background:var(--accent);color:var(--accent-ink);font-size:10px;font-weight:700;padding:4px 8px;border-radius:7px;text-transform:uppercase;letter-spacing:.5px')}>Today</div>
+                  </div>
+                  <div style={s('display:flex;gap:0;margin-top:16px;border-top:1px solid var(--line);padding-top:14px')}>
+                    <div style={s('flex:1')}><div className="mono" style={s('font-size:20px;font-weight:700')}>{todayWk.dur}</div><div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-top:2px')}>Duration</div></div>
+                    <div style={s('flex:1;border-left:1px solid var(--line);padding-left:14px')}><div className="mono" style={s('font-size:20px;font-weight:700;color:var(--accent)')}>{todayWk.load}</div><div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-top:2px')}>Load</div></div>
+                  </div>
+                  <div style={s('display:flex;gap:9px;margin-top:14px')}>
+                    <div className="ctl" onClick={() => go('ride')} style={s('flex:1;background:var(--accent);color:var(--accent-ink);text-align:center;padding:13px;border-radius:13px;font-weight:700;font-size:14px')}>Start session</div>
+                    <div className="ctl" onClick={() => go('plan')} style={s('width:52px;background:var(--bg4);border:1px solid var(--line);border-radius:13px;display:flex;align-items:center;justify-content:center')}>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round"><path d="M9 6l6 6-6 6" /></svg>
+                    </div>
                   </div>
                 </div>
-                <div style={s('background:var(--bike);color:#1a1405;font-size:10px;font-weight:700;padding:4px 8px;border-radius:7px;text-transform:uppercase;letter-spacing:.5px')}>Key</div>
               </div>
-              <div style={s('display:flex;gap:0;margin-top:16px;border-top:1px solid var(--line);padding-top:14px')}>
-                <div style={s('flex:1')}><div className="mono" style={s('font-size:20px;font-weight:700')}>1:15</div><div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-top:2px')}>Duration</div></div>
-                <div style={s('flex:1;border-left:1px solid var(--line);padding-left:14px')}><div className="mono" style={s('font-size:20px;font-weight:700')}>~42<span style={s('font-size:12px;color:var(--text2)')}>km</span></div><div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-top:2px')}>Distance</div></div>
-                <div style={s('flex:1;border-left:1px solid var(--line);padding-left:14px')}><div className="mono" style={s('font-size:20px;font-weight:700;color:var(--accent)')}>78</div><div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-top:2px')}>Load</div></div>
+            ) : (
+              <div className="ctl" onClick={() => go('plan')} style={s('background:var(--bg2);border:1px dashed var(--line2);border-radius:20px;padding:22px 18px;text-align:center')}>
+                <div style={s('font-size:15px;font-weight:600')}>No session planned for today</div>
+                <div style={s('font-size:12.5px;color:var(--text3);margin-top:5px;line-height:1.5')}>Your coach's weekly plan shows up here. Tap to open your plan.</div>
               </div>
-              <div style={s('background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:14px;display:flex;gap:9px;align-items:flex-start')}>
-                <div style={s('width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,#37c0ff,#5a86ff);flex:none;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff')}>C</div>
-                <div style={s('font-size:12px;color:var(--text2);line-height:1.45')}><span style={s('color:var(--text);font-weight:600')}>Coach Ronen:</span> Hold the last interval — don't fade. Cadence 90+.</div>
-              </div>
-              <div style={s('display:flex;gap:9px;margin-top:14px')}>
-                <div className="ctl" onClick={() => go('ride')} style={s('flex:1;background:var(--accent);color:var(--accent-ink);text-align:center;padding:13px;border-radius:13px;font-weight:700;font-size:14px')}>Start session</div>
-                <div className="ctl" onClick={() => go('plan')} style={s('width:52px;background:var(--bg4);border:1px solid var(--line);border-radius:13px;display:flex;align-items:center;justify-content:center')}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round"><path d="M9 6l6 6-6 6" /></svg>
-                </div>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
+            )}
+          </>
+        );
+      })()}
 
       {/* squad status */}
       <div style={s('display:flex;justify-content:space-between;align-items:baseline;margin:22px 2px 12px')}>
@@ -155,6 +149,9 @@ function DashboardEN({ vm, state, go, openAthlete, openActivity }) {
         <div style={s('font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:1.4px;font-weight:600')}>Domestique Team activity</div>
         <div className="ctl" onClick={() => go('activities')} style={s('font-size:11.5px;color:var(--accent);font-weight:600')}>See all →</div>
       </div>
+      {vm.feed.length === 0 && (
+        <div style={s('padding:18px;border:1px dashed var(--line2);border-radius:16px;text-align:center;font-size:12.5px;color:var(--text3);line-height:1.5')}>No activity yet. When the club trains, it shows up here.</div>
+      )}
       <div style={s('display:flex;flex-direction:column;gap:10px')}>
         {vm.feed.map((f) => (
           <div key={f.id} className="ctl" onClick={() => (f.activityId ? openActivity(f.activityId) : go('activities'))} style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:13px 14px;display:flex;gap:12px;align-items:center')}>
@@ -192,44 +189,41 @@ function DashboardHE({ vm, go, openAthlete, openActivity }) {
         </div>
       </div>
 
-      <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:20px;padding:16px 17px;margin-bottom:14px;position:relative;overflow:hidden')}>
-        <div style={s('display:flex;justify-content:space-between;align-items:flex-start;flex-direction:row-reverse')}>
-          <div>
-            <div style={s('font-size:11px;color:var(--text3);font-weight:600')}>הבלוק הנוכחי</div>
-            <div style={s('font-size:18px;font-weight:700')}>בסיס · סיבולת</div>
-          </div>
-          <div style={s('text-align:left')}>
-            <div className="mono" style={s('font-size:11px;color:var(--text2)')} dir="ltr">WK <span style={s('color:var(--accent);font-weight:700')}>03</span> / 12</div>
-            <div style={s('font-size:10.5px;color:var(--text3);margin-top:2px')}>טבריה 70.3 · <span style={s('color:var(--text)')}>42 ימים</span></div>
-          </div>
-        </div>
-        <div style={s('height:7px;border-radius:4px;background:var(--bg4);margin-top:13px;overflow:hidden;position:relative')}>
-          <div style={s('position:absolute;inset:0;right:0;width:25%;background:linear-gradient(90deg,var(--accent),color-mix(in srgb,var(--accent) 60%, #fff));border-radius:4px;margin-left:auto')} />
-        </div>
-      </div>
-
-      <div style={s('font-size:12px;color:var(--text3);letter-spacing:.5px;font-weight:600;margin:20px 2px 10px')}>היום · יום ג׳</div>
-      <div style={s('background:linear-gradient(160deg,var(--bg3),var(--bg2));border:1px solid var(--line);border-radius:22px;overflow:hidden')}>
-        <div style={s('height:4px;background:var(--bike)')} />
-        <div style={s('padding:17px 18px 18px')}>
-          <div style={s('display:flex;justify-content:space-between;align-items:flex-start;flex-direction:row-reverse')}>
-            <div style={s('display:flex;gap:12px;align-items:center;flex-direction:row-reverse')}>
-              <div style={s('width:46px;height:46px;border-radius:14px;background:color-mix(in srgb,var(--bike) 18%, transparent);display:flex;align-items:center;justify-content:center')}><BikeIcon /></div>
-              <div style={s('text-align:right')}>
-                <div style={s('font-size:19px;font-weight:700')}>אופניים · סף</div>
-                <div style={s('font-size:13px;color:var(--text2)')}>3 × 12′ בעוצמת סף · אזור 4</div>
+      {(() => {
+        const todayWk = vm.plan.find((p) => p.status === 'today');
+        return (
+          <>
+            <div style={s('font-size:12px;color:var(--text3);letter-spacing:.5px;font-weight:600;margin:4px 2px 10px')}>היום · {vm.todayLabelHe}</div>
+            {todayWk ? (
+              <div style={s('background:linear-gradient(160deg,var(--bg3),var(--bg2));border:1px solid var(--line);border-radius:22px;overflow:hidden')}>
+                <div style={s(`height:4px;background:${todayWk.color}`)} />
+                <div style={s('padding:17px 18px 18px')}>
+                  <div style={s('display:flex;justify-content:space-between;align-items:flex-start;flex-direction:row-reverse')}>
+                    <div style={s('display:flex;gap:12px;align-items:center;flex-direction:row-reverse')}>
+                      <div style={s(`width:46px;height:46px;border-radius:14px;background:color-mix(in srgb,${todayWk.color} 18%, transparent);color:${todayWk.color};display:flex;align-items:center;justify-content:center`)} dangerouslySetInnerHTML={html(todayWk.iconHtml)} />
+                      <div style={s('text-align:right')}>
+                        <div style={s('font-size:19px;font-weight:700')}>{todayWk.title}</div>
+                        {todayWk.sub && <div style={s('font-size:13px;color:var(--text2)')}>{todayWk.sub}</div>}
+                      </div>
+                    </div>
+                    <div style={s('background:var(--accent);color:var(--accent-ink);font-size:10px;font-weight:700;padding:4px 8px;border-radius:7px')}>היום</div>
+                  </div>
+                  <div style={s('display:flex;margin-top:16px;border-top:1px solid var(--line);padding-top:14px;flex-direction:row-reverse;text-align:right')}>
+                    <div style={s('flex:1')}><div className="mono" style={s('font-size:20px;font-weight:700')}>{todayWk.dur}</div><div style={s('font-size:10px;color:var(--text3);margin-top:2px')}>משך</div></div>
+                    <div style={s('flex:1;border-right:1px solid var(--line);padding-right:14px')}><div className="mono" style={s('font-size:20px;font-weight:700;color:var(--accent)')}>{todayWk.load}</div><div style={s('font-size:10px;color:var(--text3);margin-top:2px')}>עומס</div></div>
+                  </div>
+                  <div className="ctl" onClick={() => go('ride')} style={s('background:var(--accent);color:var(--accent-ink);text-align:center;padding:13px;border-radius:13px;font-weight:700;font-size:14px;margin-top:14px')}>התחל אימון</div>
+                </div>
               </div>
-            </div>
-            <div style={s('background:var(--bike);color:#1a1405;font-size:10px;font-weight:700;padding:4px 8px;border-radius:7px')}>אימון מפתח</div>
-          </div>
-          <div style={s('display:flex;margin-top:16px;border-top:1px solid var(--line);padding-top:14px;flex-direction:row-reverse;text-align:right')}>
-            <div style={s('flex:1')}><div className="mono" style={s('font-size:20px;font-weight:700')}>1:15</div><div style={s('font-size:10px;color:var(--text3);margin-top:2px')}>משך</div></div>
-            <div style={s('flex:1;border-right:1px solid var(--line);padding-right:14px')}><div className="mono" style={s('font-size:20px;font-weight:700')}>42<span style={s('font-size:12px;color:var(--text2)')}>ק״מ</span></div><div style={s('font-size:10px;color:var(--text3);margin-top:2px')}>מרחק</div></div>
-            <div style={s('flex:1;border-right:1px solid var(--line);padding-right:14px')}><div className="mono" style={s('font-size:20px;font-weight:700;color:var(--accent)')}>78</div><div style={s('font-size:10px;color:var(--text3);margin-top:2px')}>עומס</div></div>
-          </div>
-          <div className="ctl" onClick={() => go('ride')} style={s('background:var(--accent);color:var(--accent-ink);text-align:center;padding:13px;border-radius:13px;font-weight:700;font-size:14px;margin-top:14px')}>התחל אימון</div>
-        </div>
-      </div>
+            ) : (
+              <div className="ctl" onClick={() => go('plan')} style={s('background:var(--bg2);border:1px dashed var(--line2);border-radius:20px;padding:22px 18px;text-align:center')}>
+                <div style={s('font-size:15px;font-weight:600')}>אין אימון מתוכנן להיום</div>
+                <div style={s('font-size:12.5px;color:var(--text3);margin-top:5px;line-height:1.5')}>התוכנית השבועית של המאמן תופיע כאן. הקש כדי לפתוח.</div>
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       <div style={s('display:flex;justify-content:space-between;align-items:baseline;margin:22px 2px 12px;flex-direction:row-reverse')}>
         <div style={s('font-size:12px;color:var(--text3);font-weight:600')}>המועדון השבוע</div>
@@ -238,6 +232,9 @@ function DashboardHE({ vm, go, openAthlete, openActivity }) {
       <SquadRail squad={vm.squad} rtl onOpen={openAthlete} />
 
       <div style={s('font-size:12px;color:var(--text3);font-weight:600;margin:20px 2px 12px')}>פעילות המועדון</div>
+      {vm.feed.length === 0 && (
+        <div style={s('padding:18px;border:1px dashed var(--line2);border-radius:16px;text-align:center;font-size:12.5px;color:var(--text3);line-height:1.5')}>אין עדיין פעילות.</div>
+      )}
       <div style={s('display:flex;flex-direction:column;gap:10px')}>
         {vm.feed.map((f) => (
           <div key={f.id} className="ctl" onClick={() => (f.activityId ? openActivity(f.activityId) : go('activities'))} style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:13px 14px;display:flex;gap:12px;align-items:center;flex-direction:row-reverse;text-align:right')}>

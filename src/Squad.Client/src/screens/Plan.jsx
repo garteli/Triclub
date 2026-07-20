@@ -1,4 +1,5 @@
 import { s, html } from '../lib/style.js';
+import EmptyState from '../components/EmptyState.jsx';
 
 const seg = (active) =>
   active
@@ -31,7 +32,7 @@ function WorkoutSheet({ wkDetail, actions }) {
         </div>
         <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:13px;margin-top:16px;display:flex;gap:10px;align-items:flex-start')}>
           <div style={s('width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#37c0ff,#5a86ff);flex:none;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff')}>C</div>
-          <div style={s('font-size:12.5px;color:var(--text2);line-height:1.5')}><span style={s('color:var(--text);font-weight:600')}>Coach Ronen:</span> {wkDetail.note}</div>
+          <div style={s('font-size:12.5px;color:var(--text2);line-height:1.5')}><span style={s('color:var(--text);font-weight:600')}>Coach:</span> {wkDetail.note}</div>
         </div>
         <div style={s('display:flex;gap:9px;margin-top:16px')}>
           <div className="ctl" onClick={() => actions.go('ride')} style={s('flex:1;background:var(--accent);color:var(--accent-ink);text-align:center;padding:14px;border-radius:13px;font-weight:700;font-size:14px')}>Start now</div>
@@ -82,6 +83,9 @@ export default function Plan({ vm, state, actions }) {
               <div style={s('flex:1;text-align:center')}><div className="mono" style={s('font-size:18px;font-weight:700')}>{sm.done}<span style={s('font-size:11px;color:var(--text2)')}>/{sm.total}</span></div><div style={s('font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.7px')}>Done</div></div>
             </div>
             ); })()}
+            {vm.plan.length === 0 && (
+              <EmptyState icon="📅" title="No sessions planned" sub="Your coach's weekly plan will appear here once it's set." />
+            )}
             <div style={s('display:flex;flex-direction:column;gap:9px')}>
               {vm.plan.map((p) => (
                 <div key={p.day} className="ctl" onClick={() => actions.openWorkout(p.wk)} style={s(`background:var(--bg2);border:1px solid ${p.rowBorder};border-radius:16px;padding:12px 13px;display:flex;gap:12px;align-items:center`)}>

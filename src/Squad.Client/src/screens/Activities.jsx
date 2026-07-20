@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { s } from '../lib/style.js';
 import TileMap from '../components/TileMap.jsx';
 import { toPathD } from '../lib/tiles.js';
+import EmptyState from '../components/EmptyState.jsx';
 
 const MiniMap = ({ a }) => (
   <div style={s('margin-top:11px;border-radius:14px;overflow:hidden;border:1px solid var(--line)')}>
@@ -11,9 +12,9 @@ const MiniMap = ({ a }) => (
         const start = project(a.routePath[0][0], a.routePath[0][1]);
         return (
           <>
-            <path d={d} fill="none" stroke="rgba(0,0,0,.45)" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" />
+            <path d={d} fill="none" stroke="rgba(255,255,255,.9)" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" />
             <path d={d} fill="none" stroke={a.sportColor} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-            <circle cx={start.x} cy={start.y} r="5" fill="var(--good)" stroke="#0b0f14" strokeWidth="2" />
+            <circle cx={start.x} cy={start.y} r="5" fill="var(--good)" stroke="#fff" strokeWidth="2" />
           </>
         );
       }}
@@ -84,7 +85,9 @@ export default function Activities({ vm, actions }) {
 
       {/* list */}
       <div style={s('display:flex;flex-direction:column;gap:12px;margin-top:16px')}>
-        {list.map((a) => <Card key={a.id} a={a} onOpen={actions.openActivity} onAthlete={actions.openAthlete} />)}
+        {list.length === 0
+          ? <EmptyState icon="🚴" title={tab === 'you' ? 'No activities yet' : 'No squad activity yet'} sub={tab === 'you' ? 'Record a ride or sync from Apple Health and it shows up here.' : 'When your teammates train, their activities appear here.'} />
+          : list.map((a) => <Card key={a.id} a={a} onOpen={actions.openActivity} onAthlete={actions.openAthlete} />)}
       </div>
     </div>
   );

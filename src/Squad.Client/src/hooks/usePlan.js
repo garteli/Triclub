@@ -24,7 +24,7 @@ function mapRow(r) {
 }
 const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 
-// Fetches the athlete's weekly plan (seeded server-side on first view).
+// Fetches the athlete's weekly plan (empty until a plan is assigned).
 export function usePlan({ getToken, enabled = true } = {}) {
   const [plan, setPlan] = useState(null);
   const [summary, setSummary] = useState(null);

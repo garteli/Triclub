@@ -18,6 +18,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Node is required by Squad.Web.csproj's BuildClientApp target, which builds
+      # the React client (Squad.Client) into wwwroot during the Release publish.
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: npm
+          cache-dependency-path: src/Squad.Client/package-lock.json
+
       - name: Set up .NET Core
         uses: actions/setup-dotnet@v4
         with:

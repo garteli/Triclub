@@ -13,19 +13,31 @@ const BIOMETRIC_KEY = 'squad.biometric';  // { credentialId, athleteId } — loc
 
 // --- HTTP -------------------------------------------------------------------
 
-async function api(path, { method = 'GET', body, token } = {}) {
-  const res = await fetch(path, {
-    method,
-    headers: {
-      ...(body ? { 'Content-Type': 'application/json' } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  let data = null;
-  try { data = await res.json(); } catch { /* empty body */ }
-  if (!res.ok) throw new Error(data?.error || `Request failed (${res.status})`);
-  return data;
+async function api(path, { method = 'GET', body, token, timeoutMs = 45000 } = {}) {
+  // Bound every request so a stalled connection can't leave the caller (e.g. the
+  // sign-in button) spinning forever.
+  const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = ctrl ? setTimeout(() => ctrl.abort(), timeoutMs) : null;
+  try {
+    const res = await fetch(path, {
+      method,
+      headers: {
+        ...(body ? { 'Content-Type': 'application/json' } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+      signal: ctrl?.signal,
+    });
+    let data = null;
+    try { data = await res.json(); } catch { /* empty body */ }
+    if (!res.ok) throw new Error(data?.error || `Request failed (${res.status})`);
+    return data;
+  } catch (e) {
+    if (e?.name === 'AbortError') throw new Error('The server took too long — please try again.');
+    throw e;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 // --- session persistence ----------------------------------------------------
@@ -87,15 +99,22 @@ export async function updateProfile(token, fields) {
 }
 
 // Which social providers the server has configured (+ their public client ids).
+// The first hit after an Azure cold start (or a flaky mobile network at app launch)
+// can be slow or fail. Retry with a generous timeout and — crucially — cache ONLY a
+// successful result: caching a failure here would hide the Google/Apple buttons for
+// the whole app session (the native app never reloads to clear it).
 let _authConfig;
 export async function authConfig() {
   if (_authConfig) return _authConfig;
-  try {
-    _authConfig = await api('/api/auth/config');
-  } catch {
-    _authConfig = { google: null, apple: null };
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      _authConfig = await api('/api/auth/config', { timeoutMs: 90000 });
+      return _authConfig;
+    } catch {
+      await new Promise((r) => setTimeout(r, 2000));
+    }
   }
-  return _authConfig;
+  return { google: null, apple: null }; // not cached — a later call retries
 }
 
 // Full social sign-in: obtain the provider id_token in the browser, exchange it

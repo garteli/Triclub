@@ -40,7 +40,7 @@ export default function Welcome({ actions }) {
   const anySocial = providers.google || providers.apple;
 
   return (
-    <div style={s('padding:0 22px 40px;height:100%;display:flex;flex-direction:column;animation:floatUp .35s ease')}>
+    <div style={s('padding:0 22px calc(20px + env(safe-area-inset-bottom, 0px));min-height:calc(100dvh - env(safe-area-inset-top, 0px) - 12px);display:flex;flex-direction:column;animation:floatUp .35s ease')}>
       {/* hero */}
       <div style={s('flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center')}>
         <Logo size={78} />

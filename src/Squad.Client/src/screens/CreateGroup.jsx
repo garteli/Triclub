@@ -83,7 +83,7 @@ export default function CreateGroup({ actions, onCreateSquad }) {
         <>
           <Title>Register a group</Title>
           <Sub>Set up your club so athletes can find and join it.</Sub>
-          <Field label="Group name" value={form.name} onChange={set('name')} placeholder="Kaza Tri Club" />
+          <Field label="Group name" value={form.name} onChange={set('name')} placeholder="Your club name" />
           <Field label="City / base" value={form.city} onChange={set('city')} placeholder="Tiberias" />
           <FieldLabel>Disciplines</FieldLabel>
           <Chips options={DISCIPLINES} value={form.disc} onChange={set('disc')} multi />

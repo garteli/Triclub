@@ -68,6 +68,31 @@ body {
 .nav-btn { cursor: pointer; transition: color .15s; }
 .ctl { cursor: pointer; transition: all .15s; }
 
+/* ---- live ride page system: fill the viewport, scale numbers to tile size ---- */
+/* Active page is a flex column pinned to the viewport; the field row grows to fill
+   the space between the timer header and the floating pager + bottom nav. */
+.live-active {
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - 12px);
+  padding: 6px 0 calc(150px + env(safe-area-inset-bottom));
+}
+.live-row { flex: 1; min-height: 0; }
+
+/* Metric value: a per-page fallback size (--vf, count-based) that scales UP to fill
+   the tile where container queries are supported (iOS 16+, all modern browsers). */
+.live-metric-val {
+  font-weight: 700;
+  line-height: .9;
+  letter-spacing: -1px;
+  font-size: var(--vf, 34px);
+}
+@supports (font-size: 1cqmin) {
+  .live-tile { container-type: size; }
+  .live-metric-val { font-size: max(var(--vf, 34px), min(30cqw, 46cqh)); }
+  .live-metric-val.hero { font-size: max(var(--vf, 44px), min(23cqw, 56cqh)); }
+}
+
 /* app shell — fills the viewport, centers the app column. */
 .app-shell {
   min-height: 100dvh;
