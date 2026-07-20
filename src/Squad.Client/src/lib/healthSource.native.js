@@ -32,6 +32,15 @@ function num(v) {
   return Number.isFinite(n) ? n : null;
 }
 
+// Keep only workouts that carry some real signal — a distance, some calories, or a
+// non-trivial duration (>= 60s). Filters out empty auto-logged HealthKit samples that
+// would otherwise import as 0-distance, 0-load junk activities.
+function hasRealData(dto) {
+  return (dto.distanceMeters ?? 0) > 0
+    || (dto.calories ?? 0) > 0
+    || (dto.movingTimeSeconds ?? 0) >= 60;
+}
+
 // HKWorkout → NativeActivityDto (the shape NativeActivityDto.cs mirrors). We fill the
 // fields a workout reliably carries; HR/power enrichment (separate HKQuantity queries)
 // is a documented follow-up and stays null — the backend treats every metric as optional
@@ -71,6 +80,8 @@ export async function createNativeHealthSource() {
     },
 
     // All workouts in [since, until], newest first, mapped to canonical DTOs.
+    // Empty/junk workouts (no distance, no calories, trivially short) are skipped so
+    // auto-logged HealthKit samples don't flood the feed as 0-distance "rides".
     async listWorkouts({ since, until = new Date() } = {}) {
       const res = await CapacitorHealthkit.queryHKitSampleType({
         sampleName: 'workoutType',
@@ -82,6 +93,7 @@ export async function createNativeHealthSource() {
       return rows
         .filter((w) => w && w.uuid && w.startDate)
         .map(mapWorkout)
+        .filter(hasRealData)
         .sort((a, b) => new Date(b.startUtc) - new Date(a.startUtc));
     },
   };
