@@ -5,9 +5,9 @@ using Squad.Core;
 namespace Squad.Web;
 
 /// <summary>
-/// The signed-in athlete's weekly training plan (Mon..Sun of the current week),
-/// seeded on first view. Per-row status is derived from the date: past = done,
-/// today = today, future = planned, rest days = rest.
+/// The signed-in athlete's weekly training plan (Mon..Sun of the current week).
+/// Per-row status is derived from the date: past = done, today = today,
+/// future = planned, rest days = rest. No plan assigned = empty week.
 /// </summary>
 public static class PlanEndpoints
 {

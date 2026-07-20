@@ -337,8 +337,13 @@ export function buildViewModel(state, t, opts = {}) {
     return { ...a, metricCards, analysis: activityAnalysis(a) };
   })();
 
+  const now = new Date();
+  const todayLabel = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][now.getDay()];
+  const todayLabelHe = ['יום א׳', 'יום ב׳', 'יום ג׳', 'יום ד׳', 'יום ה׳', 'יום ו׳', 'שבת'][now.getDay()];
+
   return {
     squad, squadOnTrack, squadTotal,
+    todayLabel, todayLabelHe,
     squadName: opts.squadName || null,
     feed: liveFeedRows ?? feedRows,
     activities, myActivities, activityDetail,

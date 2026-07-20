@@ -1,7 +1,7 @@
 -- ===========================================================================
 --  Plan schema — a per-athlete weekly training plan. Run AFTER RawActivity.sql.
---  One row per planned workout on a date. The service seeds a template week the
---  first time an athlete opens their plan. Idempotent.
+--  One row per planned workout on a date. Rows are created when a plan is
+--  actually assigned; an athlete with no plan simply has no rows. Idempotent.
 -- ===========================================================================
 SET ANSI_NULLS ON;
 SET QUOTED_IDENTIFIER ON;
