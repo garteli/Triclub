@@ -79,6 +79,7 @@ export default function Settings({ vm, state, actions }) {
       <div style={s(label)}>General</div>
       <div style={s(card)}>
         <NavRow onClick={() => actions.go('units')}>Units · {unitsLabel(units)}</NavRow>
+        <NavRow onClick={() => actions.go('zones')}>Training zones · FTP &amp; max HR</NavRow>
         <NavRow onClick={() => actions.go('notifprefs')}>Notifications</NavRow>
         <NavRow onClick={() => actions.go('sensors')}>Connected apps &amp; sensors</NavRow>
         <NavRow last onClick={() => actions.go('privacy')}>Privacy</NavRow>

@@ -1,8 +1,14 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { s } from '../lib/style.js';
 import TileMap from './TileMap.jsx';
 import { toPathD } from '../lib/tiles.js';
 import { useActivityTrack } from '../hooks/useActivityTrack.js';
+import { loadZones } from '../lib/zones.js';
+import { normalizedPower, hrZones, powerZones, powerCurve } from '../lib/powerAnalysis.js';
+
+const POWER_COLORS = ['#8a94a6', '#4a86ff', '#22c55e', '#eab308', '#f97316', '#ef4444', '#a855f7'];
+const HR_COLORS = ['#8a94a6', '#22c55e', '#eab308', '#f97316', '#ef4444'];
+const CURVE_LABEL = { 5: '5s', 15: '15s', 30: '30s', 60: '1m', 300: '5m', 600: '10m', 1200: '20m', 3600: '60m' };
 
 // Route map + Strava-style analysis for an activity's detail view. Fetches the recorded
 // track (GET /api/activities/{id}/track) and derives, all from the FIT stream we already
@@ -161,8 +167,33 @@ function SegmentTable({ title, rows, isSwim, isFoot }) {
   );
 }
 
+// Time-in-zone distribution: one bar per zone, width = share of total, with time + percent.
+function ZoneDist({ title, seconds, colors }) {
+  const total = seconds.reduce((a, b) => a + b, 0);
+  if (total <= 0) return null;
+  return (
+    <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:12px 13px;margin-top:10px')}>
+      <div style={s('font-size:12px;font-weight:700;margin-bottom:4px')}>{title}</div>
+      {seconds.map((sec, i) => {
+        const pct = Math.round((sec / total) * 100);
+        return (
+          <div key={i} style={s('display:flex;align-items:center;gap:9px;margin-top:6px')}>
+            <div style={s(`width:22px;font-size:10px;font-weight:700;color:${colors[i]}`)}>Z{i + 1}</div>
+            <div style={s('flex:1;height:9px;border-radius:5px;background:var(--bg4);overflow:hidden')}>
+              <div style={s(`height:100%;width:${pct}%;background:${colors[i]};border-radius:5px`)} />
+            </div>
+            <div className="mono" style={s('width:46px;text-align:right;font-size:10.5px;color:var(--text3)')}>{fmtDur(sec)}</div>
+            <div className="mono" style={s('width:30px;text-align:right;font-size:10.5px;color:var(--text2)')}>{pct}%</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function ActivityDetailAnalysis({ activityId, sport, getToken }) {
   const { track, laps, status } = useActivityTrack(activityId, { getToken });
+  const [zones] = useState(() => loadZones()); // device FTP / max HR
   const isSwim = sport === 'Swim';
   const isFoot = sport === 'Run';
 
@@ -184,6 +215,15 @@ export default function ActivityDetailAnalysis({ activityId, sport, getToken }) 
 
   const splits = useMemo(() => computeSplits(track || [], isSwim ? 100 : 1000), [track, isSwim]);
   const workKJ = useMemo(() => totalWorkKJ(track || []), [track]);
+
+  // Power/HR analysis. NP + power curve need only the stream; zones + IF need the settings.
+  const np = useMemo(() => normalizedPower(track || []), [track]);
+  const pwZones = useMemo(() => powerZones(track || [], zones.ftp), [track, zones.ftp]);
+  const hZones = useMemo(() => hrZones(track || [], zones.maxHr), [track, zones.maxHr]);
+  const curve = useMemo(() => powerCurve(track || []), [track]);
+  const ifactor = np && zones.ftp ? np / zones.ftp : null;
+  const hasPower = curve.length > 0 || np != null;
+  const hasHr = (track || []).some((p) => Number.isFinite(p.heartRate));
 
   // Device laps (auto-lap or manual) → the same row shape as computed splits.
   const lapRows = useMemo(() => (laps || [])
@@ -259,6 +299,34 @@ export default function ActivityDetailAnalysis({ activityId, sport, getToken }) 
       {shown.map((tr) => (
         <Trace key={tr.key} title={tr.title} unit={tr.unit} values={tr.values} stroke={tr.stroke} fill={tr.fill} fmt={tr.fmt} />
       ))}
+
+      {/* Normalized Power / Intensity Factor + zone distributions + power curve */}
+      {(np != null || ifactor != null) && (
+        <div className="mono" style={s('font-size:11px;color:var(--text3);margin-top:10px')}>
+          {np != null && <>Normalized Power <b style={s('color:var(--text)')}>{np}</b> W</>}
+          {ifactor != null && <> · IF <b style={s('color:var(--text)')}>{ifactor.toFixed(2)}</b></>}
+        </div>
+      )}
+      {pwZones && <ZoneDist title="Power zones" seconds={pwZones} colors={POWER_COLORS} />}
+      {hZones && <ZoneDist title="Heart-rate zones" seconds={hZones} colors={HR_COLORS} />}
+      {curve.length > 0 && (
+        <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:12px 13px;margin-top:10px')}>
+          <div style={s('font-size:12px;font-weight:700;margin-bottom:8px')}>Power curve · best watts</div>
+          <div style={s('display:flex;flex-wrap:wrap')}>
+            {curve.map((c) => (
+              <div key={c.sec} style={s('flex:1;min-width:52px;text-align:center;padding:2px 0')}>
+                <div className="mono" style={s('font-size:14px;font-weight:700')}>{c.watts}<span style={s('font-size:9px;color:var(--text3)')}>w</span></div>
+                <div style={s('font-size:9.5px;color:var(--text3)')}>{CURVE_LABEL[c.sec]}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {((hasPower && !zones.ftp) || (hasHr && !zones.maxHr)) && (
+        <div style={s('font-size:11px;color:var(--text3);margin-top:8px;line-height:1.5')}>
+          Set your FTP &amp; max HR in <b>Settings → Training zones</b> to unlock power / heart-rate zones and Intensity Factor.
+        </div>
+      )}
 
       {useLaps
         ? <SegmentTable title="Laps" rows={lapRows} isSwim={isSwim} isFoot={isFoot} />
