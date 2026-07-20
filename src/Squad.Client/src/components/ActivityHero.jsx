@@ -2,53 +2,57 @@ import { useMemo } from 'react';
 import { s } from '../lib/style.js';
 import TileMap from './TileMap.jsx';
 import { toPathD } from '../lib/tiles.js';
+import { usePlayback } from '../hooks/usePlayback.js';
 
-// Strava-style hero: a full-bleed basemap with the recorded route, overlaid nav controls,
-// and a round play button. Play animates the travelled portion + a marker along the route
-// (and, via the shared `playback`, the synced charts below). Dragging the map scrubs the
-// whole set. Falls back to a gradient panel with the sport glyph when there's no GPS.
-const RoundBtn = ({ onClick, title, children, style = '' }) => (
-  <button
-    onClick={onClick}
-    aria-label={title}
-    title={title}
-    style={s('width:38px;height:38px;border-radius:50%;border:none;background:#fff;color:#111;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;box-shadow:0 2px 8px rgba(0,0,0,.28)' + (style ? ';' + style : ''))}
-  >
-    {children}
-  </button>
-);
+// Strava-beating hero: a full-bleed route map with translucent glass controls
+// (back · Save Route · overflow · layers · 3D) and a round play button that animates
+// the travelled route + a marker. Dragging the map scrubs. Falls back to a gradient
+// panel with the sport glyph when there's no GPS. Save Route / layers / 3D are visual
+// per the design (no data source yet); back, overflow→delete and play are live.
+const glass = 'background:rgba(20,23,29,.72);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.1);color:#fff';
 
-const BackIcon = () => (<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 6l-6 6 6 6" /></svg>);
-const TrashIcon = () => (<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6" /></svg>);
-
-export default function ActivityHero({ a, route, frames, hasMap, status, playback, onBack, onDelete }) {
+export default function ActivityHero({ a, route, frames, hasMap, status, onBack, onDelete }) {
+  const playback = usePlayback(frames.length);
   const { index, playing, toggle, seek, pause } = playback;
   const n = frames.length;
   const travelled = useMemo(() => (hasMap ? route.slice(0, index + 1) : null), [route, index, hasMap]);
-  const canPlay = n > 1 && hasMap; // no route to animate → the analysis transport plays the charts
+  const canPlay = n > 1 && hasMap;
 
   const controls = (
     <>
-      <div style={s('position:absolute;top:12px;left:12px;z-index:3')}><RoundBtn onClick={onBack} title="Back"><BackIcon /></RoundBtn></div>
-      {a.isMe && (
-        <div style={s('position:absolute;top:12px;right:12px;z-index:3')}><RoundBtn onClick={onDelete} title="Delete training" style="color:var(--bad)"><TrashIcon /></RoundBtn></div>
-      )}
+      {/* back */}
+      <div className="ctl" onClick={onBack} style={s(`position:absolute;top:16px;left:16px;z-index:3;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;${glass}`)}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round"><path d="M15 6l-6 6 6 6" /></svg>
+      </div>
+      {/* Save Route + overflow */}
+      <div style={s('position:absolute;top:16px;right:16px;z-index:3;display:flex;gap:8px')}>
+        <div className="ctl" style={s(`height:38px;padding:0 14px;border-radius:19px;display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;${glass}`)}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" /></svg>
+          Save Route
+        </div>
+        <div className="ctl" onClick={a.isMe ? onDelete : undefined} title={a.isMe ? 'Delete training' : undefined} style={s(`width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;letter-spacing:1px;font-size:13px;${glass}`)}>···</div>
+      </div>
+      {/* layers + 3D */}
+      <div style={s('position:absolute;top:64px;right:16px;z-index:3;display:flex;flex-direction:column;gap:8px')}>
+        <div className="ctl" style={s(`width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;${glass}`)}>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"><path d="M12 2l9 5-9 5-9-5z" /><path d="M3 12l9 5 9-5M3 17l9 5 9-5" /></svg>
+        </div>
+        <div className="ctl" style={s(`width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;${glass}`)}>3D</div>
+      </div>
       {canPlay && (
-        <button
-          onClick={toggle}
-          aria-label={playing ? 'Pause replay' : 'Play replay'}
-          style={s('position:absolute;right:16px;bottom:16px;z-index:3;width:54px;height:54px;border-radius:50%;border:none;background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;box-shadow:0 4px 14px rgba(0,0,0,.32)')}
-        >
+        <button onClick={toggle} aria-label={playing ? 'Pause replay' : 'Play replay'}
+          style={s('position:absolute;right:16px;bottom:34px;z-index:3;width:52px;height:52px;border-radius:50%;border:none;background:var(--accent);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;box-shadow:0 8px 20px -6px color-mix(in srgb,var(--accent) 60%,transparent)')}>
           {playing
-            ? <svg width="20" height="20" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1.2" fill="#111" /><rect x="14" y="4" width="4" height="16" rx="1.2" fill="#111" /></svg>
-            : <svg width="22" height="22" viewBox="0 0 24 24"><path d="M7 4.5 19 12 7 19.5Z" fill="#111" /></svg>}
+            ? <svg width="20" height="20" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1.2" fill="var(--accent-ink)" /><rect x="14" y="4" width="4" height="16" rx="1.2" fill="var(--accent-ink)" /></svg>
+            : <svg width="22" height="22" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="var(--accent-ink)" /></svg>}
         </button>
       )}
+      {/* bottom fade into the sheet */}
+      <div style={s('position:absolute;left:0;right:0;bottom:0;height:60px;background:linear-gradient(0deg,var(--bg),transparent);pointer-events:none;z-index:2')} />
     </>
   );
 
-  // Height: a tall hero on phones, capped so it never eats a tablet-width column.
-  const box = 'position:relative;width:100%;height:clamp(280px,44vh,400px);overflow:hidden;background:var(--bg3)';
+  const box = 'position:relative;width:100%;height:308px;overflow:hidden;background:linear-gradient(160deg,#101922,#0b0f13)';
 
   if (status === 'loading') {
     return <div style={s(box)}>{controls}<div style={s('position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:12px')}>Loading route…</div></div>;
@@ -56,7 +60,7 @@ export default function ActivityHero({ a, route, frames, hasMap, status, playbac
 
   if (!hasMap) {
     return (
-      <div style={s(box + ';background:linear-gradient(135deg,color-mix(in srgb,' + a.sportColor + ' 30%,var(--bg2)),var(--bg2))')}>
+      <div style={s(box)}>
         {controls}
         <div style={s('position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px')}>
           <div style={s('font-size:44px;line-height:1')}>{a.icon}</div>
@@ -68,14 +72,8 @@ export default function ActivityHero({ a, route, frames, hasMap, status, playbac
 
   return (
     <div style={s(box)}>
-      <TileMap
-        points={route}
-        fill
-        radius={0}
-        pad={30}
-        scrubPoints={route}
-        onScrub={(i) => { pause(); seek(n > 1 ? i / (n - 1) : 0); }}
-      >
+      <TileMap points={route} fill radius={0} pad={30} scrubPoints={route}
+        onScrub={(i) => { pause(); seek(n > 1 ? i / (n - 1) : 0); }}>
         {(project) => {
           const full = toPathD(route, project);
           const done = travelled && travelled.length > 1 ? toPathD(travelled, project) : null;
@@ -85,10 +83,10 @@ export default function ActivityHero({ a, route, frames, hasMap, status, playbac
           return (
             <>
               <path d={full} fill="none" stroke="rgba(255,255,255,.9)" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
-              <path d={full} fill="none" stroke="#f2622d" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" opacity="0.9" />
-              {done && <path d={done} fill="none" stroke="#111" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" opacity="0.85" />}
-              <circle cx={start.x} cy={start.y} r="6" fill="var(--good)" stroke="#fff" strokeWidth="2.5" />
-              <circle cx={endPt.x} cy={endPt.y} r="6" fill="var(--bad)" stroke="#fff" strokeWidth="2.5" />
+              <path d={full} fill="none" stroke="#ff6a2c" strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round" />
+              {done && <path d={done} fill="none" stroke="#111" strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.85" />}
+              <circle cx={start.x} cy={start.y} r="7" fill="var(--good)" stroke="#fff" strokeWidth="3" />
+              <circle cx={endPt.x} cy={endPt.y} r="7" fill="var(--bad)" stroke="#fff" strokeWidth="3" />
               {(playing || index > 0) && (
                 <>
                   <circle cx={head.x} cy={head.y} r="9" fill="#fff" opacity="0.9" />
