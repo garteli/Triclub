@@ -253,6 +253,9 @@ export function buildViewModel(state, t, opts = {}) {
         icon: f.icon,
         discColor: f.discColor,
         reacts: f.reacts ?? 0,
+        kudos: f.kudos ?? 0,
+        comments: f.comments ?? 0,
+        iKudoed: !!f.iKudoed,
         athleteId: f.athleteId,
         // f.id is the activity's own Guid (ActivityFeedItem.Id) — same key the
         // activities list uses — so the card can deep-link into its detail page.
@@ -316,9 +319,9 @@ export function buildViewModel(state, t, opts = {}) {
       athleteName: isMe ? 'You' : (a.athleteName ?? m.name), isMe,
       initials: a.initials ?? m.initials, color: a.color ?? m.color,
       sportColor: SPORT_COLOR[a.sport] || 'var(--accent)', icon: SPORT_ICON[a.sport] || '🏅',
-      reactText: (a.fire || a.strong || a.clap)
-        ? `🔥 ${a.fire} · 💪 ${a.strong} · 👏 ${a.clap}`
-        : 'Be the first to react',
+      reactText: a.kudos > 0
+        ? `${a.kudos} ${a.kudos === 1 ? 'kudos' : 'kudos'} given`
+        : 'Be the first to give kudos',
       hasMap: a.sport === 'Bike' || a.sport === 'Run',
       // The feed + detail maps draw the real ingested GPS track (GET .../track), so no
       // synthetic route is generated here.

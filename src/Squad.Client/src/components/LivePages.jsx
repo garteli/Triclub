@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { s } from '../lib/style.js';
-import { metricCatalog, liveMetricValues, liveChartsView, liveRadarView, spreadRiders } from '../lib/liveMetrics.js';
+import { metricCatalog, metricGroups, liveMetricValues, liveChartsView, liveRadarView, spreadRiders } from '../lib/liveMetrics.js';
 import TileMap from './TileMap.jsx';
 
 // ---- Group side column: teammates front→back on a rail + rear-radar vehicle blip ----
@@ -84,6 +84,14 @@ function FieldCell({ f, editing, actions, index }) {
             )}
           </div>
           <div style={s('position:absolute;top:10px;left:11px;font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.8px;font-weight:600;background:color-mix(in srgb,var(--bg) 60%,transparent);padding:2px 7px;border-radius:6px;z-index:2')}>Route</div>
+          {f.packFused && (
+            // BLE pack-ranging is live: badge the map with a pulse + the fused gap to the
+            // nearest teammate (positions on this map are BLE-tightened, not raw GPS).
+            <div style={s('position:absolute;top:10px;right:11px;display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;color:var(--good);background:color-mix(in srgb,var(--good) 16%,var(--bg) 70%);padding:2px 8px;border-radius:6px;z-index:2')}>
+              <span style={s('width:6px;height:6px;border-radius:50%;background:var(--good);animation:pulseDot 1.4s infinite')} />
+              <span className="mono">BLE{f.packGap != null ? ` · ${f.packGap} m` : ''}</span>
+            </div>
+          )}
         </>
       )}
       {editing && (
@@ -145,7 +153,6 @@ function PickerSheet({ page, slot, actions }) {
   const cur = page.fields[slot];
   const charts = [['chart:spd', 'Speed chart', 'graph'], ['chart:hr', 'HR chart', 'graph'], ['chart:power', 'Power chart', 'graph']];
   const maps = [['map', 'Route map', 'map']];
-  const metrics = Object.keys(metricCatalog).map((id) => [id, metricCatalog[id].label, metricCatalog[id].unit]);
   const section = (title, rows) => (
     <>
       <div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:7px')}>{title}</div>
@@ -162,7 +169,7 @@ function PickerSheet({ page, slot, actions }) {
         <div style={s('font-size:17px;font-weight:700;letter-spacing:-.3px;margin-bottom:12px')}>Choose a field</div>
         {section('Charts', charts)}
         {section('Map', maps)}
-        {section('Metrics', metrics)}
+        {metricGroups.map(([cat, toks]) => section(cat, toks.map((id) => [id, metricCatalog[id].label, metricCatalog[id].unit])))}
       </div>
     </>
   );
@@ -200,7 +207,9 @@ export default function LivePages({ tel, lp }) {
       // Real rider positions from the hub (those with a GPS fix). Empty → "Waiting for GPS".
       const riders = (tel?.riders || []).filter((r) => r.lat != null && r.lon != null);
       const pts = riders.map((r) => [r.lat, r.lon]);
-      return { ...base, kind: 'map', label: 'Route', riders, pts };
+      // Phone-to-phone BLE pack-spacing readout, shown only when fusion is live this tick.
+      const packGap = tel?.packFused ? (tel?.gap != null ? Math.round(tel.gap) : null) : null;
+      return { ...base, kind: 'map', label: 'Route', riders, pts, packFused: !!tel?.packFused, packGap };
     }
     if (charts[tok]) { const c = charts[tok]; return { ...base, kind: 'chart', label: c.label, value: c.cur, unit: c.unit, color: c.color, pts: c.pts, area: c.area }; }
     const m = metricCatalog[tok] || { label: tok, unit: '' };

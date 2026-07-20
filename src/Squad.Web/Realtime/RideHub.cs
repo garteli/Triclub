@@ -69,8 +69,73 @@ public sealed class RideHub(IAthleteDirectory directory, IRideSessionState state
             Ts = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
         };
 
+        // Pack-position fusion: sharpen this rider's spot from fresh BLE ranges to teammates.
+        var fused = FuseRider(rideId, athleteId.Value, t.Lat, t.Lon);
+        if (fused.Fused)
+            update = update with { FusedLat = fused.Lat, FusedLon = fused.Lon, NearestGapM = fused.NearestGapM, Fused = true };
+
         state.Upsert(rideId, update);
         await Clients.Group(RideGroup(rideId)).SendAsync("riderMoved", update);
+    }
+
+    // Only ranges newer than this feed the fix — a stale range would anchor to where a
+    // teammate used to be.
+    private const long PeerRangeTtlMs = 6_000;
+
+    /// <summary>
+    /// Localize <paramref name="athleteId"/> from its GPS fix plus the freshest BLE range to
+    /// each teammate (either direction of the pair), anchoring on those teammates' current
+    /// positions. Returns the unrefined GPS position when no usable range exists.
+    /// </summary>
+    private FusedPosition FuseRider(Guid rideId, Guid athleteId, double lat, double lon)
+    {
+        long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+        // Newest fresh range to each distinct teammate.
+        var perPeer = new Dictionary<Guid, PeerRangeObservation>();
+        foreach (var r in state.PeerRanges(rideId))
+        {
+            if (now - r.Ts > PeerRangeTtlMs || r.DistanceM is null) continue;
+            Guid other;
+            if (r.ObserverId == athleteId) other = r.PeerId;
+            else if (r.PeerId == athleteId) other = r.ObserverId;
+            else continue;
+            if (!perPeer.TryGetValue(other, out var cur) || r.Ts > cur.Ts) perPeer[other] = r;
+        }
+        if (perPeer.Count == 0) return new FusedPosition(lat, lon, null, false);
+
+        // Anchor on each teammate's current position (their own fused fix when they have one).
+        var neighbors = new List<(double Lat, double Lon, double RangeM)>(perPeer.Count);
+        foreach (var (other, obs) in perPeer)
+        {
+            if (!state.TryGet(rideId, other, out var u) || u is null) continue;
+            neighbors.Add((u.FusedLat ?? u.Lat, u.FusedLon ?? u.Lon, obs.DistanceM!.Value));
+        }
+        if (neighbors.Count == 0) return new FusedPosition(lat, lon, null, false);
+
+        return PackFusion.Localize(lat, lon, neighbors);
+    }
+
+    /// <summary>
+    /// Phone-to-phone BLE range: the caller's device saw a teammate's beacon. Identity of
+    /// the observer is taken from the connection, never the payload. Recorded for the
+    /// pack-position fusion pass; not fanned out (the fused position rides on 'riderMoved').
+    /// </summary>
+    public Task PushPeerRange(Guid rideId, PeerRange r)
+    {
+        var observerId = ResolveAthleteId(Context.User);
+        if (observerId is null || r is null) return Task.CompletedTask;
+        // Ignore a device ranging itself (its own beacon echoed back).
+        if (r.PeerId == observerId.Value) return Task.CompletedTask;
+
+        state.RecordPeerRange(rideId, new PeerRangeObservation(
+            observerId.Value, r.PeerId, r.Rssi, r.DistanceM,
+            DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()));
+
+        // TODO(pack-fusion): a positioning pass consumes state.PeerRanges(rideId) together
+        // with each rider's GPS+heading to tighten in-pack spacing. Until it lands the
+        // ranges are recorded but positions still come straight from GPS.
+        return Task.CompletedTask;
     }
 
     private static Guid? ResolveAthleteId(ClaimsPrincipal? user)

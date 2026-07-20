@@ -19,6 +19,12 @@ public sealed record ActivityFeedItem
     public int Reacts { get; init; }
     /// <summary>Proxy path to the athlete's avatar photo (null when they have none → initials).</summary>
     public string? AvatarUrl { get; init; }
+    /// <summary>Total kudos on this activity.</summary>
+    public int Kudos { get; init; }
+    /// <summary>Total comments on this activity.</summary>
+    public int Comments { get; init; }
+    /// <summary>Whether the athlete who requested this card has kudoed the activity.</summary>
+    public bool IKudoed { get; init; }
 }
 
 // ----- Leaderboard -----
@@ -54,6 +60,15 @@ public sealed record RiderTelemetry(
     int? RadarThreatLevel = null, int? RadarVehicleCount = null,
     double? RadarClosestMeters = null, double? RadarClosestClosingKph = null);
 
+/// <summary>One phone-to-phone BLE range observation a device uploads: the caller
+/// (observer, resolved from the connection — never trusted from the payload) saw
+/// <see cref="PeerId"/>'s beacon at this RSSI / estimated metres.</summary>
+public sealed record PeerRange(Guid PeerId, int Rssi, double? DistanceM);
+
+/// <summary>A stored peer range, tagged with the observer and receipt time, ready for
+/// the pack-position fusion pass to consume alongside GPS+heading.</summary>
+public sealed record PeerRangeObservation(Guid ObserverId, Guid PeerId, int Rssi, double? DistanceM, long Ts);
+
 /// <summary>What every watcher receives — telemetry enriched with rider identity.</summary>
 public sealed record RiderUpdate
 {
@@ -71,4 +86,12 @@ public sealed record RiderUpdate
     public int? RadarVehicleCount { get; init; }
     public double? RadarClosestMeters { get; init; }
     public long Ts { get; init; }
+
+    // Pack-position fusion output (null until BLE peer ranges refine this rider). FusedLat/Lon
+    // are the sharpened coordinates the map prefers; NearestGapM is the fused spacing to the
+    // closest ranged teammate. Fused flags that ranges — not just GPS — shaped the position.
+    public double? FusedLat { get; init; }
+    public double? FusedLon { get; init; }
+    public double? NearestGapM { get; init; }
+    public bool Fused { get; init; }
 }

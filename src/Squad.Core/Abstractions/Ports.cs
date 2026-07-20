@@ -50,24 +50,27 @@ public interface ILeaderboardService
     Task<IReadOnlyList<LeaderboardRow>> GetWeeklyAsync(Guid squadId, Guid? me, DateTimeOffset asOf, CancellationToken ct);
 }
 
-/// <summary>Recent committed activities for a squad — the initial feed load the hub then tops up live.</summary>
+/// <summary>Recent committed activities for a squad — the initial feed load the hub then tops up live.
+/// <paramref name="me"/> is the caller, so each row can report whether they've kudoed it.</summary>
 public interface IFeedReadService
 {
-    Task<IReadOnlyList<FeedActivityRow>> GetRecentAsync(Guid squadId, int take, CancellationToken ct);
+    Task<IReadOnlyList<FeedActivityRow>> GetRecentAsync(Guid squadId, Guid me, int take, CancellationToken ct);
 }
 
-/// <summary>Raw joined row (Activity + Athlete display) the host maps into an ActivityFeedItem.</summary>
+/// <summary>Raw joined row (Activity + Athlete display) the host maps into an ActivityFeedItem.
+/// Kudos/Comments are counts; IKudoed is whether the requesting caller has kudoed this activity.</summary>
 public sealed record FeedActivityRow(
     Guid Id, Guid AthleteId, string AthleteName, string Initials, string AvatarColor,
     int Sport, DateTimeOffset StartUtc, int MovingTimeSec,
     double? DistanceMeters, double? TrainingLoad, double? AvgHeartRate,
     // Proxy path to the athlete's avatar photo (null when they have none → initials).
-    string? AvatarUrl = null);
+    string? AvatarUrl = null,
+    int Kudos = 0, int Comments = 0, bool IKudoed = false);
 
 /// <summary>Recent activities for a squad — the Activities list (with full summary metrics for the detail view).</summary>
 public interface IActivityReadService
 {
-    Task<IReadOnlyList<ActivitySummaryRow>> GetForSquadAsync(Guid squadId, int take, CancellationToken ct);
+    Task<IReadOnlyList<ActivitySummaryRow>> GetForSquadAsync(Guid squadId, Guid me, int take, CancellationToken ct);
 
     /// <summary>Delete one of the caller's OWN activities (scoped to the owner) plus its raw
     /// payload, so the same source workout can be re-imported later. True if a row was removed.</summary>
@@ -86,7 +89,9 @@ public sealed record ActivitySummaryRow(
     double? DistanceMeters, double? ElevationGainM, double? AvgHeartRate,
     double? AvgPowerWatts, double? TrainingLoad, double? Calories,
     // Proxy path to the athlete's avatar photo (null when they have none → initials).
-    string? AvatarUrl = null);
+    string? AvatarUrl = null,
+    // Kudos/Comments are counts; IKudoed is whether the requesting caller has kudoed this activity.
+    int Kudos = 0, int Comments = 0, bool IKudoed = false);
 
 /// <summary>Last-known live-ride position per rider. In-memory/single-instance; Redis to scale out.</summary>
 public interface IRideSessionState
@@ -95,4 +100,9 @@ public interface IRideSessionState
     bool TryGet(Guid rideId, Guid athleteId, out RiderUpdate? update);
     void Remove(Guid rideId, Guid athleteId);
     IReadOnlyCollection<RiderUpdate> Snapshot(Guid rideId);
+
+    // Phone-to-phone BLE ranges, keyed by (observer, peer) so the newest range for each
+    // ordered pair overwrites the last. A future pack-position fusion pass reads these.
+    void RecordPeerRange(Guid rideId, PeerRangeObservation obs);
+    IReadOnlyCollection<PeerRangeObservation> PeerRanges(Guid rideId);
 }

@@ -3,6 +3,7 @@ import { useTick } from './hooks/useTick.js';
 import { useLiveRide } from './hooks/useLiveRide.js';
 import { useSensors } from './hooks/useSensors.js';
 import { useRideRecorder } from './hooks/useRideRecorder.js';
+import { usePeerRanging } from './hooks/usePeerRanging.js';
 import { useRideTelemetry } from './hooks/useRideTelemetry.js';
 import { useLivePages } from './hooks/useLivePages.js';
 import { useSquadFeed } from './hooks/useSquadFeed.js';
@@ -12,6 +13,7 @@ import { useSquads } from './hooks/useSquads.js';
 import { usePlan } from './hooks/usePlan.js';
 import { useGarminSync } from './hooks/useGarminSync.js';
 import { createSquad, joinSquad } from './lib/squads.js';
+import { recordPayment, markPaymentPaid, waivePayment } from './lib/payments.js';
 // import { useLiveRide } from './hooks/useLiveRide.js'; // swap in for real telemetry
 import { buildViewModel } from './lib/viewModel.js';
 import { loadSession, saveSession, clearSession, enrollBiometric, fetchMe, getProfile } from './lib/auth.js';
@@ -33,6 +35,8 @@ import Profile from './screens/Profile.jsx';
 import Discover from './screens/Discover.jsx';
 import GroupProfile from './screens/GroupProfile.jsx';
 import Checkout from './screens/Checkout.jsx';
+import RidePayment from './screens/RidePayment.jsx';
+import CoachLedger from './screens/CoachLedger.jsx';
 import JoinRequests from './screens/JoinRequests.jsx';
 import Messages from './screens/Messages.jsx';
 import Settings from './screens/Settings.jsx';
@@ -69,7 +73,7 @@ const initialState = {
 const screens = {
   dash: Dashboard, ride: LiveRide, plan: Plan, lb: Leaderboard,
   feed: Feed, seg: Segments, coach: Coach, profile: Profile,
-  discover: Discover, group: GroupProfile, pay: Checkout, requests: JoinRequests, chat: Messages,
+  discover: Discover, group: GroupProfile, pay: Checkout, recordpay: RidePayment, ledger: CoachLedger, requests: JoinRequests, chat: Messages,
   settings: Settings, welcome: Welcome, register: Register, login: Login, newgroup: CreateGroup,
   athlete: AthleteProfile, editprofile: EditProfile, notifs: Notifications, activities: Activities,
   upload: UploadActivity, sensors: Sensors,
@@ -199,6 +203,26 @@ export default function App() {
     },
   }), [session?.token, refreshSession]);
 
+  // Ride-payment ledger ops (need the bearer; rebuilt on token change). Passed down as
+  // a `payments` prop, like squadOps — the app only tracks status, money moves off-app.
+  const paymentOps = useMemo(() => ({
+    onRecordPayment: async (body) => {
+      const created = await recordPayment(session.token, body);
+      setRefreshSignal((n) => n + 1);
+      return created;
+    },
+    onMarkPaid: async (id, method, note) => {
+      const updated = await markPaymentPaid(session.token, id, method, note);
+      setRefreshSignal((n) => n + 1);
+      return updated;
+    },
+    onWaivePayment: async (id, note) => {
+      const updated = await waivePayment(session.token, id, note);
+      setRefreshSignal((n) => n + 1);
+      return updated;
+    },
+  }), [session?.token]);
+
   // Pull-to-refresh: re-pull every live surface (feed snapshot, leaderboard,
   // activities, squads, profile) by bumping the shared signal, and hold the
   // spinner briefly so the gesture reads as doing work even on a fast network.
@@ -251,6 +275,9 @@ export default function App() {
     setLbTab: (lbTab) => patch({ lbTab }),
     // discover / groups
     openGroup: (id) => patch({ selGroup: id, screen: 'group' }),
+    // ride-payment nav — selGroup is already the viewed squad
+    openRecordPay: () => patch({ screen: 'recordpay' }),
+    openLedger: () => patch({ screen: 'ledger' }),
     applyJoin: () => setState((s) => ({ ...s, joinState: { ...s.joinState, [s.selGroup]: 'applied' } })),
     simulateApprove: () => setState((s) => ({ ...s, joinState: { ...s.joinState, [s.selGroup]: 'approved' } })),
     freeJoin: () => setState((s) => ({ ...s, joinState: { ...s.joinState, [s.selGroup]: 'paid' } })),
@@ -312,12 +339,15 @@ export default function App() {
   const sensors = useSensors();
   const liveRide = useLiveRide(squadId, { getToken, meId: session?.athleteId, enabled: onRide && !!squadId });
   const recorder = useRideRecorder({ pushTelemetry: liveRide.pushTelemetry, sensors, getToken, onSaved: () => setRefreshSignal((n) => n + 1), enabled: authed });
+  // Phone-to-phone BLE ranging (native only): advertise this athlete + scan teammates for
+  // pack position while a ride is active. Inert on web — no-op that leaves GPS+heading in charge.
+  const peerRanging = usePeerRanging({ athleteId: session?.athleteId, active: rideActive, pushPeerRange: liveRide.pushPeerRange });
   const tel = useRideTelemetry({ t, active: rideActive, riders: liveRide.riders, recorder, sensors });
 
   // Garmin Edge–style live-ride pages (configurable fields, auto-rotate, edit).
   const livePages = useLivePages(t, rideActive);
 
-  const live = { riders: liveRide.riders, status: liveRide.status, pushTelemetry: liveRide.pushTelemetry, recorder, sensors, tel, livePages };
+  const live = { riders: liveRide.riders, status: liveRide.status, pushTelemetry: liveRide.pushTelemetry, recorder, sensors, tel, livePages, peerRanging };
 
   // Remember the last screen + selections so a refresh returns here (see lib/navState.js).
   // Only while signed in — a logged-out location isn't worth restoring.
@@ -348,6 +378,7 @@ export default function App() {
           profile={profile} onProfileSaved={setProfile}
           onJoinSquad={authed ? squadOps.onJoinSquad : undefined}
           onCreateSquad={authed ? squadOps.onCreateSquad : undefined}
+          payments={authed ? paymentOps : undefined}
           meId={session?.athleteId} />
       </Phone>
     </div>
