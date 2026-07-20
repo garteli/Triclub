@@ -57,6 +57,7 @@ export function mapActivity(r) {
     title: TITLES[sport] || 'Session',
     sport,
     when: ago(r.startUtc),
+    startUtc: r.startUtc,
     location: '',
     dist, distU,
     moving: dur(sec),

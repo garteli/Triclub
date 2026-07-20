@@ -1,5 +1,16 @@
 import { s, html } from '../lib/style.js';
 import Avatar from '../components/Avatar.jsx';
+import FeedActivityCard from '../components/FeedActivityCard.jsx';
+
+// Last 7 days of squad activities for the main-page feed. Live rows carry a real
+// startUtc (kept when a row can't be dated, e.g. seed data), newest first.
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+function last7Days(activities) {
+  const cutoff = Date.now() - WEEK_MS;
+  return (activities || [])
+    .filter((a) => { const t = a.startUtc ? new Date(a.startUtc).getTime() : NaN; return Number.isNaN(t) || t >= cutoff; })
+    .sort((a, b) => new Date(b.startUtc || 0) - new Date(a.startUtc || 0));
+}
 
 const BikeIcon = ({ size = 26, stroke = 'var(--bike)' }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round">
@@ -40,8 +51,10 @@ function SquadRail({ squad, rtl, onOpen }) {
   );
 }
 
-function DashboardEN({ vm, state, go, openAthlete, openActivity }) {
+function DashboardEN({ vm, state, go, openAthlete, openActivity, getToken }) {
   const dashB = state.dashVar === 'b';
+  const token = getToken?.() ?? null;
+  const recent = last7Days(vm.activities);
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .4s ease')}>
       {/* header */}
@@ -144,35 +157,27 @@ function DashboardEN({ vm, state, go, openAthlete, openActivity }) {
       </div>
       <SquadRail squad={vm.squad} onOpen={openAthlete} />
 
-      {/* team feed */}
+      {/* team feed — last 7 days of squad activity, with route maps + photos */}
       <div style={s('display:flex;justify-content:space-between;align-items:baseline;margin:20px 2px 12px')}>
-        <div style={s('font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:1.4px;font-weight:600')}>Domestique Team activity</div>
+        <div style={s('font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:1.4px;font-weight:600')}>Domestique Team · last 7 days</div>
         <div className="ctl" onClick={() => go('activities')} style={s('font-size:11.5px;color:var(--accent);font-weight:600')}>See all →</div>
       </div>
-      {vm.feed.length === 0 && (
-        <div style={s('padding:18px;border:1px dashed var(--line2);border-radius:16px;text-align:center;font-size:12.5px;color:var(--text3);line-height:1.5')}>No activity yet. When the club trains, it shows up here.</div>
+      {recent.length === 0 ? (
+        <div style={s('padding:18px;border:1px dashed var(--line2);border-radius:16px;text-align:center;font-size:12.5px;color:var(--text3);line-height:1.5')}>No activity in the last 7 days. When the club trains, it shows up here.</div>
+      ) : (
+        <div style={s('display:flex;flex-direction:column;gap:12px')}>
+          {recent.map((a) => (
+            <FeedActivityCard key={a.id} a={a} onOpen={openActivity} onAthlete={openAthlete} token={token} getToken={getToken} />
+          ))}
+        </div>
       )}
-      <div style={s('display:flex;flex-direction:column;gap:10px')}>
-        {vm.feed.map((f) => (
-          <div key={f.id} className="ctl" onClick={() => (f.activityId ? openActivity(f.activityId) : go('activities'))} style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:13px 14px;display:flex;gap:12px;align-items:center')}>
-            <div style={s(`width:40px;height:40px;border-radius:12px;background:${f.color};flex:none;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#0c0e11`)}>{f.initials}</div>
-            <div style={s('flex:1;min-width:0')}>
-              <div style={s('font-size:13px;line-height:1.3')}><span style={s('font-weight:600')}>{f.name}</span> <span style={s('color:var(--text2)')}>{f.action}</span></div>
-              <div style={s('display:flex;gap:10px;margin-top:4px;align-items:center')}>
-                <span className="mono" style={s('font-size:11px;color:var(--text)')}>{f.metric}</span>
-                <span style={s('font-size:11px;color:var(--text3)')}>{f.time}</span>
-                <span style={s('font-size:11px;color:var(--text3)')}>· ♥ {f.reacts}</span>
-              </div>
-            </div>
-            <div style={s(`width:30px;height:30px;border-radius:8px;background:color-mix(in srgb,${f.discColor} 16%, transparent);flex:none;display:flex;align-items:center;justify-content:center;font-size:14px`)}>{f.icon}</div>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
 
-function DashboardHE({ vm, go, openAthlete, openActivity }) {
+function DashboardHE({ vm, go, openAthlete, openActivity, getToken }) {
+  const token = getToken?.() ?? null;
+  const recent = last7Days(vm.activities);
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .4s ease;text-align:right')}>
       <div style={s('display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-direction:row-reverse')}>
@@ -231,27 +236,25 @@ function DashboardHE({ vm, go, openAthlete, openActivity }) {
       </div>
       <SquadRail squad={vm.squad} rtl onOpen={openAthlete} />
 
-      <div style={s('font-size:12px;color:var(--text3);font-weight:600;margin:20px 2px 12px')}>פעילות המועדון</div>
-      {vm.feed.length === 0 && (
-        <div style={s('padding:18px;border:1px dashed var(--line2);border-radius:16px;text-align:center;font-size:12.5px;color:var(--text3);line-height:1.5')}>אין עדיין פעילות.</div>
-      )}
-      <div style={s('display:flex;flex-direction:column;gap:10px')}>
-        {vm.feed.map((f) => (
-          <div key={f.id} className="ctl" onClick={() => (f.activityId ? openActivity(f.activityId) : go('activities'))} style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:13px 14px;display:flex;gap:12px;align-items:center;flex-direction:row-reverse;text-align:right')}>
-            <div style={s(`width:40px;height:40px;border-radius:12px;background:${f.color};flex:none;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#0c0e11`)}>{f.he}</div>
-            <div style={s('flex:1;min-width:0')}>
-              <div style={s('font-size:13px;line-height:1.3')}><span style={s('font-weight:600')}>{f.nameHe}</span> <span style={s('color:var(--text2)')}>{f.actionHe}</span></div>
-              <div style={s('display:flex;gap:10px;margin-top:4px;align-items:center;flex-direction:row-reverse')}><span className="mono" style={s('font-size:11px')} dir="ltr">{f.metric}</span><span style={s('font-size:11px;color:var(--text3)')}>{f.timeHe}</span></div>
-            </div>
-          </div>
-        ))}
+      <div style={s('display:flex;justify-content:space-between;align-items:baseline;margin:20px 2px 12px;flex-direction:row-reverse')}>
+        <div style={s('font-size:12px;color:var(--text3);font-weight:600')}>פעילות המועדון · 7 ימים אחרונים</div>
+        <div className="ctl" onClick={() => go('activities')} style={s('font-size:11.5px;color:var(--accent);font-weight:600')}>← הכל</div>
       </div>
+      {recent.length === 0 ? (
+        <div style={s('padding:18px;border:1px dashed var(--line2);border-radius:16px;text-align:center;font-size:12.5px;color:var(--text3);line-height:1.5')}>אין פעילות ב-7 הימים האחרונים.</div>
+      ) : (
+        <div style={s('display:flex;flex-direction:column;gap:12px')} dir="ltr">
+          {recent.map((a) => (
+            <FeedActivityCard key={a.id} a={a} onOpen={openActivity} onAthlete={openAthlete} token={token} getToken={getToken} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-export default function Dashboard({ vm, state, actions }) {
+export default function Dashboard({ vm, state, actions, getToken }) {
   return state.lang === 'he'
-    ? <DashboardHE vm={vm} go={actions.go} openAthlete={actions.openAthlete} openActivity={actions.openActivity} />
-    : <DashboardEN vm={vm} state={state} go={actions.go} openAthlete={actions.openAthlete} openActivity={actions.openActivity} />;
+    ? <DashboardHE vm={vm} go={actions.go} openAthlete={actions.openAthlete} openActivity={actions.openActivity} getToken={getToken} />
+    : <DashboardEN vm={vm} state={state} go={actions.go} openAthlete={actions.openAthlete} openActivity={actions.openActivity} getToken={getToken} />;
 }
