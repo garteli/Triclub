@@ -135,8 +135,8 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged }) {
       {/* activity photos (attached or captured in-ride) + add-photos on your own */}
       <ActivityPhotos activityId={a.id} isMe={a.isMe} token={token} getToken={getToken} />
 
-      {/* route map + HR/power/speed/elevation traces from the ingested recording */}
-      <ActivityDetailAnalysis activityId={a.id} getToken={getToken} />
+      {/* route map + traces + per-km splits from the ingested recording */}
+      <ActivityDetailAnalysis activityId={a.id} sport={a.sport} getToken={getToken} />
 
       {/* reactions */}
       <div style={s('padding:20px 18px 0')}>
