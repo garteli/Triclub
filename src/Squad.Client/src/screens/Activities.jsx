@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { s } from '../lib/style.js';
 import EmptyState from '../components/EmptyState.jsx';
 import AuthedAvatar from '../components/AuthedAvatar.jsx';
 import TileMap from '../components/TileMap.jsx';
 import { toPathD } from '../lib/tiles.js';
+import { useActivityTrack } from '../hooks/useActivityTrack.js';
 
 // Route trace colour on the feed maps — a warm Strava-style orange that reads the
 // same in both themes (the basemap is always the light CARTO Voyager tileset).
@@ -30,11 +31,50 @@ function metricsFor(a) {
   return [time, ['Avg HR', a.avgHr ? a.avgHr + ' bpm' : '—'], ['Load', String(a.load)]];
 }
 
-function Card({ a, onOpen, onAthlete, token }) {
+// Downsample a recorded track to its GPS polyline ([lat,lon] pairs) for the feed map.
+function routeLatLon(track, max = 300) {
+  const gps = (track || []).filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lon));
+  if (gps.length <= max) return gps.map((p) => [p.lat, p.lon]);
+  const step = gps.length / max;
+  const out = [];
+  for (let i = 0; i < max; i++) out.push(gps[Math.floor(i * step)]);
+  out.push(gps[gps.length - 1]);
+  return out.map((p) => [p.lat, p.lon]);
+}
+
+// Real recorded route for a feed card — the ingested GPS track (GET .../track), the same
+// data the detail screen maps. Renders nothing when the activity has no GPS (indoor /
+// summary-only import) rather than faking a route.
+function FeedRouteMap({ activityId, getToken }) {
+  const { track, status } = useActivityTrack(activityId, { getToken });
+  const pts = useMemo(() => routeLatLon(track), [track]);
+  if (status === 'loading') return <div style={s('margin-top:14px;aspect-ratio:356/150;border-radius:14px;background:var(--bg3);border:1px solid var(--line)')} />;
+  if (pts.length < 2) return null;
+  return (
+    <div style={s('margin-top:14px')}>
+      <TileMap points={pts} radius={14} pad={22} H={150}>
+        {(project) => {
+          const d = toPathD(pts, project);
+          const start = project(pts[0][0], pts[0][1]);
+          const end = project(pts[pts.length - 1][0], pts[pts.length - 1][1]);
+          return (
+            <>
+              <path d={d} fill="none" stroke="rgba(255,255,255,.9)" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+              <path d={d} fill="none" stroke={ROUTE} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+              <circle cx={start.x} cy={start.y} r="4.5" fill="var(--good)" stroke="#fff" strokeWidth="2" />
+              <circle cx={end.x} cy={end.y} r="4.5" fill={ROUTE} stroke="#fff" strokeWidth="2" />
+            </>
+          );
+        }}
+      </TileMap>
+    </div>
+  );
+}
+
+function Card({ a, onOpen, onAthlete, token, getToken }) {
   const metrics = metricsFor(a);
   const meta = [a.when, a.location].filter(Boolean).join(' · ');
   const kudos = (a.fire || 0) + (a.strong || 0) + (a.clap || 0);
-  const hasMap = a.routePath && a.routePath.length > 1;
   const stop = (e) => e.stopPropagation();
   return (
     <div className="ctl" onClick={() => onOpen(a.id)} style={s('background:var(--bg2);border:1px solid var(--line);border-radius:18px;padding:15px;box-shadow:var(--shadow)')}>
@@ -73,22 +113,8 @@ function Card({ a, onOpen, onAthlete, token }) {
         </div>
       )}
 
-      {/* route map (rides + runs) */}
-      {hasMap && (
-        <div style={s('margin-top:14px')}>
-          <TileMap points={a.routePath} radius={14} pad={22} H={150}>
-            {(project) => {
-              const d = toPathD(a.routePath, project);
-              return (
-                <>
-                  <path d={d} fill="none" stroke="rgba(255,255,255,.9)" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d={d} fill="none" stroke={ROUTE} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                </>
-              );
-            }}
-          </TileMap>
-        </div>
-      )}
+      {/* real recorded route (rides + runs with GPS) */}
+      {(a.sport === 'Bike' || a.sport === 'Run') && <FeedRouteMap activityId={a.id} getToken={getToken} />}
 
       {/* kudos footer */}
       <div style={s('display:flex;align-items:center;gap:10px;margin-top:14px;padding-top:13px;border-top:1px solid var(--line)')}>
@@ -131,7 +157,7 @@ export default function Activities({ vm, actions, getToken }) {
       <div style={s('display:flex;flex-direction:column;gap:12px;margin-top:16px')}>
         {list.length === 0
           ? <EmptyState icon="🚴" title={tab === 'you' ? 'No activities yet' : 'No squad activity yet'} sub={tab === 'you' ? 'Record a ride or sync from Apple Health and it shows up here.' : 'When your teammates train, their activities appear here.'} />
-          : list.map((a) => <Card key={a.id} a={a} onOpen={actions.openActivity} onAthlete={actions.openAthlete} token={token} />)}
+          : list.map((a) => <Card key={a.id} a={a} onOpen={actions.openActivity} onAthlete={actions.openAthlete} token={token} getToken={getToken} />)}
       </div>
     </div>
   );
