@@ -34,7 +34,7 @@ public sealed class FitUploadAdapter : ISourceAdapter
 
     public Task<Activity> NormalizeAsync(RawActivity raw, CancellationToken ct)
     {
-        var (session, records) = DecodeFit(raw.Payload);
+        var (session, records, lapMsgs) = DecodeFit(raw.Payload);
         if (session is null)
             throw new FitParseException("FIT file contained no Session message — cannot summarize.");
 
@@ -49,8 +49,9 @@ public sealed class FitUploadAdapter : ISourceAdapter
         var movingTime = TimeSpan.FromSeconds(session.GetTotalTimerTime() ?? 0);
         var elapsedTime = TimeSpan.FromSeconds(session.GetTotalElapsedTime() ?? session.GetTotalTimerTime() ?? 0);
 
-        // ----- track -----
+        // ----- track + laps -----
         var track = BuildTrack(records, start);
+        var laps = BuildLaps(lapMsgs, start);
 
         var activity = new Activity
         {
@@ -71,6 +72,7 @@ public sealed class FitUploadAdapter : ISourceAdapter
             Source = Source,
             SourceExternalId = raw.SourceExternalId,
             Track = track,
+            Laps = laps,
             // Fingerprint is derived from the normalized summary, so it matches every
             // other source reporting the same physical activity.
             Fingerprint = Fingerprint.Compute(sport, start, distance),
@@ -84,10 +86,11 @@ public sealed class FitUploadAdapter : ISourceAdapter
     //  Multisport (triathlon) files can carry several sessions; MVP takes the
     //  first. TODO: split multisport into one Activity per child session.
     // -------------------------------------------------------------------
-    private static (SessionMesg? session, List<RecordMesg> records) DecodeFit(byte[] bytes)
+    private static (SessionMesg? session, List<RecordMesg> records, List<LapMesg> laps) DecodeFit(byte[] bytes)
     {
         var sessions = new List<SessionMesg>();
         var records = new List<RecordMesg>();
+        var laps = new List<LapMesg>();
 
         var decode = new Decode();
         var broadcaster = new MesgBroadcaster();
@@ -95,6 +98,7 @@ public sealed class FitUploadAdapter : ISourceAdapter
         decode.MesgDefinitionEvent += broadcaster.OnMesgDefinition;
         broadcaster.SessionMesgEvent += (_, e) => sessions.Add((SessionMesg)e.mesg);
         broadcaster.RecordMesgEvent += (_, e) => records.Add((RecordMesg)e.mesg);
+        broadcaster.LapMesgEvent += (_, e) => laps.Add((LapMesg)e.mesg);
 
         using var ms = new MemoryStream(bytes, writable: false);
         if (!decode.IsFIT(ms))
@@ -112,7 +116,33 @@ public sealed class FitUploadAdapter : ISourceAdapter
                 throw new FitParseException($"FIT decode failed: {ex.Message}");
         }
 
-        return (sessions.Count > 0 ? sessions[0] : null, records);
+        return (sessions.Count > 0 ? sessions[0] : null, records, laps);
+    }
+
+    private static IReadOnlyList<Lap> BuildLaps(List<LapMesg> lapMsgs, DateTimeOffset start)
+    {
+        // A single whole-activity lap is just the session again — not worth a table; skip it.
+        if (lapMsgs.Count < 2) return [];
+
+        var laps = new List<Lap>(lapMsgs.Count);
+        foreach (var l in lapMsgs)
+        {
+            DateTime? startUtc = l.GetStartTime()?.GetDateTime();
+            int offsetSec = startUtc is null
+                ? 0
+                : (int)(new DateTimeOffset(DateTime.SpecifyKind(startUtc.Value, DateTimeKind.Utc)) - start).TotalSeconds;
+
+            laps.Add(new Lap(
+                OffsetSec: offsetSec,
+                DurationSec: l.GetTotalTimerTime() ?? l.GetTotalElapsedTime() ?? 0,
+                DistanceMeters: l.GetTotalDistance(),
+                AvgSpeedMps: l.GetEnhancedAvgSpeed() ?? l.GetAvgSpeed(),
+                AvgHeartRate: l.GetAvgHeartRate(),
+                AvgPowerWatts: l.GetAvgPower(),
+                AvgCadence: l.GetAvgCadence(),
+                ElevGainMeters: l.GetTotalAscent()));
+        }
+        return laps;
     }
 
     private static IReadOnlyList<TrackPoint> BuildTrack(List<RecordMesg> records, DateTimeOffset start)

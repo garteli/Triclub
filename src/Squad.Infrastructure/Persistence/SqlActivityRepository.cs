@@ -107,15 +107,18 @@ public sealed class SqlActivityRepository(string connectionString) : IActivityRe
         P("@Source", SqlDbType.TinyInt, (byte)a.Source);
         P("@SourceExternalId", SqlDbType.NVarChar, a.SourceExternalId);
         P("@Fingerprint", SqlDbType.Char, a.Fingerprint);
-        P("@TrackBlob", SqlDbType.VarBinary, GzipTrack(a.Track));
+        P("@TrackBlob", SqlDbType.VarBinary, GzipDetail(a.Track, a.Laps));
     }
 
-    private static object GzipTrack(IReadOnlyList<TrackPoint> track)
+    // Gzipped JSON of the detail payload (track + laps). Format v2 is an ActivityDetail
+    // object; v1 (pre-laps) was a bare TrackPoint[] — the read side handles both. Column
+    // stays TrackBlob, so no schema change.
+    private static object GzipDetail(IReadOnlyList<TrackPoint> track, IReadOnlyList<Lap> laps)
     {
-        if (track.Count == 0) return DBNull.Value;
+        if (track.Count == 0 && laps.Count == 0) return DBNull.Value;
         using var outStream = new MemoryStream();
         using (var gzip = new GZipStream(outStream, CompressionLevel.Optimal, leaveOpen: true))
-            JsonSerializer.Serialize(gzip, track);
+            JsonSerializer.Serialize(gzip, new ActivityDetail(track, laps));
         return outStream.ToArray();
     }
 }

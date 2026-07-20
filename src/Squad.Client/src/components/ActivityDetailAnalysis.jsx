@@ -121,18 +121,18 @@ function Trace({ title, unit, values, stroke, fill, fmt }) {
   );
 }
 
-// Strava-style splits table: one row per km (or 100 m for swim), with a bar scaled to the
-// fastest split so pace variation reads at a glance.
-function Splits({ splits, isSwim, isFoot }) {
-  if (splits.length < 1) return null;
-  const speeds = splits.map((sp) => (sp.sec > 0 ? sp.meters / sp.sec : 0)); // m/s
+// Strava-style segment table: one row per lap (device laps) or per km/100m (computed
+// splits). Each row is { index, meters, sec, avgHr, gain, partial }; a bar scaled to the
+// fastest row makes pace variation read at a glance.
+function SegmentTable({ title, rows, isSwim, isFoot }) {
+  if (rows.length < 1) return null;
+  const speeds = rows.map((sp) => (sp.sec > 0 ? sp.meters / sp.sec : 0)); // m/s
   const fastest = Math.max(...speeds, 0.1);
-  const unitLabel = isSwim ? '100m' : 'km';
   return (
     <div style={s('margin-top:14px')}>
-      <div style={s(label + ';margin-bottom:8px')}>Splits · per {unitLabel}</div>
+      <div style={s(label + ';margin-bottom:8px')}>{title}</div>
       <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:14px;overflow:hidden')}>
-        {splits.map((sp, i) => {
+        {rows.map((sp, i) => {
           const mps = speeds[i];
           const rate = isFoot || isSwim
             ? pace(sp.sec / (sp.meters / (isSwim ? 100 : 1000))) + (isSwim ? '/100' : '/km')
@@ -162,7 +162,7 @@ function Splits({ splits, isSwim, isFoot }) {
 }
 
 export default function ActivityDetailAnalysis({ activityId, sport, getToken }) {
-  const { track, status } = useActivityTrack(activityId, { getToken });
+  const { track, laps, status } = useActivityTrack(activityId, { getToken });
   const isSwim = sport === 'Swim';
   const isFoot = sport === 'Run';
 
@@ -185,6 +185,19 @@ export default function ActivityDetailAnalysis({ activityId, sport, getToken }) 
   const splits = useMemo(() => computeSplits(track || [], isSwim ? 100 : 1000), [track, isSwim]);
   const workKJ = useMemo(() => totalWorkKJ(track || []), [track]);
 
+  // Device laps (auto-lap or manual) → the same row shape as computed splits.
+  const lapRows = useMemo(() => (laps || [])
+    .map((l, i) => ({
+      index: i + 1,
+      meters: l.distanceMeters || 0,
+      sec: l.durationSec || 0,
+      avgHr: l.avgHeartRate ?? null,
+      avgPower: l.avgPowerWatts ?? null,
+      gain: l.elevGainMeters || 0,
+    }))
+    .filter((r) => r.meters > 0 && r.sec > 0), [laps]);
+  const useLaps = lapRows.length >= 2;
+
   if (status === 'loading') {
     return (
       <div style={s('padding:20px 18px 0')}>
@@ -204,7 +217,7 @@ export default function ActivityDetailAnalysis({ activityId, sport, getToken }) 
   ];
   const shown = traces.filter((tr) => tr.values.filter((v) => v != null && Number.isFinite(v)).length >= 2);
 
-  if (!hasMap && shown.length === 0) {
+  if (!hasMap && shown.length === 0 && !useLaps && splits.length === 0) {
     return (
       <div style={s('padding:20px 18px 0')}>
         <div style={s('background:var(--bg2);border:1px dashed var(--line2);border-radius:16px;padding:18px;text-align:center')}>
@@ -247,7 +260,9 @@ export default function ActivityDetailAnalysis({ activityId, sport, getToken }) 
         <Trace key={tr.key} title={tr.title} unit={tr.unit} values={tr.values} stroke={tr.stroke} fill={tr.fill} fmt={tr.fmt} />
       ))}
 
-      <Splits splits={splits} isSwim={isSwim} isFoot={isFoot} />
+      {useLaps
+        ? <SegmentTable title="Laps" rows={lapRows} isSwim={isSwim} isFoot={isFoot} />
+        : <SegmentTable title={`Splits · per ${isSwim ? '100m' : 'km'}`} rows={splits} isSwim={isSwim} isFoot={isFoot} />}
     </div>
   );
 }

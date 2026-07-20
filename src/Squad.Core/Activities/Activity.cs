@@ -31,8 +31,9 @@ public sealed record Activity
     public string? SourceExternalId { get; init; }   // Garmin activityId, HK uuid, ...
     public string Fingerprint { get; init; } = string.Empty;
 
-    // Detailed track — stored compressed, hydrated only for map replay.
+    // Detailed track + laps — stored compressed, hydrated only for the detail view.
     public IReadOnlyList<TrackPoint> Track { get; init; } = [];
+    public IReadOnlyList<Lap> Laps { get; init; } = [];
 }
 
 /// <summary>A single sample along the recorded track.</summary>
@@ -45,3 +46,21 @@ public sealed record TrackPoint(
     double? PowerW,
     double? Cadence,
     double? SpeedMps);
+
+/// <summary>One recorded lap (device auto-lap or manual press). Metrics are the lap's own
+/// summary as the head unit computed them — not re-derived from the track.</summary>
+public sealed record Lap(
+    int OffsetSec,             // lap start, seconds from Activity.StartUtc
+    double DurationSec,        // timer (moving) time for the lap
+    double? DistanceMeters,
+    double? AvgSpeedMps,
+    double? AvgHeartRate,
+    double? AvgPowerWatts,
+    double? AvgCadence,
+    double? ElevGainMeters);
+
+/// <summary>The hydrated detail payload for one activity — the track and its laps. Persisted
+/// as one gzipped blob; the read side returns both to the detail view in a single fetch.</summary>
+public sealed record ActivityDetail(
+    IReadOnlyList<TrackPoint> Track,
+    IReadOnlyList<Lap> Laps);

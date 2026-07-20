@@ -1,17 +1,21 @@
 import { useEffect, useState } from 'react';
 
-// Fetches one activity's full recorded track — the route plus per-point heart-rate, power,
-// elevation and speed — from GET /api/activities/{id}/track (the heavy blob the list omits).
+// Fetches one activity's recorded detail from GET /api/activities/{id}/track — the route +
+// per-point heart-rate/power/elevation/speed track, plus device laps (the heavy blob the
+// list omits). Returns { track, laps, status }:
 //   track: null while loading, [] when there's none (indoor / not visible), else the points.
+//   laps:  [] unless the recording carried ≥2 laps.
 export function useActivityTrack(activityId, { getToken, enabled = true } = {}) {
   const [track, setTrack] = useState(null);
+  const [laps, setLaps] = useState([]);
   const [status, setStatus] = useState('loading'); // 'loading' | 'ready' | 'error'
 
   useEffect(() => {
-    if (!enabled || !activityId) { setTrack([]); setStatus('ready'); return; }
+    if (!enabled || !activityId) { setTrack([]); setLaps([]); setStatus('ready'); return; }
     let cancelled = false;
     setStatus('loading');
     setTrack(null);
+    setLaps([]);
     (async () => {
       try {
         const token = getToken ? await getToken() : null;
@@ -19,10 +23,13 @@ export function useActivityTrack(activityId, { getToken, enabled = true } = {}) 
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         });
         if (!res.ok) throw new Error(String(res.status));
-        const pts = await res.json();
-        if (!cancelled) { setTrack(Array.isArray(pts) ? pts : []); setStatus('ready'); }
+        const data = await res.json();
+        // { track, laps } is the current shape; tolerate a bare array from older servers.
+        const t = Array.isArray(data?.track) ? data.track : (Array.isArray(data) ? data : []);
+        const l = Array.isArray(data?.laps) ? data.laps : [];
+        if (!cancelled) { setTrack(t); setLaps(l); setStatus('ready'); }
       } catch {
-        if (!cancelled) { setTrack([]); setStatus('error'); }
+        if (!cancelled) { setTrack([]); setLaps([]); setStatus('error'); }
       }
     })();
     return () => { cancelled = true; };
@@ -31,5 +38,5 @@ export function useActivityTrack(activityId, { getToken, enabled = true } = {}) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activityId, enabled]);
 
-  return { track, status };
+  return { track, laps, status };
 }

@@ -14,15 +14,15 @@ public static class ActivityQueryEndpoints
     public static IEndpointRouteBuilder MapActivityQuery(this IEndpointRouteBuilder app)
     {
         app.MapGet("/api/activities", GetActivities).RequireAuthorization();
-        app.MapGet("/api/activities/{id:guid}/track", GetTrack).RequireAuthorization();
+        app.MapGet("/api/activities/{id:guid}/track", GetDetail).RequireAuthorization();
         app.MapDelete("/api/activities/{id:guid}", DeleteActivity).RequireAuthorization();
         return app;
     }
 
-    // The full recorded track (route + per-point HR/power/elevation/speed) for one activity,
-    // scoped to the caller's squad. Empty array when there's no GPS/sensor track (indoor) or
-    // the activity isn't visible — the client renders the map/traces only when points exist.
-    private static async Task<IResult> GetTrack(
+    // The recorded detail — { track, laps } — for one activity, scoped to the caller's squad.
+    // Empty track+laps when there's no recording (indoor) or the activity isn't visible; the
+    // client renders the map/traces/laps only when the data exists.
+    private static async Task<IResult> GetDetail(
         Guid id, HttpContext http, IAthleteDirectory directory, IActivityReadService activities, CancellationToken ct)
     {
         var claim = http.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? http.User.FindFirstValue("sub");
@@ -31,8 +31,8 @@ public static class ActivityQueryEndpoints
         var profile = await directory.GetAsync(athleteId, ct);
         if (profile is null) return Results.Unauthorized();
 
-        var track = await activities.GetTrackAsync(id, profile.SquadId, ct);
-        return Results.Ok(track ?? []);
+        var detail = await activities.GetDetailAsync(id, profile.SquadId, ct);
+        return Results.Ok(detail ?? new ActivityDetail([], []));
     }
 
     // Delete one of the caller's own activities. Owner-scoped in the store, so a request

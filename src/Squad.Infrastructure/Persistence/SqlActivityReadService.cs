@@ -50,7 +50,7 @@ public sealed class SqlActivityReadService(string connectionString) : IActivityR
         return rows.ToList();
     }
 
-    public async Task<IReadOnlyList<TrackPoint>?> GetTrackAsync(Guid activityId, Guid squadId, CancellationToken ct)
+    public async Task<ActivityDetail?> GetDetailAsync(Guid activityId, Guid squadId, CancellationToken ct)
     {
         // Squad-scoped: only activities owned by a member of the caller's squad are visible.
         const string sql = """
@@ -63,13 +63,21 @@ public sealed class SqlActivityReadService(string connectionString) : IActivityR
         await using var conn = new SqlConnection(connectionString);
         var blob = await conn.ExecuteScalarAsync<byte[]?>(
             new CommandDefinition(sql, new { activityId, squadId }, cancellationToken: ct));
-        if (blob is null || blob.Length == 0) return null; // not visible, or no GPS/sensor track
+        if (blob is null || blob.Length == 0) return null; // not visible, or no stored detail
 
-        // Mirror SqlActivityRepository.GzipTrack: gzipped JSON of List<TrackPoint>.
+        // Gzipped JSON written by SqlActivityRepository.GzipDetail. v2 is an ActivityDetail
+        // object; v1 (pre-laps) was a bare TrackPoint[] — detect by the first JSON token so
+        // already-imported activities still hydrate (with no laps).
         await using var input = new MemoryStream(blob);
-        await using var gzip = new GZipStream(input, CompressionMode.Decompress);
-        var track = await JsonSerializer.DeserializeAsync<List<TrackPoint>>(gzip, cancellationToken: ct);
-        return track;
+        using var gzip = new GZipStream(input, CompressionMode.Decompress);
+        using var reader = new StreamReader(gzip);
+        var json = (await reader.ReadToEndAsync(ct)).TrimStart();
+        if (json.StartsWith('['))
+        {
+            var track = JsonSerializer.Deserialize<List<TrackPoint>>(json) ?? [];
+            return new ActivityDetail(track, []);
+        }
+        return JsonSerializer.Deserialize<ActivityDetail>(json) ?? new ActivityDetail([], []);
     }
 
     public async Task<bool> DeleteAsync(Guid activityId, Guid athleteId, CancellationToken ct)
