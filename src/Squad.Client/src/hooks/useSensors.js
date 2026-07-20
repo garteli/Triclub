@@ -28,6 +28,9 @@ export function useSensors() {
   const [status, setStatus] = useState(offStatus);
   const [metrics, setMetrics] = useState(emptySnapshot);
   const [paired, setPaired] = useState(loadPaired);
+  const [scanning, setScanning] = useState(false);
+  const [scanResult, setScanResult] = useState(null); // { kinds:[], name } | null
+  const [scanError, setScanError] = useState(null);
 
   // Poll the shared store so the UI reflects incoming notifications.
   useEffect(() => {
@@ -66,6 +69,27 @@ export function useSensors() {
     }
   }, [ensureController, rememberPaired]);
 
+  // Search-all / auto-detect: one picker, then subscribe to every kind the chosen device
+  // exposes. Surfaces a themed result sheet via scanResult / scanError.
+  const connectAll = useCallback(async () => {
+    if (scanning) return;
+    const c = await ensureController();
+    if (!c.connectAny) { setScanError('Auto-detect isn’t available on this platform.'); return; }
+    setScanning(true); setScanError(null); setScanResult(null);
+    try {
+      const res = await c.connectAny();
+      res.kinds.forEach((k) => rememberPaired(k, { id: res.id, name: res.name }));
+      setStatus((s) => { const n = { ...s }; res.kinds.forEach((k) => (n[k] = 'connected')); return n; });
+      setScanResult({ kinds: res.kinds, name: res.name });
+    } catch (e) {
+      setScanError(e?.message || 'Scan cancelled — no sensor selected.');
+    } finally {
+      setScanning(false);
+    }
+  }, [scanning, ensureController, rememberPaired]);
+
+  const dismissScan = useCallback(() => { setScanResult(null); setScanError(null); }, []);
+
   const disconnect = useCallback(async (kind, { forget = true } = {}) => {
     try { await ctrl.current?.disconnect(kind); } catch { /* ignore */ }
     setStatus((s) => ({ ...s, [kind]: 'off' }));
@@ -101,5 +125,5 @@ export function useSensors() {
 
   const current = useCallback(() => (ctrl.current ? ctrl.current.snapshot() : {}), []);
 
-  return { kinds: KINDS, status, metrics, paired, connect, disconnect, current };
+  return { kinds: KINDS, status, metrics, paired, connect, connectAll, scanning, scanResult, scanError, dismissScan, disconnect, current };
 }

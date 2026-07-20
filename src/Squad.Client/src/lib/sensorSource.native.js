@@ -3,6 +3,9 @@
 // `latest` store that the recorder samples each push; works in the background on native.
 import { SENSOR_SPECS, emptySnapshot } from './ble.js';
 
+// Every distinct advertised service — the "search all" scan filter + optionalServices.
+const ALL_SERVICES = [...new Set(Object.values(SENSOR_SPECS).map((s) => s.service))];
+
 export async function createNativeSensorController() {
   const { BleClient } = await import('@capacitor-community/bluetooth-le');
   await BleClient.initialize({ androidNeverForLocation: true });
@@ -36,6 +39,34 @@ export async function createNativeSensorController() {
     return { id: device.deviceId, name: device.name || kind };
   }
 
+  // "Search all" — one picker listing any device advertising a supported service; after
+  // the athlete picks one we read its GATT services and subscribe to every kind it exposes.
+  // (Varia radar advertises no service, so it's found via its own dedicated Connect.)
+  async function connectAny() {
+    const device = await BleClient.requestDevice({ services: ALL_SERVICES, optionalServices: ALL_SERVICES });
+    await BleClient.connect(device.deviceId, () => {
+      for (const k of Object.keys(deviceIds)) if (deviceIds[k] === device.deviceId) clearKind(k);
+    });
+    const services = await BleClient.getServices(device.deviceId);
+    const present = new Set(services.map((s) => (s.uuid || '').toLowerCase()));
+    const kinds = [];
+    for (const [kind, spec] of Object.entries(SENSOR_SPECS)) {
+      if (!present.has(spec.service.toLowerCase())) continue;
+      try {
+        await BleClient.startNotifications(device.deviceId, spec.service, spec.measurement, (dv) => {
+          try { spec.apply(dv, latest); } catch { /* skip */ }
+        });
+        deviceIds[kind] = device.deviceId;
+        kinds.push(kind);
+      } catch { /* characteristic unusable — skip this kind */ }
+    }
+    if (kinds.length === 0) {
+      try { await BleClient.disconnect(device.deviceId); } catch { /* ignore */ }
+      throw new Error('No supported sensor found on that device.');
+    }
+    return { id: device.deviceId, name: device.name || 'sensor', kinds };
+  }
+
   // Silent reconnect to a remembered device id — no scan/picker.
   //
   // The plugin only tracks peripherals discovered in the *current* process: after an
@@ -67,5 +98,5 @@ export async function createNativeSensorController() {
     if (spec?.reset) delete latest[spec.reset];
   }
 
-  return { kind: 'native', connect, connectKnown, disconnect, snapshot: () => ({ ...latest }) };
+  return { kind: 'native', connect, connectAny, connectKnown, disconnect, snapshot: () => ({ ...latest }) };
 }
