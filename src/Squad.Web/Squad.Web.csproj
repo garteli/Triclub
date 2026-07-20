@@ -17,6 +17,23 @@
     <PackageReference Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" Version="8.0.1" />
   </ItemGroup>
 
-  <!-- The React app (Squad.Client) builds into wwwroot; served as static files. -->
+  <!--
+    The React app (Squad.Client) builds into wwwroot and is served as static files.
+    This target builds it as part of a Release build/publish so every deploy path
+    (CI `dotnet publish`, deploy/publish-deploy.sh) ships a fresh SPA. It runs before
+    static-web-asset discovery so the generated wwwroot is picked up by publish.
+    Skipped in Debug (use `npm run dev`) and with -p:SkipClientBuild=true.
+    Requires Node.js/npm on PATH.
+  -->
+  <Target Name="BuildClientApp"
+          BeforeTargets="BeforeBuild"
+          Condition="'$(Configuration)' == 'Release' And '$(SkipClientBuild)' != 'true'">
+    <PropertyGroup>
+      <ClientDir>$(MSBuildProjectDirectory)/../Squad.Client</ClientDir>
+    </PropertyGroup>
+    <Message Importance="high" Text="BuildClientApp: building React client in $(ClientDir)" />
+    <Exec Command="npm ci" WorkingDirectory="$(ClientDir)" Condition="!Exists('$(ClientDir)/node_modules')" />
+    <Exec Command="npm run build" WorkingDirectory="$(ClientDir)" />
+  </Target>
 
 </Project>
