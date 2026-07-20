@@ -2,11 +2,14 @@ import { s } from '../lib/style.js';
 import EmptyState from '../components/EmptyState.jsx';
 
 export default function Leaderboard({ vm, state, actions }) {
+  // Real days until the weekly board resets (next Monday). Mon=0..Sun=6.
+  const dayIdx = (new Date().getDay() + 6) % 7;
+  const daysToReset = 7 - dayIdx;
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
       <div style={s('display:flex;align-items:center;justify-content:space-between;margin-bottom:6px')}>
         <div><div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.6px;font-weight:600')}>This week</div><div style={s('font-size:23px;font-weight:700;letter-spacing:-.5px')}>Domestique Team Ranks</div></div>
-        <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:11px;padding:7px 10px;text-align:center')}><div className="mono" style={s('font-size:13px;font-weight:700;color:var(--accent)')}>4d</div><div style={s('font-size:9px;color:var(--text3);text-transform:uppercase')}>resets</div></div>
+        <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:11px;padding:7px 10px;text-align:center')}><div className="mono" style={s('font-size:13px;font-weight:700;color:var(--accent)')}>{daysToReset}d</div><div style={s('font-size:9px;color:var(--text3);text-transform:uppercase')}>resets</div></div>
       </div>
 
       {/* tabs */}

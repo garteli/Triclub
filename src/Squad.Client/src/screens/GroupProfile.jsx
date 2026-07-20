@@ -39,17 +39,18 @@ export default function GroupProfile({ vm, actions, onJoinSquad }) {
         <div style={s('font-size:22px;font-weight:700;letter-spacing:-.4px')}>{g.name}</div>
         <div style={s('font-size:12.5px;color:var(--text2);margin-top:2px')}>{g.loc} · {g.disc} · {g.level}</div>
         <div style={s('display:flex;gap:16px;margin-top:12px')}>
-          <div><div className="mono" style={s('font-size:18px;font-weight:700')}>★ {g.rating}</div><div style={s('font-size:9.5px;color:var(--text3);text-transform:uppercase')}>Rating</div></div>
-          <div><div className="mono" style={s('font-size:18px;font-weight:700')}>{g.members}</div><div style={s('font-size:9.5px;color:var(--text3);text-transform:uppercase')}>Riders</div></div>
-          <div><div className="mono" style={s('font-size:18px;font-weight:700')}>4×</div><div style={s('font-size:9.5px;color:var(--text3);text-transform:uppercase')}>Rides/wk</div></div>
+          {g.rating && <div><div className="mono" style={s('font-size:18px;font-weight:700')}>★ {g.rating}</div><div style={s('font-size:9.5px;color:var(--text3);text-transform:uppercase')}>Rating</div></div>}
+          <div><div className="mono" style={s('font-size:18px;font-weight:700')}>{g.members ?? 0}</div><div style={s('font-size:9.5px;color:var(--text3);text-transform:uppercase')}>Riders</div></div>
         </div>
-        <div style={s('font-size:12.5px;color:var(--text2);line-height:1.5;margin-top:14px')}>Structured group training with weekly threshold and long endurance rides. Coach-led plans, live group rides, and a supportive squad chasing 70.3 and Olympic-distance goals.</div>
+        {g.desc && <div style={s('font-size:12.5px;color:var(--text2);line-height:1.5;margin-top:14px')}>{g.desc}</div>}
 
-        {/* coach contact */}
+        {/* message the squad */}
         <div className="ctl" onClick={() => actions.go('chat')} style={s('display:flex;align-items:center;gap:11px;background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:12px 13px;margin-top:14px')}>
-          <div style={s('width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#37c0ff,#5a86ff);flex:none;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff')}>R</div>
-          <div style={s('flex:1')}><div style={s('font-size:13px;font-weight:600')}>Coach · manager</div><div style={s('font-size:11px;color:var(--text2)')}>Usually replies within an hour</div></div>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round"><path d="M21 11.5a8.5 8.5 0 0 1-12 7.7L3 21l1.8-6A8.5 8.5 0 1 1 21 11.5z" /></svg>
+          <div style={s('width:36px;height:36px;border-radius:11px;background:var(--bg4);flex:none;display:flex;align-items:center;justify-content:center')}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round"><path d="M21 11.5a8.5 8.5 0 0 1-12 7.7L3 21l1.8-6A8.5 8.5 0 1 1 21 11.5z" /></svg>
+          </div>
+          <div style={s('flex:1')}><div style={s('font-size:13px;font-weight:600')}>Message the squad</div><div style={s('font-size:11px;color:var(--text2)')}>Ask about training, pace and joining</div></div>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.4" strokeLinecap="round"><path d="M9 6l6 6-6 6" /></svg>
         </div>
 
         {/* membership & services */}
@@ -59,14 +60,18 @@ export default function GroupProfile({ vm, actions, onJoinSquad }) {
             <div style={s('flex:1')}><div style={s('font-size:14px;font-weight:700')}>Membership</div><div style={s('font-size:11.5px;color:var(--text2)')}>Full access · all group rides &amp; plan</div></div>
             <div style={s('text-align:right')}><div className="mono" style={s('font-size:16px;font-weight:700')}>{g.price}<span style={s('font-size:11px;color:var(--text2)')}>{g.per}</span></div>{!live && <div className="ctl" onClick={actions.payMember} style={s(a.joinBtnStyle)}>Join {a.tierLabel}</div>}</div>
           </div>
-          <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:13px 14px;display:flex;align-items:center;gap:12px')}>
-            <div style={s('flex:1')}><div style={s('font-size:14px;font-weight:700')}>One-time group ride</div><div style={s('font-size:11.5px;color:var(--text2)')}>Drop in for a single session</div></div>
-            <div style={s('text-align:right')}><div className="mono" style={s('font-size:16px;font-weight:700')}>₪35</div>{!live && <div className="ctl" onClick={actions.payDropin} style={s(a.bookBtnStyle)}>Book {a.tierLabel}</div>}</div>
-          </div>
-          <div style={s('background:var(--bg2);border:1px solid color-mix(in srgb,var(--gym) 30%,transparent);border-radius:14px;padding:13px 14px;display:flex;align-items:center;gap:12px')}>
-            <div style={s('flex:1')}><div style={s('font-size:14px;font-weight:700')}>1:1 Coaching</div><div style={s('font-size:11.5px;color:var(--text2)')}>Personalised plan + weekly review</div></div>
-            <div style={s('text-align:right')}><div className="mono" style={s('font-size:16px;font-weight:700')}>₪450<span style={s('font-size:11px;color:var(--text2)')}>/mo</span></div>{!live && <div className="ctl" onClick={actions.payCoach} style={s(a.coachBtnStyle)}>Enquire {a.tierLabel}</div>}</div>
-          </div>
+          {!live && (
+            <>
+              <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:13px 14px;display:flex;align-items:center;gap:12px')}>
+                <div style={s('flex:1')}><div style={s('font-size:14px;font-weight:700')}>One-time group ride</div><div style={s('font-size:11.5px;color:var(--text2)')}>Drop in for a single session</div></div>
+                <div style={s('text-align:right')}><div className="mono" style={s('font-size:16px;font-weight:700')}>₪35</div><div className="ctl" onClick={actions.payDropin} style={s(a.bookBtnStyle)}>Book {a.tierLabel}</div></div>
+              </div>
+              <div style={s('background:var(--bg2);border:1px solid color-mix(in srgb,var(--gym) 30%,transparent);border-radius:14px;padding:13px 14px;display:flex;align-items:center;gap:12px')}>
+                <div style={s('flex:1')}><div style={s('font-size:14px;font-weight:700')}>1:1 Coaching</div><div style={s('font-size:11.5px;color:var(--text2)')}>Personalised plan + weekly review</div></div>
+                <div style={s('text-align:right')}><div className="mono" style={s('font-size:16px;font-weight:700')}>₪450<span style={s('font-size:11px;color:var(--text2)')}>/mo</span></div><div className="ctl" onClick={actions.payCoach} style={s(a.coachBtnStyle)}>Enquire {a.tierLabel}</div></div>
+              </div>
+            </>
+          )}
         </div>
 
         {/* live join / request / membership status */}

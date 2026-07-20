@@ -83,16 +83,25 @@ export function buildViewModel(state, t, opts = {}) {
     note: wd.note,
   };
 
-  // ---- month grid (35 cells) ----
+  // ---- month grid (real current month; workout dots only from the real plan) ----
+  const mnow = new Date();
+  const mYear = mnow.getFullYear(), mMonth = mnow.getMonth();
+  const firstDow = (new Date(mYear, mMonth, 1).getDay() + 6) % 7; // Mon=0..Sun=6
+  const daysInMonth = new Date(mYear, mMonth + 1, 0).getDate();
+  const mToday = mnow.getDate();
+  // Map real planned workouts to their day-of-month → discipline (empty when no plan).
+  const DISC_DOT = { bike: 'var(--bike)', swim: 'var(--swim)', run: 'var(--run)', gym: 'var(--gym)' };
+  const planByDom = {};
+  planSource.forEach((p) => { const dom = parseInt(p.date, 10); if (dom) planByDom[dom] = p.disc; });
   const monthCells = [];
-  const discCycle = ['', 'bike', 'gym', 'run', 'swim', 'bike', 'run', 'gym', 'bike', '', 'run', 'bike', 'swim', 'gym', 'run'];
-  for (let i = 0; i < 35; i++) {
-    const dn = i - 2;
-    const inMonth = dn >= 1 && dn <= 30;
-    const disc = inMonth ? discCycle[dn % discCycle.length] : '';
-    const dotColor = disc === 'bike' ? 'var(--bike)' : disc === 'swim' ? 'var(--swim)' : disc === 'run' ? 'var(--run)' : disc === 'gym' ? 'var(--gym)' : 'transparent';
-    const today = dn === 13;
-    const done = inMonth && dn < 13;
+  const totalCells = Math.ceil((firstDow + daysInMonth) / 7) * 7;
+  for (let i = 0; i < totalCells; i++) {
+    const dn = i - firstDow + 1;
+    const inMonth = dn >= 1 && dn <= daysInMonth;
+    const disc = inMonth ? (planByDom[dn] || '') : '';
+    const dotColor = DISC_DOT[disc] || 'transparent';
+    const today = inMonth && dn === mToday;
+    const done = inMonth && !!disc && dn < mToday;
     const cellStyle = today ? 'background:var(--accent);color:var(--accent-ink)' : inMonth ? 'background:var(--bg2);border:1px solid var(--line)' : 'background:transparent';
     monthCells.push({ day: inMonth ? dn : '', inMonth, disc, dotColor, done, today, cellStyle, dayOpacity: inMonth ? '1' : '0', dotOpacity: done ? '1' : '.5' });
   }

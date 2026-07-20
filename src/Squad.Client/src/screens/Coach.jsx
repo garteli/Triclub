@@ -10,22 +10,14 @@ export default function Coach({ vm }) {
       </div>
       <div style={s('font-size:23px;font-weight:700;letter-spacing:-.5px')}>Your week, read closely</div>
 
-      {/* readiness ring */}
-      <div style={s('background:linear-gradient(160deg,var(--bg3),var(--bg2));border:1px solid var(--line);border-radius:20px;padding:18px;margin-top:16px;display:flex;gap:18px;align-items:center')}>
-        <div style={s('position:relative;width:96px;height:96px;flex:none')}>
-          <svg width="96" height="96" viewBox="0 0 96 96" style={{ transform: 'rotate(-90deg)' }}>
-            <circle cx="48" cy="48" r="40" fill="none" stroke="var(--bg4)" strokeWidth="8" />
-            <circle cx="48" cy="48" r="40" fill="none" stroke="var(--warn)" strokeWidth="8" strokeLinecap="round" strokeDasharray="181 251" />
-          </svg>
-          <div style={s('position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center')}><div className="mono" style={s('font-size:28px;font-weight:700;line-height:1')}>72</div><div style={s('font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1px')}>ready</div></div>
+      {/* readiness — needs a connected wearable (HRV / sleep); empty until then */}
+      <div style={s('background:linear-gradient(160deg,var(--bg3),var(--bg2));border:1px solid var(--line);border-radius:20px;padding:18px;margin-top:16px;display:flex;gap:16px;align-items:center')}>
+        <div style={s('width:52px;height:52px;border-radius:15px;flex:none;background:var(--bg4);display:flex;align-items:center;justify-content:center')}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12h4l2 6 4-16 2 10h6" /></svg>
         </div>
         <div style={s('flex:1')}>
-          <div style={s('font-size:14px;font-weight:600;margin-bottom:8px')}>Moderate readiness</div>
-          <div style={s('display:flex;flex-direction:column;gap:7px')}>
-            <div style={s('display:flex;justify-content:space-between;font-size:12px')}><span style={s('color:var(--text2)')}>HRV</span><span className="mono" style={s('color:var(--bad);font-weight:600')}>48ms ▼</span></div>
-            <div style={s('display:flex;justify-content:space-between;font-size:12px')}><span style={s('color:var(--text2)')}>Sleep</span><span className="mono" style={s('color:var(--warn);font-weight:600')}>6h05</span></div>
-            <div style={s('display:flex;justify-content:space-between;font-size:12px')}><span style={s('color:var(--text2)')}>Form (TSB)</span><span className="mono" style={s('color:var(--good);font-weight:600')}>+4</span></div>
-          </div>
+          <div style={s('font-size:14px;font-weight:600')}>Readiness unavailable</div>
+          <div style={s('font-size:12px;color:var(--text3);line-height:1.5;margin-top:3px')}>Connect a wearable to track HRV, sleep and form (TSB) here.</div>
         </div>
       </div>
 

@@ -56,7 +56,7 @@ export default function Plan({ vm, state, actions }) {
     <>
       <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
         <div style={s('display:flex;align-items:center;justify-content:space-between;margin-bottom:14px')}>
-          <div><div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.6px;font-weight:600')}>Week 3 · Base block</div><div style={s('font-size:23px;font-weight:700;letter-spacing:-.5px')}>Training Plan</div></div>
+          <div><div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.6px;font-weight:600')}>This week</div><div style={s('font-size:23px;font-weight:700;letter-spacing:-.5px')}>Training Plan</div></div>
           <div className="ctl" onClick={actions.toggleCoach} style={s(`${coachToggleStyle};border-radius:11px;padding:8px 11px;font-size:11.5px;font-weight:700;display:flex;align-items:center;gap:6px`)}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>Coach
           </div>
@@ -65,7 +65,7 @@ export default function Plan({ vm, state, actions }) {
         {state.coachView && (
           <div style={s('background:var(--accent-dim);border:1px solid color-mix(in srgb,var(--accent) 40%,transparent);border-radius:14px;padding:11px 13px;margin-bottom:14px;display:flex;gap:9px;align-items:center')}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round"><path d="M12 2a10 10 0 1 0 10 10" /><path d="M22 4L12 14l-3-3" /></svg>
-            <div style={s('font-size:12px;color:var(--text2);line-height:1.4')}><span style={s('color:var(--text);font-weight:600')}>Coach mode.</span> Edits apply to all 8 squad athletes. Tap a day to assign.</div>
+            <div style={s('font-size:12px;color:var(--text2);line-height:1.4')}><span style={s('color:var(--text);font-weight:600')}>Coach mode.</span> Edits apply to all squad athletes. Tap a day to assign.</div>
           </div>
         )}
 
@@ -76,7 +76,7 @@ export default function Plan({ vm, state, actions }) {
 
         {week ? (
           <>
-            {(() => { const sm = vm.planSummary || { planned: '9:45', load: '583', done: 3, total: 7 }; return (
+            {(() => { const sm = vm.planSummary || { planned: '0:00', load: '0', done: 0, total: 0 }; return (
             <div style={s('display:flex;justify-content:space-between;margin-bottom:14px;background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:12px 8px')}>
               <div style={s('flex:1;text-align:center;border-right:1px solid var(--line)')}><div className="mono" style={s('font-size:18px;font-weight:700')}>{sm.planned}</div><div style={s('font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.7px')}>Planned</div></div>
               <div style={s('flex:1;text-align:center;border-right:1px solid var(--line)')}><div className="mono" style={s('font-size:18px;font-weight:700;color:var(--accent)')}>{sm.load}</div><div style={s('font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.7px')}>Load</div></div>

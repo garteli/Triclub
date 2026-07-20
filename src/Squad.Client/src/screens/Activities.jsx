@@ -1,26 +1,6 @@
 import { useState } from 'react';
 import { s } from '../lib/style.js';
-import TileMap from '../components/TileMap.jsx';
-import { toPathD } from '../lib/tiles.js';
 import EmptyState from '../components/EmptyState.jsx';
-
-const MiniMap = ({ a }) => (
-  <div style={s('margin-top:11px;border-radius:14px;overflow:hidden;border:1px solid var(--line)')}>
-    <TileMap points={a.routePath} W={356} H={120} radius={14} pad={16}>
-      {(project) => {
-        const d = toPathD(a.routePath, project);
-        const start = project(a.routePath[0][0], a.routePath[0][1]);
-        return (
-          <>
-            <path d={d} fill="none" stroke="rgba(255,255,255,.9)" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" />
-            <path d={d} fill="none" stroke={a.sportColor} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-            <circle cx={start.x} cy={start.y} r="5" fill="var(--good)" stroke="#fff" strokeWidth="2" />
-          </>
-        );
-      }}
-    </TileMap>
-  </div>
-);
 
 function Card({ a, onOpen, onAthlete }) {
   const stats = a.sport === 'Gym'
@@ -39,8 +19,6 @@ function Card({ a, onOpen, onAthlete }) {
       </div>
 
       <div style={s('font-size:15px;font-weight:700;margin-top:10px')}>{a.title}</div>
-
-      {a.hasMap && a.routePath && <MiniMap a={a} />}
 
       {/* stats */}
       <div style={s('display:flex;margin-top:12px')}>
