@@ -128,9 +128,9 @@ export default function FeedActivityCard({ a, onOpen, onAthlete, token, getToken
         <div className="ctl" onClick={(e) => { stop(e); onAthlete(a.athleteId); }} style={s('flex:none')}>
           <AuthedAvatar avatarUrl={a.avatarUrl} token={token} initials={a.initials} color={a.color} size={40} radius={12} fontSize={14} />
         </div>
-        <div style={s('flex:1;min-width:0')}>
-          <div style={s('font-size:13.5px;font-weight:700')}>{a.athleteName}</div>
-          {meta && <div style={s('font-size:11px;color:var(--text3);margin-top:1px')}>{meta}</div>}
+        <div style={s('flex:1;min-width:0;display:flex;align-items:baseline;gap:7px')}>
+          <span style={s('font-size:13.5px;font-weight:700;flex:none')}>{a.athleteName}</span>
+          {meta && <span style={s('font-size:11px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>· {meta}</span>}
         </div>
       </div>
 

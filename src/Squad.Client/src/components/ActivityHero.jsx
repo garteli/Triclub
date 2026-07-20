@@ -16,12 +16,11 @@ const glass = 'background:rgba(20,23,29,.72);backdrop-filter:blur(8px);border:1p
 
 export default function ActivityHero({ a, route, frames, hasMap, status, token, onBack, onDelete }) {
   const playback = usePlayback(frames.length);
-  const { index, playing, toggle, seek, pause } = playback;
+  const { index, playing, speed, setSpeed, toggle, seek, pause } = playback;
   const n = frames.length;
   const travelled = useMemo(() => (hasMap ? route.slice(0, index + 1) : null), [route, index, hasMap]);
   const canPlay = n > 1 && hasMap;
   const [mapStyle, setMapStyle] = useState('voyager');
-  const [tilt, setTilt] = useState(false);
   const [full, setFull] = useState(false);
   const cycleStyle = () => setMapStyle((st) => MAP_STYLES[(MAP_STYLES.indexOf(st) + 1) % MAP_STYLES.length]);
 
@@ -39,12 +38,12 @@ export default function ActivityHero({ a, route, frames, hasMap, status, token, 
         </div>
         <div className="ctl" onClick={a.isMe ? onDelete : undefined} title={a.isMe ? 'Delete training' : undefined} style={s(`width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;letter-spacing:1px;font-size:13px;${glass}`)}>···</div>
       </div>
-      {/* layers (cycle basemap) + 3D (perspective tilt) */}
+      {/* layers (cycle basemap) + 3D (opens the real 3D-terrain full map) */}
       <div style={s('position:absolute;top:64px;right:16px;z-index:3;display:flex;flex-direction:column;gap:8px')}>
         <div className="ctl" onClick={cycleStyle} title={`Map: ${mapStyle}`} style={s(`width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;${glass}`)}>
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"><path d="M12 2l9 5-9 5-9-5z" /><path d="M3 12l9 5 9-5M3 17l9 5 9-5" /></svg>
         </div>
-        <div className="ctl" onClick={() => setTilt((t) => !t)} title="Perspective (3D)" style={s(`width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;${tilt ? 'background:var(--accent);color:var(--accent-ink);border:1px solid var(--accent)' : glass}`)}>3D</div>
+        {hasMap && <div className="ctl" onClick={() => setFull(true)} title="3D map" style={s(`width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;${glass}`)}>3D</div>}
       </div>
       {hasMap && (
         <div className="ctl" onClick={() => setFull(true)} title="Full-screen map" style={s(`position:absolute;left:16px;bottom:34px;z-index:3;width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;${glass}`)}>
@@ -52,12 +51,15 @@ export default function ActivityHero({ a, route, frames, hasMap, status, token, 
         </div>
       )}
       {canPlay && (
-        <button onClick={toggle} aria-label={playing ? 'Pause replay' : 'Play replay'}
-          style={s('position:absolute;right:16px;bottom:34px;z-index:3;width:52px;height:52px;border-radius:50%;border:none;background:var(--accent);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;box-shadow:0 8px 20px -6px color-mix(in srgb,var(--accent) 60%,transparent)')}>
-          {playing
-            ? <svg width="20" height="20" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1.2" fill="var(--accent-ink)" /><rect x="14" y="4" width="4" height="16" rx="1.2" fill="var(--accent-ink)" /></svg>
-            : <svg width="22" height="22" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="var(--accent-ink)" /></svg>}
-        </button>
+        <div style={s('position:absolute;right:16px;bottom:34px;z-index:3;display:flex;flex-direction:column;align-items:center;gap:8px')}>
+          <div className="ctl" onClick={() => setSpeed((sp) => (sp >= 4 ? 1 : sp * 2))} title="Playback speed" style={s(`min-width:36px;height:28px;padding:0 8px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;${glass}`)}>{speed}×</div>
+          <button onClick={toggle} aria-label={playing ? 'Pause replay' : 'Play replay'}
+            style={s('width:52px;height:52px;border-radius:50%;border:none;background:var(--accent);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;box-shadow:0 8px 20px -6px color-mix(in srgb,var(--accent) 60%,transparent)')}>
+            {playing
+              ? <svg width="20" height="20" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1.2" fill="var(--accent-ink)" /><rect x="14" y="4" width="4" height="16" rx="1.2" fill="var(--accent-ink)" /></svg>
+              : <svg width="22" height="22" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="var(--accent-ink)" /></svg>}
+          </button>
+        </div>
       )}
       {/* bottom fade into the sheet */}
       <div style={s('position:absolute;left:0;right:0;bottom:0;height:60px;background:linear-gradient(0deg,var(--bg),transparent);pointer-events:none;z-index:2')} />
@@ -84,7 +86,6 @@ export default function ActivityHero({ a, route, frames, hasMap, status, token, 
 
   return (
     <div style={s(box)}>
-      <div style={s(`position:absolute;inset:0;transition:transform .4s ease;${tilt ? 'transform:perspective(760px) rotateX(46deg) scale(1.42);transform-origin:50% 62%' : ''}`)}>
       <TileMap points={route} fill radius={0} pad={30} style={mapStyle} scrubPoints={route}
         onScrub={(i) => { pause(); seek(n > 1 ? i / (n - 1) : 0); }}>
         {(project) => {
@@ -110,7 +111,6 @@ export default function ActivityHero({ a, route, frames, hasMap, status, token, 
           );
         }}
       </TileMap>
-      </div>
       {controls}
       {full && <FullMap route={route} style={mapStyle} a={a} token={token} onClose={() => setFull(false)} />}
     </div>
