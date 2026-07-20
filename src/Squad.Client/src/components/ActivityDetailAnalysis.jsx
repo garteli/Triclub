@@ -4,7 +4,10 @@ import TileMap from './TileMap.jsx';
 import { toPathD } from '../lib/tiles.js';
 import { useActivityTrack } from '../hooks/useActivityTrack.js';
 import { loadZones } from '../lib/zones.js';
-import { normalizedPower, hrZones, powerZones, powerCurve } from '../lib/powerAnalysis.js';
+import {
+  normalizedPower, hrZones, powerZones, powerCurve,
+  HR_ZONE_FRACS, HR_ZONE_NAMES, PWR_ZONE_FRACS, PWR_ZONE_NAMES,
+} from '../lib/powerAnalysis.js';
 
 const POWER_COLORS = ['#8a94a6', '#4a86ff', '#22c55e', '#eab308', '#f97316', '#ef4444', '#a855f7'];
 const HR_COLORS = ['#8a94a6', '#22c55e', '#eab308', '#f97316', '#ef4444'];
@@ -167,23 +170,37 @@ function SegmentTable({ title, rows, isSwim, isFoot }) {
   );
 }
 
-// Time-in-zone distribution: one bar per zone, width = share of total, with time + percent.
-function ZoneDist({ title, seconds, colors }) {
+// Strava-style zone-distribution table: highest zone first, each row = zone badge, name, the
+// bpm/watt range, time, percent, over a bar scaled to the biggest zone. `bounds` are the upper
+// threshold VALUES (length = zones − 1); the top/bottom rows render open-ended.
+function ZoneDist({ title, seconds, colors, names, bounds }) {
   const total = seconds.reduce((a, b) => a + b, 0);
   if (total <= 0) return null;
+  const n = seconds.length;
+  const max = Math.max(...seconds);
+  const range = (i) => {
+    const lo = i === 0 ? null : Math.round(bounds[i - 1]);
+    const hi = i === n - 1 ? null : Math.round(bounds[i]) - 1;
+    if (lo == null) return `< ${hi + 1}`;
+    if (hi == null) return `> ${lo - 1}`;
+    return `${lo}–${hi}`;
+  };
   return (
     <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:12px 13px;margin-top:10px')}>
-      <div style={s('font-size:12px;font-weight:700;margin-bottom:4px')}>{title}</div>
-      {seconds.map((sec, i) => {
-        const pct = Math.round((sec / total) * 100);
+      <div style={s('font-size:12px;font-weight:700;margin-bottom:6px')}>{title}</div>
+      {[...seconds.keys()].reverse().map((i) => {
+        const pct = Math.round((seconds[i] / total) * 100);
+        const barPct = max > 0 ? Math.round((seconds[i] / max) * 100) : 0;
         return (
-          <div key={i} style={s('display:flex;align-items:center;gap:9px;margin-top:6px')}>
-            <div style={s(`width:22px;font-size:10px;font-weight:700;color:${colors[i]}`)}>Z{i + 1}</div>
-            <div style={s('flex:1;height:9px;border-radius:5px;background:var(--bg4);overflow:hidden')}>
-              <div style={s(`height:100%;width:${pct}%;background:${colors[i]};border-radius:5px`)} />
+          <div key={i} style={s('position:relative;overflow:hidden;border-radius:8px;background:var(--bg3);margin-top:6px')}>
+            <div style={s(`position:absolute;top:0;bottom:0;left:0;width:${barPct}%;background:${colors[i]};opacity:.20`)} />
+            <div style={s('position:relative;display:flex;align-items:center;gap:8px;padding:8px 10px')}>
+              <span style={s(`font-size:10px;font-weight:800;color:${colors[i]};width:20px;flex:none`)}>Z{i + 1}</span>
+              <span style={s('font-size:12px;font-weight:600;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>{names[i]}</span>
+              <span className="mono" style={s('font-size:10px;color:var(--text3);flex:none')}>{range(i)}</span>
+              <span className="mono" style={s('font-size:11px;font-weight:600;width:50px;text-align:right;flex:none')}>{fmtDur(seconds[i])}</span>
+              <span className="mono" style={s('font-size:10px;color:var(--text2);width:30px;text-align:right;flex:none')}>{pct}%</span>
             </div>
-            <div className="mono" style={s('width:46px;text-align:right;font-size:10.5px;color:var(--text3)')}>{fmtDur(sec)}</div>
-            <div className="mono" style={s('width:30px;text-align:right;font-size:10.5px;color:var(--text2)')}>{pct}%</div>
           </div>
         );
       })}
@@ -307,8 +324,14 @@ export default function ActivityDetailAnalysis({ activityId, sport, getToken }) 
           {ifactor != null && <> · IF <b style={s('color:var(--text)')}>{ifactor.toFixed(2)}</b></>}
         </div>
       )}
-      {pwZones && <ZoneDist title="Power zones" seconds={pwZones} colors={POWER_COLORS} />}
-      {hZones && <ZoneDist title="Heart-rate zones" seconds={hZones} colors={HR_COLORS} />}
+      {pwZones && (
+        <ZoneDist title="Power zones · W" seconds={pwZones} colors={POWER_COLORS}
+          names={PWR_ZONE_NAMES} bounds={PWR_ZONE_FRACS.map((f) => f * zones.ftp)} />
+      )}
+      {hZones && (
+        <ZoneDist title="Heart-rate zones · bpm" seconds={hZones} colors={HR_COLORS}
+          names={HR_ZONE_NAMES} bounds={HR_ZONE_FRACS.map((f) => f * zones.maxHr)} />
+      )}
       {curve.length > 0 && (() => {
         const maxW = Math.max(...curve.map((c) => c.watts));
         const CH = 88; // bar-chart height (px)
