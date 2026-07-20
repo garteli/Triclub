@@ -27,6 +27,7 @@ import Phone from './components/Phone.jsx';
 import Dashboard from './screens/Dashboard.jsx';
 import LiveRide from './screens/LiveRide.jsx';
 import Plan from './screens/Plan.jsx';
+import PlanEditor from './screens/PlanEditor.jsx';
 import Leaderboard from './screens/Leaderboard.jsx';
 import Feed from './screens/Feed.jsx';
 import Segments from './screens/Segments.jsx';
@@ -71,7 +72,7 @@ const initialState = {
 };
 
 const screens = {
-  dash: Dashboard, ride: LiveRide, plan: Plan, lb: Leaderboard,
+  dash: Dashboard, ride: LiveRide, plan: Plan, planeditor: PlanEditor, lb: Leaderboard,
   feed: Feed, seg: Segments, coach: Coach, profile: Profile,
   discover: Discover, group: GroupProfile, pay: Checkout, recordpay: RidePayment, ledger: CoachLedger, requests: JoinRequests, chat: Messages,
   settings: Settings, welcome: Welcome, register: Register, login: Login, newgroup: CreateGroup,
