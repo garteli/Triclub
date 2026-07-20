@@ -103,3 +103,68 @@ export function powerCurve(track) {
   }
   return out;
 }
+
+function haversine(la1, lo1, la2, lo2) {
+  const R = 6371000, r = Math.PI / 180;
+  const dLa = (la2 - la1) * r, dLo = (lo2 - lo1) * r;
+  const a = Math.sin(dLa / 2) ** 2 + Math.cos(la1 * r) * Math.cos(la2 * r) * Math.sin(dLo / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+}
+
+// Best-effort durations (s) and distances (m) — the standard sets Strava lists.
+export const EFFORT_DURATIONS = [5, 15, 30, 60, 120, 180, 300, 480, 600, 1200, 1800, 3600];
+export const EFFORT_DISTANCES = [1000, 5000, 10000, 16093, 20000, 30000, 40000, 50000];
+
+// Best average power sustained for each duration, plus the avg HR during that winning window.
+export function powerBestEfforts(track, durations = EFFORT_DURATIONS) {
+  if (!hasField(track, 'powerW')) return [];
+  const p = resample1s(track, 'powerW', true);
+  const hr = resample1s(track, 'heartRate', false);
+  const out = [];
+  for (const d of durations) {
+    if (p.length < d) continue;
+    let sum = 0, best = -1, bestEnd = -1;
+    for (let i = 0; i < p.length; i++) {
+      sum += p[i];
+      if (i >= d) sum -= p[i - d];
+      if (i >= d - 1 && sum / d > best) { best = sum / d; bestEnd = i; }
+    }
+    if (best <= 0) continue;
+    let hs = 0, hn = 0;
+    for (let k = bestEnd - d + 1; k <= bestEnd; k++) { if (hr[k] > 0) { hs += hr[k]; hn++; } }
+    out.push({ sec: d, watts: Math.round(best), avgHr: hn ? Math.round(hs / hn) : null });
+  }
+  return out;
+}
+
+// Fastest time to cover each target distance (m), plus the avg HR over that stretch. GPS
+// distance where available, else speed×dt; two-pointer over cumulative distance.
+export function distanceBestEfforts(track, targets = EFFORT_DISTANCES) {
+  const pts = track.filter((p) => Number.isFinite(p.offsetSec));
+  if (pts.length < 2) return [];
+  const cum = [0];
+  for (let i = 1; i < pts.length; i++) {
+    let dd = 0;
+    if (Number.isFinite(pts[i - 1].lat) && Number.isFinite(pts[i].lat)) dd = haversine(pts[i - 1].lat, pts[i - 1].lon, pts[i].lat, pts[i].lon);
+    else if (Number.isFinite(pts[i].speedMps)) dd = pts[i].speedMps * Math.max(0, pts[i].offsetSec - pts[i - 1].offsetSec);
+    cum.push(cum[i - 1] + dd);
+  }
+  const total = cum[cum.length - 1];
+  const out = [];
+  for (const D of targets) {
+    if (D > total) continue;
+    let best = Infinity, bi = -1, bj = -1, j = 0;
+    for (let i = 0; i < pts.length; i++) {
+      while (j < i && cum[i] - cum[j] >= D) {
+        const time = pts[i].offsetSec - pts[j].offsetSec;
+        if (time > 0 && time < best) { best = time; bi = i; bj = j; }
+        j++;
+      }
+    }
+    if (best === Infinity) continue;
+    let hs = 0, hn = 0;
+    for (let k = bj; k <= bi; k++) { if (Number.isFinite(pts[k].heartRate)) { hs += pts[k].heartRate; hn++; } }
+    out.push({ meters: D, sec: best, avgHr: hn ? Math.round(hs / hn) : null });
+  }
+  return out;
+}
