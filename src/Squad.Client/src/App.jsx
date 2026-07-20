@@ -177,8 +177,9 @@ export default function App() {
     () => buildViewModel(state, t, {
       feedItems: liveFeed, leaderboardRows: liveLeaderboard, activityItems: liveActivities,
       profile, squads: liveSquads, plan: livePlan, planSummary: livePlanSummary, avatar: state.avatar,
-      // The athlete's active squad name (for the dashboard header).
+      // The athlete's active squad (name + logo/banner for the dashboard header).
       squadName: authed ? liveSquads.find((sq) => sq.id === squadId)?.name : undefined,
+      activeSquad: authed ? liveSquads.find((sq) => sq.id === squadId) : null,
     }),
     [state, t, liveFeed, liveLeaderboard, liveActivities, profile, liveSquads, livePlan, livePlanSummary, authed, squadId],
   );

@@ -1,7 +1,9 @@
+import { useEffect, useState } from 'react';
 import { s } from '../lib/style.js';
 import EmptyState from '../components/EmptyState.jsx';
+import AuthedImage from '../components/AuthedImage.jsx';
 
-// Group bike glyph, reused as the tile mark on each club row.
+// Group bike glyph, reused as the tile mark on each club row (fallback when no logo).
 const GroupBike = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0c0e11" strokeWidth="2.2" strokeLinecap="round">
     <circle cx="5.5" cy="17.5" r="3.5" /><circle cx="18.5" cy="17.5" r="3.5" />
@@ -9,9 +11,22 @@ const GroupBike = () => (
   </svg>
 );
 
+// Club tile: the uploaded logo when set, else the colour-filled bike glyph.
+const GroupMark = ({ g, token }) => (
+  g.logoUrl
+    ? <AuthedImage url={g.logoUrl} token={token} style="width:46px;height:46px;border-radius:13px;flex:none" />
+    : <div style={s(`width:46px;height:46px;border-radius:13px;background:${g.color};flex:none;display:flex;align-items:center;justify-content:center`)}><GroupBike /></div>
+);
+
 const filters = ['All', 'Cycling', 'Triathlon', 'Swim'];
 
-export default function Discover({ vm, actions }) {
+export default function Discover({ vm, actions, getToken }) {
+  const [token, setToken] = useState(null);
+  useEffect(() => {
+    let ok = true;
+    Promise.resolve(getToken?.()).then((t) => { if (ok) setToken(t || null); });
+    return () => { ok = false; };
+  }, [getToken]);
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
       <div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.6px;font-weight:600')}>Find your squad</div>
@@ -43,7 +58,7 @@ export default function Discover({ vm, actions }) {
         )}
         {vm.nearbyGroups.map((g) => (
           <div key={g.id} className="ctl" onClick={() => actions.openGroup(g.id)} style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:13px 14px;display:flex;gap:12px;align-items:center')}>
-            <div style={s(`width:46px;height:46px;border-radius:13px;background:${g.color};flex:none;display:flex;align-items:center;justify-content:center`)}><GroupBike /></div>
+            <GroupMark g={g} token={token} />
             <div style={s('flex:1;min-width:0')}>
               <div style={s('display:flex;align-items:center;gap:6px')}>
                 <span style={s('font-size:14.5px;font-weight:700')}>{g.name}</span>
