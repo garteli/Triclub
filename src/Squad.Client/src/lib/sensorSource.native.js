@@ -36,10 +36,17 @@ export async function createNativeSensorController() {
     return { id: device.deviceId, name: device.name || kind };
   }
 
-  // Silent reconnect to a remembered device id — no scan/picker. iOS/Android keep the
-  // pairing, so this works across app launches when the sensor is in range.
+  // Silent reconnect to a remembered device id — no scan/picker.
+  //
+  // The plugin only tracks peripherals discovered in the *current* process: after an
+  // app restart its internal map is empty and connect(id) fails outright with
+  // "Device not found. Call 'requestDevice', 'requestLEScan' or 'getDevices' first."
+  // getDevices([id]) re-hydrates that map from the system's known peripherals, so it
+  // must run before connect on every fresh launch — otherwise no remembered sensor
+  // (HR, power, radar) ever reconnects without the user re-picking it from a scan.
   async function connectKnown(kind, deviceId) {
     if (!SENSOR_SPECS[kind]) throw new Error(`Unknown sensor: ${kind}`);
+    await BleClient.getDevices([deviceId]);
     await subscribe(kind, deviceId);
     return { id: deviceId, name: kind };
   }
