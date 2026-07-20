@@ -14,8 +14,12 @@ export function mapLiveRider(u, meId) {
     name: u.name,
     initials: u.initials,
     color: u.color,
-    lat: u.lat,
-    lon: u.lon,
+    // Prefer the pack-fused position when the server has one (BLE ranges tighten in-pack
+    // spacing); fall back to raw GPS otherwise.
+    lat: u.fusedLat ?? u.lat,
+    lon: u.fusedLon ?? u.lon,
+    gapM: u.nearestGapM ?? null,   // fused metres to the closest ranged teammate
+    fused: !!u.fused,
     spd: (u.speedKph ?? 0).toFixed(1),
     hr: Math.round(hr),
     powerW: u.powerW ?? null,
@@ -77,6 +81,14 @@ export function useLiveRide(rideId, { hubUrl = API_BASE + '/hubs/ride', getToken
     [rideId],
   );
 
+  // Phone-to-phone BLE range observation ({ peerId, rssi, distanceM }). Best-effort:
+  // if the hub lacks the method (older backend) the invoke rejects and we swallow it,
+  // leaving pack position on GPS+heading.
+  const pushPeerRange = useCallback(
+    (r) => connRef.current?.invoke('PushPeerRange', rideId, r).catch(() => {}),
+    [rideId],
+  );
+
   const riders = Object.values(byId).map((u) => mapLiveRider(u, meId));
-  return { riders, status, pushTelemetry };
+  return { riders, status, pushTelemetry, pushPeerRange };
 }

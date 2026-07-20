@@ -75,7 +75,7 @@ export const metricCatalog = {
   // Other
   kcal: { label: 'Calories', unit: 'kcal', cat: 'Other' },
   temp: { label: 'Temperature', unit: '°C', cat: 'Other' },
-  gap: { label: 'Gap to last', unit: 'm', cat: 'Other' },
+  gap: { label: 'Pack gap', unit: 'm', cat: 'Other' },
   resp: { label: 'Respiration', unit: 'brpm', cat: 'Other' },
   battery: { label: 'Battery', unit: '%', cat: 'Other' },
 };
@@ -115,7 +115,9 @@ export function liveMetricValues(tel) {
     // Gears — no gearing/Di2 sensor source yet.
     gear: { v: DASH }, gearratio: { v: DASH }, di2: { v: DASH },
     // Other
-    kcal: { v: r0(tel?.kcal) }, temp: { v: DASH }, gap: { v: DASH, color: 'var(--behind)' },
+    kcal: { v: r0(tel?.kcal) }, temp: { v: DASH },
+    // Fused metres to the nearest teammate (phone-to-phone BLE ranging). "—" until ranged.
+    gap: { v: r0(tel?.gap), color: tel?.gap == null ? 'var(--behind)' : 'var(--good)' },
     resp: { v: DASH }, battery: { v: DASH },
   };
 }
