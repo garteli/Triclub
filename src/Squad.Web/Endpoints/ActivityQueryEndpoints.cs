@@ -14,7 +14,20 @@ public static class ActivityQueryEndpoints
     public static IEndpointRouteBuilder MapActivityQuery(this IEndpointRouteBuilder app)
     {
         app.MapGet("/api/activities", GetActivities).RequireAuthorization();
+        app.MapDelete("/api/activities/{id:guid}", DeleteActivity).RequireAuthorization();
         return app;
+    }
+
+    // Delete one of the caller's own activities. Owner-scoped in the store, so a request
+    // for someone else's (or a missing) activity is a 404 — never touches another's data.
+    private static async Task<IResult> DeleteActivity(
+        Guid id, HttpContext http, IActivityReadService activities, CancellationToken ct)
+    {
+        var claim = http.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? http.User.FindFirstValue("sub");
+        if (!Guid.TryParse(claim, out var athleteId)) return Results.Unauthorized();
+
+        var deleted = await activities.DeleteAsync(id, athleteId, ct);
+        return deleted ? Results.NoContent() : Results.NotFound();
     }
 
     private static async Task<IResult> GetActivities(

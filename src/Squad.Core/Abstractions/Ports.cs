@@ -64,6 +64,10 @@ public sealed record FeedActivityRow(
 public interface IActivityReadService
 {
     Task<IReadOnlyList<ActivitySummaryRow>> GetForSquadAsync(Guid squadId, int take, CancellationToken ct);
+
+    /// <summary>Delete one of the caller's OWN activities (scoped to the owner) plus its raw
+    /// payload, so the same source workout can be re-imported later. True if a row was removed.</summary>
+    Task<bool> DeleteAsync(Guid activityId, Guid athleteId, CancellationToken ct);
 }
 
 /// <summary>An activity summary joined to athlete display fields; drives both the list card and the detail metrics.</summary>

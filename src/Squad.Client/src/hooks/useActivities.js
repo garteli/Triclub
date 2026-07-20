@@ -67,6 +67,17 @@ export function mapActivity(r) {
   };
 }
 
+// Delete one of the caller's own activities. 204 on success; 404 if it isn't yours or
+// no longer exists. Caller refreshes the list (onDataChanged / bumped refreshSignal).
+export async function deleteActivity(id, token) {
+  const res = await fetch(`/api/activities/${id}`, {
+    method: 'DELETE',
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+  if (!res.ok && res.status !== 204) throw new Error(`Delete failed (${res.status})`);
+  return true;
+}
+
 // Fetches the squad's activities; refetch via the returned fn or a bumped refreshSignal.
 export function useActivities({ getToken, enabled = true, refreshSignal } = {}) {
   const [items, setItems] = useState([]);

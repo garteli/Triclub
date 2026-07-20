@@ -44,4 +44,30 @@ public sealed class SqlActivityReadService(string connectionString) : IActivityR
             new CommandDefinition(sql, new { squadId }, cancellationToken: ct));
         return rows.ToList();
     }
+
+    public async Task<bool> DeleteAsync(Guid activityId, Guid athleteId, CancellationToken ct)
+    {
+        // Delete the canonical activity (owner-scoped) and its raw payload, keyed by the
+        // activity's own (Source, SourceExternalId), so re-syncing the same workout isn't
+        // deduped away as "already-received". @@ROWCOUNT of the Activity delete is the result.
+        const string sql = """
+            DECLARE @src TINYINT, @ext NVARCHAR(128);
+            SELECT @src = Source, @ext = SourceExternalId
+              FROM dbo.Activity WHERE Id = @activityId AND AthleteId = @athleteId;
+
+            DELETE FROM dbo.Activity WHERE Id = @activityId AND AthleteId = @athleteId;
+            DECLARE @n INT = @@ROWCOUNT;
+
+            IF @n > 0 AND @ext IS NOT NULL
+                DELETE FROM dbo.RawActivity
+                 WHERE AthleteId = @athleteId AND Source = @src AND SourceExternalId = @ext;
+
+            SELECT @n;
+            """;
+
+        await using var conn = new SqlConnection(connectionString);
+        var affected = await conn.ExecuteScalarAsync<int>(
+            new CommandDefinition(sql, new { activityId, athleteId }, cancellationToken: ct));
+        return affected > 0;
+    }
 }
