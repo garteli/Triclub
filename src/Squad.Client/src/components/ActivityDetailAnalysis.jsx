@@ -237,7 +237,10 @@ export default function ActivityDetailAnalysis({ activityId, sport, getToken }) 
     };
   }, [track]);
 
-  const splits = useMemo(() => computeSplits(track || [], isSwim ? 100 : 1000), [track, isSwim]);
+  // Split distance by sport: swim 100m, ride 5km, run (and everything else) 1km.
+  const splitUnit = isSwim ? 100 : sport === 'Bike' ? 5000 : 1000;
+  const splitUnitLabel = isSwim ? 'per 100m' : sport === 'Bike' ? 'per 5km' : 'per km';
+  const splits = useMemo(() => computeSplits(track || [], splitUnit), [track, splitUnit]);
   const workKJ = useMemo(() => totalWorkKJ(track || []), [track]);
 
   // Power/HR analysis. NP + power curve need only the stream; zones + IF need the settings.
@@ -381,7 +384,7 @@ export default function ActivityDetailAnalysis({ activityId, sport, getToken }) 
 
       {useLaps
         ? <SegmentTable title="Laps" rows={lapRows} isSwim={isSwim} isFoot={isFoot} />
-        : <SegmentTable title={`Splits · per ${isSwim ? '100m' : 'km'}`} rows={splits} isSwim={isSwim} isFoot={isFoot} />}
+        : <SegmentTable title={`Splits · ${splitUnitLabel}`} rows={splits} isSwim={isSwim} isFoot={isFoot} />}
 
       {(bestPower.length > 0 || bestDist.length > 0) && (
         <div style={s('margin-top:14px')}>
