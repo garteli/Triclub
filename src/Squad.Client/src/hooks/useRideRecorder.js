@@ -43,6 +43,7 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, ena
   const [recording, setRecording] = useState(false);
   const [paused, setPaused] = useState(false);       // web: backgrounded / screen locked
   const [distanceKm, setDistanceKm] = useState(0);
+  const [elapsedSec, setElapsedSec] = useState(0);   // wall-clock since the ride started, ticks live
   const [lastFix, setLastFix] = useState(null);      // { lat, lon, speedKph, accuracy }
   const [error, setError] = useState(null);
   const [mode, setMode] = useState('idle');          // 'web' | 'native'
@@ -64,6 +65,7 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, ena
   const removePhoto = useCallback((id) => setPhotos((ps) => ps.filter((p) => p.id !== id)), []);
 
   const source = useRef(null);
+  const startedAtRef = useRef(null); // fallback ride start before the first GPS fix lands
   const wakeLock = useRef(null);
   const prevCoord = useRef(null);
   const distMeters = useRef(0);
@@ -172,7 +174,8 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, ena
   const start = useCallback(async () => {
     setError(null);
     setPending(null); setSaveState('idle'); setSaveError(null); setPhotos([]);
-    resetCapture(); setDistanceKm(0);
+    resetCapture(); setDistanceKm(0); setElapsedSec(0);
+    startedAtRef.current = Date.now();
     clearDraft(); // a fresh ride supersedes any recovered draft
     try {
       await openSource();
@@ -257,10 +260,24 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, ena
   }, [pending, getToken, onSaved, photos]);
 
   const discardRide = useCallback(() => {
-    samples.current = []; agg.current = null;
+    samples.current = []; agg.current = null; startedAtRef.current = null;
     clearDraft();
-    setPending(null); setSaveState('idle'); setSaveError(null); setDistanceKm(0); setPhotos([]);
+    setPending(null); setSaveState('idle'); setSaveError(null); setDistanceKm(0); setElapsedSec(0); setPhotos([]);
   }, []);
+
+  // Tick the live elapsed (wall-clock) time once a second while recording. Anchored to the
+  // first fix (agg.startMs) so it survives a reload/resume; falls back to the start() moment
+  // until that first fix lands.
+  useEffect(() => {
+    if (!recording) return undefined;
+    const tick = () => {
+      const base = agg.current?.startMs ?? startedAtRef.current;
+      setElapsedSec(base ? Math.max(0, Math.round((Date.now() - base) / 1000)) : 0);
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [recording]);
 
   // Restore a persisted ride once on boot (see lib/rideDraft.js). A fresh in-progress ride
   // resumes recording (re-arms the GPS + Wake Lock and keeps appending to the same buffer);
@@ -277,6 +294,7 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, ena
     agg.current = draft.agg || null;
     distMeters.current = draft.distMeters || 0;
     prevCoord.current = draft.prevCoord || null;
+    startedAtRef.current = draft.startedAtMs ?? draft.agg?.startMs ?? null;
     lastPush.current = 0;
     setDistanceKm((draft.distMeters || 0) / 1000);
     if (how === 'resume') {
@@ -308,6 +326,7 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, ena
       sport,
       distMeters: distMeters.current,
       prevCoord: prevCoord.current,
+      startedAtMs: startedAtRef.current,
       agg: agg.current,
       samples: samples.current,
       pending: isRecording ? null : pending,
@@ -351,7 +370,7 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, ena
   useEffect(() => () => { source.current?.stop?.(); releaseWakeLock(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return {
-    recording, paused, distanceKm, lastFix, error, mode, start, stop,
+    recording, paused, distanceKm, elapsedSec, lastFix, error, mode, start, stop,
     pending, saveState, saveError, saveRide, discardRide,
     photos, addPhoto, removePhoto,
   };
