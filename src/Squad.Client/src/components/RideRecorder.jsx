@@ -20,12 +20,88 @@ const Dot = ({ color, pulse }) => (
   <span style={s(`width:9px;height:9px;border-radius:50%;background:${color};${pulse ? 'animation:pulseDot 1.1s infinite' : ''}`)} />
 );
 
+const fmtDur = (sec) => {
+  if (!sec || sec < 0) return '0:00';
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s2 = Math.floor(sec % 60);
+  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(s2).padStart(2, '0')}` : `${m}:${String(s2).padStart(2, '0')}`;
+};
+
+function Stat({ value, unit, label }) {
+  return (
+    <div style={s('flex:1;min-width:64px')}>
+      <div className="mono" style={s('font-size:19px;font-weight:700')}>{value}{unit && <span style={s('font-size:11px;color:var(--text2)')}>{unit}</span>}</div>
+      <div style={s('font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.7px')}>{label}</div>
+    </div>
+  );
+}
+
+// Post-ride summary: encode the captured ride as a real Garmin .fit and upload it
+// through the same ingest as a Garmin file. Shown after Stop, before anything is saved.
+function RideSummary({ pending, saveState, saveError, saveRide, discardRide }) {
+  const { summary: sm, sampleCount } = pending;
+  const empty = sampleCount === 0;
+  const saved = saveState === 'saved';
+  const saving = saveState === 'saving';
+
+  return (
+    <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:14px;margin-top:14px')}>
+      <div style={s('display:flex;align-items:center;gap:8px')}>
+        <Dot color={saved ? 'var(--good)' : 'var(--accent)'} />
+        <span style={s('font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--text2)')}>
+          {saved ? 'Ride saved' : 'Ride complete'}
+        </span>
+      </div>
+
+      {empty ? (
+        <div style={s('font-size:12px;color:var(--text3);margin-top:12px;line-height:1.5')}>No GPS fixes were recorded, so there’s nothing to save.</div>
+      ) : (
+        <>
+          <div style={s('display:flex;flex-wrap:wrap;gap:12px 8px;margin-top:12px;border-top:1px solid var(--line);padding-top:12px')}>
+            <Stat value={((sm.distanceM ?? 0) / 1000).toFixed(2)} unit="km" label="Distance" />
+            <Stat value={fmtDur(sm.movingSec)} label="Moving" />
+            {sm.avgHr != null && <Stat value={sm.avgHr} unit="bpm" label="Avg HR" />}
+            {sm.avgPowerW != null && <Stat value={sm.avgPowerW} unit="W" label="Avg Power" />}
+            {sm.avgCadence != null && <Stat value={sm.avgCadence} unit="rpm" label="Avg Cad" />}
+            {sm.ascentM != null && <Stat value={sm.ascentM} unit="m" label="Ascent" />}
+            {sm.calories != null && <Stat value={sm.calories} unit="kcal" label="Energy" />}
+          </div>
+          <div style={s('font-size:10px;color:var(--text3);margin-top:10px')}>{sampleCount.toLocaleString()} points · exports as a Garmin <span className="mono">.fit</span></div>
+        </>
+      )}
+
+      {saveState === 'error' && <div style={s('font-size:11.5px;color:var(--bad);margin-top:10px')}>{saveError}</div>}
+      {saved && <div style={s('font-size:11.5px;color:var(--good);margin-top:10px')}>Uploaded — it’ll appear in the feed once parsed.</div>}
+
+      <div style={s('display:flex;gap:9px;margin-top:14px')}>
+        {saved ? (
+          <div className="ctl" onClick={discardRide} style={s('flex:1;text-align:center;padding:13px;border-radius:13px;font-weight:700;font-size:14px;background:var(--accent);color:var(--accent-ink)')}>Done</div>
+        ) : (
+          <>
+            <div className="ctl" onClick={saving ? undefined : discardRide} style={s(`flex:1;text-align:center;padding:13px;border-radius:13px;font-weight:700;font-size:14px;background:var(--bg3);border:1px solid var(--line);color:var(--text);opacity:${saving ? 0.5 : 1}`)}>Discard</div>
+            {!empty && (
+              <div className="ctl" onClick={saving ? undefined : saveRide} style={s(`flex:1.4;text-align:center;padding:13px;border-radius:13px;font-weight:700;font-size:14px;background:var(--accent);color:var(--accent-ink);opacity:${saving ? 0.7 : 1}`)}>
+                {saving ? 'Saving…' : 'Save ride'}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // Presentational: the shared recorder + sensors are owned by App (so recording and the
 // hub connection persist across lobby→active). `streaming` reflects whether fixes are
 // going to the ride hub.
 export default function RideRecorder({ recorder, sensors, streaming }) {
-  const { recording, paused, distanceKm, lastFix, error, mode, start, stop } = recorder;
+  const { recording, paused, distanceKm, lastFix, error, mode, start, stop,
+          pending, saveState, saveError, saveRide, discardRide } = recorder;
   const radar = sensors.metrics.radar;
+
+  // After Stop, a finished ride awaits the save/discard decision — show its summary.
+  if (pending) {
+    return <RideSummary pending={pending} saveState={saveState} saveError={saveError} saveRide={saveRide} discardRide={discardRide} />;
+  }
 
   return (
     <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:14px;margin-top:14px')}>

@@ -237,7 +237,7 @@ export default function App() {
   const rideActive = onRide && state.rideState === 'active';
   const sensors = useSensors();
   const liveRide = useLiveRide(squadId, { getToken, meId: session?.athleteId, enabled: onRide && !!squadId });
-  const recorder = useRideRecorder({ pushTelemetry: liveRide.pushTelemetry, sensors });
+  const recorder = useRideRecorder({ pushTelemetry: liveRide.pushTelemetry, sensors, getToken, onSaved: () => setRefreshSignal((n) => n + 1) });
   const tel = useRideTelemetry({ t, active: rideActive, riders: liveRide.riders, recorder, sensors });
 
   // Garmin Edge–style live-ride pages (configurable fields, auto-rotate, edit).
