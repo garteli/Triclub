@@ -11,7 +11,8 @@ namespace Squad.Web;
 /// </summary>
 public static class FeedCard
 {
-    /// <summary>From a committed canonical Activity (live push path).</summary>
+    /// <summary>From a committed canonical Activity (live push path). A just-posted activity
+    /// has no kudos/comments yet, so those default to 0.</summary>
     public static ActivityFeedItem From(Activity a, AthleteProfile p) => Build(
         a.Id, a.AthleteId, p.Name, p.Initials, p.AvatarColor,
         a.Sport, a.StartUtc, (int)a.MovingTime.TotalSeconds,
@@ -21,18 +22,21 @@ public static class FeedCard
     public static ActivityFeedItem From(FeedActivityRow r) => Build(
         r.Id, r.AthleteId, r.AthleteName, r.Initials, r.AvatarColor,
         (ActivitySport)r.Sport, r.StartUtc, r.MovingTimeSec,
-        r.DistanceMeters, r.TrainingLoad, r.AvgHeartRate, reacts: 0, avatarUrl: r.AvatarUrl);
+        r.DistanceMeters, r.TrainingLoad, r.AvgHeartRate, reacts: 0, avatarUrl: r.AvatarUrl,
+        kudos: r.Kudos, comments: r.Comments, iKudoed: r.IKudoed);
 
     /// <summary>From an activity summary row (athlete-profile recent-activity list).</summary>
     public static ActivityFeedItem From(ActivitySummaryRow r) => Build(
         r.Id, r.AthleteId, r.AthleteName, r.Initials, r.AvatarColor,
         (ActivitySport)r.Sport, r.StartUtc, r.MovingTimeSec,
-        r.DistanceMeters, r.TrainingLoad, r.AvgHeartRate, reacts: 0, avatarUrl: r.AvatarUrl);
+        r.DistanceMeters, r.TrainingLoad, r.AvgHeartRate, reacts: 0, avatarUrl: r.AvatarUrl,
+        kudos: r.Kudos, comments: r.Comments, iKudoed: r.IKudoed);
 
     private static ActivityFeedItem Build(
         Guid id, Guid athleteId, string name, string initials, string color,
         ActivitySport sport, DateTimeOffset startUtc, int movingTimeSec,
-        double? distanceMeters, double? trainingLoad, double? avgHeartRate, int reacts, string? avatarUrl = null)
+        double? distanceMeters, double? trainingLoad, double? avgHeartRate, int reacts, string? avatarUrl = null,
+        int kudos = 0, int comments = 0, bool iKudoed = false)
     {
         var (icon, disc, verb) = sport switch
         {
@@ -57,6 +61,9 @@ public static class FeedCard
             StartUtc = startUtc,
             Reacts = reacts,
             AvatarUrl = avatarUrl,
+            Kudos = kudos,
+            Comments = comments,
+            IKudoed = iKudoed,
         };
     }
 

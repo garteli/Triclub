@@ -38,6 +38,8 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IProfileService>(_ => new SqlProfileService(sqlConnectionString));
         services.AddScoped<ISquadService>(_ => new SqlSquadService(sqlConnectionString));
         services.AddScoped<IChatService>(_ => new SqlChatService(sqlConnectionString));
+        services.AddScoped<IKudosService>(_ => new SqlKudosService(sqlConnectionString));
+        services.AddScoped<ICommentService>(_ => new SqlCommentService(sqlConnectionString));
         services.AddScoped<IFollowService>(_ => new SqlFollowService(sqlConnectionString));
         services.AddScoped<INotificationService>(_ => new SqlNotificationService(sqlConnectionString));
         services.AddScoped<IPlanService>(_ => new SqlPlanService(sqlConnectionString));

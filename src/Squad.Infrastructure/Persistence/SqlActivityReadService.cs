@@ -22,7 +22,7 @@ namespace Squad.Infrastructure;
 
 public sealed class SqlActivityReadService(string connectionString) : IActivityReadService
 {
-    public async Task<IReadOnlyList<ActivitySummaryRow>> GetForSquadAsync(Guid squadId, int take, CancellationToken ct)
+    public async Task<IReadOnlyList<ActivitySummaryRow>> GetForSquadAsync(Guid squadId, Guid me, int take, CancellationToken ct)
     {
         var top = Math.Clamp(take, 1, 200);
         var sql = $"""
@@ -37,7 +37,12 @@ public sealed class SqlActivityReadService(string connectionString) : IActivityR
                    CAST(a.TrainingLoad   AS float) AS TrainingLoad,
                    CAST(a.Calories       AS float) AS Calories,
                    CASE WHEN ath.AvatarBlob IS NOT NULL
-                        THEN '/api/images/avatars/' + LOWER(CONVERT(varchar(36), a.AthleteId)) END AS AvatarUrl
+                        THEN '/api/images/avatars/' + LOWER(CONVERT(varchar(36), a.AthleteId)) END AS AvatarUrl,
+                   (SELECT COUNT(*) FROM dbo.ActivityKudos k WHERE k.ActivityId = a.Id) AS Kudos,
+                   (SELECT COUNT(*) FROM dbo.ActivityComment c WHERE c.ActivityId = a.Id) AS Comments,
+                   CAST(CASE WHEN EXISTS (SELECT 1 FROM dbo.ActivityKudos k2
+                                          WHERE k2.ActivityId = a.Id AND k2.AthleteId = @me)
+                             THEN 1 ELSE 0 END AS bit) AS IKudoed
             FROM dbo.Activity a
             JOIN dbo.Athlete ath ON ath.Id = a.AthleteId
             WHERE ath.SquadId = @squadId
@@ -46,7 +51,7 @@ public sealed class SqlActivityReadService(string connectionString) : IActivityR
 
         await using var conn = new SqlConnection(connectionString);
         var rows = await conn.QueryAsync<ActivitySummaryRow>(
-            new CommandDefinition(sql, new { squadId }, cancellationToken: ct));
+            new CommandDefinition(sql, new { squadId, me }, cancellationToken: ct));
         return rows.ToList();
     }
 

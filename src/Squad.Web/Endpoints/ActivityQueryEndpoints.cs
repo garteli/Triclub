@@ -60,7 +60,7 @@ public static class ActivityQueryEndpoints
         var profile = await directory.GetAsync(athleteId, ct);
         if (profile is null) return Results.Unauthorized();
 
-        var rows = await activities.GetForSquadAsync(profile.SquadId, take, ct);
+        var rows = await activities.GetForSquadAsync(profile.SquadId, athleteId, take, ct);
         // Tag the caller's own rows so the client's "You" tab can filter without another call.
         var result = rows.Select(r => new
         {
@@ -68,6 +68,7 @@ public static class ActivityQueryEndpoints
             r.Sport, r.StartUtc, r.MovingTimeSec, r.ElapsedTimeSec,
             r.DistanceMeters, r.ElevationGainM, r.AvgHeartRate,
             r.AvgPowerWatts, r.TrainingLoad, r.Calories, r.AvatarUrl,
+            r.Kudos, r.Comments, r.IKudoed,
             isMe = r.AthleteId == athleteId,
         });
         return Results.Ok(result);
