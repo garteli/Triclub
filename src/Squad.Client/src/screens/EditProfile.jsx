@@ -3,7 +3,8 @@ import { s } from '../lib/style.js';
 import { Back, Field, TextArea, Chips, FieldLabel, PrimaryBtn } from './wizard.jsx';
 import { updateProfile } from '../lib/auth.js';
 import Avatar from '../components/Avatar.jsx';
-import { fileToAvatarDataUrl } from '../lib/avatar.js';
+import AvatarEditor from '../components/AvatarEditor.jsx';
+import { loadImageFile } from '../lib/avatar.js';
 
 const SPORTS = ['Triathlon', 'Cycling', 'Running', 'Swimming'];
 const LEVELS = ['New to it', 'Intermediate', 'Advanced', 'Racing'];
@@ -19,6 +20,7 @@ export default function EditProfile({ vm, actions, getToken, onProfileSaved }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [photoError, setPhotoError] = useState('');
+  const [editing, setEditing] = useState(null); // decoded image being repositioned
   const fileRef = useRef(null);
   const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -28,12 +30,14 @@ export default function EditProfile({ vm, actions, getToken, onProfileSaved }) {
     if (!file) return;
     setPhotoError('');
     try {
-      const dataUrl = await fileToAvatarDataUrl(file);
-      actions.setAvatar(dataUrl);
+      setEditing(await loadImageFile(file)); // open the reposition editor
     } catch (err) {
       setPhotoError(err.message || 'Could not use that image.');
     }
   };
+
+  const closeEditor = () => { editing?.close?.(); setEditing(null); };
+  const applyPhoto = (dataUrl) => { actions.setAvatar(dataUrl); closeEditor(); };
 
   const save = async () => {
     setError(''); setBusy(true);
@@ -95,6 +99,8 @@ export default function EditProfile({ vm, actions, getToken, onProfileSaved }) {
 
       {error && <div style={s('color:var(--bad);font-size:12.5px;margin-top:12px;text-align:center')}>{error}</div>}
       <PrimaryBtn onClick={busy ? undefined : save} disabled={busy}>{busy ? 'Saving…' : 'Save changes'}</PrimaryBtn>
+
+      {editing && <AvatarEditor img={editing} onCancel={closeEditor} onDone={applyPhoto} />}
     </div>
   );
 }

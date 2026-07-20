@@ -8,8 +8,20 @@ export default function Avatar({ photo, initials, color, size = 44, radius = 14,
   const box = `width:${size}px;height:${size}px;border-radius:${radius}px;flex:none`;
 
   if (photo) {
+    // NB: the photo is a data: URL (data:image/jpeg;base64,…) — its embedded
+    // semicolons would be split apart by s(), mangling the url() and leaving a
+    // blank box. Set the image props directly and only run `style` through s().
     return (
-      <div style={s(`${box};background-image:url(${photo});background-size:cover;background-position:center;background-repeat:no-repeat${style ? ';' + style : ''}`)} />
+      <div
+        style={{
+          ...s(box),
+          backgroundImage: `url("${photo}")`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          ...(style ? s(style) : {}),
+        }}
+      />
     );
   }
 
