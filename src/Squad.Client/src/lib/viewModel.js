@@ -83,28 +83,52 @@ export function buildViewModel(state, t, opts = {}) {
     note: wd.note,
   };
 
-  // ---- month grid (real current month; workout dots only from the real plan) ----
+  // ---- date navigation offsets (week & month are stepped independently) ----
+  const weekOffset = state.planWeekOffset || 0;
+  const monthOffset = state.planMonthOffset || 0;
+
+  // ---- month grid (viewed month = current month + offset; dots from the real plan) ----
   const mnow = new Date();
-  const mYear = mnow.getFullYear(), mMonth = mnow.getMonth();
+  const monthAnchor = new Date(mnow.getFullYear(), mnow.getMonth() + monthOffset, 1);
+  const mYear = monthAnchor.getFullYear(), mMonth = monthAnchor.getMonth();
   const firstDow = (new Date(mYear, mMonth, 1).getDay() + 6) % 7; // Mon=0..Sun=6
   const daysInMonth = new Date(mYear, mMonth + 1, 0).getDate();
-  const mToday = mnow.getDate();
-  // Map real planned workouts to their day-of-month → discipline (empty when no plan).
+  const todayMs = new Date(mnow.getFullYear(), mnow.getMonth(), mnow.getDate()).getTime();
+  // Map real planned workouts to their full date → discipline (empty when no plan). Keying
+  // by full 'yyyy-MM-dd' keeps dots on their real days when navigating between months.
   const DISC_DOT = { bike: 'var(--bike)', swim: 'var(--swim)', run: 'var(--run)', gym: 'var(--gym)' };
-  const planByDom = {};
-  planSource.forEach((p) => { const dom = parseInt(p.date, 10); if (dom) planByDom[dom] = p.disc; });
+  const isoOf = (y, m, d) => `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  const planByIso = {};
+  planSource.forEach((p) => { if (p.iso) planByIso[p.iso] = p.disc; });
   const monthCells = [];
   const totalCells = Math.ceil((firstDow + daysInMonth) / 7) * 7;
   for (let i = 0; i < totalCells; i++) {
     const dn = i - firstDow + 1;
     const inMonth = dn >= 1 && dn <= daysInMonth;
-    const disc = inMonth ? (planByDom[dn] || '') : '';
+    const disc = inMonth ? (planByIso[isoOf(mYear, mMonth, dn)] || '') : '';
     const dotColor = DISC_DOT[disc] || 'transparent';
-    const today = inMonth && dn === mToday;
-    const done = inMonth && !!disc && dn < mToday;
+    const cellMs = inMonth ? new Date(mYear, mMonth, dn).getTime() : 0;
+    const today = inMonth && cellMs === todayMs;
+    const done = inMonth && !!disc && cellMs < todayMs;
     const cellStyle = today ? 'background:var(--accent);color:var(--accent-ink)' : inMonth ? 'background:var(--bg2);border:1px solid var(--line)' : 'background:transparent';
     monthCells.push({ day: inMonth ? dn : '', inMonth, disc, dotColor, done, today, cellStyle, dayOpacity: inMonth ? '1' : '0', dotOpacity: done ? '1' : '.5' });
   }
+
+  // ---- plan date-nav labels (header eyebrow + the prev/next range/month strip) ----
+  const monthLabel = monthAnchor.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  const weekMonday = new Date(mnow.getFullYear(), mnow.getMonth(), mnow.getDate() - ((mnow.getDay() + 6) % 7) + weekOffset * 7);
+  const weekSunday = new Date(weekMonday.getFullYear(), weekMonday.getMonth(), weekMonday.getDate() + 6);
+  const rangeFmt = (d) => d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const weekLabel = `${rangeFmt(weekMonday)} – ${rangeFmt(weekSunday)}`;
+  const weekEyebrow = weekOffset === 0 ? 'This week'
+    : weekOffset === -1 ? 'Last week'
+    : weekOffset === 1 ? 'Next week'
+    : weekOffset < 0 ? `${-weekOffset} weeks ago`
+    : `In ${weekOffset} weeks`;
+  const planNav = {
+    weekLabel, monthLabel, weekEyebrow,
+    isCurrent: state.planView === 'week' ? weekOffset === 0 : monthOffset === 0,
+  };
 
   // ---- leaderboard ----
   const tab = lbTab;
@@ -369,7 +393,7 @@ export function buildViewModel(state, t, opts = {}) {
     noApplicantOpen: !selApplicant, applicantOpen: !!selApplicant,
     applicantPending: !!selApplicant && (reqStatus[selApplicant] || 'pending') === 'pending',
     chatThread,
-    plan, wkDetail, monthCells,
+    plan, wkDetail, monthCells, planNav,
     planSummary: opts.planSummary
       ? {
           planned: `${Math.floor(opts.planSummary.plannedMin / 60)}:${String(opts.planSummary.plannedMin % 60).padStart(2, '0')}`,

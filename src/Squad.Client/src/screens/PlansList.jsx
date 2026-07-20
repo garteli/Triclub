@@ -15,6 +15,7 @@ export default function PlansList({ plans, actions }) {
   const [items, setItems] = useState(null); // null = loading
   const [error, setError] = useState('');
   const [busyId, setBusyId] = useState(null);
+  const [confirmId, setConfirmId] = useState(null); // plan pending delete-confirmation
 
   const load = useCallback(async () => {
     if (!plans?.list) { setItems([]); return; }
@@ -33,15 +34,21 @@ export default function PlansList({ plans, actions }) {
   const remove = async (id) => {
     if (!plans?.remove) return;
     setBusyId(id);
+    setError('');
     try {
       await plans.remove(id);
       setItems((xs) => (xs || []).filter((p) => p.id !== id));
+      setConfirmId(null);
     } catch (e) {
       setError(e?.message || 'Could not delete plan.');
+      setConfirmId(null);
     } finally {
       setBusyId(null);
     }
   };
+
+  const pendingPlan = confirmId ? (items || []).find((p) => p.id === confirmId) : null;
+  const deleting = busyId === confirmId;
 
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
@@ -82,12 +89,29 @@ export default function PlansList({ plans, actions }) {
               <div className="ctl" onClick={() => plans?.open?.(p.id)} style={s('width:32px;height:32px;border-radius:9px;background:var(--bg3);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--text2);flex:none')}>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>
               </div>
-              <div className={busyId === p.id ? undefined : 'ctl'} onClick={busyId === p.id ? undefined : () => remove(p.id)} style={s('width:32px;height:32px;border-radius:9px;background:color-mix(in srgb,var(--bad) 12%,var(--bg3));border:1px solid color-mix(in srgb,var(--bad) 30%,transparent);display:flex;align-items:center;justify-content:center;color:var(--bad);flex:none;' + (busyId === p.id ? 'opacity:.5' : ''))}>
+              <div className={busyId === p.id ? undefined : 'ctl'} onClick={busyId === p.id ? undefined : () => setConfirmId(p.id)} style={s('width:32px;height:32px;border-radius:9px;background:color-mix(in srgb,var(--bad) 12%,var(--bg3));border:1px solid color-mix(in srgb,var(--bad) 30%,transparent);display:flex;align-items:center;justify-content:center;color:var(--bad);flex:none;' + (busyId === p.id ? 'opacity:.5' : ''))}>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6" /></svg>
               </div>
             </div>
           ))}
         </div>
+      )}
+
+      {/* delete-plan confirmation — deleting a saved plan can't be undone */}
+      {pendingPlan && (
+        <>
+          <div className="ctl" onClick={deleting ? undefined : () => setConfirmId(null)} style={s('position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50;animation:floatUp .2s ease')} />
+          <div className="scr" style={s('position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(90%,420px);z-index:51;background:var(--bg);border:1px solid var(--line2);border-radius:20px;padding:20px;animation:floatUpCenter .25s ease')}>
+            <div style={s('font-size:17px;font-weight:700')}>Delete this plan?</div>
+            <div style={s('font-size:13px;color:var(--text2);line-height:1.5;margin-top:8px')}>
+              <span style={s('color:var(--text);font-weight:600')}>{pendingPlan.name || 'Untitled plan'}</span> will be permanently deleted. This can’t be undone.
+            </div>
+            <div style={s('display:flex;gap:10px;margin-top:18px')}>
+              <div className="ctl" onClick={deleting ? undefined : () => setConfirmId(null)} style={s(`flex:1;text-align:center;padding:12px;border-radius:12px;font-weight:700;font-size:14px;background:var(--bg3);border:1px solid var(--line);color:var(--text2);opacity:${deleting ? 0.5 : 1}`)}>Cancel</div>
+              <div className="ctl" onClick={deleting ? undefined : () => remove(pendingPlan.id)} style={s(`flex:1;text-align:center;padding:12px;border-radius:12px;font-weight:700;font-size:14px;background:var(--bad);color:#fff;opacity:${deleting ? 0.7 : 1}`)}>{deleting ? 'Deleting…' : 'Delete'}</div>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

@@ -65,7 +65,7 @@ import Legal from './screens/Legal.jsx';
 const initialState = {
   screen: 'dash', theme: 'dark', lang: 'en', accent: 'orange',
   dashVar: 'a', rideVar: 'a', rideState: 'lobby',
-  planView: 'week', lbTab: 'load', showWorkout: false, workoutKey: 'bike', coachView: false,
+  planView: 'week', planWeekOffset: 0, planMonthOffset: 0, lbTab: 'load', showWorkout: false, workoutKey: 'bike', coachView: false,
   // discover / group / join-request / chat flow
   selGroup: 'galilee', selApplicant: null, payPlan: null, joinState: {}, reqStatus: {},
   // profiles
@@ -149,7 +149,15 @@ export default function App() {
   const { rows: liveLeaderboard } = useLeaderboard(authed ? squadId : null, { getToken, refreshSignal });
   const { items: liveActivities } = useActivities({ getToken, enabled: authed, refreshSignal });
   const { items: liveSquads } = useSquads({ getToken, enabled: authed, refreshSignal });
-  const { plan: livePlan, summary: livePlanSummary } = usePlan({ getToken, enabled: authed });
+  // Monday (local) of the week the plan screen is viewing — current week shifted by the
+  // week date-nav offset — sent to the backend so week navigation fetches real data.
+  const planWeekStart = useMemo(() => {
+    const now = new Date();
+    const monday = new Date(now.getFullYear(), now.getMonth(),
+      now.getDate() - ((now.getDay() + 6) % 7) + state.planWeekOffset * 7);
+    return `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`;
+  }, [state.planWeekOffset]);
+  const { plan: livePlan, summary: livePlanSummary } = usePlan({ getToken, enabled: authed, weekStart: planWeekStart });
 
   // The signed-in athlete's persisted profile (drives vm.me + Edit profile).
   const [profile, setProfile] = useState(null);
@@ -296,6 +304,11 @@ export default function App() {
     backToLobby: () => patch({ rideState: 'lobby' }),
     // plan
     setPlanView: (planView) => patch({ planView }),
+    // Date navigation: step the active view (week or month) forward/back, or jump to today.
+    planStep: (dir) => setState((s) => (s.planView === 'week'
+      ? { ...s, planWeekOffset: s.planWeekOffset + dir }
+      : { ...s, planMonthOffset: s.planMonthOffset + dir })),
+    planToday: () => patch({ planWeekOffset: 0, planMonthOffset: 0 }),
     toggleCoach: () => setState((s) => ({ ...s, coachView: !s.coachView })),
     openWorkout: (workoutKey) => patch({ showWorkout: true, workoutKey }),
     closeWorkout: () => patch({ showWorkout: false }),

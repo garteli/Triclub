@@ -15,7 +15,8 @@ public sealed record PublishWorkoutDto(
 public sealed record SavePlanRequest(Guid? Id, string? Name, string? Doc, Guid? SquadId);
 
 /// <summary>
-/// The signed-in athlete's weekly training plan (Mon..Sun of the current week).
+/// The signed-in athlete's weekly training plan (Mon..Sun of the current week,
+/// or of the week containing an optional ?weekStart=yyyy-MM-dd).
 /// Per-row status is derived from the date: past = done, today = today,
 /// future = planned, rest days = rest. No plan assigned = empty week.
 /// A coach can publish a plan (POST) onto their squad athletes' calendars.
@@ -129,7 +130,17 @@ public static class PlanEndpoints
         if (!Guid.TryParse(claim, out var athleteId)) return Results.Unauthorized();
 
         var today = DateTime.UtcNow.Date;
-        var monday = today.AddDays(-(((int)today.DayOfWeek + 6) % 7)); // Mon=0..Sun=6
+
+        // Optional ?weekStart=yyyy-MM-dd selects a different week (client date-nav); any day
+        // in the target week is accepted and normalised to that week's Monday. Status stays
+        // relative to the real today, so past weeks read "done" and future weeks "planned".
+        var anchor = today;
+        if (http.Request.Query.TryGetValue("weekStart", out var ws) &&
+            DateOnly.TryParse(ws, System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var parsed))
+            anchor = parsed.ToDateTime(TimeOnly.MinValue);
+
+        var monday = anchor.AddDays(-(((int)anchor.DayOfWeek + 6) % 7)); // Mon=0..Sun=6
 
         var rows = await plans.GetWeekAsync(athleteId, monday, ct);
 
