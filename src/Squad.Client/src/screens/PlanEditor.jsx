@@ -200,18 +200,21 @@ export default function PlanEditor({ vm, actions, plan, plans, onPublishPlan }) 
 
   // ── save this plan (the coach's working copy — a named, reloadable doc) ──
   const buildDoc = () => JSON.stringify({ planName, anchorType, anchorDate, totalWeeks, weeks, assigned });
+  // Persist the working copy; drives the Save indicator and returns the plan id
+  // (adopting a freshly-created one). Throws on failure — callers decide fatality.
+  const persist = async () => {
+    if (!plans?.save) throw new Error('Sign in as a coach to save.');
+    setSave({ status: 'busy', msg: '' });
+    const res = await plans.save({ id: planId, name: planName || 'Untitled plan', doc: buildDoc() });
+    const id = res?.id ?? planId;
+    if (id && id !== planId) setPlanId(id); // adopt the new id so re-saves update
+    setSave({ status: 'saved', msg: 'Saved' });
+    setTimeout(() => setSave((sv) => (sv.status === 'saved' ? { status: 'idle', msg: '' } : sv)), 1800);
+    return id;
+  };
   const savePlanNow = async () => {
     if (save.status === 'busy') return;
-    if (!plans?.save) { setSave({ status: 'error', msg: 'Sign in as a coach to save.' }); return; }
-    setSave({ status: 'busy', msg: '' });
-    try {
-      const res = await plans.save({ id: planId, name: planName || 'Untitled plan', doc: buildDoc() });
-      if (res?.id && res.id !== planId) setPlanId(res.id); // adopt the new id so re-saves update
-      setSave({ status: 'saved', msg: 'Saved' });
-      setTimeout(() => setSave((sv) => (sv.status === 'saved' ? { status: 'idle', msg: '' } : sv)), 1800);
-    } catch (e) {
-      setSave({ status: 'error', msg: e?.message || 'Could not save.' });
-    }
+    try { await persist(); } catch (e) { setSave({ status: 'error', msg: e?.message || 'Could not save.' }); }
   };
 
   // ── publish the whole plan to each assigned athlete (real dates → PlannedWorkout) ──
@@ -242,6 +245,9 @@ export default function PlanEditor({ vm, actions, plan, plans, onPublishPlan }) 
     if (!onPublishPlan) { setPub({ status: 'error', msg: 'Sign in as a coach to publish.' }); return; }
     setPub({ status: 'busy', msg: '' });
     try {
+      // Publishing also saves the coach's working copy first (best-effort — a save
+      // hiccup shouldn't block delivering the plan to athletes).
+      try { await persist(); } catch { /* keep going; the athlete write is the primary action */ }
       const res = await onPublishPlan({
         athleteIds, planName: planName || null,
         startDate: toISO(startMonday), weeks: nWeeks, workouts,
