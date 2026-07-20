@@ -357,6 +357,10 @@ export function buildViewModel(state, t, opts = {}) {
     squad, squadOnTrack, squadTotal,
     todayLabel, todayLabelHe,
     squadName: opts.squadName || null,
+    // Active squad branding (proxy paths, null until the owner uploads) — surfaced
+    // on the dashboard header so the club's identity carries across the app.
+    squadLogo: opts.activeSquad?.logoUrl || null,
+    squadBanner: opts.activeSquad?.bannerUrl || null,
     feed: liveFeedRows ?? feedRows,
     activities, myActivities, activityDetail,
     athlete, me: meFull,
