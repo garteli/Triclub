@@ -25,6 +25,27 @@ export const listRequests = (token) => req('/api/requests', { token });
 export const approveRequest = (token, squadId, athleteId) => req(`/api/squads/${squadId}/requests/${athleteId}/approve`, { method: 'POST', token });
 export const declineRequest = (token, squadId, athleteId) => req(`/api/squads/${squadId}/requests/${athleteId}/decline`, { method: 'POST', token });
 
+// Owner-side group management: edit details/pricing + roster (add/remove members).
+export const updateSquad = (token, id, body) => req(`/api/squads/${id}`, { method: 'PATCH', token, body });
+export const listMembers = (token, id) => req(`/api/squads/${id}/members`, { token });
+export const addMember = (token, id, email) => req(`/api/squads/${id}/members`, { method: 'POST', token, body: { email } });
+export const removeMember = (token, id, athleteId) => req(`/api/squads/${id}/members/${athleteId}`, { method: 'DELETE', token });
+
+// Logo / banner upload. dataUrl is a downscaled JPEG (see lib/photos.js downscaleToJpeg).
+// kind is 'logo' | 'banner'. Returns { url }.
+export async function uploadSquadImage(token, id, kind, blob) {
+  const fd = new FormData();
+  fd.append('file', blob, `${kind}.jpg`);
+  const res = await fetch(`/api/squads/${id}/${kind}`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    body: fd,
+  });
+  if (!res.ok) throw new Error(`Upload failed (${res.status})`);
+  return res.json().catch(() => ({}));
+}
+export const deleteSquadImage = (token, id, kind) => req(`/api/squads/${id}/${kind}`, { method: 'DELETE', token });
+
 // Map a server SquadSummary to the shape the Discover / Group screens render
 // (see data/squadData.js nearbyGroups). Price/rating are display strings already.
 export function mapSquad(s) {
@@ -45,5 +66,7 @@ export function mapSquad(s) {
 
     requestStatus: s.requestStatus || 'none', // none | pending | approved | declined
     description: s.description || '',
+    logoUrl: s.logoUrl || null,     // proxy path to the club logo (null → gradient fallback)
+    bannerUrl: s.bannerUrl || null, // proxy path to the club banner image
   };
 }

@@ -20,6 +20,11 @@ public static class SquadEndpoints
         g.MapPost("/{id:guid}/join", Join);
         g.MapPost("/{id:guid}/requests/{athleteId:guid}/approve", Approve);
         g.MapPost("/{id:guid}/requests/{athleteId:guid}/decline", Decline);
+        // Owner management: edit details/pricing + roster (add/remove members).
+        g.MapPatch("/{id:guid}", Update);
+        g.MapGet("/{id:guid}/members", Members);
+        g.MapPost("/{id:guid}/members", AddMember);
+        g.MapDelete("/{id:guid}/members/{athleteId:guid}", RemoveMember);
         // The owner's cross-squad pending-request inbox.
         app.MapGet("/api/requests", Requests).RequireAuthorization();
         return app;
@@ -101,6 +106,48 @@ public static class SquadEndpoints
         var squad = await squads.GetAsync(id, me, ct);
         await notes.AddAsync(athleteId, "declined", me, squad?.Name ?? "A squad", $"declined your request to join {squad?.Name}", ct);
         return Results.Ok(new { status = "declined" });
+    }
+
+    // ----- owner management ---------------------------------------------------
+
+    private static async Task<IResult> Update(Guid id, SquadUpdate body, HttpContext http, ISquadService squads, CancellationToken ct)
+    {
+        if (Me(http) is not { } me) return Results.Unauthorized();
+        if (!await squads.UpdateAsync(id, me, body, ct))
+            return Results.NotFound(new { error = "Squad not found, or you don't manage it." });
+        return Results.Ok(await squads.GetAsync(id, me, ct));
+    }
+
+    private static async Task<IResult> Members(Guid id, HttpContext http, ISquadService squads, CancellationToken ct)
+    {
+        if (Me(http) is not { } me) return Results.Unauthorized();
+        var rows = await squads.GetMembersAsync(id, me, ct);
+        return rows is null
+            ? Results.NotFound(new { error = "Squad not found, or you don't manage it." })
+            : Results.Ok(rows);
+    }
+
+    private static async Task<IResult> AddMember(Guid id, AddMemberRequest body, HttpContext http, ISquadService squads, CancellationToken ct)
+    {
+        if (Me(http) is not { } me) return Results.Unauthorized();
+        var email = body?.Email?.Trim() ?? "";
+        if (email.Length == 0) return Results.BadRequest(new { error = "An email is required." });
+
+        return await squads.AddMemberByEmailAsync(id, email, me, ct) switch
+        {
+            AddMemberOutcome.Added => Results.Ok(new { status = "added" }),
+            AddMemberOutcome.AlreadyMember => Results.Ok(new { status = "alreadymember" }),
+            AddMemberOutcome.AthleteNotFound => Results.NotFound(new { error = "No athlete with that email has signed up." }),
+            _ => Results.NotFound(new { error = "Squad not found, or you don't manage it." }),
+        };
+    }
+
+    private static async Task<IResult> RemoveMember(Guid id, Guid athleteId, HttpContext http, ISquadService squads, CancellationToken ct)
+    {
+        if (Me(http) is not { } me) return Results.Unauthorized();
+        return await squads.RemoveMemberAsync(id, athleteId, me, ct)
+            ? Results.Ok(new { status = "removed" })
+            : Results.NotFound(new { error = "Couldn't remove that member (not a member, the owner, or you don't manage this squad)." });
     }
 
     private static Guid? Me(HttpContext http)

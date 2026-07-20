@@ -34,6 +34,7 @@ import Coach from './screens/Coach.jsx';
 import Profile from './screens/Profile.jsx';
 import Discover from './screens/Discover.jsx';
 import GroupProfile from './screens/GroupProfile.jsx';
+import ManageGroup from './screens/ManageGroup.jsx';
 import Checkout from './screens/Checkout.jsx';
 import RidePayment from './screens/RidePayment.jsx';
 import CoachLedger from './screens/CoachLedger.jsx';
@@ -73,7 +74,7 @@ const initialState = {
 const screens = {
   dash: Dashboard, ride: LiveRide, plan: Plan, lb: Leaderboard,
   feed: Feed, seg: Segments, coach: Coach, profile: Profile,
-  discover: Discover, group: GroupProfile, pay: Checkout, recordpay: RidePayment, ledger: CoachLedger, requests: JoinRequests, chat: Messages,
+  discover: Discover, group: GroupProfile, manage: ManageGroup, pay: Checkout, recordpay: RidePayment, ledger: CoachLedger, requests: JoinRequests, chat: Messages,
   settings: Settings, welcome: Welcome, register: Register, login: Login, newgroup: CreateGroup,
   athlete: AthleteProfile, editprofile: EditProfile, notifs: Notifications, activities: Activities,
   upload: UploadActivity, sensors: Sensors,
@@ -278,6 +279,7 @@ export default function App() {
     // ride-payment nav — selGroup is already the viewed squad
     openRecordPay: () => patch({ screen: 'recordpay' }),
     openLedger: () => patch({ screen: 'ledger' }),
+    openManage: () => patch({ screen: 'manage' }),
     applyJoin: () => setState((s) => ({ ...s, joinState: { ...s.joinState, [s.selGroup]: 'applied' } })),
     simulateApprove: () => setState((s) => ({ ...s, joinState: { ...s.joinState, [s.selGroup]: 'approved' } })),
     freeJoin: () => setState((s) => ({ ...s, joinState: { ...s.joinState, [s.selGroup]: 'paid' } })),
