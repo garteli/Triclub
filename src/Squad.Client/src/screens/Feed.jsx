@@ -1,10 +1,14 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { s } from '../lib/style.js';
 import EmptyState from '../components/EmptyState.jsx';
 import AuthedAvatar from '../components/AuthedAvatar.jsx';
 import AuthedImage from '../components/AuthedImage.jsx';
 import { deleteActivity } from '../hooks/useActivities.js';
 import { useActivityPhotos } from '../hooks/useActivityPhotos.js';
+import { useActivityTrack } from '../hooks/useActivityTrack.js';
+import { usePlayback } from '../hooks/usePlayback.js';
+import { buildFrames, frameRoute, gpsFrameCount, buildTraces } from '../lib/activityFrames.js';
+import ActivityHero from '../components/ActivityHero.jsx';
 import ActivityDetailAnalysis from '../components/ActivityDetailAnalysis.jsx';
 import ActivityInteractions from '../components/ActivityInteractions.jsx';
 import { downscaleToJpeg, captureNativePhoto, isNativePlatform, uploadActivityPhoto } from '../lib/photos.js';
@@ -79,6 +83,15 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
   const [confirmDel, setConfirmDel] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  // Recording stream → shared replay model. One playhead drives the hero-map marker AND
+  // the synced charts in the detailed analysis, so play/scrub moves everything together.
+  const { track, laps, status } = useActivityTrack(a?.id, { getToken });
+  const frames = useMemo(() => buildFrames(track), [track]);
+  const route = useMemo(() => frameRoute(frames), [frames]);
+  const hasMap = useMemo(() => gpsFrameCount(frames) >= 2, [frames]);
+  const traces = useMemo(() => buildTraces(frames), [frames]);
+  const playback = usePlayback(frames.length);
+
   const doDelete = async () => {
     if (!a || deleting) return;
     setDeleting(true);
@@ -104,40 +117,56 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
       </div>
     );
   }
-  return (
-    <div style={s('padding:6px 0 120px;animation:floatUp .35s ease')}>
-      {/* header */}
-      <div style={s('display:flex;align-items:center;gap:11px;padding:2px 18px 12px')}>
-        <div className="ctl" onClick={() => actions.go(state.activityBack || 'activities')} style={s('width:34px;height:34px;border-radius:10px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;flex:none')}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round"><path d="M15 6l-6 6 6 6" /></svg>
-        </div>
-        <div className="ctl" onClick={() => actions.openAthlete(a.athleteId)} style={s('flex:none')}>
-          <AuthedAvatar avatarUrl={a.avatarUrl} token={token} initials={a.initials} color={a.color} size={40} radius={12} fontSize={14} />
-        </div>
-        <div style={s('flex:1;min-width:0')}><div style={s('font-size:15px;font-weight:700')}>{a.title}</div><div style={s('font-size:12px;color:var(--text2)')}>{a.athleteName} · {a.when} · {a.location}</div></div>
-        <div style={s(`background:color-mix(in srgb,${a.sportColor} 16%,transparent);color:${a.sportColor};font-size:10px;font-weight:700;padding:4px 9px;border-radius:7px;text-transform:uppercase`)}>{a.sport}</div>
-        {a.isMe && (
-          <div className="ctl" onClick={() => setConfirmDel(true)} title="Delete training" style={s('width:34px;height:34px;border-radius:10px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;flex:none;color:var(--bad)')}>
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6" /></svg>
-          </div>
-        )}
-      </div>
 
-      {/* key metrics (real activity summary) */}
-      <div style={s('display:grid;grid-template-columns:repeat(3,1fr);gap:9px;padding:14px 18px 0')}>
-        {a.metricCards.map(([v, u, l, col], i) => (
-          <div key={i} style={s('background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:11px 12px')}>
-            <div className="mono" style={s(`font-size:20px;font-weight:700${col ? ';color:' + col : ''}`)}>{v}{u && <span style={s('font-size:11px;color:var(--text2)')}>{u}</span>}</div>
-            <div style={s('font-size:9.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.6px')}>{l}</div>
+  // Strava-style stat grid — only the metrics we actually have (Avg HR hidden when 0).
+  const stats = [
+    ['Distance', `${a.dist}${a.distU ? ' ' + a.distU : ''}`],
+    ['Elevation Gain', `${a.elev} m`],
+    ['Moving Time', a.moving],
+    ['Avg Speed', `${a.avgSpeed}${a.speedU || ''}`],
+    ...(a.avgHr ? [['Avg HR', `${a.avgHr} bpm`]] : []),
+    ['Training Load', String(a.load)],
+  ];
+
+  return (
+    <div style={s('padding:0 0 120px;animation:floatUp .35s ease')}>
+      {/* Strava-style hero: full-bleed route map, overlaid nav + round play button */}
+      <ActivityHero a={a} route={route} frames={frames} hasMap={hasMap} status={status}
+        playback={playback} onBack={() => actions.go(state.activityBack || 'activities')} onDelete={() => setConfirmDel(true)} />
+
+      {/* content sheet, overlapping the map with a rounded lip + drag handle */}
+      <div style={s('position:relative;margin-top:-18px;background:var(--bg);border-radius:20px 20px 0 0;padding:10px 18px 0')}>
+        <div style={s('width:40px;height:4px;border-radius:3px;background:var(--line2);margin:0 auto 14px')} />
+
+        <div style={s('display:flex;align-items:center;gap:11px')}>
+          <div className="ctl" onClick={() => actions.openAthlete(a.athleteId)} style={s('flex:none')}>
+            <AuthedAvatar avatarUrl={a.avatarUrl} token={token} initials={a.initials} color={a.color} size={40} radius={12} fontSize={14} />
           </div>
-        ))}
+          <div style={s('flex:1;min-width:0')}>
+            <div style={s('font-size:14px;font-weight:700')}>{a.athleteName}</div>
+            <div style={s('font-size:11.5px;color:var(--text2)')}>{[a.when, a.location].filter(Boolean).join(' · ')}</div>
+          </div>
+          <div style={s(`background:color-mix(in srgb,${a.sportColor} 16%,transparent);color:${a.sportColor};font-size:10px;font-weight:700;padding:4px 9px;border-radius:7px;text-transform:uppercase;flex:none`)}>{a.sport}</div>
+        </div>
+
+        <div style={s('font-size:26px;font-weight:800;letter-spacing:-.5px;margin-top:12px')}>{a.title}</div>
+
+        <div style={s('display:grid;grid-template-columns:1fr 1fr;gap:16px 12px;margin-top:16px;border-top:1px solid var(--line);padding-top:16px')}>
+          {stats.map(([l, v]) => (
+            <div key={l} style={s('text-align:center')}>
+              <div style={s('font-size:12px;color:var(--text3)')}>{l}</div>
+              <div className="mono" style={s('font-size:22px;font-weight:800;margin-top:2px')}>{v}</div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* activity photos (attached or captured in-ride) + add-photos on your own */}
       <ActivityPhotos activityId={a.id} isMe={a.isMe} token={token} getToken={getToken} />
 
-      {/* route map + traces + per-km splits from the ingested recording */}
-      <ActivityDetailAnalysis activityId={a.id} sport={a.sport} getToken={getToken} />
+      {/* replay transport + synced traces + per-km splits from the ingested recording */}
+      <ActivityDetailAnalysis frames={frames} traces={traces} playback={playback}
+        track={track} laps={laps} status={status} sport={a.sport} />
 
       {/* kudos + comments */}
       <ActivityInteractions activity={a} token={token} getToken={getToken} meId={meId} />

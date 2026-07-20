@@ -1,7 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { s } from '../lib/style.js';
-import ActivityReplay from './ActivityReplay.jsx';
-import { useActivityTrack } from '../hooks/useActivityTrack.js';
+import CursorTrace, { capture } from './CursorTrace.jsx';
 import { loadZones } from '../lib/zones.js';
 import {
   normalizedPower, hrZones, powerZones, powerCurve, powerBestEfforts, distanceBestEfforts,
@@ -21,16 +20,6 @@ const CURVE_LABEL = { 1: '1s', 5: '5s', 15: '15s', 30: '30s', 60: '1m', 300: '5m
 // elevation), per-kilometre splits, and total work. Replaces the old placeholder.
 
 const label = 'font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.3px;font-weight:600';
-
-// Evenly downsample to at most `max` points (keeps first & last) so a multi-thousand-point
-// ride doesn't render thousands of SVG nodes. Splits/work are computed on the FULL track.
-function sample(arr, max) {
-  if (arr.length <= max) return arr;
-  const step = (arr.length - 1) / (max - 1);
-  const out = [];
-  for (let i = 0; i < max; i++) out.push(arr[Math.round(i * step)]);
-  return out;
-}
 
 function fmtDur(sec) {
   sec = Math.max(0, Math.round(sec));
@@ -175,47 +164,55 @@ function ZoneDist({ title, seconds, colors, names, bounds }) {
   );
 }
 
-export default function ActivityDetailAnalysis({ activityId, sport, getToken }) {
-  const { track, laps, status } = useActivityTrack(activityId, { getToken });
+// The replay transport under the hero map: a scrubber + elapsed/total time + a speed cycle.
+// The play/pause button lives on the hero map; this drives the same shared `playback`.
+function Transport({ playback, curSec, totalSec }) {
+  const trackRef = useRef(null);
+  const seekFromEvent = (e) => {
+    const r = trackRef.current?.getBoundingClientRect();
+    if (!r || !r.width) return;
+    playback.seek((e.clientX - r.left) / r.width);
+  };
+  const cycleSpeed = () => playback.setSpeed((sp) => (sp >= 4 ? 1 : sp * 2));
+  return (
+    <div style={s('display:flex;align-items:center;gap:11px;margin-top:2px')}>
+      <button
+        onClick={playback.toggle}
+        aria-label={playback.playing ? 'Pause' : 'Play'}
+        style={s('flex:none;width:34px;height:34px;border-radius:50%;border:none;background:var(--accent);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0')}
+      >
+        {playback.playing
+          ? <svg width="13" height="13" viewBox="0 0 14 14"><rect x="2" y="1.5" width="3.4" height="11" rx="1" fill="var(--accent-ink)" /><rect x="8.6" y="1.5" width="3.4" height="11" rx="1" fill="var(--accent-ink)" /></svg>
+          : <svg width="13" height="13" viewBox="0 0 14 14"><path d="M3 1.7 12 7 3 12.3Z" fill="var(--accent-ink)" /></svg>}
+      </button>
+      <div
+        ref={trackRef}
+        onPointerDown={(e) => { capture(e); playback.pause(); seekFromEvent(e); }}
+        onPointerMove={(e) => { if (e.buttons) seekFromEvent(e); }}
+        style={{ position: 'relative', flex: 1, height: 26, display: 'flex', alignItems: 'center', cursor: 'pointer', touchAction: 'none' }}
+      >
+        <div style={s('position:absolute;left:0;right:0;height:5px;border-radius:3px;background:var(--bg4)')} />
+        <div style={{ position: 'absolute', left: 0, width: `${playback.pos * 100}%`, height: 5, borderRadius: 3, background: 'var(--accent)' }} />
+        <div style={{ position: 'absolute', left: `${playback.pos * 100}%`, width: 14, height: 14, marginLeft: -7, borderRadius: '50%', background: '#fff', border: '2px solid var(--accent)', boxShadow: '0 1px 3px rgba(0,0,0,.25)' }} />
+      </div>
+      <div className="mono" style={s('font-size:11px;color:var(--text3);flex:none;letter-spacing:.2px')}>
+        <b style={s('color:var(--text)')}>{fmtDur(curSec)}</b> / {fmtDur(totalSec)}
+      </div>
+      <button onClick={cycleSpeed} aria-label="Playback speed"
+        style={s('flex:none;min-width:34px;height:26px;border-radius:8px;border:1px solid var(--line);background:var(--bg2);color:var(--text2);font-size:11px;font-weight:700;cursor:pointer;padding:0 7px')}>
+        {playback.speed}×
+      </button>
+    </div>
+  );
+}
+
+// Detailed analysis: the replay transport + time-synced traces (both driven by the shared
+// `playback` that also moves the hero-map marker), then Strava-style splits / zones / power
+// curve / best efforts. Frames + traces are derived once by the parent (Feed).
+export default function ActivityDetailAnalysis({ frames, traces, playback, track, laps, status, sport }) {
   const [zones] = useState(() => loadZones()); // device FTP / max HR
   const isSwim = sport === 'Swim';
   const isFoot = sport === 'Run';
-
-  // One downsampled frame array drives the whole animated replay — the map marker, the
-  // progressive route, and every chart cursor share this single index space. Map positions
-  // carry forward through gaps (and back-fill at the head) so a brief GPS dropout doesn't
-  // strand the marker; the metric fields keep nulls so chart gaps still read as gaps.
-  const frames = useMemo(() => {
-    const t = sample(track || [], 600);
-    const fr = t.map((p) => ({
-      lat: Number.isFinite(p.lat) ? p.lat : null,
-      lon: Number.isFinite(p.lon) ? p.lon : null,
-      offsetSec: Number.isFinite(p.offsetSec) ? p.offsetSec : null,
-      hr: p.heartRate ?? null,
-      power: p.powerW ?? null,
-      speed: p.speedMps != null ? p.speedMps * 3.6 : null, // m/s → km/h
-      cadence: p.cadence ?? null,
-      elev: p.elevM ?? null,
-    }));
-    let lat = null, lon = null;
-    for (const f of fr) {
-      if (f.lat != null && f.lon != null) { lat = f.lat; lon = f.lon; }
-      f.mLat = lat; f.mLon = lon;
-    }
-    const first = fr.find((f) => f.mLat != null);
-    if (first) for (const f of fr) { if (f.mLat == null) { f.mLat = first.mLat; f.mLon = first.mLon; } }
-    return fr;
-  }, [track]);
-
-  const gpsCount = useMemo(() => frames.reduce((n, f) => n + (f.lat != null ? 1 : 0), 0), [frames]);
-  const route = useMemo(() => frames.map((f) => [f.mLat, f.mLon]), [frames]);
-  const series = useMemo(() => ({
-    hr: frames.map((f) => f.hr),
-    power: frames.map((f) => f.power),
-    speed: frames.map((f) => f.speed),
-    cadence: frames.map((f) => f.cadence),
-    elev: frames.map((f) => f.elev),
-  }), [frames]);
 
   // Split distance by sport: swim 100m, ride 5km, run (and everything else) 1km.
   const splitUnit = isSwim ? 100 : sport === 'Bike' ? 5000 : 1000;
@@ -256,17 +253,11 @@ export default function ActivityDetailAnalysis({ activityId, sport, getToken }) 
     );
   }
 
-  const hasMap = gpsCount >= 2;
-  const traces = [
-    { key: 'hr', title: 'Heart rate', unit: 'bpm', stroke: 'var(--bad)', fill: 'var(--bad)', values: series.hr },
-    { key: 'power', title: 'Power', unit: 'W', stroke: 'var(--accent)', fill: 'var(--accent)', values: series.power },
-    { key: 'speed', title: 'Speed', unit: 'km/h', stroke: 'var(--bike)', fill: 'var(--bike)', values: series.speed, fmt: (x) => x.toFixed(1) },
-    { key: 'cadence', title: 'Cadence', unit: 'rpm', stroke: 'var(--warn)', fill: 'var(--warn)', values: series.cadence },
-    { key: 'elev', title: 'Elevation', unit: 'm', stroke: 'var(--good)', fill: 'var(--good)', values: series.elev },
-  ];
-  const shown = traces.filter((tr) => tr.values.filter((v) => v != null && Number.isFinite(v)).length >= 2);
+  const hasReplay = frames.length > 1 && traces.length > 0;
+  const totalSec = frames.length ? (frames[frames.length - 1].offsetSec ?? 0) : 0;
+  const curSec = frames[playback.index]?.offsetSec ?? 0;
 
-  if (!hasMap && shown.length === 0 && !useLaps && splits.length === 0) {
+  if (!hasReplay && !useLaps && splits.length === 0) {
     return (
       <div style={s('padding:20px 18px 0')}>
         <div style={s('background:var(--bg2);border:1px dashed var(--line2);border-radius:16px;padding:18px;text-align:center')}>
@@ -281,8 +272,15 @@ export default function ActivityDetailAnalysis({ activityId, sport, getToken }) 
     <div style={s('padding:20px 18px 0')}>
       <div style={s(label + ';margin-bottom:10px')}>Detailed analysis</div>
 
-      {(hasMap || shown.length > 0) && (
-        <ActivityReplay frames={frames} route={route} hasMap={hasMap} traces={shown} />
+      {hasReplay && (
+        <>
+          <Transport playback={playback} curSec={curSec} totalSec={totalSec} />
+          {traces.map((tr) => (
+            <CursorTrace key={tr.key} title={tr.title} unit={tr.unit} values={tr.values}
+              stroke={tr.stroke} fill={tr.fill} fmt={tr.fmt}
+              index={playback.index} onSeek={playback.seek} onGrab={playback.pause} />
+          ))}
+        </>
       )}
 
       {workKJ >= 1 && (

@@ -5,8 +5,9 @@ import { usePullToRefresh } from '../hooks/usePullToRefresh.js';
 
 // Logged-out / full-screen flows render without the bottom tab bar.
 const CHROMELESS = new Set(['welcome', 'register', 'login', 'newgroup']);
-// The live-ride map owns its own gestures — no pull-to-refresh there.
-const NO_PULL = new Set([...CHROMELESS, 'ride']);
+// The live-ride map owns its own gestures, and the chat is a fixed-height pane that
+// scrolls its own thread — no page-level pull-to-refresh on either.
+const NO_PULL = new Set([...CHROMELESS, 'ride', 'chat']);
 const REST = 46;        // where the spinner rests while a refresh is in flight
 const TRIGGER_UI = 60;  // fade the indicator in over the first ~60px of pull (matches the hook trigger)
 

@@ -73,7 +73,7 @@ function FieldCell({ f, editing, actions, index }) {
         <>
           <div style={s('position:absolute;inset:0')}>
             {f.pts.length ? (
-              <TileMap points={f.pts} W={344} H={240} radius={0} pad={28}>
+              <TileMap points={f.pts} fill radius={0} pad={28}>
                 {(project) => f.riders.map((r, k) => {
                   const p = project(r.lat, r.lon);
                   return <circle key={k} cx={p.x} cy={p.y} r={r.you ? 9 : 6} fill={r.you ? 'var(--accent)' : r.color} stroke="#fff" strokeWidth={r.you ? 3 : 2.5} />;
