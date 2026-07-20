@@ -10,6 +10,7 @@ import { useLeaderboard } from './hooks/useLeaderboard.js';
 import { useActivities } from './hooks/useActivities.js';
 import { useSquads } from './hooks/useSquads.js';
 import { usePlan } from './hooks/usePlan.js';
+import { useGarminSync } from './hooks/useGarminSync.js';
 import { createSquad, joinSquad } from './lib/squads.js';
 // import { useLiveRide } from './hooks/useLiveRide.js'; // swap in for real telemetry
 import { buildViewModel } from './lib/viewModel.js';
@@ -90,6 +91,16 @@ export default function App() {
   const squadId = session?.squadId;
   const getToken = useCallback(() => session?.token ?? null, [session]);
   const [refreshSignal, setRefreshSignal] = useState(0);
+
+  // Garmin Connect: on the native build, once a session is persisted on the device, pull
+  // any new activities on launch (and right after connecting). No-op on web / when signed
+  // out. New activities land in the same ingest pipeline as .fit uploads, so the feed,
+  // leaderboard and Activities list refresh via the shared data-refresh signal.
+  useGarminSync({
+    getToken,
+    onDataChanged: () => setRefreshSignal((n) => n + 1),
+    syncOnLaunch: authed,
+  });
 
   // Latest session for the (deps-[]) actions closure — so setAvatar can read the
   // current token without rebuilding the whole actions object.

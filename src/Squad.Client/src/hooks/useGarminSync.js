@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  garminAvailable, garminHasSession, garminLogin, garminLogout, syncGarmin,
+  garminAvailable, garminHasSession, garminLogin, garminLoginWebView, garminLogout, syncGarmin,
 } from '../lib/garmin.js';
 
 // Drives Garmin Connect: login/logout, "is a session persisted?", a run() sync trigger,
@@ -52,6 +52,13 @@ export function useGarminSync({ getToken, onDataChanged, syncOnLaunch = false } 
     return run({ force: false });
   }, [run]);
 
+  const loginWebView = useCallback(async () => {
+    setError(null);
+    await garminLoginWebView();
+    setConnected(true);
+    return run({ force: false });
+  }, [run]);
+
   const logout = useCallback(async () => {
     await garminLogout();
     setConnected(false);
@@ -67,5 +74,5 @@ export function useGarminSync({ getToken, onDataChanged, syncOnLaunch = false } 
     run({ force: false });
   }, [available, syncOnLaunch, connected, run]);
 
-  return { available, connected, status, progress, summary, error, run, login, logout };
+  return { available, connected, status, progress, summary, error, run, login, loginWebView, logout };
 }

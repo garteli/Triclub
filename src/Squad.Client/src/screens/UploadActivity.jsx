@@ -2,6 +2,7 @@ import { s } from '../lib/style.js';
 import { Back } from './wizard.jsx';
 import ActivityUpload from '../components/ActivityUpload.jsx';
 import AppleHealthSync from '../components/AppleHealthSync.jsx';
+import GarminSync from '../components/GarminSync.jsx';
 
 // Screen wrapper around ActivityUpload: drops a .fit onto the real ingest endpoint
 // (/api/activities/upload). Once the background worker parses it, the fan-out pushes
@@ -20,6 +21,7 @@ export default function UploadActivity({ actions, getToken, onDataChanged }) {
         onUploaded={(result) => { if (result?.status === 'queued') onDataChanged?.(); }}
       />
       <AppleHealthSync getToken={getToken} onDataChanged={onDataChanged} />
+      <GarminSync getToken={getToken} onDataChanged={onDataChanged} />
     </div>
   );
 }

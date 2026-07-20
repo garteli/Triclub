@@ -90,6 +90,13 @@ export async function login({ username, password }) {
     throw new Error('Garmin SSO: login returned no ticket (wrong email/password, or the SSO flow changed).');
   }
 
+  return exchangeTicket(ticket);
+}
+
+// Swap an SSO service ticket for a full session (OAuth1 token + OAuth2 bearer). Shared by
+// the headless login above and the WebView-login fallback (garminWebLogin.native.js) — the
+// WebView only needs to surface the ticket; the token exchange is identical either way.
+export async function exchangeTicket(ticket) {
   const oauth1 = await ticketToOAuth1(ticket);
   const oauth2 = await oauth1ToOAuth2(oauth1);
   return { oauth1, oauth2, savedAt: Date.now() };

@@ -58,6 +58,21 @@ export async function garminLogin({ username, password, rememberCredentials = fa
   return { ok: true };
 }
 
+// WebView login — the robust fallback for 2-step-verification / Cloudflare accounts. Opens
+// Garmin's real login page (garmin/garminWebLogin.native.js); we never handle the password.
+// Persists the resulting session just like garminLogin. No rememberCredentials option here —
+// with the WebView flow we never see the credentials to store.
+export async function garminLoginWebView() {
+  if (!garminAvailable()) throw new Error('Garmin sign-in is only available in the mobile app.');
+  const [web, store] = await Promise.all([
+    import('./garmin/garminWebLogin.native.js'),
+    import('./garmin/garminStore.native.js'),
+  ]);
+  const session = await web.loginWithWebView();
+  await store.saveSession(session);
+  return { ok: true };
+}
+
 export async function garminLogout() {
   if (!garminAvailable()) return;
   const store = await import('./garmin/garminStore.native.js');
