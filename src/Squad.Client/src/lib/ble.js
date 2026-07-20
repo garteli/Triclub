@@ -44,9 +44,29 @@ export function parseHeartRate(dv) {
   return flags & 0x01 ? dv.getUint16(1, true) : dv.getUint8(1);
 }
 
-// Cycling Power Measurement (0x2A63): uint16 flags (LE), then sint16 instantaneous watts.
-export function parseCyclingPower(dv) {
-  return dv.getInt16(2, true);
+// Cycling Power Measurement (0x2A63): uint16 flags (LE), then sint16 instantaneous watts,
+// then a variable field list. Many power meters also carry crank revolution data (flags
+// bit5) → cadence. We walk the optional fields in flag order to find that block, then diff
+// crank revs / event-time against the previous packet (stashed on latest._cpwr), handling
+// the 16-bit event-time rollover — same technique as the CSC crank block.
+export function applyCyclingPower(dv, latest) {
+  const flags = dv.getUint16(0, true);
+  latest.powerW = dv.getInt16(2, true);
+  let o = 4;
+  if (flags & 0x0001) o += 1;   // pedal power balance (uint8)
+  if (flags & 0x0004) o += 2;   // accumulated torque (uint16)
+  if (flags & 0x0010) o += 6;   // wheel revolution data (uint32 revs + uint16 event time)
+  if (flags & 0x0020) {         // crank revolution data → cadence
+    const revs = dv.getUint16(o, true);
+    const time = dv.getUint16(o + 2, true);                     // 1/1024 s
+    const st = latest._cpwr || (latest._cpwr = {});
+    if (st.ct != null) {
+      const dt = ((time - st.ct) & 0xffff) / 1024;
+      const dr = (revs - st.cr) & 0xffff;
+      if (dt > 0) latest.cadence = Math.round((dr / dt) * 60);
+    }
+    st.cr = revs; st.ct = time;
+  }
 }
 
 // Varia radar (reverse-engineered): 1 header byte, then 3 bytes per threat —
@@ -128,23 +148,28 @@ export function applyIndoorBike(dv, latest) {
 // `clears` lists the snapshot fields to null on disconnect; `reset` clears rolling state.
 export const SENSOR_SPECS = {
   hr:      { ...HR,    clears: ['heartRate'],                 apply: (dv, l) => { l.heartRate = parseHeartRate(dv); } },
-  power:   { ...POWER, clears: ['powerW'],                    apply: (dv, l) => { l.powerW = parseCyclingPower(dv); } },
+  power:   { ...POWER, clears: ['powerW', 'cadence'], reset: '_cpwr', apply: applyCyclingPower },
   csc:     { ...CSC,   clears: ['speedKph', 'cadence'], reset: '_csc', apply: applyCSC },
   rsc:     { ...RSC,   clears: ['speedKph', 'cadence'],       apply: applyRSC },
   trainer: { ...FTMS,  clears: ['powerW', 'speedKph', 'cadence'], apply: applyIndoorBike },
-  radar:   { ...RADAR, clears: ['radar'],                     apply: (dv, l) => { l.radar = parseVariaRadar(dv); } },
+  // Varia radar units DON'T advertise their proprietary radar service, so a service-only
+  // scan filter never surfaces them. Scan by name prefix instead (RTL5xx / RTL510/515);
+  // the service lives in optionalServices so we can still subscribe after connecting.
+  radar:   { ...RADAR, clears: ['radar'], namePrefix: 'RTL',  apply: (dv, l) => { l.radar = parseVariaRadar(dv); } },
 };
 
 // Display catalog for the Sensors screen: order, labels, which metrics each device
 // surfaces, and honest availability. `available:false` renders a disabled row with a note.
 export const SENSOR_CATALOG = [
   { kind: 'hr',      label: 'Heart rate',        hint: 'Chest strap or optical HRM',       metrics: ['heartRate'] },
-  { kind: 'power',   label: 'Power meter',       hint: 'Crank, pedal or hub power',        metrics: ['powerW'] },
+  { kind: 'power',   label: 'Power meter',       hint: 'Crank, pedal or hub power',        metrics: ['powerW', 'cadence'] },
   { kind: 'csc',     label: 'Speed & cadence',   hint: 'Standard CSC sensor',              metrics: ['speedKph', 'cadence'] },
   { kind: 'trainer', label: 'Smart trainer',     hint: 'FTMS indoor trainer (power)',      metrics: ['powerW', 'speedKph', 'cadence'] },
   { kind: 'rsc',     label: 'Run footpod',       hint: 'Running speed & cadence',          metrics: ['speedKph', 'cadence'] },
   { kind: 'radar',   label: 'Rear radar',        hint: 'Garmin Varia · unofficial',        metrics: ['radar'] },
-  { kind: 'gears',   label: 'Electronic shifting', hint: 'Di2 / AXS — no standard BLE profile', metrics: [], available: false },
+  // Electronic shifting (Di2 / AXS) intentionally omitted: live gear data isn't on a
+  // standard BLE profile (Di2 uses private ANT; iOS has no ANT radio). Re-add here if a
+  // BLE gear characteristic is ever confirmed.
 ];
 
 // Blank snapshot — the shape every controller keeps and the recorder/UI read.

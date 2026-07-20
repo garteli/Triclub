@@ -24,7 +24,14 @@ export async function createNativeSensorController() {
   async function connect(kind) {
     const spec = SENSOR_SPECS[kind];
     if (!spec) throw new Error(`Unknown sensor: ${kind}`);
-    const device = await BleClient.requestDevice({ services: [spec.service] });
+    // Sensors that advertise their service are filtered on it directly. Devices that don't
+    // (e.g. Varia radar) are scanned by name prefix, with the service in optionalServices
+    // so it's reachable once connected.
+    const device = await BleClient.requestDevice(
+      spec.namePrefix
+        ? { namePrefix: spec.namePrefix, optionalServices: [spec.service] }
+        : { services: [spec.service] },
+    );
     await subscribe(kind, device.deviceId);
     return { id: device.deviceId, name: device.name || kind };
   }

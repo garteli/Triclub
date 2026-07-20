@@ -30,8 +30,12 @@ export function createWebSensorController() {
     const spec = SENSOR_SPECS[kind];
     if (!spec) throw new Error(`Unknown sensor: ${kind}`);
 
+    // Match by advertised service, plus by name prefix for devices that don't advertise
+    // their service (e.g. Varia radar). Keep the service in optionalServices either way.
     const device = await navigator.bluetooth.requestDevice({
-      filters: [{ services: [spec.service] }],
+      filters: spec.namePrefix
+        ? [{ services: [spec.service] }, { namePrefix: spec.namePrefix }]
+        : [{ services: [spec.service] }],
       optionalServices: [spec.service],
     });
     return subscribe(kind, device);
