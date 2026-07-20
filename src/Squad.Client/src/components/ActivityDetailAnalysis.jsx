@@ -5,9 +5,12 @@ import { toPathD } from '../lib/tiles.js';
 import { useActivityTrack } from '../hooks/useActivityTrack.js';
 import { loadZones } from '../lib/zones.js';
 import {
-  normalizedPower, hrZones, powerZones, powerCurve,
+  normalizedPower, hrZones, powerZones, powerCurve, powerBestEfforts, distanceBestEfforts,
   HR_ZONE_FRACS, HR_ZONE_NAMES, PWR_ZONE_FRACS, PWR_ZONE_NAMES,
 } from '../lib/powerAnalysis.js';
+
+const DIST_LABEL = { 1000: '1K', 5000: '5K', 10000: '10K', 16093: '10 mi', 20000: '20K', 30000: '30K', 40000: '40K', 50000: '50K' };
+const fmtEffortDur = (sec) => (sec < 60 ? `${sec}s` : sec % 60 === 0 ? `${sec / 60}m` : `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`);
 
 const POWER_COLORS = ['#8a94a6', '#4a86ff', '#22c55e', '#eab308', '#f97316', '#ef4444', '#a855f7'];
 const HR_COLORS = ['#8a94a6', '#22c55e', '#eab308', '#f97316', '#ef4444'];
@@ -242,6 +245,8 @@ export default function ActivityDetailAnalysis({ activityId, sport, getToken }) 
   const pwZones = useMemo(() => powerZones(track || [], zones.ftp), [track, zones.ftp]);
   const hZones = useMemo(() => hrZones(track || [], zones.maxHr), [track, zones.maxHr]);
   const curve = useMemo(() => powerCurve(track || []), [track]);
+  const bestPower = useMemo(() => powerBestEfforts(track || []), [track]);
+  const bestDist = useMemo(() => distanceBestEfforts(track || []), [track]);
   const ifactor = np && zones.ftp ? np / zones.ftp : null;
   const hasPower = curve.length > 0 || np != null;
   const hasHr = (track || []).some((p) => Number.isFinite(p.heartRate));
@@ -377,6 +382,45 @@ export default function ActivityDetailAnalysis({ activityId, sport, getToken }) 
       {useLaps
         ? <SegmentTable title="Laps" rows={lapRows} isSwim={isSwim} isFoot={isFoot} />
         : <SegmentTable title={`Splits · per ${isSwim ? '100m' : 'km'}`} rows={splits} isSwim={isSwim} isFoot={isFoot} />}
+
+      {(bestPower.length > 0 || bestDist.length > 0) && (
+        <div style={s('margin-top:14px')}>
+          <div style={s(label + ';margin-bottom:8px')}>Best efforts</div>
+          <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:10px 12px')}>
+            {bestPower.length > 0 && (() => {
+              const maxW = Math.max(...bestPower.map((e) => e.watts));
+              return (
+                <>
+                  <div style={s('font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px')}>Power</div>
+                  {bestPower.map((e) => (
+                    <div key={e.sec} style={s('display:flex;align-items:center;gap:9px;padding:4px 0')}>
+                      <div className="mono" style={s('width:38px;font-size:11px;color:var(--text2)')}>{fmtEffortDur(e.sec)}</div>
+                      <div style={s('flex:1;height:7px;border-radius:4px;background:var(--bg4);overflow:hidden')}>
+                        <div style={s(`height:100%;border-radius:4px;background:var(--accent);width:${Math.round((e.watts / maxW) * 100)}%`)} />
+                      </div>
+                      <div className="mono" style={s('width:46px;text-align:right;font-size:12px;font-weight:700')}>{e.watts}<span style={s('font-size:9px;color:var(--text3)')}>w</span></div>
+                      <div className="mono" style={s('width:44px;text-align:right;font-size:11px;color:var(--text3)')}>{e.avgHr != null ? `${e.avgHr}` : '—'}</div>
+                    </div>
+                  ))}
+                </>
+              );
+            })()}
+            {bestDist.length > 0 && (
+              <>
+                <div style={s(`font-size:11px;font-weight:700;color:var(--text2);margin:${bestPower.length ? '10px' : '0'} 0 4px`)}>Distance</div>
+                {bestDist.map((e) => (
+                  <div key={e.meters} style={s('display:flex;align-items:center;gap:9px;padding:4px 0')}>
+                    <div style={s('width:46px;font-size:12px;font-weight:600')}>{DIST_LABEL[e.meters] || `${Math.round(e.meters / 1000)}K`}</div>
+                    <div className="mono" style={s('flex:1;font-size:12px;font-weight:600')}>{fmtDur(e.sec)}</div>
+                    <div className="mono" style={s('width:60px;text-align:right;font-size:11px;color:var(--text3)')}>{((e.meters / 1000) / (e.sec / 3600)).toFixed(1)} km/h</div>
+                    <div className="mono" style={s('width:44px;text-align:right;font-size:11px;color:var(--text3)')}>{e.avgHr != null ? `${e.avgHr}` : '—'}</div>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
