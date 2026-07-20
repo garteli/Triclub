@@ -1,0 +1,43 @@
+diff --git a/node_modules/@perfood/capacitor-healthkit/ios/Plugin/CapacitorHealthkitPlugin.swift b/node_modules/@perfood/capacitor-healthkit/ios/Plugin/CapacitorHealthkitPlugin.swift
+index 0c5d95c..c19957b 100644
+--- a/node_modules/@perfood/capacitor-healthkit/ios/Plugin/CapacitorHealthkitPlugin.swift
++++ b/node_modules/@perfood/capacitor-healthkit/ios/Plugin/CapacitorHealthkitPlugin.swift
+@@ -64,6 +64,10 @@ public class CapacitorHealthkitPlugin: CAPPlugin {
+             return HKQuantityType.quantityType(forIdentifier: HKQuantityTypeIdentifier.restingHeartRate)!
+         case "respiratoryRate":
+             return HKQuantityType.quantityType(forIdentifier: HKQuantityTypeIdentifier.respiratoryRate)!
++        case "hrv":
++            return HKQuantityType.quantityType(forIdentifier: HKQuantityTypeIdentifier.heartRateVariabilitySDNN)!
++        case "vo2Max":
++            return HKQuantityType.quantityType(forIdentifier: HKQuantityTypeIdentifier.vo2Max)!
+         case "bodyFat":
+             return HKQuantityType.quantityType(forIdentifier: HKQuantityTypeIdentifier.bodyFatPercentage)!
+         case "oxygenSaturation":
+@@ -110,6 +114,10 @@ public class CapacitorHealthkitPlugin: CAPPlugin {
+                 types.insert(HKQuantityType.quantityType(forIdentifier: HKQuantityTypeIdentifier.restingHeartRate)!)
+             case "respiratoryRate":
+                 types.insert(HKQuantityType.quantityType(forIdentifier: HKQuantityTypeIdentifier.respiratoryRate)!)
++            case "hrv":
++                types.insert(HKQuantityType.quantityType(forIdentifier: HKQuantityTypeIdentifier.heartRateVariabilitySDNN)!)
++            case "vo2Max":
++                types.insert(HKQuantityType.quantityType(forIdentifier: HKQuantityTypeIdentifier.vo2Max)!)
+             case "bodyFat":
+                 types.insert(HKQuantityType.quantityType(forIdentifier: HKQuantityTypeIdentifier.bodyFatPercentage)!)
+             case "oxygenSaturation":
+@@ -418,6 +426,16 @@ public class CapacitorHealthkitPlugin: CAPPlugin {
+                 } else if sampleName == "respiratoryRate" {
+                     unit = HKUnit(from: "count/min")
+                     unitName = "BrPM"
++                } else if sampleName == "hrv" {
++                    // HRV SDNN is a time quantity — must be handled BEFORE the generic
++                    // minute()-compatible fallback below, or it'd be reported in minutes.
++                    unit = HKUnit.secondUnit(with: .milli)
++                    unitName = "ms"
++                } else if sampleName == "vo2Max" {
++                    // mL/(kg·min) — not compatible with any generic branch, so without
++                    // this case `unit` stays nil and the force-unwrap crashes.
++                    unit = HKUnit(from: "ml/kg*min")
++                    unitName = "mL/kg·min"
+                 } else if sampleName == "bodyFat" {
+                     unit = HKUnit.percent()
+                     unitName = "percent"

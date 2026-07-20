@@ -133,34 +133,50 @@ To keep sensors alive with the screen off, also add `bluetooth-central` to
 
 ---
 
-# Apple Health (HealthKit) — import workout history
+# Apple Health (HealthKit) — import daily wellness
 
 HealthKit is **iOS-native only** — there is no web API for it (same platform reality as
 background GPS and Web Bluetooth on iOS). So the "Sync Apple Health" panel on the Upload
 screen is live only in the native iOS build; on web it renders a disabled, explanatory
-state. The read + upload lives entirely on the device — the backend HealthKit path
-(`POST /api/activities/native/healthkit`, `HealthKitAdapter`) was already there; this just
-feeds it.
+state.
+
+**Scope: wellness, not workouts.** Apple Health here is a *readiness/recovery* feed —
+resting HR, HRV, respiratory rate, weight, VO2max, and sleep. It does **not** import
+activities: Garmin/FIT own that (and Apple Health never exposes the GPS track anyway).
+The old workout-import path was retired in favour of this lighter one.
 
 ## How it fits
 
-`lib/health.js` (facade) → `lib/healthSource.native.js` (HealthKit reader) → posts each
-workout to `/api/activities/native/healthkit`. That endpoint is idempotent by HealthKit
-workout **UUID** and dedupes by fingerprint, so re-syncing is safe: already-imported
-workouts return `already-received` and never double-count. `useHealthSync` + the
-`AppleHealthSync` component drive the UI. The one plugin-specific mapping is `mapWorkout()`
-in `healthSource.native.js` — swap plugins and only that function changes.
+`lib/health.js` (facade) → `lib/healthSource.native.js` (HealthKit reader) reduces each
+metric to **one value per local calendar day**, then posts batches to
+`POST /api/health/daily`. The backend (`HealthEndpoints.cs` → `SqlHealthDailyStore`)
+upserts one wide row per `(athlete, day)` via a `MERGE` that **COALESCEs each column**, so
+re-syncing and partial syncs are safe and never wipe an already-recorded metric. Read it
+back with `GET /api/health/daily?days=90`. `useHealthSync` + the `AppleHealthSync`
+component drive the UI; the plugin-specific pieces are the `sampleName` strings and the
+per-day reducers in `healthSource.native.js`.
 
 ## Install
 
 ```bash
 cd src/Squad.Client
 npm i @perfood/capacitor-healthkit
+npm i -D patch-package        # HRV + VO2max patch (below); postinstall reapplies it
 npx cap sync
 ```
 
 (Already listed in `package.json` and marked `external` in `vite.config.js`, so the web
 bundle never tries to resolve it.)
+
+### Plugin patch — HRV & VO2max
+
+The stock `@perfood/capacitor-healthkit` (1.3.2) has **no** case for
+`heartRateVariabilitySDNN` or `vo2Max`, so it silently returns nothing for them. A
+`patch-package` patch (`patches/@perfood+capacitor-healthkit+1.3.2.patch`) adds two sample
+cases — `'hrv'` and `'vo2Max'` — to both the auth and query switches plus their unit
+mappings (HRV in **ms**, VO2max in **mL/kg·min**; HRV must be handled before the generic
+minute-compatible branch or it'd be reported in minutes). The `"postinstall": "patch-package"`
+script reapplies it after every `npm ci`, so CI (`ios-testflight.yml`) carries it into the pod.
 
 ## iOS — capability + `Info.plist`
 
@@ -169,26 +185,31 @@ bundle never tries to resolve it.)
 
 ```xml
 <key>NSHealthShareUsageDescription</key>
-<string>Domestique Team reads your workouts from Apple Health to add them to your training log and squad feed.</string>
+<string>Domestique Team reads your resting heart rate, HRV, sleep, weight and VO₂max from Apple Health to show your training readiness.</string>
 ```
 
-We only request **read** scopes (workouts, distance, activity energy, heart rate); no
-write. iOS never tells the app whether a specific type was granted (privacy by design), so
-a "successful" permission call just means the sheet was shown — a sync that finds nothing
+We request **read** scopes only — `weight`, `restingHeartRate`, `respiratoryRate`, `hrv`,
+`vo2Max`, and `activity` (sleep has no direct scope name in the plugin; `activity` grants
+it). iOS never tells the app whether a specific type was granted (privacy by design), so a
+"successful" permission call just means the sheet was shown — a sync that finds nothing
 usually means read access was declined in Settings → Privacy → Health.
 
 ## Notes
 
-- **Units**: `totalDistance` is mapped straight through as metres and `totalEnergyBurned`
-  as calories — validate against a known workout on real hardware, and adjust `mapWorkout`
-  if your locale/plugin version returns a different base unit.
-- **HR/power enrichment**: `mapWorkout` fills the fields an `HKWorkout` reliably carries;
-  average HR/power need separate per-workout `HKQuantity` queries and are left `null` for
-  now (a documented follow-up). The dedup fingerprint only needs sport + start + distance,
-  so imports are correct without them.
-- **Android**: the parallel path is Health Connect (`ActivitySource.HealthConnect`,
-  `/api/activities/native/healthconnect`) — the backend adapter exists; a Health Connect
-  reader on the client is the analogous next step.
+- **Units**: weight is **kg**, HRV **ms**, VO2max **mL/kg·min**, resting HR / respiratory
+  rate in bpm/brpm — validate against a known day on real hardware and adjust the reducer
+  in `healthSource.native.js` if a plugin version returns a different base unit.
+- **Daily reduction**: resting HR / HRV / respiratory rate are **averaged** over the day;
+  weight / VO2max take the **latest** reading; sleep **sums** "Asleep" interval hours onto
+  the day the user woke (falling back to "InBed" only when no asleep stages were logged).
+- **Day bucketing** uses the **device-local** date so a reading lands on the day the user
+  actually lived, not a UTC-shifted one.
+- **No "stress"**: HealthKit has no stress metric (it's a Garmin/Whoop-derived value that
+  does not sync to Apple Health). HRV is the closest recovery proxy; true stress/Body
+  Battery would have to come from the Garmin pull.
+- **Android**: the analogous wellness source is Health Connect (resting HR / HRV / sleep
+  are all available there) — a client reader posting to the same `/api/health/daily`
+  endpoint is the next step.
 
 HR and power are Bluetooth SIG standards and parse to spec. **Radar is reverse-engineered**
 (1 header byte + 3 bytes/threat: distance + threat-level bits) — it works with Garmin

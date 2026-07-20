@@ -45,6 +45,7 @@ import Activities from './screens/Activities.jsx';
 import UploadActivity from './screens/UploadActivity.jsx';
 import Sensors from './screens/Sensors.jsx';
 import Units from './screens/Units.jsx';
+import TrainingZones from './screens/TrainingZones.jsx';
 import NotificationPrefs from './screens/NotificationPrefs.jsx';
 import Privacy from './screens/Privacy.jsx';
 import Help from './screens/Help.jsx';
@@ -70,7 +71,7 @@ const screens = {
   settings: Settings, welcome: Welcome, register: Register, login: Login, newgroup: CreateGroup,
   athlete: AthleteProfile, editprofile: EditProfile, notifs: Notifications, activities: Activities,
   upload: UploadActivity, sensors: Sensors,
-  units: Units, notifprefs: NotificationPrefs, privacy: Privacy, help: Help, legal: Legal,
+  units: Units, zones: TrainingZones, notifprefs: NotificationPrefs, privacy: Privacy, help: Help, legal: Legal,
 };
 
 export default function App() {
@@ -111,6 +112,7 @@ export default function App() {
   const { feed: liveFeed, status: feedStatus } = useSquadFeed({
     getToken,
     enabled: authed,
+    refreshSignal,
     onLeaderboardChanged: () => setRefreshSignal((n) => n + 1),
   });
   const { rows: liveLeaderboard } = useLeaderboard(authed ? squadId : null, { getToken, refreshSignal });
@@ -173,6 +175,14 @@ export default function App() {
       return created;
     },
   }), [session?.token, refreshSession]);
+
+  // Pull-to-refresh: re-pull every live surface (feed snapshot, leaderboard,
+  // activities, squads, profile) by bumping the shared signal, and hold the
+  // spinner briefly so the gesture reads as doing work even on a fast network.
+  const onRefresh = useCallback(async () => {
+    setRefreshSignal((n) => n + 1);
+    await new Promise((resolve) => setTimeout(resolve, 650));
+  }, []);
 
   const patch = (p) => setState((s) => ({ ...s, ...p }));
 
@@ -293,7 +303,8 @@ export default function App() {
     <div className="app-shell">
       {/* Dev-only prototype harness (screen switcher / theme toggles); never shipped. */}
       {import.meta.env.DEV && <ControlDock state={state} actions={actions} />}
-      <Phone theme={state.theme} accent={state.accent} lang={state.lang} dir={dir} screen={state.screen} go={actions.go}>
+      <Phone theme={state.theme} accent={state.accent} lang={state.lang} dir={dir} screen={state.screen} go={actions.go}
+        onRefresh={authed ? onRefresh : undefined}>
         <Screen vm={vm} state={state} actions={actions} live={live} tick={t} livePages={livePages}
           getToken={getToken} onDataChanged={() => setRefreshSignal((n) => n + 1)}
           profile={profile} onProfileSaved={setProfile}

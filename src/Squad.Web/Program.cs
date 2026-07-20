@@ -112,6 +112,7 @@ app.MapProfile();          // GET/PUT /api/profile
 app.MapImages();           // avatars + activity photos (upload + authenticated read proxy)
 app.MapActivityIntake();   // POST /api/activities/upload  +  /api/activities/native/{source}
 app.MapActivityQuery();    // GET  /api/activities
+app.MapHealthDaily();      // POST/GET /api/health/daily (Apple Health wellness)
 app.MapSquads();           // GET/POST /api/squads (+ /{id}, /{id}/join)
 app.MapLeaderboard();      // GET  /api/squads/{squadId}/leaderboard
 app.MapFeed();             // GET  /api/feed

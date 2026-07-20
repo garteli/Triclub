@@ -7,7 +7,7 @@ import { API_BASE } from '../lib/apiBase.js';
 // on the client. New activities (posted after the worker parses an upload) arrive
 // on 'activityPosted' and are prepended; 'leaderboardChanged' fires onLeaderboardChanged
 // so ranked views can refetch.
-export function useSquadFeed({ hubUrl = API_BASE + '/hubs/squad', feedUrl = '/api/feed', getToken, initial = [], enabled = true, onLeaderboardChanged } = {}) {
+export function useSquadFeed({ hubUrl = API_BASE + '/hubs/squad', feedUrl = '/api/feed', getToken, initial = [], enabled = true, refreshSignal, onLeaderboardChanged } = {}) {
   const [feed, setFeed] = useState(initial);
   const [status, setStatus] = useState('connecting'); // 'connecting' | 'live' | 'offline'
   const cbRef = useRef(onLeaderboardChanged);
@@ -33,8 +33,10 @@ export function useSquadFeed({ hubUrl = API_BASE + '/hubs/squad', feedUrl = '/ap
       } catch { /* offline — hub may still connect */ }
     })();
     return () => { cancelled = true; };
+    // refreshSignal re-pulls the snapshot on demand (pull-to-refresh); the merge
+    // below dedups by id, so re-fetching can't duplicate live items already shown.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [feedUrl, enabled]);
+  }, [feedUrl, enabled, refreshSignal]);
 
   useEffect(() => {
     if (!enabled) { setStatus('offline'); return; }
