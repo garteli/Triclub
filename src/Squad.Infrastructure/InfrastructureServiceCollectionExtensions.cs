@@ -14,8 +14,11 @@ public static class InfrastructureServiceCollectionExtensions
     /// </summary>
     /// <param name="storageConnectionString">Azure Storage connection string for image blobs.
     /// When null/empty, images fall back to the local filesystem (dev/no-storage-account).</param>
+    /// <param name="paymentsClubFeeBps">The club's default cut of each tracked ride payment, in basis
+    /// points (1000 = 10%). Snapshotted onto each ledger row at creation.</param>
     public static IServiceCollection AddSquadInfrastructure(
-        this IServiceCollection services, string sqlConnectionString, string? storageConnectionString = null)
+        this IServiceCollection services, string sqlConnectionString, string? storageConnectionString = null,
+        int paymentsClubFeeBps = 1000)
     {
         // Collection-surface adapters (resolved by Source in the worker).
         services.AddSingleton<ISourceAdapter, FitUploadAdapter>();
@@ -37,6 +40,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IAthleteAccounts>(_ => new SqlAthleteAccounts(sqlConnectionString));
         services.AddScoped<IProfileService>(_ => new SqlProfileService(sqlConnectionString));
         services.AddScoped<ISquadService>(_ => new SqlSquadService(sqlConnectionString));
+        services.AddScoped<IPaymentService>(_ => new SqlPaymentService(sqlConnectionString, paymentsClubFeeBps));
         services.AddScoped<IChatService>(_ => new SqlChatService(sqlConnectionString));
         services.AddScoped<IKudosService>(_ => new SqlKudosService(sqlConnectionString));
         services.AddScoped<ICommentService>(_ => new SqlCommentService(sqlConnectionString));
