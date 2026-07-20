@@ -79,4 +79,55 @@ public sealed class SqlPlanService(string connectionString) : IPlanService
         await tx.CommitAsync(ct);
         return allowed.Count;
     }
+
+    // ----- a coach's saved plans -----
+
+    public async Task<IReadOnlyList<CoachPlanSummary>> ListPlansAsync(Guid ownerId, CancellationToken ct)
+    {
+        await using var conn = new SqlConnection(connectionString);
+        var rows = await conn.QueryAsync<CoachPlanSummary>(new CommandDefinition("""
+            SELECT Id, Name, UpdatedUtc FROM dbo.CoachPlan
+            WHERE OwnerId = @ownerId ORDER BY UpdatedUtc DESC;
+            """, new { ownerId }, cancellationToken: ct));
+        return rows.ToList();
+    }
+
+    public async Task<CoachPlanDoc?> GetPlanAsync(Guid ownerId, Guid planId, CancellationToken ct)
+    {
+        await using var conn = new SqlConnection(connectionString);
+        return await conn.QuerySingleOrDefaultAsync<CoachPlanDoc>(new CommandDefinition("""
+            SELECT Id, Name, Doc, UpdatedUtc FROM dbo.CoachPlan
+            WHERE Id = @planId AND OwnerId = @ownerId;
+            """, new { planId, ownerId }, cancellationToken: ct));
+    }
+
+    public async Task<Guid?> SavePlanAsync(Guid ownerId, Guid? planId, string name, string doc, Guid? squadId, CancellationToken ct)
+    {
+        await using var conn = new SqlConnection(connectionString);
+
+        if (planId is { } id)
+        {
+            var updated = await conn.ExecuteAsync(new CommandDefinition("""
+                UPDATE dbo.CoachPlan SET Name = @name, Doc = @doc, SquadId = @squadId, UpdatedUtc = SYSUTCDATETIME()
+                WHERE Id = @id AND OwnerId = @ownerId;
+                """, new { id, ownerId, name, doc, squadId }, cancellationToken: ct));
+            return updated > 0 ? id : (Guid?)null; // 0 rows → not theirs / gone
+        }
+
+        var newId = Guid.NewGuid();
+        await conn.ExecuteAsync(new CommandDefinition("""
+            INSERT INTO dbo.CoachPlan (Id, OwnerId, SquadId, Name, Doc, UpdatedUtc)
+            VALUES (@newId, @ownerId, @squadId, @name, @doc, SYSUTCDATETIME());
+            """, new { newId, ownerId, squadId, name, doc }, cancellationToken: ct));
+        return newId;
+    }
+
+    public async Task<bool> DeletePlanAsync(Guid ownerId, Guid planId, CancellationToken ct)
+    {
+        await using var conn = new SqlConnection(connectionString);
+        var removed = await conn.ExecuteAsync(new CommandDefinition(
+            "DELETE FROM dbo.CoachPlan WHERE Id = @planId AND OwnerId = @ownerId;",
+            new { planId, ownerId }, cancellationToken: ct));
+        return removed > 0;
+    }
 }

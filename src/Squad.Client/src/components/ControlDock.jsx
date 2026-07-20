@@ -9,7 +9,7 @@ const menuBase = 'padding:7px 10px;border-radius:9px;font-size:12px;font-weight:
 
 const screenMenuDef = [
   ['welcome', 'Welcome · sign-up'], ['register', 'Register athlete'], ['newgroup', 'Register a group'],
-  ['dash', 'Domestique Team Dashboard'], ['ride', 'Live Group Ride'], ['plan', 'Plan / Calendar'], ['planeditor', 'Plan Editor · coach'],
+  ['dash', 'Domestique Team Dashboard'], ['ride', 'Live Group Ride'], ['plan', 'Plan / Calendar'], ['plans', 'Plans list · coach'], ['planeditor', 'Plan Editor · coach'],
   ['discover', 'Discover Groups'], ['group', 'Group Profile'], ['recordpay', 'Record payment · rider'], ['ledger', 'Ride payments · coach'], ['requests', 'Join Requests · coach'], ['chat', 'Messages'],
   ['activities', 'Activities'], ['feed', 'Activity detail'],
   ['lb', 'Leaderboard'], ['seg', 'Segments'], ['coach', 'AI Coach'], ['profile', 'Profile'],

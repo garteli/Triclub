@@ -14,7 +14,7 @@ import { usePlan } from './hooks/usePlan.js';
 import { useGarminSync } from './hooks/useGarminSync.js';
 import { createSquad, joinSquad } from './lib/squads.js';
 import { recordPayment, markPaymentPaid, waivePayment } from './lib/payments.js';
-import { publishPlan } from './lib/plan.js';
+import { publishPlan, listPlans, getPlan, savePlan, deletePlan } from './lib/plan.js';
 // import { useLiveRide } from './hooks/useLiveRide.js'; // swap in for real telemetry
 import { buildViewModel } from './lib/viewModel.js';
 import { loadSession, saveSession, clearSession, enrollBiometric, fetchMe, getProfile } from './lib/auth.js';
@@ -29,6 +29,7 @@ import Dashboard from './screens/Dashboard.jsx';
 import LiveRide from './screens/LiveRide.jsx';
 import Plan from './screens/Plan.jsx';
 import PlanEditor from './screens/PlanEditor.jsx';
+import PlansList from './screens/PlansList.jsx';
 import Leaderboard from './screens/Leaderboard.jsx';
 import Feed from './screens/Feed.jsx';
 import Segments from './screens/Segments.jsx';
@@ -73,7 +74,7 @@ const initialState = {
 };
 
 const screens = {
-  dash: Dashboard, ride: LiveRide, plan: Plan, planeditor: PlanEditor, lb: Leaderboard,
+  dash: Dashboard, ride: LiveRide, plan: Plan, plans: PlansList, planeditor: PlanEditor, lb: Leaderboard,
   feed: Feed, seg: Segments, coach: Coach, profile: Profile,
   discover: Discover, group: GroupProfile, pay: Checkout, recordpay: RidePayment, ledger: CoachLedger, requests: JoinRequests, chat: Messages,
   settings: Settings, welcome: Welcome, register: Register, login: Login, newgroup: CreateGroup,
@@ -233,6 +234,21 @@ export default function App() {
     return result;
   }, [session?.token]);
 
+  // Coach's saved plans (CRUD). `selectedPlan` is the one loaded into the editor
+  // (null = a new, blank plan). open/create set it and navigate to the editor.
+  const [selectedPlan, setSelectedPlan] = useState(null);
+  const planOps = useMemo(() => ({
+    list: () => listPlans(session?.token),
+    open: async (id) => {
+      const p = await getPlan(session?.token, id);
+      setSelectedPlan(p);
+      setState((s) => ({ ...s, screen: 'planeditor' }));
+    },
+    create: () => { setSelectedPlan(null); setState((s) => ({ ...s, screen: 'planeditor' })); },
+    save: (body) => savePlan(session?.token, body),
+    remove: (id) => deletePlan(session?.token, id),
+  }), [session?.token]);
+
   // Pull-to-refresh: re-pull every live surface (feed snapshot, leaderboard,
   // activities, squads, profile) by bumping the shared signal, and hold the
   // spinner briefly so the gesture reads as doing work even on a fast network.
@@ -383,13 +399,15 @@ export default function App() {
       {import.meta.env.DEV && <ControlDock state={state} actions={actions} />}
       <Phone theme={state.theme} accent={state.accent} lang={state.lang} dir={dir} screen={state.screen} go={actions.go}
         onRefresh={authed ? onRefresh : undefined} recording={recorder.recording}>
-        <Screen vm={vm} state={state} actions={actions} live={live} tick={t} livePages={livePages}
+        <Screen key={state.screen === 'planeditor' ? `pe-${selectedPlan?.id || 'new'}` : state.screen}
+          vm={vm} state={state} actions={actions} live={live} tick={t} livePages={livePages}
           getToken={getToken} onDataChanged={() => setRefreshSignal((n) => n + 1)}
           profile={profile} onProfileSaved={setProfile}
           onJoinSquad={authed ? squadOps.onJoinSquad : undefined}
           onCreateSquad={authed ? squadOps.onCreateSquad : undefined}
           payments={authed ? paymentOps : undefined}
           onPublishPlan={authed ? onPublishPlan : undefined}
+          plans={authed ? planOps : undefined} plan={selectedPlan}
           meId={session?.athleteId} />
       </Phone>
     </div>

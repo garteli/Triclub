@@ -112,16 +112,28 @@ function SessionSheet({ editor, onField, onSave, onDelete, onClose }) {
   );
 }
 
-export default function PlanEditor({ vm, actions, onPublishPlan }) {
-  const [planName, setPlanName] = useState('');
-  const [anchorType, setAnchorType] = useState('start'); // 'start' | 'target'
-  const [anchorDate, setAnchorDate] = useState('');      // yyyy-mm-dd (start date, or race/target day)
-  const [totalWeeks, setTotalWeeks] = useState('');      // length of the block, in weeks
+// Parse a saved plan's JSON doc (never throw — a corrupt doc just starts blank).
+function parseDoc(plan) {
+  if (!plan?.doc) return null;
+  try { return typeof plan.doc === 'string' ? JSON.parse(plan.doc) : plan.doc; } catch { return null; }
+}
+
+// `plan` is the saved plan being edited ({ id, name, doc }) or null for a new one.
+// Mount fresh per plan (App keys the screen by plan id), so seeding state from the
+// doc in the useState initializers is enough — they run once on mount.
+export default function PlanEditor({ vm, actions, plan, plans, onPublishPlan }) {
+  const doc = parseDoc(plan);
+  const [planId, setPlanId] = useState(plan?.id ?? null);
+  const [planName, setPlanName] = useState(doc?.planName ?? plan?.name ?? '');
+  const [anchorType, setAnchorType] = useState(doc?.anchorType ?? 'start'); // 'start' | 'target'
+  const [anchorDate, setAnchorDate] = useState(doc?.anchorDate ?? '');      // yyyy-mm-dd (start date, or race/target day)
+  const [totalWeeks, setTotalWeeks] = useState(doc?.totalWeeks ?? '');      // length of the block, in weeks
   const [week, setWeek] = useState(1);
-  const [weeks, setWeeks] = useState({}); // weekNum -> { title, targetHrs, targetLoad, focus, sessions:{day:[...]} }
-  const [assigned, setAssigned] = useState({}); // athleteId -> bool (default: assigned)
+  const [weeks, setWeeks] = useState(doc?.weeks ?? {}); // weekNum -> { title, targetHrs, targetLoad, focus, sessions:{day:[...]} }
+  const [assigned, setAssigned] = useState(doc?.assigned ?? {}); // athleteId -> bool (default: assigned)
   const [editor, setEditor] = useState(null); // null | { id, day, week, sport, title, dur, load, z, note }
   const [pub, setPub] = useState({ status: 'idle', msg: '' }); // idle | busy | done | error
+  const [save, setSave] = useState({ status: 'idle', msg: '' }); // idle | busy | saved | error
 
   // The current week's editable slice, and a setter for one of its fields.
   const cur = weeks[week] || BLANK_WEEK;
@@ -186,6 +198,22 @@ export default function PlanEditor({ vm, actions, onPublishPlan }) {
   };
   const toggleAthlete = (id) => setAssigned((a) => ({ ...a, [id]: a[id] === false }));
 
+  // ── save this plan (the coach's working copy — a named, reloadable doc) ──
+  const buildDoc = () => JSON.stringify({ planName, anchorType, anchorDate, totalWeeks, weeks, assigned });
+  const savePlanNow = async () => {
+    if (save.status === 'busy') return;
+    if (!plans?.save) { setSave({ status: 'error', msg: 'Sign in as a coach to save.' }); return; }
+    setSave({ status: 'busy', msg: '' });
+    try {
+      const res = await plans.save({ id: planId, name: planName || 'Untitled plan', doc: buildDoc() });
+      if (res?.id && res.id !== planId) setPlanId(res.id); // adopt the new id so re-saves update
+      setSave({ status: 'saved', msg: 'Saved' });
+      setTimeout(() => setSave((sv) => (sv.status === 'saved' ? { status: 'idle', msg: '' } : sv)), 1800);
+    } catch (e) {
+      setSave({ status: 'error', msg: e?.message || 'Could not save.' });
+    }
+  };
+
   // ── publish the whole plan to each assigned athlete (real dates → PlannedWorkout) ──
   const publish = async () => {
     if (pub.status === 'busy') return;
@@ -228,18 +256,23 @@ export default function PlanEditor({ vm, actions, onPublishPlan }) {
   return (
     <>
       <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
-        {/* eyebrow + back */}
+        {/* eyebrow + back + save */}
         <div style={s('display:flex;align-items:center;gap:10px')}>
-          <div className="ctl" onClick={() => actions.go('plan')} style={s('width:30px;height:30px;border-radius:9px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;flex:none')}>
+          <div className="ctl" onClick={() => actions.go('plans')} style={s('width:30px;height:30px;border-radius:9px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;flex:none')}>
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round"><path d="M15 6l-6 6 6 6" /></svg>
           </div>
-          <div style={s('display:flex;align-items:center;gap:8px')}>
+          <div style={s('flex:1;display:flex;align-items:center;gap:8px')}>
             <div style={s('width:22px;height:22px;border-radius:7px;background:var(--accent);display:flex;align-items:center;justify-content:center')}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--accent-ink)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>
             </div>
             <span style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.6px;font-weight:600')}>Coach · Plan editor</span>
           </div>
+          <div className={save.status === 'busy' ? undefined : 'ctl'} onClick={save.status === 'busy' ? undefined : savePlanNow}
+            style={s('flex:none;font-size:12.5px;font-weight:700;padding:8px 15px;border-radius:10px;' + (save.status === 'saved' ? 'background:color-mix(in srgb,var(--good) 16%,transparent);color:var(--good)' : 'background:var(--bg3);border:1px solid var(--line2);color:var(--text)'))}>
+            {save.status === 'busy' ? 'Saving…' : save.status === 'saved' ? 'Saved ✓' : 'Save'}
+          </div>
         </div>
+        {save.status === 'error' && <div style={s('font-size:11.5px;color:var(--bad);font-weight:600;margin-top:8px')}>{save.msg}</div>}
 
         {/* plan name */}
         <input value={planName} onChange={(e) => setPlanName(e.target.value)} placeholder="Plan name"

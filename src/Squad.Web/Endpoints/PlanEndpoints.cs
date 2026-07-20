@@ -11,6 +11,9 @@ public sealed record PublishPlanRequest(
 public sealed record PublishWorkoutDto(
     DateTime Date, string? Discipline, string? Title, string? Sub, int DurationMin, int Load);
 
+/// <summary>Create/update a coach's saved plan. Id null = create.</summary>
+public sealed record SavePlanRequest(Guid? Id, string? Name, string? Doc, Guid? SquadId);
+
 /// <summary>
 /// The signed-in athlete's weekly training plan (Mon..Sun of the current week).
 /// Per-row status is derived from the date: past = done, today = today,
@@ -26,7 +29,57 @@ public static class PlanEndpoints
     {
         app.MapGet("/api/plan", GetPlan).RequireAuthorization();
         app.MapPost("/api/plan/publish", PublishPlan).RequireAuthorization();
+        // A coach's own saved plans (they can have many).
+        app.MapGet("/api/plan/plans", ListPlans).RequireAuthorization();
+        app.MapGet("/api/plan/plans/{id:guid}", GetPlanDoc).RequireAuthorization();
+        app.MapPost("/api/plan/plans", SavePlanDoc).RequireAuthorization();
+        app.MapDelete("/api/plan/plans/{id:guid}", DeletePlanDoc).RequireAuthorization();
         return app;
+    }
+
+    private static Guid? CallerId(HttpContext http)
+    {
+        var claim = http.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? http.User.FindFirstValue("sub");
+        return Guid.TryParse(claim, out var id) ? id : null;
+    }
+
+    private static async Task<IResult> ListPlans(HttpContext http, IPlanService plans, CancellationToken ct)
+    {
+        if (CallerId(http) is not { } ownerId) return Results.Unauthorized();
+        var list = await plans.ListPlansAsync(ownerId, ct);
+        return Results.Ok(list.Select(p => new { id = p.Id, name = p.Name, updatedUtc = p.UpdatedUtc }));
+    }
+
+    private static async Task<IResult> GetPlanDoc(HttpContext http, Guid id, IPlanService plans, CancellationToken ct)
+    {
+        if (CallerId(http) is not { } ownerId) return Results.Unauthorized();
+        var plan = await plans.GetPlanAsync(ownerId, id, ct);
+        return plan is null
+            ? Results.NotFound(new { error = "Plan not found." })
+            : Results.Ok(new { id = plan.Id, name = plan.Name, doc = plan.Doc, updatedUtc = plan.UpdatedUtc });
+    }
+
+    private static async Task<IResult> SavePlanDoc(HttpContext http, SavePlanRequest req, IPlanService plans, CancellationToken ct)
+    {
+        if (CallerId(http) is not { } ownerId) return Results.Unauthorized();
+        var name = (req.Name ?? "").Trim();
+        if (name.Length == 0) name = "Untitled plan";
+        if (name.Length > 120) name = name[..120];
+        var doc = req.Doc ?? "";
+        if (doc.Length == 0) return Results.BadRequest(new { error = "Nothing to save." });
+        if (doc.Length > 400_000) return Results.BadRequest(new { error = "Plan is too large to save." });
+
+        var id = await plans.SavePlanAsync(ownerId, req.Id, name, doc, req.SquadId, ct);
+        return id is null
+            ? Results.NotFound(new { error = "Plan not found." })
+            : Results.Ok(new { id, name });
+    }
+
+    private static async Task<IResult> DeletePlanDoc(HttpContext http, Guid id, IPlanService plans, CancellationToken ct)
+    {
+        if (CallerId(http) is not { } ownerId) return Results.Unauthorized();
+        var ok = await plans.DeletePlanAsync(ownerId, id, ct);
+        return ok ? Results.Ok(new { deleted = true }) : Results.NotFound(new { error = "Plan not found." });
     }
 
     private static async Task<IResult> PublishPlan(HttpContext http, PublishPlanRequest req, IPlanService plans, CancellationToken ct)

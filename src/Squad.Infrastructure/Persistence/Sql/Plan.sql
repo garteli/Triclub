@@ -22,3 +22,23 @@ CREATE TABLE dbo.PlannedWorkout (
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_PlannedWorkout_Athlete_Date' AND object_id = OBJECT_ID('dbo.PlannedWorkout'))
 CREATE INDEX IX_PlannedWorkout_Athlete_Date ON dbo.PlannedWorkout (AthleteId, WorkoutDate);
+
+-- ---------------------------------------------------------------------------
+--  CoachPlan — a coach's saved, editable plan (name + JSON doc of the whole
+--  multi-week block + assignment). A coach can have many. Publishing a plan
+--  writes PlannedWorkout rows (above); this is the coach's own working copy.
+-- ---------------------------------------------------------------------------
+IF OBJECT_ID('dbo.CoachPlan', 'U') IS NULL
+CREATE TABLE dbo.CoachPlan (
+    Id         UNIQUEIDENTIFIER NOT NULL DEFAULT NEWID(),
+    OwnerId    UNIQUEIDENTIFIER NOT NULL,          -- the coach who owns it
+    SquadId    UNIQUEIDENTIFIER NULL,              -- optional: the squad it's for
+    Name       NVARCHAR(120)    NOT NULL,
+    Doc        NVARCHAR(MAX)    NOT NULL,           -- JSON: weeks/sessions/targets/assignment
+    UpdatedUtc DATETIME2        NOT NULL DEFAULT SYSUTCDATETIME(),
+    CONSTRAINT PK_CoachPlan PRIMARY KEY (Id),
+    CONSTRAINT FK_CoachPlan_Owner FOREIGN KEY (OwnerId) REFERENCES dbo.Athlete (Id)
+);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_CoachPlan_Owner' AND object_id = OBJECT_ID('dbo.CoachPlan'))
+CREATE INDEX IX_CoachPlan_Owner ON dbo.CoachPlan (OwnerId, UpdatedUtc DESC);

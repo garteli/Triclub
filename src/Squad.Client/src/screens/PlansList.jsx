@@ -1,0 +1,94 @@
+import { useCallback, useEffect, useState } from 'react';
+import { s } from '../lib/style.js';
+
+// A coach's saved training plans. Create a new one, open one to edit, or delete.
+// Data comes from the `plans` ops object (list/open/create/remove), backed by
+// /api/plan/plans. Signed-out / non-coach users just see the empty state.
+
+const fmtWhen = (iso) => {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+};
+
+export default function PlansList({ plans, actions }) {
+  const [items, setItems] = useState(null); // null = loading
+  const [error, setError] = useState('');
+  const [busyId, setBusyId] = useState(null);
+
+  const load = useCallback(async () => {
+    if (!plans?.list) { setItems([]); return; }
+    setError('');
+    try {
+      const list = await plans.list();
+      setItems(Array.isArray(list) ? list : []);
+    } catch (e) {
+      setError(e?.message || 'Could not load plans.');
+      setItems([]);
+    }
+  }, [plans]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const remove = async (id) => {
+    if (!plans?.remove) return;
+    setBusyId(id);
+    try {
+      await plans.remove(id);
+      setItems((xs) => (xs || []).filter((p) => p.id !== id));
+    } catch (e) {
+      setError(e?.message || 'Could not delete plan.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  return (
+    <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
+      {/* header */}
+      <div style={s('display:flex;align-items:center;gap:10px')}>
+        <div className="ctl" onClick={() => actions.go('plan')} style={s('width:30px;height:30px;border-radius:9px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;flex:none')}>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round"><path d="M15 6l-6 6 6 6" /></svg>
+        </div>
+        <div style={s('flex:1')}>
+          <div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.6px;font-weight:600')}>Coach</div>
+          <div style={s('font-size:23px;font-weight:700;letter-spacing:-.5px')}>Training plans</div>
+        </div>
+      </div>
+
+      {/* new plan */}
+      <div className="ctl" onClick={() => plans?.create?.()} style={s('display:flex;align-items:center;gap:10px;background:var(--accent);color:var(--accent-ink);border-radius:14px;padding:13px 15px;font-weight:700;font-size:14px;margin-top:16px')}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>New plan
+      </div>
+
+      {error && <div style={s('font-size:12px;color:var(--bad);font-weight:600;margin-top:12px')}>{error}</div>}
+
+      {/* list */}
+      {items === null ? (
+        <div style={s('text-align:center;font-size:12.5px;color:var(--text3);margin-top:26px')}>Loading…</div>
+      ) : items.length === 0 ? (
+        <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:22px;text-align:center;margin-top:16px')}>
+          <div style={s('font-size:14px;font-weight:700')}>No plans yet</div>
+          <div style={s('font-size:12.5px;color:var(--text3);line-height:1.5;margin-top:5px')}>Create a plan to build a multi-week block and publish it to your squad.</div>
+        </div>
+      ) : (
+        <div style={s('display:flex;flex-direction:column;gap:10px;margin-top:16px')}>
+          {items.map((p) => (
+            <div key={p.id} style={s('display:flex;align-items:center;gap:10px;background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:13px 14px')}>
+              <div className="ctl" onClick={() => plans?.open?.(p.id)} style={s('flex:1;min-width:0')}>
+                <div style={s('font-size:14.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>{p.name || 'Untitled plan'}</div>
+                <div style={s('font-size:11px;color:var(--text3);margin-top:2px')}>Updated {fmtWhen(p.updatedUtc)}</div>
+              </div>
+              <div className="ctl" onClick={() => plans?.open?.(p.id)} style={s('width:32px;height:32px;border-radius:9px;background:var(--bg3);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--text2);flex:none')}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>
+              </div>
+              <div className={busyId === p.id ? undefined : 'ctl'} onClick={busyId === p.id ? undefined : () => remove(p.id)} style={s('width:32px;height:32px;border-radius:9px;background:color-mix(in srgb,var(--bad) 12%,var(--bg3));border:1px solid color-mix(in srgb,var(--bad) 30%,transparent);display:flex;align-items:center;justify-content:center;color:var(--bad);flex:none;' + (busyId === p.id ? 'opacity:.5' : ''))}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6" /></svg>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
