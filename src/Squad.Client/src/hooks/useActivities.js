@@ -68,6 +68,9 @@ export function mapActivity(r) {
     // Social layer (real, from the server): kudos count, comment count, and whether
     // the signed-in athlete has kudoed this one.
     kudos: r.kudos || 0, comments: r.comments || 0, iKudoed: !!r.iKudoed, achievements: 0,
+    // Recording device (from FIT) and weather-at-start (Open-Meteo); null when unknown.
+    deviceName: r.deviceName ?? null,
+    weather: r.weather ?? null,
   };
 }
 

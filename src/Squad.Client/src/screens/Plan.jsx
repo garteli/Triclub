@@ -9,8 +9,13 @@ const seg = (active) =>
 function WorkoutSheet({ wkDetail, actions }) {
   return (
     <>
-      <div className="ctl" onClick={actions.closeWorkout} style={s('position:absolute;inset:0;background:rgba(0,0,0,.55);z-index:50;animation:floatUp .2s ease')} />
-      <div className="scr" style={s('position:absolute;left:0;right:0;bottom:0;z-index:51;background:var(--bg);border-radius:26px 26px 0 0;border-top:1px solid var(--line2);max-height:88%;overflow-y:auto;animation:floatUp .3s ease;padding:14px 18px 32px')}>
+      <div className="ctl" onClick={actions.closeWorkout} style={s('position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50;animation:floatUp .2s ease')} />
+      {/* Viewport-anchored (fixed): absolute pins to Phone's content-height scroll
+          wrapper, so on a short page the sheet floats mid-screen with dead space below
+          (see PlanEditor's sheet for the same fix). The wrapper is click-through so taps
+          outside the sheet hit the overlay; the sheet re-enables its own pointer events. */}
+      <div style={s('position:fixed;left:0;right:0;bottom:0;z-index:51;display:flex;justify-content:center;pointer-events:none')}>
+      <div className="scr" style={s('width:100%;max-width:480px;pointer-events:auto;background:var(--bg);border-radius:26px 26px 0 0;border-top:1px solid var(--line2);max-height:90dvh;overflow-y:auto;animation:floatUp .3s ease;padding:14px 18px 32px')}>
         <div style={s('width:40px;height:4px;border-radius:3px;background:var(--line2);margin:0 auto 16px')} />
         <div style={s(`height:4px;background:${wkDetail.color};border-radius:3px;margin-bottom:14px;width:52px`)} />
         <div style={s('font-size:22px;font-weight:700;letter-spacing:-.4px')}>{wkDetail.title}</div>
@@ -38,6 +43,7 @@ function WorkoutSheet({ wkDetail, actions }) {
           <div className="ctl" onClick={() => actions.go('ride')} style={s('flex:1;background:var(--accent);color:var(--accent-ink);text-align:center;padding:14px;border-radius:13px;font-weight:700;font-size:14px')}>Start now</div>
           <div className="ctl" onClick={actions.closeWorkout} style={s('width:56px;background:var(--bg3);border:1px solid var(--line);border-radius:13px;display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:13px;font-weight:600')}>Close</div>
         </div>
+      </div>
       </div>
     </>
   );

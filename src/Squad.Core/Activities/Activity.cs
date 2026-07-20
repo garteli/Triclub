@@ -26,6 +26,14 @@ public sealed record Activity
     public double? Calories { get; init; }
     public double? TrainingLoad { get; init; }   // TSS-style; see TrainingLoad.cs
 
+    // Recording device — the head unit / phone that produced the file (from FIT
+    // FileId/DeviceInfo, e.g. "Garmin Edge 1050"). Null when the source doesn't say.
+    public string? DeviceName { get; init; }
+
+    // Weather at the start location + time, enriched post-parse from Open-Meteo.
+    // Null for indoor activities (no GPS) or when the lookup failed.
+    public ActivityWeather? Weather { get; init; }
+
     // Provenance — critical for dedup.
     public ActivitySource Source { get; init; }
     public string? SourceExternalId { get; init; }   // Garmin activityId, HK uuid, ...

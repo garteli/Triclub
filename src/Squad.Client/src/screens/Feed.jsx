@@ -7,6 +7,7 @@ import { deleteActivity } from '../hooks/useActivities.js';
 import { useActivityPhotos } from '../hooks/useActivityPhotos.js';
 import { useActivityTrack } from '../hooks/useActivityTrack.js';
 import { buildFrames, frameRoute, gpsFrameCount, buildTraces } from '../lib/activityFrames.js';
+import { describeWeather } from '../lib/weather.js';
 import { useActivityAnalytics, fmtDur, pace, fmtEffortDur, CURVE_LABEL, DIST_LABEL } from '../hooks/useActivityAnalytics.js';
 import { PWR_ZONE_FRACS, PWR_ZONE_NAMES, HR_ZONE_FRACS, HR_ZONE_NAMES } from '../lib/powerAnalysis.js';
 import ActivityHero from '../components/ActivityHero.jsx';
@@ -138,17 +139,21 @@ function AIInsight() {
   );
 }
 
-// ---- device + weather (no source yet → SAMPLE) ----
-function DeviceWeather() {
+// ---- device + weather (real: device from the FIT file, weather from Open-Meteo) ----
+// Each line falls back to a SAMPLE placeholder only when that datum is missing (e.g. an
+// indoor session has no weather; a manual/native entry may have no device).
+function DeviceWeather({ device, weather }) {
+  const wxText = describeWeather(weather);
   return (
     <div style={s('padding:16px 18px 0;display:flex;flex-direction:column;gap:12px')}>
       <div style={s('display:flex;align-items:center;gap:11px')}>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2.5" /><path d="M9 6h6" /></svg>
-        <span style={s('font-size:13px;color:var(--text)')}>Garmin Edge 1050</span><Sample />
+        <span style={s('font-size:13px;color:var(--text)')}>{device || 'Garmin Edge 1050'}</span>{!device && <Sample />}
       </div>
       <div style={s('display:flex;align-items:flex-start;gap:11px')}>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--warn)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4.5" /><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19" /></svg>
-        <span style={s('font-size:12.5px;color:var(--text2);line-height:1.45')}>Clear, 23°C. Feels like 23°C. Humidity 71%. Wind 4.0 km/h from SSE.</span>
+        <span style={s('font-size:12.5px;color:var(--text2);line-height:1.45')}>{wxText || 'Clear, 23°C. Feels like 23°C. Humidity 71%. Wind 4.0 km/h from SSE.'}</span>
+        {!weather && <Sample />}
       </div>
     </div>
   );
@@ -313,23 +318,55 @@ function RelativeEffort({ score }) {
   );
 }
 
-// ---- fitness + matched rides (no source yet → SAMPLE) ----
-function StubTrends() {
+// ---- fitness (still SAMPLE) + matched rides (real: squad-mates who rode the same
+// place + time, from the /track endpoint) ----
+function StubTrends({ matched }) {
+  const mates = matched || [];
   return (
     <div style={s('padding:16px 18px 0')}>
-      <div style={s('display:flex;align-items:center;gap:6px;margin-bottom:8px')}><span style={s(label)}>Trends</span><Sample /></div>
+      <div style={s('display:flex;align-items:center;gap:6px;margin-bottom:8px')}><span style={s(label)}>Trends</span></div>
       <div style={s('display:flex;gap:10px')}>
         <div style={s('flex:1;background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:14px')}>
-          <div style={s('font-size:14px;font-weight:700')}>Fitness +3</div>
+          <div style={s('display:flex;align-items:center;gap:6px')}><span style={s('font-size:14px;font-weight:700')}>Fitness +3</span><Sample /></div>
           <div style={s('font-size:11px;color:var(--text3);margin-top:2px')}>Score <b className="mono" style={s('color:var(--text)')}>19</b></div>
           <svg viewBox="0 0 120 54" preserveAspectRatio="none" style={{ width: '100%', height: 44, marginTop: 8, display: 'block' }}><polyline points="4,34 30,30 56,32 84,40 104,34 116,10" fill="none" stroke="var(--accent)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /><circle cx="116" cy="10" r="3" fill="var(--accent)" /></svg>
         </div>
-        <div style={s('flex:1;background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:14px')}>
-          <div style={s('font-size:14px;font-weight:700')}>Matched Rides</div>
-          <div className="mono" style={s('font-size:11px;color:var(--text3);margin-top:2px')}>28.2 km/h · 17</div>
-          <svg viewBox="0 0 120 54" preserveAspectRatio="none" style={{ width: '100%', height: 44, marginTop: 8, display: 'block' }}><polyline points="4,18 34,16 62,20 90,30 116,26" fill="none" stroke="var(--swim)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /><circle cx="116" cy="26" r="3" fill="var(--accent)" /></svg>
-        </div>
+        <MatchedRides mates={mates} />
       </div>
+    </div>
+  );
+}
+
+// The teammates who rode alongside (same sport, start point + time). Real data when present;
+// falls back to a SAMPLE card until this activity has any matches.
+function MatchedRides({ mates }) {
+  if (!mates.length) {
+    return (
+      <div style={s('flex:1;background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:14px')}>
+        <div style={s('display:flex;align-items:center;gap:6px')}><span style={s('font-size:14px;font-weight:700')}>Matched Rides</span><Sample /></div>
+        <div className="mono" style={s('font-size:11px;color:var(--text3);margin-top:2px')}>28.2 km/h · 17</div>
+        <svg viewBox="0 0 120 54" preserveAspectRatio="none" style={{ width: '100%', height: 44, marginTop: 8, display: 'block' }}><polyline points="4,18 34,16 62,20 90,30 116,26" fill="none" stroke="var(--swim)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /><circle cx="116" cy="26" r="3" fill="var(--accent)" /></svg>
+      </div>
+    );
+  }
+  const names = mates.map((m) => (m.athleteName || '').split(' ')[0]).filter(Boolean);
+  const sub = names.length <= 2 ? names.join(' & ') : `${names.slice(0, 2).join(', ')} +${names.length - 2}`;
+  return (
+    <div style={s('flex:1;background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:14px')}>
+      <div style={s('font-size:14px;font-weight:700')}>Matched Rides</div>
+      <div style={s('display:flex;align-items:baseline;gap:6px;margin-top:2px')}>
+        <span className="mono" style={s('font-size:22px;font-weight:800;line-height:1')}>{mates.length}</span>
+        <span style={s('font-size:11px;color:var(--text3)')}>{mates.length === 1 ? 'teammate' : 'teammates'}</span>
+      </div>
+      <div style={s('display:flex;margin-top:10px')}>
+        {mates.slice(0, 5).map((m, i) => (
+          <div key={m.activityId || i} title={m.athleteName}
+               style={s(`width:26px;height:26px;border-radius:50%;background:${m.avatarColor || 'var(--bg4)'};color:#fff;display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:700;border:2px solid var(--bg2);margin-left:${i ? -8 : 0}px`)}>
+            {m.initials || (m.athleteName || '?').slice(0, 2).toUpperCase()}
+          </div>
+        ))}
+      </div>
+      <div style={s('font-size:11px;color:var(--text2);margin-top:8px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>{sub}</div>
     </div>
   );
 }
@@ -614,7 +651,7 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
   const [confirmDel, setConfirmDel] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  const { track, laps, status } = useActivityTrack(a?.id, { getToken });
+  const { track, laps, matched, status } = useActivityTrack(a?.id, { getToken });
   const frames = useMemo(() => buildFrames(track), [track]);
   const route = useMemo(() => frameRoute(frames), [frames]);
   const hasMap = useMemo(() => gpsFrameCount(frames) >= 2, [frames]);
@@ -691,7 +728,7 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
       <AthleteTitle a={a} token={token} onAthlete={actions.openAthlete} />
       <MetricHero a={a} load={effLoad} />
       <AIInsight />
-      <DeviceWeather />
+      <DeviceWeather device={a.deviceName} weather={a.weather} />
 
       {/* social — real kudos (self-kudos blocked) + comments */}
       <div style={s('padding:16px 0 0')}>
@@ -701,7 +738,7 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
       <TrainingLoad load={effLoad} estimated={!(a.load > 0) && computedTss != null} />
       <Intensity pct={intensityPct} />
       <RelativeEffort score={relEffort} />
-      <StubTrends />
+      <StubTrends matched={matched} />
       <Goals myActivities={vm.myActivities} />
 
       <ActivityPhotos activityId={a.id} isMe={a.isMe} token={token} getToken={getToken} />

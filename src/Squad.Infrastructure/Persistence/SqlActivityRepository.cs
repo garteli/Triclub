@@ -57,12 +57,14 @@ public sealed class SqlActivityRepository(string connectionString) : IActivityRe
                 (Id, AthleteId, Sport, StartUtc, MovingTimeSec, ElapsedTimeSec,
                  DistanceMeters, ElevationGainM, AvgHeartRate, MaxHeartRate,
                  AvgPowerWatts, AvgCadence, Calories, TrainingLoad,
-                 Source, SourceExternalId, Fingerprint, TrackBlob)
+                 Source, SourceExternalId, Fingerprint, TrackBlob,
+                 DeviceName, WeatherJson, StartLat, StartLon)
             VALUES
                 (@Id, @AthleteId, @Sport, @StartUtc, @MovingTimeSec, @ElapsedTimeSec,
                  @DistanceMeters, @ElevationGainM, @AvgHeartRate, @MaxHeartRate,
                  @AvgPowerWatts, @AvgCadence, @Calories, @TrainingLoad,
-                 @Source, @SourceExternalId, @Fingerprint, @TrackBlob);
+                 @Source, @SourceExternalId, @Fingerprint, @TrackBlob,
+                 @DeviceName, @WeatherJson, @StartLat, @StartLon);
             """;
         Bind(cmd, a);
         await cmd.ExecuteNonQueryAsync(ct);
@@ -79,7 +81,9 @@ public sealed class SqlActivityRepository(string connectionString) : IActivityRe
                 AvgHeartRate = @AvgHeartRate, MaxHeartRate = @MaxHeartRate,
                 AvgPowerWatts = @AvgPowerWatts, AvgCadence = @AvgCadence,
                 Calories = @Calories, TrainingLoad = @TrainingLoad,
-                Source = @Source, SourceExternalId = @SourceExternalId, TrackBlob = @TrackBlob
+                Source = @Source, SourceExternalId = @SourceExternalId, TrackBlob = @TrackBlob,
+                DeviceName = @DeviceName, WeatherJson = @WeatherJson,
+                StartLat = @StartLat, StartLon = @StartLon
             WHERE Id = @ExistingId;
             """;
         Bind(cmd, a);
@@ -108,6 +112,13 @@ public sealed class SqlActivityRepository(string connectionString) : IActivityRe
         P("@SourceExternalId", SqlDbType.NVarChar, a.SourceExternalId);
         P("@Fingerprint", SqlDbType.Char, a.Fingerprint);
         P("@TrackBlob", SqlDbType.VarBinary, GzipDetail(a.Track, a.Laps));
+        P("@DeviceName", SqlDbType.NVarChar, a.DeviceName);
+        P("@WeatherJson", SqlDbType.NVarChar, a.Weather is null ? null : JsonSerializer.Serialize(a.Weather));
+        // StartLat/StartLon denormalize the first GPS point so the matched-rides query can
+        // seek on start position without decompressing every TrackBlob.
+        var start = a.Track.Count > 0 ? a.Track[0] : null;
+        P("@StartLat", SqlDbType.Float, start?.Lat);
+        P("@StartLon", SqlDbType.Float, start?.Lon);
     }
 
     // Gzipped JSON of the detail payload (track + laps). Format v2 is an ActivityDetail
