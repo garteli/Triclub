@@ -16,6 +16,11 @@ const isNative = () => { try { return Capacitor.isNativePlatform(); } catch { re
 
 // --- native SDK (Capacitor) — initialized once from /api/auth/config values ---
 let _nativeReady;
+// NB: returns the plugin **wrapped in an object**, never bare. Capacitor plugin
+// proxies turn any property access into a native call, so returning one directly
+// from an async function makes the promise machinery probe `.then` — which fires a
+// bogus `SocialLogin.then()` bridge call that rejects ("not implemented on ios")
+// and leaves the awaited promise permanently unsettled (sign-in silently hangs).
 async function nativeSocialLogin(cfg) {
   const { SocialLogin } = await import('@capgo/capacitor-social-login');
   if (!_nativeReady) {
@@ -32,7 +37,7 @@ async function nativeSocialLogin(cfg) {
     }).catch((e) => { _nativeReady = undefined; throw e; });
   }
   await _nativeReady;
-  return SocialLogin;
+  return { SocialLogin };
 }
 
 // --- script loader (once per src) ---
@@ -63,7 +68,7 @@ export async function getGoogleIdToken(cfg) {
     if (!cfg?.google?.iosClientId) {
       throw new Error('Google sign-in isn’t set up for the app yet (missing iOS client id).');
     }
-    const SocialLogin = await nativeSocialLogin(cfg);
+    const { SocialLogin } = await nativeSocialLogin(cfg);
     const res = await SocialLogin.login({ provider: 'google', options: { scopes: ['email', 'profile'] } });
     const idToken = res?.result?.idToken;
     if (!idToken) throw new Error('Google sign-in did not return a token.');
@@ -100,7 +105,7 @@ export async function getGoogleIdToken(cfg) {
 // `cfg` is the full /api/auth/config object.
 export async function getAppleIdToken(cfg) {
   if (isNative()) {
-    const SocialLogin = await nativeSocialLogin(cfg);
+    const { SocialLogin } = await nativeSocialLogin(cfg);
     const res = await SocialLogin.login({ provider: 'apple', options: { scopes: ['email', 'name'] } });
     const idToken = res?.result?.idToken;
     if (!idToken) throw new Error('Apple sign-in did not return a token.');

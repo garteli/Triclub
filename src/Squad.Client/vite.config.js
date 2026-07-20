@@ -9,13 +9,16 @@ export default defineConfig({
     outDir: '../Squad.Web/wwwroot',
     emptyOutDir: true,
     rollupOptions: {
-      // These native-only plugins are loaded at runtime inside the native shell (behind
-      // dynamic import() gated on Capacitor.isNativePlatform()), so keep them out of the
-      // web bundle — a web-only install doesn't need them present.
-      // NB: do NOT externalize @capacitor/core. oauth.js imports it statically, so
-      // externalizing leaves a bare `import '@capacitor/core'` the browser can't resolve
-      // and the web SPA never mounts (stuck on splash). It's a dependency, so it bundles.
-      external: ['@capacitor-community/background-geolocation', '@capacitor-community/bluetooth-le', '@perfood/capacitor-healthkit'],
+      // Do NOT externalize packages that source code import()s by name. The native
+      // shell loads the *same* bundle as the web build, so an external leaves a bare
+      // specifier like `import("@perfood/capacitor-healthkit")` that no webview can
+      // resolve — Apple Health and BLE sensors then fail at runtime with a module
+      // resolution error. Keeping them bundled is free: they're behind dynamic
+      // import() gated on Capacitor.isNativePlatform(), so Rollup already splits them
+      // into their own chunks and a web install never fetches them.
+      // (@capacitor-community/background-geolocation is reached via registerPlugin()
+      // rather than a direct import, so it never needed listing here either.)
+      external: [],
     },
   },
   server: {

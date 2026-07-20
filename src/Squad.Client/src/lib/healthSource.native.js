@@ -11,7 +11,11 @@
 // NSHealthShareUsageDescription string; without them requestAuthorization throws.
 
 // HealthKit read scopes we need to build a workout summary.
-const READ_SCOPES = ['workouts', 'distance', 'activity', 'calories', 'heart_rate'];
+// NB: these strings must match the plugin's `getTypes` switch exactly — an unknown
+// scope is silently skipped (it only prints "no match in case: <scope>" to the native
+// log), so a typo costs you the permission without any error. 'activity' is what pulls
+// in HKWorkoutType; heart rate is camelCase 'heartRate', not 'heart_rate'.
+const READ_SCOPES = ['distance', 'activity', 'calories', 'heartRate'];
 
 // HKWorkoutActivityType name (workoutActivityName) → our lenient sport string.
 // The DTO parse is already lenient; this just narrows the common triathlon types.
