@@ -64,8 +64,11 @@ body {
 @keyframes sheen { 0% { background-position: -140% 0; } 100% { background-position: 240% 0; } }
 @keyframes riderPing { 0% { r: 9; } 50% { r: 11; } 100% { r: 9; } }
 @keyframes floatUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes recFlash { 0%, 100% { opacity: 1; } 50% { opacity: .4; } }
 
 .nav-btn { cursor: pointer; transition: color .15s; }
+/* Recording: the Live tab flashes so an active recording is visible from any screen. */
+.nav-rec { animation: recFlash 1.2s ease-in-out infinite; }
 .ctl { cursor: pointer; transition: all .15s; }
 
 /* ---- live ride page system: fill the viewport, scale numbers to tile size ---- */
@@ -75,8 +78,12 @@ body {
   display: flex;
   flex-direction: column;
   height: calc(100dvh - 12px);
-  padding: 6px 0 calc(150px + env(safe-area-inset-bottom));
+  /* Tiles fill down to just above the bottom nav. The pager dock is edit-only now, so a
+     normal ride needn't reserve its space — that space became a dead gap under the tiles. */
+  padding: 6px 0 calc(96px + env(safe-area-inset-bottom));
 }
+/* In edit mode the pager dock reappears (bottom:100px) — reserve room for it again. */
+.live-active.editing { padding-bottom: calc(150px + env(safe-area-inset-bottom)); }
 .live-row { flex: 1; min-height: 0; }
 
 /* Metric value: a per-page fallback size (--vf, count-based) that scales UP to fill

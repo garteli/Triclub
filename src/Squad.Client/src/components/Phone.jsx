@@ -13,7 +13,7 @@ const TRIGGER_UI = 60;  // fade the indicator in over the first ~60px of pull (m
 // The app viewport. `.phone` (see theme.css) carries the design tokens and fills
 // the screen (full-width on phones, a centered column on desktop). The real device
 // draws its own status bar, so we only reserve safe-area space at the top.
-export default function Phone({ theme, accent, lang, dir, screen, go, onRefresh, children }) {
+export default function Phone({ theme, accent, lang, dir, screen, go, onRefresh, recording, children }) {
   const hideNav = CHROMELESS.has(screen);
   const scrollRef = useRef(null);
   const canPull = typeof onRefresh === 'function' && !NO_PULL.has(screen);
@@ -54,7 +54,7 @@ export default function Phone({ theme, accent, lang, dir, screen, go, onRefresh,
         </div>
       </div>
 
-      {!hideNav && <BottomNav screen={screen} lang={lang} go={go} />}
+      {!hideNav && <BottomNav screen={screen} lang={lang} go={go} recording={recording} />}
     </div>
   );
 }

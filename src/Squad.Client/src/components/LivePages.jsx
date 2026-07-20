@@ -177,7 +177,7 @@ function PickerSheet({ page, slot, actions }) {
 
 // ---- the unified full-screen rotating page system ----
 export default function LivePages({ tel, lp }) {
-  const { pages, pageIdx, editFields, picker, autoRotate, pagerVisible, actions } = lp;
+  const { pages, pageIdx, editFields, picker, autoRotate, actions } = lp;
   const page = pages[pageIdx];
   const side = page.side || 'none';
   const withSide = side !== 'none';
@@ -226,7 +226,6 @@ export default function LivePages({ tel, lp }) {
   // threshold counts; vertical scrolls and taps are ignored.
   const swipe = useRef(null);
   const onRowPointerDown = (e) => {
-    actions.pokePager();
     swipe.current = editFields ? null : { x: e.clientX, y: e.clientY };
   };
   const onRowPointerUp = (e) => {
@@ -241,9 +240,6 @@ export default function LivePages({ tel, lp }) {
   };
 
   const gridStyle = `flex:1;display:grid;grid-template-columns:repeat(${cols},1fr);gap:8px;grid-auto-rows:1fr;min-width:0`;
-  const pagerAnim = (pagerVisible || editFields)
-    ? 'opacity:1;transform:none;transition:opacity .3s ease,transform .3s ease'
-    : 'opacity:0;transform:translateY(26px);pointer-events:none;transition:opacity .3s ease,transform .3s ease';
 
   return (
     <>
@@ -257,8 +253,11 @@ export default function LivePages({ tel, lp }) {
 
       {editFields && <EditPanel page={page} actions={actions} />}
 
-      {/* unified pager: prev · page name + dots · Auto · Edit · next */}
-      <div style={s(`position:absolute;left:12px;right:12px;bottom:100px;z-index:34;display:flex;align-items:center;gap:9px;background:color-mix(in srgb,var(--bg2) 92%,transparent);backdrop-filter:blur(14px);border:1px solid var(--line);border-radius:16px;padding:9px 11px;box-shadow:0 10px 26px -12px rgba(0,0,0,.6);${pagerAnim}`)}>
+      {/* Pager dock — edit-only. During a ride the page is changed by horizontal swipe (or
+          Auto-rotate) and edit is entered by long-pressing a tile, so the dock stays out of
+          the way; it reappears here with its full controls once editing. */}
+      {editFields && (
+      <div style={s('position:absolute;left:12px;right:12px;bottom:100px;z-index:34;display:flex;align-items:center;gap:9px;background:color-mix(in srgb,var(--bg2) 92%,transparent);backdrop-filter:blur(14px);border:1px solid var(--line);border-radius:16px;padding:9px 11px;box-shadow:0 10px 26px -12px rgba(0,0,0,.6);animation:floatUp .25s ease')}>
         <div className="ctl" onClick={actions.prevPage} style={s('width:30px;height:30px;border-radius:9px;background:var(--bg3);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;flex:none')}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2.2" strokeLinecap="round"><path d="M15 6l-6 6 6 6" /></svg>
         </div>
@@ -276,6 +275,7 @@ export default function LivePages({ tel, lp }) {
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2.2" strokeLinecap="round"><path d="M9 6l6 6-6 6" /></svg>
         </div>
       </div>
+      )}
 
       {picker.open && <PickerSheet page={page} slot={picker.slot} actions={actions} />}
     </>
