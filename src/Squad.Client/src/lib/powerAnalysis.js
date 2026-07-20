@@ -50,8 +50,10 @@ export function normalizedPower(track) {
   return Math.round(mean4 ** 0.25);
 }
 
-// HR zones (5, fractions of max HR): Z1 <60, Z2 60–70, Z3 70–80, Z4 80–90, Z5 ≥90%.
-const HR_UPPER = [0.6, 0.7, 0.8, 0.9];
+// Zone thresholds + names — one source for both the compute below and the detail-view table.
+// HR: 5 zones, upper fraction of max HR (Z1 <60, Z2 60–70, Z3 70–80, Z4 80–90, Z5 ≥90%).
+export const HR_ZONE_FRACS = [0.6, 0.7, 0.8, 0.9];
+export const HR_ZONE_NAMES = ['Recovery', 'Endurance', 'Tempo', 'Threshold', 'Anaerobic'];
 export function hrZones(track, maxHr) {
   if (!maxHr || !hasField(track, 'heartRate')) return null;
   const secs = [0, 0, 0, 0, 0];
@@ -59,7 +61,7 @@ export function hrZones(track, maxHr) {
     const hr = track[i].heartRate;
     if (!Number.isFinite(hr)) continue;
     const frac = hr / maxHr;
-    let z = HR_UPPER.findIndex((u) => frac < u);
+    let z = HR_ZONE_FRACS.findIndex((u) => frac < u);
     if (z < 0) z = 4;
     secs[z] += dtOf(track, i);
   }
@@ -67,14 +69,15 @@ export function hrZones(track, maxHr) {
 }
 
 // Power zones (7, Coggan fractions of FTP): upper bounds 55/75/90/105/120/150%, then Z7.
-const PWR_UPPER = [0.55, 0.75, 0.9, 1.05, 1.2, 1.5];
+export const PWR_ZONE_FRACS = [0.55, 0.75, 0.9, 1.05, 1.2, 1.5];
+export const PWR_ZONE_NAMES = ['Recovery', 'Endurance', 'Tempo', 'Threshold', 'VO₂ max', 'Anaerobic', 'Neuromuscular'];
 export function powerZones(track, ftp) {
   if (!ftp || !hasField(track, 'powerW')) return null;
   const secs = [0, 0, 0, 0, 0, 0, 0];
   for (let i = 0; i < track.length; i++) {
     const pw = track[i].powerW;
     if (!Number.isFinite(pw)) continue;
-    let z = PWR_UPPER.findIndex((u) => pw / ftp < u);
+    let z = PWR_ZONE_FRACS.findIndex((u) => pw / ftp < u);
     if (z < 0) z = 6;
     secs[z] += dtOf(track, i);
   }
@@ -82,7 +85,8 @@ export function powerZones(track, ftp) {
 }
 
 // Best average power sustained for each standard duration (the mean-max power curve).
-const DURATIONS = [5, 15, 30, 60, 300, 600, 1200, 3600];
+// Denser set → a smooth mean-max curve on a log-time axis (Strava-style).
+const DURATIONS = [1, 5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 240, 300, 420, 600, 900, 1200, 1800, 2400, 3600, 5400, 7200];
 export function powerCurve(track) {
   if (!hasField(track, 'powerW')) return [];
   const p = resample1s(track, 'powerW', true);
