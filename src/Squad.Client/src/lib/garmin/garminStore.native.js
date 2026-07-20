@@ -5,19 +5,20 @@
 // so "sync on every launch" needs only this. The short-lived OAuth2 bearer is cached
 // alongside it but treated as disposable (re-minted when it expires).
 //
-// Storage is the platform secure enclave — iOS Keychain / Android Keystore — reached
-// through a registerPlugin('SecureStorage') proxy. That's the SAME pattern
-// locationSource.native.js uses for registerPlugin('BackgroundGeolocation'): no build-time
-// dependency, resolved by the native shell at runtime. Install a Keychain/Keystore-backed
-// plugin that registers under this name on the native side, e.g.
-//   npm i @aparajita/capacitor-secure-storage   (registers as "SecureStorage")
-// and adjust the name below if your plugin differs.
+// Storage is the platform secure enclave — iOS Keychain / Android Keystore — via
+// @aparajita/capacitor-secure-storage. NB: that plugin ships a JS wrapper (`SecureStorage`)
+// whose public methods are positional — set(key, value) / get(key) / remove(key) — and map
+// to the real native methods (internalSetItem, …). Calling it as a raw
+// registerPlugin('SecureStorage') proxy with { key, value } fails at runtime with
+// "SecureStorage.set() is not implemented on ios" because no native method is named `set`.
+// So we dynamic-import the wrapper (like healthSource.native.js imports its plugin) rather
+// than build a bridge proxy by hand.
 //
 // On web there is no native plugin, so we fall back to localStorage PURELY so the flow is
 // runnable in a browser during development. That fallback is NOT secure and must never be
 // the real credential store — the Garmin login can't run on web anyway (CORS; see garmin.js).
 
-import { registerPlugin, Capacitor } from '@capacitor/core';
+import { Capacitor } from '@capacitor/core';
 
 const SESSION_KEY = 'garmin.session.v1';   // { oauth1, oauth2, savedAt }
 const CREDS_KEY = 'garmin.creds.v1';       // optional { username, password } — silent re-auth fallback
@@ -26,45 +27,49 @@ function isNative() {
   try { return Capacitor.isNativePlatform(); } catch { return false; }
 }
 
-// Bind the secure-storage plugin on native, or a localStorage shim on web/dev.
-// Both expose the same tiny get/set/remove(string) surface.
-let _backend = null;
+// Bind the secure-storage plugin on native (dynamic import, so the web build never loads
+// it), or a localStorage shim on web/dev. Both expose the same get/set/remove(string)
+// surface. Async + cached because loading the native wrapper is a dynamic import.
+let _backendPromise = null;
 function backend() {
-  if (_backend) return _backend;
-  if (isNative()) {
-    const SecureStorage = registerPlugin('SecureStorage');
-    _backend = {
-      async get(k) {
-        const r = await SecureStorage.get({ key: k }).catch(() => null);
-        return r?.value ?? null;
-      },
-      async set(k, v) { await SecureStorage.set({ key: k, value: v }); },
-      async remove(k) { await SecureStorage.remove({ key: k }).catch(() => {}); },
-    };
-  } else {
-    _backend = {
+  if (_backendPromise) return _backendPromise;
+  _backendPromise = (async () => {
+    if (isNative()) {
+      const { SecureStorage } = await import('@aparajita/capacitor-secure-storage');
+      return {
+        // The wrapper deserializes on get: a stored JSON string comes back as a string,
+        // but guard by re-stringifying anything non-string so callers always get text.
+        async get(k) {
+          const v = await SecureStorage.get(k).catch(() => null);
+          return v == null ? null : (typeof v === 'string' ? v : JSON.stringify(v));
+        },
+        async set(k, v) { await SecureStorage.set(k, v); },
+        async remove(k) { await SecureStorage.remove(k).catch(() => {}); },
+      };
+    }
+    return {
       async get(k) { try { return localStorage.getItem(k); } catch { return null; } },
       async set(k, v) { try { localStorage.setItem(k, v); } catch { /* unavailable */ } },
       async remove(k) { try { localStorage.removeItem(k); } catch { /* ignore */ } },
     };
-  }
-  return _backend;
+  })();
+  return _backendPromise;
 }
 
 // --- session (the OAuth1/OAuth2 pair) --------------------------------------
 
 export async function saveSession(session) {
-  await backend().set(SESSION_KEY, JSON.stringify(session));
+  await (await backend()).set(SESSION_KEY, JSON.stringify(session));
   return session;
 }
 
 export async function loadSession() {
-  const raw = await backend().get(SESSION_KEY);
+  const raw = await (await backend()).get(SESSION_KEY);
   try { return raw ? JSON.parse(raw) : null; } catch { return null; }
 }
 
 export async function clearSession() {
-  await backend().remove(SESSION_KEY);
+  await (await backend()).remove(SESSION_KEY);
 }
 
 // A restorable login = we still hold the long-lived OAuth1 token.
@@ -79,14 +84,14 @@ export async function hasSession() {
 // re-login; an MFA account can't be re-authed silently anyway. See garmin.js.
 
 export async function saveCredentials(username, password) {
-  await backend().set(CREDS_KEY, JSON.stringify({ username, password }));
+  await (await backend()).set(CREDS_KEY, JSON.stringify({ username, password }));
 }
 
 export async function loadCredentials() {
-  const raw = await backend().get(CREDS_KEY);
+  const raw = await (await backend()).get(CREDS_KEY);
   try { return raw ? JSON.parse(raw) : null; } catch { return null; }
 }
 
 export async function clearCredentials() {
-  await backend().remove(CREDS_KEY);
+  await (await backend()).remove(CREDS_KEY);
 }

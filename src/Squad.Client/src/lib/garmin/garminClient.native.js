@@ -39,6 +39,27 @@ const SIGNIN_PARAMS = {
 // Where a 2-step verification code is submitted (garth's loginEnterMfaCode form target).
 const VERIFY_MFA = `${SSO}/verifyMFA/loginEnterMfaCode`;
 
+// On-device tracing for the unofficial SSO flow (view in the native WebView console).
+// NEVER logs credentials — only statuses, page titles, cookie presence, and detection
+// booleans. Flip to false to silence.
+const DEBUG = true;
+const trace = (...a) => { if (DEBUG) { try { console.log('[garmin]', ...a); } catch { /* ignore */ } } };
+
+// CapacitorHttp header keys aren't case-normalized; find one case-insensitively.
+function resHeader(res, name) {
+  const h = res?.headers || {};
+  const k = Object.keys(h).find((x) => x.toLowerCase() === name.toLowerCase());
+  return k ? h[k] : undefined;
+}
+function pageTitle(html) {
+  return (html.match(/<title[^>]*>([^<]*)<\/title>/i) || [])[1]?.trim() || '';
+}
+// garth decides MFA from the page <title> ("MFA"); also match the verifyMFA form target
+// and the mfa-code field so a title-less variant is still caught.
+function looksLikeMfa(html) {
+  return /verifyMFA|loginEnterMfaCode|mfa-code/i.test(html) || /\bMFA\b/i.test(pageTitle(html));
+}
+
 let _consumer = null;
 async function consumer() {
   if (_consumer) return _consumer;
@@ -63,9 +84,10 @@ export async function login({ username, password }) {
     url: `${SSO}/signin`, method: 'GET', params: SIGNIN_PARAMS,
     headers: { 'User-Agent': UA, referer: EMBED },
   });
+  trace('signin GET', page.status, 'set-cookie?', !!resHeader(page, 'set-cookie'), 'title:', pageTitle(String(page.data ?? '')));
   const csrf = (String(page.data ?? '').match(/name="_csrf"\s+value="([^"]+)"/) || [])[1];
   if (!csrf) {
-    throw new Error('Garmin SSO: no CSRF token on the login page (page shape changed or a Cloudflare challenge — use WebView login).');
+    throw new Error(`Garmin SSO: no CSRF token on the login page (status ${page.status}; page shape changed or a Cloudflare challenge — try browser sign-in).`);
   }
 
   // 3. POST credentials → service ticket (embedded in the response HTML).
@@ -80,17 +102,20 @@ export async function login({ username, password }) {
   });
   const html = String(post.data ?? '');
   const ticket = firstTicket(html);
+  const mfa = looksLikeMfa(html);
+  trace('signin POST', post.status, 'ticket?', !!ticket, 'mfa?', mfa, 'title:', pageTitle(html));
   if (ticket) return { kind: 'session', session: await exchangeTicket(ticket) };
 
   // No ticket → either a 2-step verification code is required, or the credentials were wrong.
   // The MFA page carries its own fresh CSRF; completeMfa() posts the code back with it. The
-  // session cookies set above persist automatically in CapacitorHttp's native cookie jar, so
-  // the follow-up POST stays in the same SSO session with no extra plumbing.
-  if (/verifyMFA|mfa-code|verification/i.test(html)) {
+  // session cookies set above must persist in CapacitorHttp's native cookie jar for the
+  // follow-up POST to stay in the same SSO session (the known Android weak spot).
+  if (mfa) {
     const mfaCsrf = (html.match(/name="_csrf"\s+value="([^"]+)"/) || [])[1] || csrf;
+    trace('MFA required; csrf reused?', mfaCsrf === csrf);
     return { kind: 'mfa', csrf: mfaCsrf };
   }
-  throw new Error('Garmin SSO: login returned no ticket (wrong email/password, or the SSO flow changed).');
+  throw new Error(`Garmin SSO: login returned no ticket (status ${post.status} — wrong email/password, or the SSO flow changed).`);
 }
 
 // Finish a 2-step login: submit the verification code (with the CSRF from login()'s
@@ -105,8 +130,17 @@ export async function completeMfa({ code, csrf }) {
     },
     data: formEncode({ 'mfa-code': String(code).trim(), embed: 'true', _csrf: csrf, fromPage: 'setupEnterMfaCode' }),
   });
-  const ticket = firstTicket(String(res.data ?? ''));
-  if (!ticket) throw new Error('Garmin: verification code rejected (wrong or expired — request a new one).');
+  const body = String(res.data ?? '');
+  const ticket = firstTicket(body);
+  trace('verifyMFA POST', res.status, 'ticket?', !!ticket, 'title:', pageTitle(body));
+  if (!ticket) {
+    // Still an MFA page = the code was wrong/expired; anything else = the SSO session was
+    // lost between the two POSTs (cookies not carried), which needs the browser sign-in.
+    const stillMfa = looksLikeMfa(body);
+    throw new Error(stillMfa
+      ? `Garmin: verification code rejected (status ${res.status} — wrong or expired, request a new one).`
+      : `Garmin: 2-step session was lost (status ${res.status} — cookies weren't carried; use browser sign-in).`);
+  }
   return exchangeTicket(ticket);
 }
 
@@ -135,7 +169,8 @@ async function ticketToOAuth1(ticket) {
   const p = new URLSearchParams(String(res.data ?? ''));
   const oauth_token = p.get('oauth_token');
   const oauth_token_secret = p.get('oauth_token_secret');
-  if (!oauth_token || !oauth_token_secret) throw new Error('Garmin: OAuth1 preauthorized exchange failed.');
+  trace('preauthorized (OAuth1)', res.status, 'token?', !!oauth_token);
+  if (!oauth_token || !oauth_token_secret) throw new Error(`Garmin: OAuth1 preauthorized exchange failed (status ${res.status}).`);
   return { oauth_token, oauth_token_secret };
 }
 
@@ -152,7 +187,8 @@ async function oauth1ToOAuth2(oauth1) {
     data: '',
   });
   const j = asJson(res.data);
-  if (!j?.access_token) throw new Error('Garmin: OAuth2 exchange failed.');
+  trace('exchange (OAuth2)', res.status, 'access_token?', !!j?.access_token);
+  if (!j?.access_token) throw new Error(`Garmin: OAuth2 exchange failed (status ${res.status}).`);
   // expires_in is seconds; stamp an absolute expiry so ensureBearer can check cheaply.
   return { ...j, expiresAt: Date.now() + (Number(j.expires_in) || 3600) * 1000 };
 }
