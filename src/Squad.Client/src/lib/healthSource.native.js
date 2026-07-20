@@ -32,6 +32,17 @@ function num(v) {
   return Number.isFinite(n) ? n : null;
 }
 
+// A workout metric the plugin couldn't read comes back as its -1 sentinel, not null
+// or 0 (TDData/TEBData are initialized to -1 and only overwritten when the HKWorkout
+// actually carries that quantity). Map any negative/absent value to null so downstream
+// filters and the fingerprint don't treat a missing metric as real data. This is what
+// lets Garmin rides through: they store distance as separate DistanceCycling samples
+// and leave HKWorkout.totalDistance nil, so totalDistance arrives as -1.
+function metric(v) {
+  const n = num(v);
+  return n != null && n >= 0 ? n : null;
+}
+
 // Keep only workouts that carry some real signal — a distance, some calories, or a
 // non-trivial duration (>= 60s). Filters out empty auto-logged HealthKit samples that
 // would otherwise import as 0-distance, 0-load junk activities.
@@ -46,20 +57,23 @@ function hasRealData(dto) {
 // is a documented follow-up and stays null — the backend treats every metric as optional
 // and the dedup fingerprint only needs sport + start + distance.
 function mapWorkout(w) {
-  const durationSec = num(w.duration) ?? 0;
+  // The plugin returns `duration` in HOURS (endDate−startDate, then /3600), so scale it
+  // back to seconds before it lands in the *Seconds fields — otherwise a 1h ride imports
+  // as "1 second" and the >=60s data check below can never pass.
+  const durationSec = Math.round((num(w.duration) ?? 0) * 3600);
   return {
     externalId: w.uuid,                       // stable HKWorkout UUID → idempotency key
     sport: toSport(w.workoutActivityName),
     startUtc: w.startDate,                     // ISO 8601 from the plugin
     movingTimeSeconds: durationSec,
     elapsedTimeSeconds: durationSec,
-    distanceMeters: num(w.totalDistance),      // HK base unit (metres) — verify vs. hardware
+    distanceMeters: metric(w.totalDistance),   // HK base unit (metres); -1 sentinel → null
     elevationGainMeters: null,
     avgHeartRate: null,
     maxHeartRate: null,
     avgPowerWatts: null,
     avgCadence: null,
-    calories: num(w.totalEnergyBurned),
+    calories: metric(w.totalEnergyBurned),
     trainingLoad: null,
     track: [],
   };
