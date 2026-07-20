@@ -48,7 +48,7 @@ export default function GarminSync({ getToken, onDataChanged }) {
   const btn = (bg, ink) => `text-align:center;font-size:14px;font-weight:700;padding:12px 0;border-radius:12px;cursor:pointer;color:${ink};background:${bg};transition:opacity .15s`;
 
   return (
-    <div style={s('padding:0 18px 8px;margin-top:14px')}>
+    <div style={s('padding:0 18px 120px;margin-top:14px')}>
       <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:15px 15px 16px')}>
         <div style={s('display:flex;align-items:center;gap:12px')}>
           <div style={s('width:44px;height:44px;border-radius:13px;flex:none;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--accent) 15%,transparent)')}><GarminGlyph /></div>

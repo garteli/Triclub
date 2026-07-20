@@ -26,7 +26,7 @@ export default function AppleHealthSync({ getToken, onDataChanged }) {
   const start = () => run({ since: RANGES.find((r) => r.key === range).since() });
 
   return (
-    <div style={s('padding:0 18px 120px;margin-top:18px;animation:floatUp .35s ease')}>
+    <div style={s('padding:0 18px 0;margin-top:18px;animation:floatUp .35s ease')}>
       <div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.6px;font-weight:600;margin-bottom:8px')}>Or connect a source</div>
 
       <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:15px 15px 16px')}>
