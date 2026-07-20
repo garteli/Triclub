@@ -20,16 +20,18 @@ ZIP="$(mktemp -d)/app.zip"
 
 export PATH="$PATH:/c/Program Files/Microsoft SDKs/Azure/CLI2/wbin"
 
-# Wipe Squad.Web's intermediate output first. The BuildClientApp target rewrites wwwroot
-# with fresh vite hashes on every publish, but StaticWebAssets caches an obj/ manifest that
-# doesn't invalidate when wwwroot changes out from under it — so a publish after a manual
-# `npm run build` fails with "No file exists for the asset …/base-<oldhash>.js". Removing obj
-# forces the manifest to regenerate against the current wwwroot.
-echo "==> clean intermediate (StaticWebAssets manifest)"
+# Build the SPA to completion FIRST, then publish with the in-build client step disabled.
+# Otherwise the BuildClientApp target runs `npm run build` (emptyOutDir) *during* publish and
+# rewrites wwwroot with fresh vite hashes mid-flight — while StaticWebAssets is resolving the
+# assets it globbed a moment earlier — which fails non-deterministically with
+# "No file exists for the asset …/base-<hash>.js". Building client-then-publish keeps wwwroot
+# static across the publish. Wiping obj/bin also clears any stale StaticWebAssets manifest.
+echo "==> clean intermediate + build SPA (before publish, to avoid the wwwroot race)"
 rm -rf "$ROOT/src/Squad.Web/obj" "$ROOT/src/Squad.Web/bin"
+( cd "$ROOT/src/Squad.Client" && npm run build )
 
-echo "==> dotnet publish"
-dotnet publish "$ROOT/src/Squad.Web" -c Release -o "$PUB" --nologo -v q
+echo "==> dotnet publish (SPA already built)"
+dotnet publish "$ROOT/src/Squad.Web" -c Release -p:SkipClientBuild=true -o "$PUB" --nologo -v q
 
 echo "==> zip (python zipfile)"
 python "$ROOT/deploy/mkzip.py" "$PUB" "$ZIP"
