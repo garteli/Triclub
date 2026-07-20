@@ -30,6 +30,11 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddSingleton<IIngestQueue, ChannelIngestQueue>();
         services.AddHostedService<IngestWorker>();
 
+        // Weather enrichment (Open-Meteo, no API key). Typed HttpClient with a short timeout
+        // so a slow/unreachable weather API can't stall the ingest worker — it's best-effort.
+        services.AddHttpClient<IWeatherService, OpenMeteoWeatherService>(c =>
+            c.Timeout = TimeSpan.FromSeconds(6));
+
         // Persistence (SQL Server).
         services.AddScoped<IActivityRepository>(_ => new SqlActivityRepository(sqlConnectionString));
         services.AddScoped<IRawActivityStore>(_ => new SqlRawActivityStore(sqlConnectionString));

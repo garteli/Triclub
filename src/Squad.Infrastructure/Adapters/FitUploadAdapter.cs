@@ -34,7 +34,7 @@ public sealed class FitUploadAdapter : ISourceAdapter
 
     public Task<Activity> NormalizeAsync(RawActivity raw, CancellationToken ct)
     {
-        var (session, records, lapMsgs) = DecodeFit(raw.Payload);
+        var (session, records, lapMsgs, fileId, creatorDevice) = DecodeFit(raw.Payload);
         if (session is null)
             throw new FitParseException("FIT file contained no Session message — cannot summarize.");
 
@@ -69,6 +69,7 @@ public sealed class FitUploadAdapter : ISourceAdapter
             AvgCadence = session.GetAvgCadence(),
             Calories = session.GetTotalCalories(),
             TrainingLoad = session.GetTrainingStressScore(),         // TSS if the head unit wrote it; else null
+            DeviceName = FitDeviceName.Resolve(fileId, creatorDevice),
             Source = Source,
             SourceExternalId = raw.SourceExternalId,
             Track = track,
@@ -86,11 +87,16 @@ public sealed class FitUploadAdapter : ISourceAdapter
     //  Multisport (triathlon) files can carry several sessions; MVP takes the
     //  first. TODO: split multisport into one Activity per child session.
     // -------------------------------------------------------------------
-    private static (SessionMesg? session, List<RecordMesg> records, List<LapMesg> laps) DecodeFit(byte[] bytes)
+    private static (SessionMesg? session, List<RecordMesg> records, List<LapMesg> laps,
+                    FileIdMesg? fileId, DeviceInfoMesg? creatorDevice) DecodeFit(byte[] bytes)
     {
         var sessions = new List<SessionMesg>();
         var records = new List<RecordMesg>();
         var laps = new List<LapMesg>();
+        FileIdMesg? fileId = null;
+        // The head unit that wrote the file identifies itself as device_index 0 (the "creator").
+        // Sensors (HRM, power meter, radar) are separate device_info messages we ignore for the name.
+        DeviceInfoMesg? creatorDevice = null;
 
         var decode = new Decode();
         var broadcaster = new MesgBroadcaster();
@@ -99,6 +105,13 @@ public sealed class FitUploadAdapter : ISourceAdapter
         broadcaster.SessionMesgEvent += (_, e) => sessions.Add((SessionMesg)e.mesg);
         broadcaster.RecordMesgEvent += (_, e) => records.Add((RecordMesg)e.mesg);
         broadcaster.LapMesgEvent += (_, e) => laps.Add((LapMesg)e.mesg);
+        broadcaster.FileIdMesgEvent += (_, e) => fileId ??= (FileIdMesg)e.mesg;
+        broadcaster.DeviceInfoMesgEvent += (_, e) =>
+        {
+            var d = (DeviceInfoMesg)e.mesg;
+            // Prefer device_index 0; otherwise keep the first one we see as a fallback.
+            if (creatorDevice is null || d.GetDeviceIndex() == 0) creatorDevice = d;
+        };
 
         using var ms = new MemoryStream(bytes, writable: false);
         if (!decode.IsFIT(ms))
@@ -116,7 +129,7 @@ public sealed class FitUploadAdapter : ISourceAdapter
                 throw new FitParseException($"FIT decode failed: {ex.Message}");
         }
 
-        return (sessions.Count > 0 ? sessions[0] : null, records, laps);
+        return (sessions.Count > 0 ? sessions[0] : null, records, laps, fileId, creatorDevice);
     }
 
     private static IReadOnlyList<Lap> BuildLaps(List<LapMesg> lapMsgs, DateTimeOffset start)

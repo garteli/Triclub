@@ -83,9 +83,21 @@ CREATE TABLE dbo.Activity (
     SourceExternalId  NVARCHAR(128)     NULL,
     Fingerprint       CHAR(32)          NOT NULL,   -- MD5 hex of sport|start-60s|distance-100m
     TrackBlob         VARBINARY(MAX)    NULL,       -- gzipped JSON TrackPoint[]
+    DeviceName        NVARCHAR(128)     NULL,       -- recording head unit (from FIT), e.g. 'Garmin Edge 1050'
+    WeatherJson       NVARCHAR(400)     NULL,       -- ActivityWeather at start, JSON; enriched from Open-Meteo
+    StartLat          FLOAT             NULL,       -- first GPS point latitude  (matched-rides seek)
+    StartLon          FLOAT             NULL,       -- first GPS point longitude (matched-rides seek)
     CONSTRAINT PK_Activity PRIMARY KEY (Id),
     CONSTRAINT FK_Activity_Athlete FOREIGN KEY (AthleteId) REFERENCES dbo.Athlete (Id)
 );
+
+-- Additive columns for existing deployments (the CREATE above only runs on a fresh DB).
+-- Device name (FIT), weather-at-start (JSON), and the denormalized start point that the
+-- matched-rides query seeks on. Guarded so the script stays re-runnable.
+IF COL_LENGTH('dbo.Activity', 'DeviceName')  IS NULL ALTER TABLE dbo.Activity ADD DeviceName  NVARCHAR(128) NULL;
+IF COL_LENGTH('dbo.Activity', 'WeatherJson') IS NULL ALTER TABLE dbo.Activity ADD WeatherJson NVARCHAR(400) NULL;
+IF COL_LENGTH('dbo.Activity', 'StartLat')    IS NULL ALTER TABLE dbo.Activity ADD StartLat    FLOAT         NULL;
+IF COL_LENGTH('dbo.Activity', 'StartLon')    IS NULL ALTER TABLE dbo.Activity ADD StartLon    FLOAT         NULL;
 
 -- Dedup key: the repository's insert relies on this unique constraint (catches
 -- SQL errors 2601/2627 to resolve concurrent-insert races into a discard).
@@ -99,6 +111,13 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Activity_Athlete_Start
 CREATE INDEX IX_Activity_Athlete_Start
     ON dbo.Activity (AthleteId, StartUtc)
     INCLUDE (Sport, TrainingLoad, MovingTimeSec);
+
+-- Matched-rides scan: seek other athletes' rides by (sport, start-time window); the start
+-- point + owner ride along so the haversine filter and join stay index-covered.
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Activity_Sport_Start' AND object_id = OBJECT_ID('dbo.Activity'))
+CREATE INDEX IX_Activity_Sport_Start
+    ON dbo.Activity (Sport, StartUtc)
+    INCLUDE (AthleteId, StartLat, StartLon, DistanceMeters, MovingTimeSec, AvgHeartRate);
 
 -- ---------------------------------------------------------------------------
 --  HealthDaily — lightweight daily wellness imported from Apple Health (resting

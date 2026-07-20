@@ -80,6 +80,12 @@ public interface IActivityReadService
     /// within the given squad. Null when the activity isn't in that squad or has no stored detail
     /// (e.g. an indoor session with no GPS). Hydrated on demand — it's the heavy blob the list omits.</summary>
     Task<ActivityDetail?> GetDetailAsync(Guid activityId, Guid squadId, CancellationToken ct);
+
+    /// <summary>Other athletes in the caller's squad who recorded a ride at the same place and
+    /// time — a proxy for "rode together". Same sport, start within a short window and a short
+    /// distance of this activity's start point. Empty when the activity has no GPS start point
+    /// or isn't visible to the caller's squad.</summary>
+    Task<IReadOnlyList<MatchedRide>> GetMatchedRidesAsync(Guid activityId, Guid squadId, CancellationToken ct);
 }
 
 /// <summary>An activity summary joined to athlete display fields; drives both the list card and the detail metrics.</summary>
@@ -91,7 +97,17 @@ public sealed record ActivitySummaryRow(
     // Proxy path to the athlete's avatar photo (null when they have none → initials).
     string? AvatarUrl = null,
     // Kudos/Comments are counts; IKudoed is whether the requesting caller has kudoed this activity.
-    int Kudos = 0, int Comments = 0, bool IKudoed = false);
+    int Kudos = 0, int Comments = 0, bool IKudoed = false,
+    // Recording device name (FIT) and weather-at-start JSON (ActivityWeather). Null when unknown;
+    // the host deserializes WeatherJson before sending it to the client.
+    string? DeviceName = null, string? WeatherJson = null);
+
+/// <summary>A teammate's ride that overlapped this one in place + time (the "rode together" set).</summary>
+public sealed record MatchedRide(
+    Guid ActivityId, Guid AthleteId, string AthleteName, string Initials, string AvatarColor,
+    double? DistanceMeters, int MovingTimeSec, double? AvgHeartRate,
+    // Proxy path to the athlete's avatar photo (null when they have none → initials).
+    string? AvatarUrl = null);
 
 /// <summary>Last-known live-ride position per rider. In-memory/single-instance; Redis to scale out.</summary>
 public interface IRideSessionState
