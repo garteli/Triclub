@@ -2,13 +2,15 @@ import { useState } from 'react';
 import { s, html } from '../lib/style.js';
 
 // Coach's plan editor — build a squad's training week, assign athletes, and
-// "publish". Ported 1:1 from the Claude Design handoff (the `planeditor` screen).
-// Self-contained prototype state (local only, no backend), matching the app's
-// other form-heavy screens (CreateGroup / EditProfile).
+// "publish". The layout is ported from the design handoff (the `planeditor`
+// screen), but it starts BLANK: no seeded plan, sessions, or fake athletes.
+// The assignable roster is the real squad (vm.squad, derived from the live
+// leaderboard); the coach fills in the week themselves. Self-contained local
+// state, matching the CreateGroup / EditProfile screen conventions.
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-// Sport → accent colour + glyph markup (verbatim from the handoff).
+// Sport → accent colour + glyph markup (UI, not data).
 const SPORTS = [['Bike', 'var(--bike)'], ['Swim', 'var(--swim)'], ['Run', 'var(--run)'], ['Gym', '#c68bff'], ['Rest', 'var(--text3)']];
 const SPORT_COLOR = { Bike: 'var(--bike)', Swim: 'var(--swim)', Run: 'var(--run)', Gym: '#c68bff', Rest: 'var(--text3)' };
 const SPORT_PATH = {
@@ -26,26 +28,8 @@ const sportGlyph = (sp) => html(
 
 const durHours = (dur) => { const p = (dur || '0:00').split(':'); return (+p[0] || 0) + (+p[1] || 0) / 60; };
 
-const initialSessions = {
-  Mon: [],
-  Tue: [{ id: 't1', sport: 'Bike', title: 'Threshold 3×12′', dur: '1:15', load: 78, z: 'Zone 4', note: 'Hold the last interval — cadence 90+.' }],
-  Wed: [{ id: 'w1', sport: 'Swim', title: 'Technique 8×100', dur: '1:00', load: 45, z: 'CSS', note: 'Focus on catch & rotation.' }],
-  Thu: [{ id: 'th1', sport: 'Run', title: 'Tempo 20′', dur: '0:50', load: 62, z: 'Zone 3', note: '' }],
-  Fri: [],
-  Sat: [{ id: 's1', sport: 'Bike', title: 'Long endurance', dur: '3:00', load: 150, z: 'Zone 2', note: 'Steady, fuel every 30′.' }],
-  Sun: [{ id: 'su1', sport: 'Run', title: 'Brick 2h+20′', dur: '2:20', load: 128, z: 'Zone 2-3', note: 'Off the bike, hold form.' }],
-};
-
-const initialRoster = [
-  { id: 'noa', name: 'Noa Regev', initials: 'NR', color: '#ff9a4c', level: 'Advanced', on: true },
-  { id: 'adam', name: 'Adam Bar', initials: 'AB', color: '#37c0ff', level: 'Intermediate', on: true },
-  { id: 'maya', name: 'Maya Katz', initials: 'MK', color: '#c68bff', level: 'Intermediate', on: true },
-  { id: 'roi', name: 'Roi Gal', initials: 'RG', color: '#4fe08b', level: 'Advanced', on: true },
-  { id: 'yoav', name: 'Yoav Shani', initials: 'YS', color: '#ff6f61', level: 'Beginner', on: false },
-  { id: 'itai', name: 'Itai Tal', initials: 'IT', color: '#ffce4a', level: 'Beginner', on: false },
-  { id: 'tal', name: 'Tal Vardi', initials: 'TV', color: '#5a86ff', level: 'Advanced', on: true },
-  { id: 'dana', name: 'Dana Levi', initials: 'DL', color: '#d6ff3f', level: 'Advanced', on: true },
-];
+// Initials fallback when the roster row doesn't carry them (e.g. "You").
+const initialsOf = (m) => m.initials || (m.name || '?').split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
 
 // ── Session editor bottom sheet ──────────────────────────────────────────────
 function SessionSheet({ editor, onField, onSave, onDelete, onClose }) {
@@ -84,7 +68,7 @@ function SessionSheet({ editor, onField, onSave, onDelete, onClose }) {
           </div>
           <div style={s('flex:1')}>
             <div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:7px')}>Load</div>
-            <input value={editor.load} onChange={(e) => onField('load', e.target.value)} type="number"
+            <input value={editor.load} onChange={(e) => onField('load', e.target.value)} type="number" placeholder="60"
               style={s('width:100%;background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:14px;color:var(--text);outline:none;font-family:inherit')} />
           </div>
         </div>
@@ -110,29 +94,37 @@ function SessionSheet({ editor, onField, onSave, onDelete, onClose }) {
   );
 }
 
-export default function PlanEditor({ actions }) {
-  const [planName, setPlanName] = useState('Base · Endurance');
-  const [week] = useState(2);
-  const [weekTitle, setWeekTitle] = useState('Aerobic base + threshold intro');
-  const [targetHrs, setTargetHrs] = useState('10');
-  const [targetLoad, setTargetLoad] = useState('560');
-  const [focus, setFocus] = useState('Build the aerobic engine; introduce sustained threshold work midweek.');
-  const [roster, setRoster] = useState(initialRoster);
-  const [sessions, setSessions] = useState(initialSessions);
+export default function PlanEditor({ vm, actions }) {
+  const [planName, setPlanName] = useState('');
+  const [week, setWeek] = useState(1);
+  const [weekTitle, setWeekTitle] = useState('');
+  const [targetHrs, setTargetHrs] = useState('');
+  const [targetLoad, setTargetLoad] = useState('');
+  const [focus, setFocus] = useState('');
+  const [sessions, setSessions] = useState({}); // day -> [session]
+  const [assigned, setAssigned] = useState({}); // athleteId -> bool (default: assigned)
   const [editor, setEditor] = useState(null); // null | { id, day, sport, title, dur, load, z, note }
 
+  // Real squad roster (empty until the live leaderboard/roster loads). No fake athletes.
+  const roster = (vm?.squad ?? []).map((m) => ({
+    id: m.id, name: m.name, initials: initialsOf(m), color: m.color || 'var(--text3)',
+    level: m.status === 'crushing' ? 'On fire' : m.status === 'ontrack' ? 'On track' : 'Building',
+    on: assigned[m.id] !== false, // default assigned
+  }));
+
   // ── derived totals ──
-  const totLoad = DAYS.reduce((n, d) => n + (sessions[d] || []).reduce((a, x) => a + (+x.load || 0), 0), 0);
-  const totHrs = DAYS.reduce((n, d) => n + (sessions[d] || []).reduce((a, x) => a + durHours(x.dur), 0), 0);
-  const sessCount = DAYS.reduce((n, d) => n + (sessions[d] || []).length, 0);
+  const daySessions = (d) => sessions[d] || [];
+  const totLoad = DAYS.reduce((n, d) => n + daySessions(d).reduce((a, x) => a + (+x.load || 0), 0), 0);
+  const totHrs = DAYS.reduce((n, d) => n + daySessions(d).reduce((a, x) => a + durHours(x.dur), 0), 0);
+  const sessCount = DAYS.reduce((n, d) => n + daySessions(d).length, 0);
   const hrsPct = Math.min(100, Math.round(totHrs / (+targetHrs || 1) * 100));
   const loadPct = Math.min(100, Math.round(totLoad / (+targetLoad || 1) * 100));
   const assignedCount = roster.filter((a) => a.on).length;
 
   // ── session editing ──
   const openSession = (day, id) => {
-    const sess = id ? (sessions[day] || []).find((x) => x.id === id) : null;
-    setEditor(sess ? { ...sess, day } : { id: null, day, sport: 'Bike', title: '', dur: '1:00', load: 60, z: 'Zone 2', note: '' });
+    const sess = id ? daySessions(day).find((x) => x.id === id) : null;
+    setEditor(sess ? { ...sess, day } : { id: null, day, sport: 'Bike', title: '', dur: '1:00', load: '', z: '', note: '' });
   };
   const editField = (k, v) => setEditor((e) => ({ ...e, [k]: v }));
   const saveSession = () => {
@@ -152,7 +144,7 @@ export default function PlanEditor({ actions }) {
     setSessions((prev) => ({ ...prev, [editor.day]: (prev[editor.day] || []).filter((x) => x.id !== editor.id) }));
     setEditor(null);
   };
-  const toggleAthlete = (id) => setRoster((r) => r.map((a) => (a.id === id ? { ...a, on: !a.on } : a)));
+  const toggleAthlete = (id) => setAssigned((a) => ({ ...a, [id]: a[id] === false }));
 
   return (
     <>
@@ -173,17 +165,17 @@ export default function PlanEditor({ actions }) {
         {/* plan name */}
         <input value={planName} onChange={(e) => setPlanName(e.target.value)} placeholder="Plan name"
           style={s('width:100%;background:transparent;border:none;font-family:inherit;font-size:23px;font-weight:700;letter-spacing:-.5px;color:var(--text);outline:none;margin-top:6px;padding:0')} />
-        <div style={s('font-size:11.5px;color:var(--accent);font-weight:700;margin-bottom:4px')}>Kaza Tri Club · 12-week block</div>
+        <div style={s('font-size:11.5px;color:var(--accent);font-weight:700;margin-bottom:4px')}>{vm?.squadName || 'Your club'} · training block</div>
 
         {/* week meta: title + targets + focus */}
         <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:14px 15px;margin-top:12px')}>
           <div style={s('display:flex;align-items:center;justify-content:space-between;margin-bottom:9px')}>
-            <span style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:700')}>Week {week} of 12</span>
+            <span style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:700')}>Week {week}</span>
             <div style={s('display:flex;gap:6px')}>
-              <div className="ctl" style={s('width:26px;height:26px;border-radius:8px;background:var(--bg3);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--text2)')}>
+              <div className="ctl" onClick={() => setWeek((w) => Math.max(1, w - 1))} style={s('width:26px;height:26px;border-radius:8px;background:var(--bg3);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--text2)')}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M15 6l-6 6 6 6" /></svg>
               </div>
-              <div className="ctl" style={s('width:26px;height:26px;border-radius:8px;background:var(--bg3);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--text2)')}>
+              <div className="ctl" onClick={() => setWeek((w) => w + 1)} style={s('width:26px;height:26px;border-radius:8px;background:var(--bg3);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--text2)')}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M9 6l6 6-6 6" /></svg>
               </div>
             </div>
@@ -193,12 +185,12 @@ export default function PlanEditor({ actions }) {
           <div style={s('display:flex;gap:10px;margin-top:10px')}>
             <div style={s('flex:1')}>
               <div style={s('font-size:9.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;font-weight:600;margin-bottom:5px')}>Target hours</div>
-              <input value={targetHrs} onChange={(e) => setTargetHrs(e.target.value)} type="number"
+              <input value={targetHrs} onChange={(e) => setTargetHrs(e.target.value)} type="number" placeholder="—"
                 style={s('width:100%;background:var(--bg3);border:1px solid var(--line);border-radius:11px;padding:10px 12px;font-size:14px;color:var(--text);outline:none;font-family:inherit')} />
             </div>
             <div style={s('flex:1')}>
               <div style={s('font-size:9.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;font-weight:600;margin-bottom:5px')}>Target load</div>
-              <input value={targetLoad} onChange={(e) => setTargetLoad(e.target.value)} type="number"
+              <input value={targetLoad} onChange={(e) => setTargetLoad(e.target.value)} type="number" placeholder="—"
                 style={s('width:100%;background:var(--bg3);border:1px solid var(--line);border-radius:11px;padding:10px 12px;font-size:14px;color:var(--text);outline:none;font-family:inherit')} />
             </div>
           </div>
@@ -211,12 +203,12 @@ export default function PlanEditor({ actions }) {
         <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:13px 15px;margin-top:12px')}>
           <div style={s('display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:6px')}>
             <span style={s('color:var(--text2)')}>Planned hours</span>
-            <span className="mono" style={s('font-weight:700')}>{totHrs.toFixed(1)} / {targetHrs}h</span>
+            <span className="mono" style={s('font-weight:700')}>{totHrs.toFixed(1)} / {targetHrs || '—'}h</span>
           </div>
           <div style={s('height:7px;border-radius:4px;background:var(--bg4);overflow:hidden')}><div style={s('height:100%;width:' + hrsPct + '%;background:var(--accent);border-radius:4px')} /></div>
           <div style={s('display:flex;justify-content:space-between;font-size:11.5px;margin:11px 0 6px')}>
             <span style={s('color:var(--text2)')}>Planned load</span>
-            <span className="mono" style={s('font-weight:700')}>{totLoad} / {targetLoad}</span>
+            <span className="mono" style={s('font-weight:700')}>{totLoad} / {targetLoad || '—'}</span>
           </div>
           <div style={s('height:7px;border-radius:4px;background:var(--bg4);overflow:hidden')}><div style={s('height:100%;width:' + loadPct + '%;background:var(--bike);border-radius:4px')} /></div>
         </div>
@@ -226,20 +218,24 @@ export default function PlanEditor({ actions }) {
           <span style={s('font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text2)')}>Assigned athletes</span>
           <span className="mono" style={s('font-size:12px;color:var(--accent);font-weight:700')}>{assignedCount}/{roster.length}</span>
         </div>
-        <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;overflow:hidden')}>
-          {roster.map((a) => (
-            <div key={a.id} className="ctl" onClick={() => toggleAthlete(a.id)} style={s('display:flex;align-items:center;gap:11px;padding:11px 13px;' + (a.on ? '' : 'opacity:.55'))}>
-              <div style={s('width:34px;height:34px;border-radius:10px;background:' + a.color + ';flex:none;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#0c0e11')}>{a.initials}</div>
-              <div style={s('flex:1;min-width:0')}>
-                <div style={s('font-size:13.5px;font-weight:700')}>{a.name}</div>
-                <div style={s('font-size:11px;color:var(--text3)')}>{a.level}</div>
+        {roster.length === 0 ? (
+          <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:18px;text-align:center;font-size:12.5px;color:var(--text3);line-height:1.5')}>Your squad's athletes will appear here to assign once they've joined.</div>
+        ) : (
+          <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;overflow:hidden')}>
+            {roster.map((a) => (
+              <div key={a.id} className="ctl" onClick={() => toggleAthlete(a.id)} style={s('display:flex;align-items:center;gap:11px;padding:11px 13px;' + (a.on ? '' : 'opacity:.55'))}>
+                <div style={s('width:34px;height:34px;border-radius:10px;background:' + a.color + ';flex:none;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#0c0e11')}>{a.initials}</div>
+                <div style={s('flex:1;min-width:0')}>
+                  <div style={s('font-size:13.5px;font-weight:700')}>{a.name}</div>
+                  <div style={s('font-size:11px;color:var(--text3)')}>{a.level}</div>
+                </div>
+                <div style={s('width:24px;height:24px;border-radius:7px;flex:none;display:flex;align-items:center;justify-content:center;' + (a.on ? 'background:var(--accent)' : 'background:var(--bg3);border:1px solid var(--line2)'))}>
+                  {a.on && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-ink)" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>}
+                </div>
               </div>
-              <div style={s('width:24px;height:24px;border-radius:7px;flex:none;display:flex;align-items:center;justify-content:center;' + (a.on ? 'background:var(--accent)' : 'background:var(--bg3);border:1px solid var(--line2)'))}>
-                {a.on && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-ink)" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>}
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
         {/* week schedule */}
         <div style={s('display:flex;align-items:baseline;justify-content:space-between;margin:22px 2px 4px')}>
@@ -263,7 +259,7 @@ export default function PlanEditor({ actions }) {
 
         <div style={s('display:flex;flex-direction:column;gap:12px;margin-top:16px')}>
           {DAYS.map((day) => {
-            const list = sessions[day] || [];
+            const list = daySessions(day);
             return (
               <div key={day}>
                 <div style={s('display:flex;align-items:center;justify-content:space-between;margin-bottom:7px')}>
@@ -282,12 +278,12 @@ export default function PlanEditor({ actions }) {
                       <div key={x.id} className="ctl" onClick={() => openSession(day, x.id)} style={s('background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:12px 13px;display:flex;align-items:center;gap:12px')}>
                         <div style={s('width:38px;height:38px;border-radius:11px;background:color-mix(in srgb,' + color + ' 16%,transparent);color:' + color + ';flex:none;display:flex;align-items:center;justify-content:center')} dangerouslySetInnerHTML={sportGlyph(x.sport)} />
                         <div style={s('flex:1;min-width:0')}>
-                          <div style={s('font-size:14px;font-weight:700')}>{x.title}</div>
-                          <div style={s('font-size:11.5px;color:var(--text2)')}>{x.sport} · {x.z}</div>
+                          <div style={s('font-size:14px;font-weight:700')}>{x.title || 'Untitled session'}</div>
+                          <div style={s('font-size:11.5px;color:var(--text2)')}>{x.sport}{x.z ? ' · ' + x.z : ''}</div>
                         </div>
                         <div style={s('text-align:right;flex:none')}>
                           <div className="mono" style={s('font-size:12.5px;font-weight:700')}>{x.dur}</div>
-                          <div className="mono" style={s('font-size:10.5px;color:var(--accent)')}>{x.load} load</div>
+                          <div className="mono" style={s('font-size:10.5px;color:var(--accent)')}>{+x.load || 0} load</div>
                         </div>
                       </div>
                     );
@@ -298,7 +294,7 @@ export default function PlanEditor({ actions }) {
           })}
         </div>
 
-        <div className="ctl" style={s('background:var(--accent);color:var(--accent-ink);text-align:center;padding:14px;border-radius:14px;font-weight:700;font-size:14px;margin-top:18px')}>Publish to {assignedCount} athletes</div>
+        <div className="ctl" style={s('background:var(--accent);color:var(--accent-ink);text-align:center;padding:14px;border-radius:14px;font-weight:700;font-size:14px;margin-top:18px')}>Publish to {assignedCount} athlete{assignedCount === 1 ? '' : 's'}</div>
         <div style={s('text-align:center;font-size:11px;color:var(--text3);margin-top:8px;line-height:1.5')}>Assigned athletes get this week's sessions and targets, and are notified when you publish.</div>
       </div>
 
