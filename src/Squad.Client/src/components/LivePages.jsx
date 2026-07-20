@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { s } from '../lib/style.js';
 import { metricCatalog, liveMetricValues, liveChartsView, liveRadarView, spreadRiders } from '../lib/liveMetrics.js';
 import TileMap from './TileMap.jsx';
@@ -211,6 +212,25 @@ export default function LivePages({ tel, lp }) {
     return { ...base, kind: 'metric', hero, label: m.label, unit: m.unit, value: val.v, vf: vs, color };
   });
 
+  // Horizontal swipe to change pages (left → next, right → prev). Skipped while
+  // editing so drag-to-reorder keeps the pointer. A mostly-horizontal move past the
+  // threshold counts; vertical scrolls and taps are ignored.
+  const swipe = useRef(null);
+  const onRowPointerDown = (e) => {
+    actions.pokePager();
+    swipe.current = editFields ? null : { x: e.clientX, y: e.clientY };
+  };
+  const onRowPointerUp = (e) => {
+    const start = swipe.current;
+    swipe.current = null;
+    if (!start) return;
+    const dx = e.clientX - start.x;
+    const dy = e.clientY - start.y;
+    if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.3) {
+      if (dx < 0) actions.nextPage(); else actions.prevPage();
+    }
+  };
+
   const gridStyle = `flex:1;display:grid;grid-template-columns:repeat(${cols},1fr);gap:8px;grid-auto-rows:1fr;min-width:0`;
   const pagerAnim = (pagerVisible || editFields)
     ? 'opacity:1;transform:none;transition:opacity .3s ease,transform .3s ease'
@@ -219,7 +239,7 @@ export default function LivePages({ tel, lp }) {
   return (
     <>
       {/* full-screen page: optional Group column + fields grid */}
-      <div className="live-row" style={s('display:flex;gap:9px;padding:0 12px')} onPointerDown={actions.pokePager}>
+      <div className="live-row" style={s('display:flex;gap:9px;padding:0 12px;touch-action:pan-y')} onPointerDown={onRowPointerDown} onPointerUp={onRowPointerUp}>
         {withSide && <GroupColumn tel={tel} />}
         <div style={s(gridStyle)}>
           {fields.map((f, i) => <FieldCell key={i} f={f} index={i} editing={editFields} actions={actions} />)}
