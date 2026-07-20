@@ -138,7 +138,7 @@ function RideSummary({ pending, saveState, saveError, saveRide, discardRide, pho
 // hub connection persist across lobby→active). `streaming` reflects whether fixes are
 // going to the ride hub.
 export default function RideRecorder({ recorder, sensors, streaming }) {
-  const { recording, paused, distanceKm, lastFix, error, mode, start, stop,
+  const { recording, paused, distanceKm, elapsedSec, lastFix, error, mode, start, stop,
           pending, saveState, saveError, saveRide, discardRide,
           photos, addPhoto, removePhoto } = recorder;
   const radar = sensors.metrics.radar;
@@ -221,6 +221,7 @@ export default function RideRecorder({ recorder, sensors, streaming }) {
       {recording && (
         <div style={s('display:flex;gap:0;margin-top:12px;border-top:1px solid var(--line);padding-top:12px')}>
           <div style={s('flex:1')}><div className="mono" style={s('font-size:20px;font-weight:700')}>{distanceKm.toFixed(2)}<span style={s('font-size:11px;color:var(--text2)')}>km</span></div><div style={s('font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.7px')}>Distance</div></div>
+          <div style={s('flex:1;border-left:1px solid var(--line);padding-left:12px')}><div className="mono" style={s('font-size:20px;font-weight:700')}>{fmtDur(elapsedSec)}</div><div style={s('font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.7px')}>Time</div></div>
           <div style={s('flex:1;border-left:1px solid var(--line);padding-left:12px')}><div className="mono" style={s('font-size:20px;font-weight:700')}>{lastFix?.speedKph != null ? lastFix.speedKph.toFixed(1) : '—'}<span style={s('font-size:11px;color:var(--text2)')}>kph</span></div><div style={s('font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.7px')}>Speed</div></div>
           <div style={s('flex:1;border-left:1px solid var(--line);padding-left:12px')}><div className="mono" style={s('font-size:20px;font-weight:700')}>{lastFix?.accuracy != null ? `±${Math.round(lastFix.accuracy)}` : '—'}<span style={s('font-size:11px;color:var(--text2)')}>m</span></div><div style={s('font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.7px')}>GPS</div></div>
         </div>
