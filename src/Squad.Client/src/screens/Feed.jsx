@@ -146,18 +146,6 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged }) {
         </div>
       </div>
 
-      {/* more feed */}
-      <div style={s(label + ';margin:24px 18px 12px')}>More from your squad</div>
-      <div style={s('display:flex;flex-direction:column;gap:10px;padding:0 18px')}>
-        {vm.feed.map((f) => (
-          <div key={f.id} className="ctl" onClick={() => (f.activityId ? actions.openActivity(f.activityId) : actions.openAthlete(f.athleteId))} style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:13px 14px;display:flex;gap:12px;align-items:center')}>
-            <AuthedAvatar avatarUrl={f.avatarUrl} token={token} initials={f.initials} color={f.color} size={40} radius={12} fontSize={14} />
-            <div style={s('flex:1;min-width:0')}><div style={s('font-size:13px;line-height:1.3')}><span style={s('font-weight:600')}>{f.name}</span> <span style={s('color:var(--text2)')}>{f.action}</span></div><div style={s('display:flex;gap:10px;margin-top:4px;align-items:center')}><span className="mono" style={s('font-size:11px')}>{f.metric}</span><span style={s('font-size:11px;color:var(--text3)')}>{f.time}</span></div></div>
-            <div style={s(`width:30px;height:30px;border-radius:8px;background:color-mix(in srgb,${f.discColor} 16%,transparent);flex:none;display:flex;align-items:center;justify-content:center;font-size:14px`)}>{f.icon}</div>
-          </div>
-        ))}
-      </div>
-
       {/* delete confirmation — themed (CSS vars), consistent in dark & light */}
       {confirmDel && (
         <>
