@@ -2,9 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 
 // Maps a server ActivitySummaryRow to the exact activity shape buildViewModel's
 // enrichAct/activityDetail/activityAnalysis already consume (see data/squadData.js),
-// so switching the Activities screen from seed to live data is a drop-in. Metrics
-// the DB doesn't have yet (reactions, comments, achievements, GPS location) default
-// to empty — the synthetic per-activity analysis charts stay (seeded by id).
+// so switching the Activities screen from seed to live data is a drop-in. Kudos and
+// comments are real (from the server); metrics the DB doesn't have yet (achievements,
+// GPS location) default to empty — the synthetic per-activity analysis charts stay.
 
 const SPORTS = ['Gym', 'Swim', 'Bike', 'Run']; // ActivitySport: 0=Other→Gym, 1=Swim, 2=Bike, 3=Run
 const TITLES = { Bike: 'Ride', Run: 'Run', Swim: 'Swim', Gym: 'Session' };
@@ -65,7 +65,9 @@ export function mapActivity(r) {
     avgSpeed, speedU,
     elev: Math.round(r.elevationGainM || 0).toLocaleString(),
     avgHr: Math.round(r.avgHeartRate || 0),
-    fire: 0, strong: 0, clap: 0, comments: 0, achievements: 0,
+    // Social layer (real, from the server): kudos count, comment count, and whether
+    // the signed-in athlete has kudoed this one.
+    kudos: r.kudos || 0, comments: r.comments || 0, iKudoed: !!r.iKudoed, achievements: 0,
   };
 }
 

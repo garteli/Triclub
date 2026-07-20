@@ -52,6 +52,14 @@ export function useSquadFeed({ hubUrl = API_BASE + '/hubs/squad', feedUrl = '/ap
     });
     conn.on('leaderboardChanged', () => cbRef.current?.());
 
+    // Social layer: keep feed cards' kudos/comment counts current as teammates react.
+    conn.on('activityKudos', ({ activityId, kudos }) => {
+      setFeed((prev) => prev.map((f) => (f.id === activityId ? { ...f, kudos } : f)));
+    });
+    conn.on('activityComment', (c) => {
+      setFeed((prev) => prev.map((f) => (f.id === c.activityId ? { ...f, comments: (f.comments || 0) + 1 } : f)));
+    });
+
     conn.onreconnecting(() => setStatus('connecting'));
     conn.onreconnected(() => setStatus('live'));
     conn.onclose(() => setStatus('offline'));

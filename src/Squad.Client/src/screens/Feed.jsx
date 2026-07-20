@@ -6,6 +6,7 @@ import AuthedImage from '../components/AuthedImage.jsx';
 import { deleteActivity } from '../hooks/useActivities.js';
 import { useActivityPhotos } from '../hooks/useActivityPhotos.js';
 import ActivityDetailAnalysis from '../components/ActivityDetailAnalysis.jsx';
+import ActivityInteractions from '../components/ActivityInteractions.jsx';
 import { downscaleToJpeg, captureNativePhoto, isNativePlatform, uploadActivityPhoto } from '../lib/photos.js';
 
 // Activity photos: gallery of what's attached (or captured in-ride), plus an
@@ -72,7 +73,7 @@ const label = 'font-size:11px;color:var(--text3);text-transform:uppercase;letter
 // metrics come from vm.activityDetail (real). Deep per-point analysis (route,
 // HR/power traces, splits, laps) needs the ingested recording stream, which
 // isn't wired yet — so we show only real summary data + an honest placeholder.
-export default function Feed({ vm, state, actions, getToken, onDataChanged }) {
+export default function Feed({ vm, state, actions, getToken, onDataChanged, meId }) {
   const a = vm.activityDetail;
   const token = getToken?.() ?? null;
   const [confirmDel, setConfirmDel] = useState(false);
@@ -138,13 +139,8 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged }) {
       {/* route map + traces + per-km splits from the ingested recording */}
       <ActivityDetailAnalysis activityId={a.id} sport={a.sport} getToken={getToken} />
 
-      {/* reactions */}
-      <div style={s('padding:20px 18px 0')}>
-        <div style={s('display:flex;align-items:center;gap:8px;background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:12px 14px')}>
-          <span style={s('font-size:12px;color:var(--text2);flex:1')}>{a.reactText}</span>
-          <div className="ctl" style={s('font-size:12px;font-weight:600;color:var(--accent)')}>React</div>
-        </div>
-      </div>
+      {/* kudos + comments */}
+      <ActivityInteractions activity={a} token={token} getToken={getToken} meId={meId} />
 
       {/* delete confirmation — themed (CSS vars), consistent in dark & light */}
       {confirmDel && (
