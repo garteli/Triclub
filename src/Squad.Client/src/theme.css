@@ -36,6 +36,9 @@ body {
   overflow: hidden;
   background: var(--bg);
   color: var(--text);
+  /* Never let a flex sibling (the dev ControlDock) squeeze the portal below its
+     width — the dock overflows instead, the phone frame keeps its size. */
+  flex-shrink: 0;
 }
 
 .phone[data-theme="light"] {
