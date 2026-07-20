@@ -67,6 +67,7 @@ function RideSummary({ pending, saveState, saveError, saveRide, discardRide, pho
   const empty = sampleCount === 0;
   const saved = saveState === 'saved';
   const saving = saveState === 'saving';
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
 
   return (
     <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:14px;margin-top:14px')}>
@@ -104,7 +105,7 @@ function RideSummary({ pending, saveState, saveError, saveRide, discardRide, pho
           <div className="ctl" onClick={discardRide} style={s('flex:1;text-align:center;padding:13px;border-radius:13px;font-weight:700;font-size:14px;background:var(--accent);color:var(--accent-ink)')}>Done</div>
         ) : (
           <>
-            <div className="ctl" onClick={saving ? undefined : discardRide} style={s(`flex:1;text-align:center;padding:13px;border-radius:13px;font-weight:700;font-size:14px;background:var(--bg3);border:1px solid var(--line);color:var(--text);opacity:${saving ? 0.5 : 1}`)}>Discard</div>
+            <div className="ctl" onClick={saving ? undefined : (empty ? discardRide : () => setConfirmDiscard(true))} style={s(`flex:1;text-align:center;padding:13px;border-radius:13px;font-weight:700;font-size:14px;background:var(--bg3);border:1px solid var(--line);color:var(--text);opacity:${saving ? 0.5 : 1}`)}>Discard</div>
             {!empty && (
               <div className="ctl" onClick={saving ? undefined : saveRide} style={s(`flex:1.4;text-align:center;padding:13px;border-radius:13px;font-weight:700;font-size:14px;background:var(--accent);color:var(--accent-ink);opacity:${saving ? 0.7 : 1}`)}>
                 {saving ? 'Saving…' : 'Save ride'}
@@ -113,6 +114,22 @@ function RideSummary({ pending, saveState, saveError, saveRide, discardRide, pho
           </>
         )}
       </div>
+
+      {confirmDiscard && (
+        <>
+          <div className="ctl" onClick={() => setConfirmDiscard(false)} style={s('position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50;animation:floatUp .2s ease')} />
+          <div className="scr" style={s('position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(90%,420px);z-index:51;background:var(--bg);border:1px solid var(--line2);border-radius:20px;padding:20px;animation:floatUp .25s ease')}>
+            <div style={s('font-size:17px;font-weight:700')}>Discard this ride?</div>
+            <div style={s('font-size:13px;color:var(--text2);line-height:1.5;margin-top:8px')}>
+              {((sm.distanceM ?? 0) / 1000).toFixed(2)} km · {fmtDur(sm.movingSec)} moving. This throws away the recording — it won’t be saved and can’t be recovered.
+            </div>
+            <div style={s('display:flex;gap:10px;margin-top:18px')}>
+              <div className="ctl" onClick={() => setConfirmDiscard(false)} style={s('flex:1;text-align:center;padding:12px;border-radius:12px;font-weight:700;font-size:14px;background:var(--bg3);border:1px solid var(--line);color:var(--text2)')}>Keep</div>
+              <div className="ctl" onClick={discardRide} style={s('flex:1;text-align:center;padding:12px;border-radius:12px;font-weight:700;font-size:14px;background:var(--bad);color:#fff')}>Discard</div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
