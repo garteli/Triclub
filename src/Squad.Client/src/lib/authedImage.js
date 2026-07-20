@@ -13,11 +13,16 @@ const cache = new Map(); // url -> Promise<objectUrl|null>
 
 export function fetchAuthedObjectUrl(url, token) {
   if (!url) return Promise.resolve(null);
+  // These endpoints all require auth, so a token-less fetch just 401s. Crucially, do NOT
+  // cache that failure: components often render once before their token resolves (token
+  // null → real token), and a cached null would poison the URL so the authed retry never
+  // runs — leaving group logos/banners and avatars permanently blank. Wait for the token.
+  if (!token) return Promise.resolve(null);
   const cached = cache.get(url);
   if (cached) return cached;
   const p = (async () => {
     try {
-      const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : undefined });
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) return null; // 404 → no photo → caller falls back to initials
       return URL.createObjectURL(await res.blob());
     } catch {
