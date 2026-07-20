@@ -36,8 +36,13 @@ function SessionSheet({ editor, onField, onSave, onDelete, onClose }) {
   const canDelete = !!editor.id;
   return (
     <>
-      <div className="ctl" onClick={onClose} style={s('position:absolute;inset:0;background:rgba(0,0,0,.55);z-index:50;animation:floatUp .2s ease')} />
-      <div className="scr" style={s('position:absolute;left:0;right:0;bottom:0;z-index:51;background:var(--bg);border-radius:24px 24px 0 0;border-top:1px solid var(--line2);max-height:90%;overflow-y:auto;padding:14px 18px 28px;animation:floatUp .3s ease')}>
+      <div className="ctl" onClick={onClose} style={s('position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50;animation:floatUp .2s ease')} />
+      {/* Viewport-anchored (fixed): absolute would pin to Phone's full-height scroll
+          wrapper, dropping the sheet far below the fold on a long screen. The wrapper
+          is click-through (pointer-events:none) so taps outside the sheet hit the
+          overlay and close it; the sheet re-enables its own pointer events. */}
+      <div style={s('position:fixed;left:0;right:0;bottom:0;z-index:51;display:flex;justify-content:center;pointer-events:none')}>
+      <div className="scr" style={s('width:100%;max-width:480px;pointer-events:auto;background:var(--bg);border-radius:24px 24px 0 0;border-top:1px solid var(--line2);max-height:90dvh;overflow-y:auto;padding:14px 18px 28px;animation:floatUp .3s ease')}>
         <div style={s('width:40px;height:4px;border-radius:3px;background:var(--line2);margin:0 auto 14px')} />
         <div style={s('display:flex;align-items:center;justify-content:space-between')}>
           <div style={s('font-size:18px;font-weight:700')}>{editor.id ? 'Edit session' : 'New session'} · {editor.day}</div>
@@ -89,6 +94,7 @@ function SessionSheet({ editor, onField, onSave, onDelete, onClose }) {
           )}
           <div className="ctl" onClick={onSave} style={s('flex:1;background:var(--accent);color:var(--accent-ink);text-align:center;padding:14px;border-radius:13px;font-weight:700;font-size:14px')}>Save session</div>
         </div>
+      </div>
       </div>
     </>
   );
@@ -148,7 +154,7 @@ export default function PlanEditor({ vm, actions }) {
 
   return (
     <>
-      <div style={s('padding:6px 18px 40px;animation:floatUp .35s ease')}>
+      <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
         {/* eyebrow + back */}
         <div style={s('display:flex;align-items:center;gap:10px')}>
           <div className="ctl" onClick={() => actions.go('plan')} style={s('width:30px;height:30px;border-radius:9px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;flex:none')}>
