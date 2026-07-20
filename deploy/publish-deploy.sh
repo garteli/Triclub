@@ -20,6 +20,14 @@ ZIP="$(mktemp -d)/app.zip"
 
 export PATH="$PATH:/c/Program Files/Microsoft SDKs/Azure/CLI2/wbin"
 
+# Wipe Squad.Web's intermediate output first. The BuildClientApp target rewrites wwwroot
+# with fresh vite hashes on every publish, but StaticWebAssets caches an obj/ manifest that
+# doesn't invalidate when wwwroot changes out from under it — so a publish after a manual
+# `npm run build` fails with "No file exists for the asset …/base-<oldhash>.js". Removing obj
+# forces the manifest to regenerate against the current wwwroot.
+echo "==> clean intermediate (StaticWebAssets manifest)"
+rm -rf "$ROOT/src/Squad.Web/obj" "$ROOT/src/Squad.Web/bin"
+
 echo "==> dotnet publish"
 dotnet publish "$ROOT/src/Squad.Web" -c Release -o "$PUB" --nologo -v q
 
