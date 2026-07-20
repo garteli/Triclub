@@ -99,3 +99,24 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Activity_Athlete_Start
 CREATE INDEX IX_Activity_Athlete_Start
     ON dbo.Activity (AthleteId, StartUtc)
     INCLUDE (Sport, TrainingLoad, MovingTimeSec);
+
+-- ---------------------------------------------------------------------------
+--  HealthDaily — lightweight daily wellness imported from Apple Health (resting
+--  HR, HRV, respiratory rate, weight, VO2max, sleep). NOT activities: no
+--  fingerprint, no feed. One wide row per (athlete, local day); SqlHealthDailyStore
+--  MERGEs with COALESCE so partial/repeated syncs never wipe a recorded metric.
+-- ---------------------------------------------------------------------------
+IF OBJECT_ID('dbo.HealthDaily', 'U') IS NULL
+CREATE TABLE dbo.HealthDaily (
+    AthleteId        UNIQUEIDENTIFIER  NOT NULL,
+    Day              DATE              NOT NULL,   -- local calendar day of the reading
+    RestingHr        FLOAT             NULL,       -- bpm
+    HrvMs            FLOAT             NULL,       -- HRV SDNN, milliseconds
+    RespiratoryRate  FLOAT             NULL,       -- breaths / minute
+    WeightKg         FLOAT             NULL,       -- kilograms
+    Vo2Max           FLOAT             NULL,       -- mL/(kg·min)
+    SleepHours       FLOAT             NULL,       -- asleep hours for the night ending Day
+    UpdatedUtc       DATETIMEOFFSET(0) NOT NULL DEFAULT SYSDATETIMEOFFSET(),
+    CONSTRAINT PK_HealthDaily PRIMARY KEY (AthleteId, Day),
+    CONSTRAINT FK_HealthDaily_Athlete FOREIGN KEY (AthleteId) REFERENCES dbo.Athlete (Id)
+);

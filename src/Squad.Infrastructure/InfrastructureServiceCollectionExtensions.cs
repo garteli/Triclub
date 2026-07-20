@@ -42,6 +42,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<INotificationService>(_ => new SqlNotificationService(sqlConnectionString));
         services.AddScoped<IPlanService>(_ => new SqlPlanService(sqlConnectionString));
         services.AddScoped<IActivityPhotoService>(_ => new SqlActivityPhotoService(sqlConnectionString));
+        services.AddScoped<IHealthDailyStore>(_ => new SqlHealthDailyStore(sqlConnectionString));
 
         // Image blobs: Azure Blob Storage in prod (connection string set), else the
         // local filesystem fallback under {ContentRoot}/App_Data/images for dev.

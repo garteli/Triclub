@@ -16,8 +16,10 @@ const RANGES = [
 ];
 
 // "Connect Apple Health" panel for the Upload screen. On web it renders a disabled,
-// explanatory state (HealthKit is iOS-app-only); on the native iOS build it drives a
-// real HealthKit history import through the same ingest pipeline as .fit uploads.
+// explanatory state (HealthKit is iOS-app-only); on the native iOS build it imports
+// lightweight daily *wellness* (resting HR, HRV, respiratory rate, weight, VO2max,
+// sleep) — NOT workouts. Activities come from Garmin/FIT; Apple Health is a readiness
+// feed only.
 export default function AppleHealthSync({ getToken, onDataChanged }) {
   const [range, setRange] = useState('1y');
   const { available, status, progress, summary, error, run } = useHealthSync({ getToken, onDataChanged });
@@ -34,7 +36,7 @@ export default function AppleHealthSync({ getToken, onDataChanged }) {
           <div style={s('width:44px;height:44px;border-radius:13px;flex:none;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--accent) 15%,transparent)')}><AppleGlyph /></div>
           <div style={s('flex:1;min-width:0')}>
             <div style={s('font-size:14.5px;font-weight:700')}>Apple Health</div>
-            <div style={s('font-size:11.5px;color:var(--text3)')}>Import your workout history from HealthKit</div>
+            <div style={s('font-size:11.5px;color:var(--text3)')}>Sync resting HR, HRV, sleep, weight &amp; VO₂max</div>
           </div>
         </div>
 
@@ -62,7 +64,7 @@ export default function AppleHealthSync({ getToken, onDataChanged }) {
               onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && !syncing && start()}
               style={s(`margin-top:11px;text-align:center;font-size:14px;font-weight:700;padding:12px 0;border-radius:12px;cursor:${syncing ? 'default' : 'pointer'};color:var(--accent-ink);background:var(--accent);opacity:${syncing ? 0.7 : 1};transition:opacity .15s`)}
             >
-              {syncing ? `Syncing… ${progress?.done ?? 0}/${progress?.total ?? 0}` : 'Sync Apple Health'}
+              {syncing ? `Syncing… ${progress?.done ?? 0}/${progress?.total ?? 0} days` : 'Sync Apple Health'}
             </div>
 
             {syncing && progress?.total > 0 && (
@@ -74,11 +76,9 @@ export default function AppleHealthSync({ getToken, onDataChanged }) {
             {status === 'done' && summary && (
               <div style={s('font-size:11.5px;color:var(--text2);margin-top:11px;line-height:1.5')}>
                 {summary.total === 0
-                  ? 'No workouts found in that range.'
-                  : <>Imported <b style={s('color:var(--good)')}>{summary.queued}</b> workout{summary.queued === 1 ? '' : 's'}
-                      {summary.duplicates > 0 && <> · {summary.duplicates} already had</>}
-                      {summary.failed > 0 && <> · <span style={s('color:var(--bad)')}>{summary.failed} failed</span></>}.
-                      {summary.queued > 0 && ' They’ll appear in the feed once processed.'}</>}
+                  ? 'No health data found in that range.'
+                  : <>Synced <b style={s('color:var(--good)')}>{summary.synced}</b> day{summary.synced === 1 ? '' : 's'} of health data
+                      {summary.failed > 0 && <> · <span style={s('color:var(--bad)')}>{summary.failed} failed</span></>}.</>}
               </div>
             )}
             {status === 'error' && (
