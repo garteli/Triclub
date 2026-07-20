@@ -11,7 +11,7 @@ import {
 
 const POWER_COLORS = ['#8a94a6', '#4a86ff', '#22c55e', '#eab308', '#f97316', '#ef4444', '#a855f7'];
 const HR_COLORS = ['#8a94a6', '#22c55e', '#eab308', '#f97316', '#ef4444'];
-const CURVE_LABEL = { 5: '5s', 15: '15s', 30: '30s', 60: '1m', 300: '5m', 600: '10m', 1200: '20m', 3600: '60m' };
+const CURVE_LABEL = { 1: '1s', 5: '5s', 15: '15s', 30: '30s', 60: '1m', 300: '5m', 600: '10m', 1200: '20m', 3600: '1h', 7200: '2h' };
 
 // Route map + Strava-style analysis for an activity's detail view. Fetches the recorded
 // track (GET /api/activities/{id}/track) and derives, all from the FIT stream we already
@@ -137,6 +137,8 @@ function SegmentTable({ title, rows, isSwim, isFoot }) {
   if (rows.length < 1) return null;
   const speeds = rows.map((sp) => (sp.sec > 0 ? sp.meters / sp.sec : 0)); // m/s
   const fastest = Math.max(...speeds, 0.1);
+  const hasPwr = rows.some((sp) => sp.avgPower != null); // show power col (laps) instead of elev
+  const rateHdr = isFoot || isSwim ? 'pace' : 'speed';
   return (
     <div style={s('margin-top:14px')}>
       <div style={s(label + ';margin-bottom:8px')}>{title}</div>
@@ -145,26 +147,28 @@ function SegmentTable({ title, rows, isSwim, isFoot }) {
           const mps = speeds[i];
           const rate = isFoot || isSwim
             ? pace(sp.sec / (sp.meters / (isSwim ? 100 : 1000))) + (isSwim ? '/100' : '/km')
-            : ((sp.meters / 1000) / (sp.sec / 3600)).toFixed(1) + ' km/h';
+            : ((sp.meters / 1000) / (sp.sec / 3600)).toFixed(1);
           return (
-            <div key={sp.index} style={s(`display:flex;align-items:center;gap:10px;padding:8px 12px;position:relative;${i ? 'border-top:1px solid var(--line)' : ''}`)}>
-              <div style={s('width:20px;font-size:12px;font-weight:700;color:var(--text2);flex:none')}>{sp.partial ? '·' : sp.index}</div>
+            <div key={sp.index} style={s(`display:flex;align-items:center;gap:9px;padding:8px 12px;position:relative;${i ? 'border-top:1px solid var(--line)' : ''}`)}>
+              <div style={s('width:18px;font-size:12px;font-weight:700;color:var(--text2);flex:none')}>{sp.partial ? '·' : sp.index}</div>
               <div style={s('flex:1;min-width:0')}>
                 <div style={s('height:8px;border-radius:4px;background:var(--accent);opacity:.9;width:' + Math.max(6, Math.round((mps / fastest) * 100)) + '%')} />
               </div>
-              <div className="mono" style={s('width:66px;text-align:right;font-size:12px;font-weight:600')}>{rate}</div>
-              <div className="mono" style={s('width:52px;text-align:right;font-size:11px;color:var(--text3)')}>{fmtDur(sp.sec)}</div>
-              <div className="mono" style={s('width:44px;text-align:right;font-size:11px;color:var(--text3)')}>{sp.avgHr != null ? Math.round(sp.avgHr) : '—'}</div>
-              <div className="mono" style={s('width:40px;text-align:right;font-size:11px;color:var(--text3)')}>{Math.round(sp.gain)}m</div>
+              <div className="mono" style={s('width:52px;text-align:right;font-size:12px;font-weight:600')}>{rate}</div>
+              <div className="mono" style={s('width:44px;text-align:right;font-size:11px;color:var(--text3)')}>{fmtDur(sp.sec)}</div>
+              {hasPwr
+                ? <div className="mono" style={s('width:38px;text-align:right;font-size:11px;color:var(--text3)')}>{sp.avgPower != null ? Math.round(sp.avgPower) : '—'}</div>
+                : <div className="mono" style={s('width:38px;text-align:right;font-size:11px;color:var(--text3)')}>{Math.round(sp.gain)}m</div>}
+              <div className="mono" style={s('width:36px;text-align:right;font-size:11px;color:var(--text3)')}>{sp.avgHr != null ? Math.round(sp.avgHr) : '—'}</div>
             </div>
           );
         })}
       </div>
-      <div style={s('display:flex;gap:10px;justify-content:flex-end;margin-top:6px;padding-right:12px;font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px')}>
-        <span style={s('width:66px;text-align:right')}>pace</span>
-        <span style={s('width:52px;text-align:right')}>time</span>
-        <span style={s('width:44px;text-align:right')}>hr</span>
-        <span style={s('width:40px;text-align:right')}>▲</span>
+      <div style={s('display:flex;gap:9px;justify-content:flex-end;margin-top:6px;padding-right:12px;font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px')}>
+        <span style={s('width:52px;text-align:right')}>{rateHdr}</span>
+        <span style={s('width:44px;text-align:right')}>time</span>
+        <span style={s('width:38px;text-align:right')}>{hasPwr ? 'watts' : '▲'}</span>
+        <span style={s('width:36px;text-align:right')}>hr</span>
       </div>
     </div>
   );
@@ -332,24 +336,33 @@ export default function ActivityDetailAnalysis({ activityId, sport, getToken }) 
         <ZoneDist title="Heart-rate zones · bpm" seconds={hZones} colors={HR_COLORS}
           names={HR_ZONE_NAMES} bounds={HR_ZONE_FRACS.map((f) => f * zones.maxHr)} />
       )}
-      {curve.length > 0 && (() => {
+      {curve.length > 1 && (() => {
         const maxW = Math.max(...curve.map((c) => c.watts));
-        const CH = 88; // bar-chart height (px)
+        const first = curve[0].sec, last = curve[curve.length - 1].sec;
+        const lmin = Math.log(first), lspan = Math.log(last) - lmin || 1;
+        const W = 320, H = 116, padY = 6;
+        const X = (sec) => ((Math.log(sec) - lmin) / lspan) * W;
+        const Y = (w) => H - padY - (w / maxW) * (H - 2 * padY);
+        const linePath = curve.map((c, i) => `${i ? 'L' : 'M'}${X(c.sec).toFixed(1)},${Y(c.watts).toFixed(1)}`).join(' ');
+        const areaPath = `${linePath} L${W},${H} L0,${H} Z`;
+        const ticks = [15, 60, 300, 1200, 3600, 7200].filter((tk) => tk >= first && tk <= last);
+        const at = (sec) => curve.find((c) => c.sec === sec)?.watts ?? null;
+        const key = [5, 60, 300, 1200].map((sec) => ({ sec, w: at(sec) })).filter((k) => k.w != null);
         return (
           <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:12px 13px;margin-top:10px')}>
-            <div style={s('font-size:12px;font-weight:700;margin-bottom:10px')}>Power curve · best watts</div>
-            {/* bar per duration — height ∝ best watts, so the descending curve reads at a glance */}
-            <div style={s(`display:flex;align-items:flex-end;gap:6px;height:${CH}px`)}>
-              {curve.map((c) => (
-                <div key={c.sec} style={s('flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:3px')}>
-                  <div className="mono" style={s('font-size:10px;font-weight:700;color:var(--text2)')}>{c.watts}</div>
-                  <div style={s(`width:100%;max-width:26px;border-radius:5px 5px 0 0;background:var(--accent);height:${Math.max(4, Math.round((c.watts / maxW) * (CH - 22)))}px`)} />
-                </div>
-              ))}
+            <div style={s('display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px')}>
+              <div style={s('font-size:12px;font-weight:700')}>Power curve · best watts</div>
+              <div className="mono" style={s('font-size:10px;color:var(--text3)')}>
+                {key.map((k, i) => <span key={k.sec}>{i ? ' · ' : ''}{CURVE_LABEL[k.sec]} <b style={s('color:var(--text2)')}>{k.w}</b></span>)}
+              </div>
             </div>
-            <div style={s('display:flex;gap:6px;margin-top:5px')}>
-              {curve.map((c) => (
-                <div key={c.sec} style={s('flex:1;text-align:center;font-size:9.5px;color:var(--text3)')}>{CURVE_LABEL[c.sec]}</div>
+            <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: '100%', height: H, display: 'block' }}>
+              <path d={areaPath} fill="var(--accent)" opacity="0.14" />
+              <path d={linePath} fill="none" stroke="var(--accent)" strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
+            </svg>
+            <div style={s('position:relative;height:13px;margin-top:3px')}>
+              {ticks.map((tk) => (
+                <span key={tk} className="mono" style={s(`position:absolute;left:${((X(tk) / W) * 100).toFixed(1)}%;transform:translateX(-50%);font-size:9px;color:var(--text3)`)}>{CURVE_LABEL[tk]}</span>
               ))}
             </div>
           </div>

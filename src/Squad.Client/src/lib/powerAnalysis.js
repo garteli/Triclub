@@ -85,7 +85,8 @@ export function powerZones(track, ftp) {
 }
 
 // Best average power sustained for each standard duration (the mean-max power curve).
-const DURATIONS = [5, 15, 30, 60, 300, 600, 1200, 3600];
+// Denser set → a smooth mean-max curve on a log-time axis (Strava-style).
+const DURATIONS = [1, 5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 240, 300, 420, 600, 900, 1200, 1800, 2400, 3600, 5400, 7200];
 export function powerCurve(track) {
   if (!hasField(track, 'powerW')) return [];
   const p = resample1s(track, 'powerW', true);
