@@ -108,7 +108,7 @@ public sealed class SqlPlanService(string connectionString) : IPlanService
         if (planId is { } id)
         {
             var updated = await conn.ExecuteAsync(new CommandDefinition("""
-                UPDATE dbo.CoachPlan SET Name = @name, Doc = @doc, SquadId = @squadId, UpdatedUtc = SYSUTCDATETIME()
+                UPDATE dbo.CoachPlan SET Name = @name, Doc = @doc, SquadId = @squadId, UpdatedUtc = SYSDATETIMEOFFSET()
                 WHERE Id = @id AND OwnerId = @ownerId;
                 """, new { id, ownerId, name, doc, squadId }, cancellationToken: ct));
             return updated > 0 ? id : (Guid?)null; // 0 rows → not theirs / gone
@@ -117,7 +117,7 @@ public sealed class SqlPlanService(string connectionString) : IPlanService
         var newId = Guid.NewGuid();
         await conn.ExecuteAsync(new CommandDefinition("""
             INSERT INTO dbo.CoachPlan (Id, OwnerId, SquadId, Name, Doc, UpdatedUtc)
-            VALUES (@newId, @ownerId, @squadId, @name, @doc, SYSUTCDATETIME());
+            VALUES (@newId, @ownerId, @squadId, @name, @doc, SYSDATETIMEOFFSET());
             """, new { newId, ownerId, squadId, name, doc }, cancellationToken: ct));
         return newId;
     }

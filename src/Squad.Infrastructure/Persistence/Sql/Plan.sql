@@ -35,7 +35,7 @@ CREATE TABLE dbo.CoachPlan (
     SquadId    UNIQUEIDENTIFIER NULL,              -- optional: the squad it's for
     Name       NVARCHAR(120)    NOT NULL,
     Doc        NVARCHAR(MAX)    NOT NULL,           -- JSON: weeks/sessions/targets/assignment
-    UpdatedUtc DATETIME2        NOT NULL DEFAULT SYSUTCDATETIME(),
+    UpdatedUtc DATETIMEOFFSET(0) NOT NULL DEFAULT SYSDATETIMEOFFSET(),  -- matches DateTimeOffset mapping
     CONSTRAINT PK_CoachPlan PRIMARY KEY (Id),
     CONSTRAINT FK_CoachPlan_Owner FOREIGN KEY (OwnerId) REFERENCES dbo.Athlete (Id)
 );
