@@ -11,31 +11,112 @@ const mmss = (s) => {
   return String(m).padStart(2, '0') + ':' + String(ss).padStart(2, '0');
 };
 
-// Label + unit for every selectable metric token.
+// Selectable data fields, modelled on the Garmin data-field catalogue and grouped by
+// the same categories a Garmin Edge/watch uses. Each entry: { label, unit, cat }.
+// A field with a real telemetry source shows a live value (see liveMetricValues); the
+// rest render "—" until their sensor/route source exists — same contract as the device.
 export const metricCatalog = {
-  spd: { label: 'Speed', unit: 'kph' }, avgspd: { label: 'Avg Speed', unit: 'kph' }, maxspd: { label: 'Max Speed', unit: 'kph' },
-  dist: { label: 'Distance', unit: 'km' }, time: { label: 'Timer', unit: '' }, laptime: { label: 'Lap Time', unit: '' },
-  hr: { label: 'Heart Rate', unit: 'bpm' }, avghr: { label: 'Avg HR', unit: 'bpm' },
-  pwr: { label: 'Power', unit: 'W' }, avgpwr: { label: 'Avg Power', unit: 'W' }, np: { label: 'Norm Power', unit: 'W' },
-  cad: { label: 'Cadence', unit: 'rpm' }, grad: { label: 'Gradient', unit: '%' }, elev: { label: 'Elevation', unit: 'm' },
-  elevgain: { label: 'Elev Gain', unit: 'm' }, kcal: { label: 'Calories', unit: 'kcal' }, temp: { label: 'Temp', unit: '°C' },
-  gap: { label: 'Gap to last', unit: 'm' },
-  gear: { label: 'Gear', unit: '' }, gearratio: { label: 'Gear Ratio', unit: '' }, di2: { label: 'Di2 Battery', unit: '%' },
+  // Timers
+  time: { label: 'Timer', unit: '', cat: 'Timers' },
+  tod: { label: 'Time of Day', unit: '', cat: 'Timers' },
+  movingtime: { label: 'Moving Time', unit: '', cat: 'Timers' },
+  laptime: { label: 'Lap Time', unit: '', cat: 'Timers' },
+  lastlaptime: { label: 'Last Lap Time', unit: '', cat: 'Timers' },
+  // Distance
+  dist: { label: 'Distance', unit: 'km', cat: 'Distance' },
+  lapdist: { label: 'Lap Distance', unit: 'km', cat: 'Distance' },
+  lastlapdist: { label: 'Last Lap Dist', unit: 'km', cat: 'Distance' },
+  // Speed
+  spd: { label: 'Speed', unit: 'kph', cat: 'Speed' },
+  avgspd: { label: 'Avg Speed', unit: 'kph', cat: 'Speed' },
+  maxspd: { label: 'Max Speed', unit: 'kph', cat: 'Speed' },
+  movspd: { label: 'Avg Moving Speed', unit: 'kph', cat: 'Speed' },
+  vspd: { label: 'Vertical Speed', unit: 'm/h', cat: 'Speed' },
+  // Cadence
+  cad: { label: 'Cadence', unit: 'rpm', cat: 'Cadence' },
+  avgcad: { label: 'Avg Cadence', unit: 'rpm', cat: 'Cadence' },
+  maxcad: { label: 'Max Cadence', unit: 'rpm', cat: 'Cadence' },
+  lapcad: { label: 'Lap Cadence', unit: 'rpm', cat: 'Cadence' },
+  // Heart Rate
+  hr: { label: 'Heart Rate', unit: 'bpm', cat: 'Heart Rate' },
+  avghr: { label: 'Avg HR', unit: 'bpm', cat: 'Heart Rate' },
+  maxhr: { label: 'Max HR', unit: 'bpm', cat: 'Heart Rate' },
+  hrpct: { label: '% Max HR', unit: '%', cat: 'Heart Rate' },
+  hrzone: { label: 'HR Zone', unit: '', cat: 'Heart Rate' },
+  laphr: { label: 'Lap HR', unit: 'bpm', cat: 'Heart Rate' },
+  // Power
+  pwr: { label: 'Power', unit: 'W', cat: 'Power' },
+  avgpwr: { label: 'Avg Power', unit: 'W', cat: 'Power' },
+  maxpwr: { label: 'Max Power', unit: 'W', cat: 'Power' },
+  pwr3s: { label: '3s Power', unit: 'W', cat: 'Power' },
+  np: { label: 'Norm Power', unit: 'W', cat: 'Power' },
+  work: { label: 'Work', unit: 'kJ', cat: 'Power' },
+  pwrwkg: { label: 'Power/Weight', unit: 'W/kg', cat: 'Power' },
+  iff: { label: 'Intensity Factor', unit: '', cat: 'Power' },
+  tss: { label: 'Training Stress', unit: '', cat: 'Power' },
+  balance: { label: 'Balance L/R', unit: '', cat: 'Power' },
+  pwrzone: { label: 'Power Zone', unit: '', cat: 'Power' },
+  // Elevation
+  elev: { label: 'Elevation', unit: 'm', cat: 'Elevation' },
+  gpselev: { label: 'GPS Elevation', unit: 'm', cat: 'Elevation' },
+  maxelev: { label: 'Max Elevation', unit: 'm', cat: 'Elevation' },
+  grad: { label: 'Gradient', unit: '%', cat: 'Elevation' },
+  elevgain: { label: 'Total Ascent', unit: 'm', cat: 'Elevation' },
+  descent: { label: 'Total Descent', unit: 'm', cat: 'Elevation' },
+  // Navigation
+  heading: { label: 'Heading', unit: '°', cat: 'Navigation' },
+  bearing: { label: 'Bearing', unit: '°', cat: 'Navigation' },
+  dist2dest: { label: 'Dist Remaining', unit: 'km', cat: 'Navigation' },
+  eta: { label: 'ETA', unit: '', cat: 'Navigation' },
+  // Gears
+  gear: { label: 'Gear', unit: '', cat: 'Gears' },
+  gearratio: { label: 'Gear Ratio', unit: '', cat: 'Gears' },
+  di2: { label: 'Di2 Battery', unit: '%', cat: 'Gears' },
+  // Other
+  kcal: { label: 'Calories', unit: 'kcal', cat: 'Other' },
+  temp: { label: 'Temperature', unit: '°C', cat: 'Other' },
+  gap: { label: 'Gap to last', unit: 'm', cat: 'Other' },
+  resp: { label: 'Respiration', unit: 'brpm', cat: 'Other' },
+  battery: { label: 'Battery', unit: '%', cat: 'Other' },
 };
 
-// Instant metric values keyed by token — { v, color? }. Missing sources → "—".
+// Category order for the field picker (mirrors the Garmin data-field grouping).
+export const metricGroups = ['Timers', 'Distance', 'Speed', 'Cadence', 'Heart Rate', 'Power', 'Elevation', 'Navigation', 'Gears', 'Other']
+  .map((cat) => [cat, Object.keys(metricCatalog).filter((tok) => metricCatalog[tok].cat === cat)]);
+
+// Instant metric values keyed by token — { v, color? }. Fields backed by a real
+// telemetry source resolve to a live number; everything else stays "—".
 export function liveMetricValues(tel) {
   const hr = tel?.hr;
   const hrCol = hr == null ? undefined : (hr > 168 ? 'var(--bad)' : hr > 158 ? 'var(--warn)' : 'var(--good)');
   return {
+    // Timers
+    time: { v: mmss(tel?.elapsed) }, tod: { v: tel?.clock ?? DASH },
+    movingtime: { v: DASH }, laptime: { v: DASH }, lastlaptime: { v: DASH },
+    // Distance
+    dist: { v: f1(tel?.dist) }, lapdist: { v: DASH }, lastlapdist: { v: DASH },
+    // Speed
     spd: { v: f1(tel?.spd) }, avgspd: { v: f1(tel?.avgspd) }, maxspd: { v: f1(tel?.maxspd) },
-    dist: { v: f1(tel?.dist) }, time: { v: mmss(tel?.elapsed) }, laptime: { v: DASH },
-    hr: { v: r0(tel?.hr), color: hrCol }, avghr: { v: r0(tel?.avghr) },
-    pwr: { v: r0(tel?.pwr) }, avgpwr: { v: r0(tel?.avgpwr) }, np: { v: DASH },
-    cad: { v: r0(tel?.cad) }, grad: { v: DASH }, elev: { v: r0(tel?.elev) }, elevgain: { v: r0(tel?.elevGainM) },
-    kcal: { v: r0(tel?.kcal) }, temp: { v: DASH }, gap: { v: DASH, color: 'var(--behind)' },
-    // No gearing/Di2 sensor source yet.
+    movspd: { v: DASH }, vspd: { v: DASH },
+    // Cadence
+    cad: { v: r0(tel?.cad) }, avgcad: { v: r0(tel?.avgcad) }, maxcad: { v: r0(tel?.maxcad) }, lapcad: { v: DASH },
+    // Heart Rate
+    hr: { v: r0(tel?.hr), color: hrCol }, avghr: { v: r0(tel?.avghr) }, maxhr: { v: r0(tel?.maxhr) },
+    hrpct: { v: DASH }, hrzone: { v: DASH }, laphr: { v: DASH },
+    // Power
+    pwr: { v: r0(tel?.pwr) }, avgpwr: { v: r0(tel?.avgpwr) }, maxpwr: { v: r0(tel?.maxpwr) },
+    pwr3s: { v: r0(tel?.pwr3s) }, np: { v: r0(tel?.np) }, work: { v: r0(tel?.workKj) },
+    pwrwkg: { v: DASH }, iff: { v: DASH }, tss: { v: DASH }, balance: { v: DASH }, pwrzone: { v: DASH },
+    // Elevation
+    elev: { v: r0(tel?.elev) }, gpselev: { v: r0(tel?.elev) }, maxelev: { v: r0(tel?.maxElevM) },
+    grad: { v: f1(tel?.grade) }, elevgain: { v: r0(tel?.elevGainM) }, descent: { v: r0(tel?.descentM) },
+    // Navigation — no route/destination source yet.
+    heading: { v: DASH }, bearing: { v: DASH }, dist2dest: { v: DASH }, eta: { v: DASH },
+    // Gears — no gearing/Di2 sensor source yet.
     gear: { v: DASH }, gearratio: { v: DASH }, di2: { v: DASH },
+    // Other
+    kcal: { v: r0(tel?.kcal) }, temp: { v: DASH }, gap: { v: DASH, color: 'var(--behind)' },
+    resp: { v: DASH }, battery: { v: DASH },
   };
 }
 

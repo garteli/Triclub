@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { s } from '../lib/style.js';
-import { metricCatalog, liveMetricValues, liveChartsView, liveRadarView, spreadRiders } from '../lib/liveMetrics.js';
+import { metricCatalog, metricGroups, liveMetricValues, liveChartsView, liveRadarView, spreadRiders } from '../lib/liveMetrics.js';
 import TileMap from './TileMap.jsx';
 
 // ---- Group side column: teammates front→back on a rail + rear-radar vehicle blip ----
@@ -145,7 +145,6 @@ function PickerSheet({ page, slot, actions }) {
   const cur = page.fields[slot];
   const charts = [['chart:spd', 'Speed chart', 'graph'], ['chart:hr', 'HR chart', 'graph'], ['chart:power', 'Power chart', 'graph']];
   const maps = [['map', 'Route map', 'map']];
-  const metrics = Object.keys(metricCatalog).map((id) => [id, metricCatalog[id].label, metricCatalog[id].unit]);
   const section = (title, rows) => (
     <>
       <div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:7px')}>{title}</div>
@@ -162,7 +161,7 @@ function PickerSheet({ page, slot, actions }) {
         <div style={s('font-size:17px;font-weight:700;letter-spacing:-.3px;margin-bottom:12px')}>Choose a field</div>
         {section('Charts', charts)}
         {section('Map', maps)}
-        {section('Metrics', metrics)}
+        {metricGroups.map(([cat, toks]) => section(cat, toks.map((id) => [id, metricCatalog[id].label, metricCatalog[id].unit])))}
       </div>
     </>
   );
