@@ -10,6 +10,7 @@ function mapRow(r) {
   const d = new Date(r.date); // 'yyyy-MM-dd' parses as UTC
   return {
     id: r.id,
+    iso: r.date, // full 'yyyy-MM-dd' (month grid keys workout dots by real date)
     day: DOW[d.getUTCDay()],
     date: String(d.getUTCDate()),
     disc: r.discipline,
@@ -24,8 +25,10 @@ function mapRow(r) {
 }
 const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 
-// Fetches the athlete's weekly plan (empty until a plan is assigned).
-export function usePlan({ getToken, enabled = true } = {}) {
+// Fetches the athlete's weekly plan (empty until a plan is assigned). `weekStart`
+// (a 'yyyy-MM-dd' in the target week) selects a week other than the current one for
+// week-by-week date navigation; omit it for the current week.
+export function usePlan({ getToken, enabled = true, weekStart } = {}) {
   const [plan, setPlan] = useState(null);
   const [summary, setSummary] = useState(null);
 
@@ -33,13 +36,14 @@ export function usePlan({ getToken, enabled = true } = {}) {
     if (!enabled) return;
     try {
       const token = getToken ? await getToken() : null;
-      const res = await fetch('/api/plan', { headers: token ? { Authorization: `Bearer ${token}` } : undefined });
+      const url = weekStart ? `/api/plan?weekStart=${encodeURIComponent(weekStart)}` : '/api/plan';
+      const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : undefined });
       if (!res.ok) return;
       const data = await res.json();
       setPlan((data.week || []).map(mapRow));
       setSummary(data.summary || null);
     } catch { /* offline */ }
-  }, [getToken, enabled]);
+  }, [getToken, enabled, weekStart]);
 
   useEffect(() => { refetch(); }, [refetch]);
 

@@ -56,7 +56,7 @@ export default function Plan({ vm, state, actions }) {
     <>
       <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
         <div style={s('display:flex;align-items:center;justify-content:space-between;margin-bottom:14px')}>
-          <div><div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.6px;font-weight:600')}>This week</div><div style={s('font-size:23px;font-weight:700;letter-spacing:-.5px')}>Training Plan</div></div>
+          <div><div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.6px;font-weight:600')}>{week ? vm.planNav.weekEyebrow : 'Month'}</div><div style={s('font-size:23px;font-weight:700;letter-spacing:-.5px')}>Training Plan</div></div>
           <div className="ctl" onClick={actions.toggleCoach} style={s(`${coachToggleStyle};border-radius:11px;padding:8px 11px;font-size:11.5px;font-weight:700;display:flex;align-items:center;gap:6px`)}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>Coach
           </div>
@@ -70,9 +70,24 @@ export default function Plan({ vm, state, actions }) {
           </div>
         )}
 
-        <div style={s('display:flex;gap:6px;background:var(--bg2);border:1px solid var(--line);border-radius:13px;padding:4px;margin-bottom:16px')}>
+        <div style={s('display:flex;gap:6px;background:var(--bg2);border:1px solid var(--line);border-radius:13px;padding:4px;margin-bottom:10px')}>
           <div className="ctl" onClick={() => actions.setPlanView('week')} style={s(seg(week))}>Week</div>
           <div className="ctl" onClick={() => actions.setPlanView('month')} style={s(seg(!week))}>Month</div>
+        </div>
+
+        <div style={s('display:flex;align-items:center;gap:8px;margin-bottom:16px')}>
+          <div className="ctl" onClick={() => actions.planStep(-1)} style={s('width:38px;height:36px;flex:none;border-radius:11px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--text2)')}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M15 6l-6 6 6 6" /></svg>
+          </div>
+          <div style={s('flex:1;min-width:0;text-align:center')}>
+            <div style={s('font-size:14.5px;font-weight:700;letter-spacing:-.2px')}>{week ? vm.planNav.weekLabel : vm.planNav.monthLabel}</div>
+            {!vm.planNav.isCurrent && (
+              <div className="ctl" onClick={actions.planToday} style={s('font-size:10.5px;color:var(--accent);font-weight:700;margin-top:1px')}>Jump to today</div>
+            )}
+          </div>
+          <div className="ctl" onClick={() => actions.planStep(1)} style={s('width:38px;height:36px;flex:none;border-radius:11px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--text2)')}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
+          </div>
         </div>
 
         {week ? (
