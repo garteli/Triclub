@@ -1,8 +1,11 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { s } from '../lib/style.js';
 import TileMap from './TileMap.jsx';
+import FullMap from './FullMap.jsx';
 import { toPathD } from '../lib/tiles.js';
 import { usePlayback } from '../hooks/usePlayback.js';
+
+const MAP_STYLES = ['voyager', 'light', 'dark'];
 
 // Strava-beating hero: a full-bleed route map with translucent glass controls
 // (back · Save Route · overflow · layers · 3D) and a round play button that animates
@@ -17,6 +20,10 @@ export default function ActivityHero({ a, route, frames, hasMap, status, onBack,
   const n = frames.length;
   const travelled = useMemo(() => (hasMap ? route.slice(0, index + 1) : null), [route, index, hasMap]);
   const canPlay = n > 1 && hasMap;
+  const [mapStyle, setMapStyle] = useState('voyager');
+  const [tilt, setTilt] = useState(false);
+  const [full, setFull] = useState(false);
+  const cycleStyle = () => setMapStyle((st) => MAP_STYLES[(MAP_STYLES.indexOf(st) + 1) % MAP_STYLES.length]);
 
   const controls = (
     <>
@@ -32,13 +39,18 @@ export default function ActivityHero({ a, route, frames, hasMap, status, onBack,
         </div>
         <div className="ctl" onClick={a.isMe ? onDelete : undefined} title={a.isMe ? 'Delete training' : undefined} style={s(`width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;letter-spacing:1px;font-size:13px;${glass}`)}>···</div>
       </div>
-      {/* layers + 3D */}
+      {/* layers (cycle basemap) + 3D (perspective tilt) */}
       <div style={s('position:absolute;top:64px;right:16px;z-index:3;display:flex;flex-direction:column;gap:8px')}>
-        <div className="ctl" style={s(`width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;${glass}`)}>
+        <div className="ctl" onClick={cycleStyle} title={`Map: ${mapStyle}`} style={s(`width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;${glass}`)}>
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"><path d="M12 2l9 5-9 5-9-5z" /><path d="M3 12l9 5 9-5M3 17l9 5 9-5" /></svg>
         </div>
-        <div className="ctl" style={s(`width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;${glass}`)}>3D</div>
+        <div className="ctl" onClick={() => setTilt((t) => !t)} title="Perspective (3D)" style={s(`width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;${tilt ? 'background:var(--accent);color:var(--accent-ink);border:1px solid var(--accent)' : glass}`)}>3D</div>
       </div>
+      {hasMap && (
+        <div className="ctl" onClick={() => setFull(true)} title="Full-screen map" style={s(`position:absolute;left:16px;bottom:34px;z-index:3;width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;${glass}`)}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3" /></svg>
+        </div>
+      )}
       {canPlay && (
         <button onClick={toggle} aria-label={playing ? 'Pause replay' : 'Play replay'}
           style={s('position:absolute;right:16px;bottom:34px;z-index:3;width:52px;height:52px;border-radius:50%;border:none;background:var(--accent);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;box-shadow:0 8px 20px -6px color-mix(in srgb,var(--accent) 60%,transparent)')}>
@@ -72,7 +84,8 @@ export default function ActivityHero({ a, route, frames, hasMap, status, onBack,
 
   return (
     <div style={s(box)}>
-      <TileMap points={route} fill radius={0} pad={30} scrubPoints={route}
+      <div style={s(`position:absolute;inset:0;transition:transform .4s ease;${tilt ? 'transform:perspective(760px) rotateX(46deg) scale(1.42);transform-origin:50% 62%' : ''}`)}>
+      <TileMap points={route} fill radius={0} pad={30} style={mapStyle} scrubPoints={route}
         onScrub={(i) => { pause(); seek(n > 1 ? i / (n - 1) : 0); }}>
         {(project) => {
           const full = toPathD(route, project);
@@ -97,7 +110,9 @@ export default function ActivityHero({ a, route, frames, hasMap, status, onBack,
           );
         }}
       </TileMap>
+      </div>
       {controls}
+      {full && <FullMap route={route} style={mapStyle} onClose={() => setFull(false)} />}
     </div>
   );
 }
