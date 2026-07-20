@@ -14,6 +14,19 @@ export default function GroupProfile({ vm, actions, onJoinSquad, payments, meId,
   // Live mode: real squads from the API (onJoinSquad wired). The mock apply→pay
   // state machine below is only used in the no-session prototype.
   const live = !!onJoinSquad;
+
+  // On boot the app can restore this screen before the squad list has loaded (or the
+  // selected id may not be in it), leaving no group to render. Show a placeholder
+  // rather than dereferencing an undefined group (which white-screened the whole app).
+  if (!g) {
+    return (
+      <div style={s('padding:6px 0 120px;animation:floatUp .35s ease')}>
+        <div style={s('padding:2px 18px 0')}><Back onClick={() => actions.go('discover')} /></div>
+        <div style={s('text-align:center;color:var(--text3);font-size:13px;margin-top:64px')}>Loading group…</div>
+      </div>
+    );
+  }
+
   const isOwner = live && !!meId && !!g.owner && String(g.owner).toLowerCase() === String(meId).toLowerCase();
   const [token, setToken] = useState(null);
   useEffect(() => {
