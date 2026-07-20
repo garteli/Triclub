@@ -309,19 +309,29 @@ export default function ActivityDetailAnalysis({ activityId, sport, getToken }) 
       )}
       {pwZones && <ZoneDist title="Power zones" seconds={pwZones} colors={POWER_COLORS} />}
       {hZones && <ZoneDist title="Heart-rate zones" seconds={hZones} colors={HR_COLORS} />}
-      {curve.length > 0 && (
-        <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:12px 13px;margin-top:10px')}>
-          <div style={s('font-size:12px;font-weight:700;margin-bottom:8px')}>Power curve · best watts</div>
-          <div style={s('display:flex;flex-wrap:wrap')}>
-            {curve.map((c) => (
-              <div key={c.sec} style={s('flex:1;min-width:52px;text-align:center;padding:2px 0')}>
-                <div className="mono" style={s('font-size:14px;font-weight:700')}>{c.watts}<span style={s('font-size:9px;color:var(--text3)')}>w</span></div>
-                <div style={s('font-size:9.5px;color:var(--text3)')}>{CURVE_LABEL[c.sec]}</div>
-              </div>
-            ))}
+      {curve.length > 0 && (() => {
+        const maxW = Math.max(...curve.map((c) => c.watts));
+        const CH = 88; // bar-chart height (px)
+        return (
+          <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:12px 13px;margin-top:10px')}>
+            <div style={s('font-size:12px;font-weight:700;margin-bottom:10px')}>Power curve · best watts</div>
+            {/* bar per duration — height ∝ best watts, so the descending curve reads at a glance */}
+            <div style={s(`display:flex;align-items:flex-end;gap:6px;height:${CH}px`)}>
+              {curve.map((c) => (
+                <div key={c.sec} style={s('flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:3px')}>
+                  <div className="mono" style={s('font-size:10px;font-weight:700;color:var(--text2)')}>{c.watts}</div>
+                  <div style={s(`width:100%;max-width:26px;border-radius:5px 5px 0 0;background:var(--accent);height:${Math.max(4, Math.round((c.watts / maxW) * (CH - 22)))}px`)} />
+                </div>
+              ))}
+            </div>
+            <div style={s('display:flex;gap:6px;margin-top:5px')}>
+              {curve.map((c) => (
+                <div key={c.sec} style={s('flex:1;text-align:center;font-size:9.5px;color:var(--text3)')}>{CURVE_LABEL[c.sec]}</div>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
       {((hasPower && !zones.ftp) || (hasHr && !zones.maxHr)) && (
         <div style={s('font-size:11px;color:var(--text3);margin-top:8px;line-height:1.5')}>
           Set your FTP &amp; max HR in <b>Settings → Training zones</b> to unlock power / heart-rate zones and Intensity Factor.
