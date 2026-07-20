@@ -255,7 +255,9 @@ export function buildViewModel(state, t, opts = {}) {
         discColor: f.discColor,
         reacts: f.reacts ?? 0,
         athleteId: f.athleteId,
-        activityId: null,
+        // f.id is the activity's own Guid (ActivityFeedItem.Id) — same key the
+        // activities list uses — so the card can deep-link into its detail page.
+        activityId: f.id,
         avatarUrl: f.avatarUrl ?? null,
       }))
     : null;
