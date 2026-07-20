@@ -41,6 +41,8 @@ export function mapSquad(s) {
     rating: s.rating || '—',
     color: s.color,
     member: s.isMember,
+    owner: s.ownerId || null, // the squad owner == the coach who collects payment
+
     requestStatus: s.requestStatus || 'none', // none | pending | approved | declined
     description: s.description || '',
   };
