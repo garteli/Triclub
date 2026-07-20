@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { s } from '../lib/style.js';
 import EmptyState from '../components/EmptyState.jsx';
 import AuthedAvatar from '../components/AuthedAvatar.jsx';
@@ -99,14 +99,14 @@ function AthleteTitle({ a, token, onAthlete }) {
 }
 
 // ---- 3-column metric card ----
-function MetricHero({ a }) {
+function MetricHero({ a, load }) {
   const cells = [
     ['Distance', a.dist, a.distU ? ' ' + a.distU : ''],
     ['Elevation', a.elev, ' m'],
     ['Moving Time', a.moving, ''],
     ['Avg Speed', a.avgSpeed, a.speedU || ''],
     ['Avg HR', a.avgHr || '—', a.avgHr ? ' bpm' : ''],
-    ['Training Load', String(a.load), ''],
+    ['Training Load', String(load ?? a.load ?? 0), ''],
   ];
   return (
     <div style={s('padding:14px 18px 0')}>
@@ -155,52 +155,236 @@ function DeviceWeather() {
 }
 
 // ---- Relative Effort — score is the real training load; the bands are illustrative ----
-function RelativeEffort({ load }) {
+// Training Load = TSS (your power through the ride vs FTP). The bands below map the score
+// to how long recovery typically takes, per the club's guidance.
+const RECOVERY_BANDS = [
+  ['≤125', 'About 24 hours', 'var(--good)'],
+  ['125–250', '36–48 hours', 'var(--warn)'],
+  ['250–400', 'At least 3 days', '#f97316'],
+  ['400+', 'At least 5 days', 'var(--bad)'],
+];
+function recoveryTier(load) {
+  if (load == null) return null;
+  if (load <= 125) return 0;
+  if (load <= 250) return 1;
+  if (load <= 400) return 2;
+  return 3;
+}
+
+function TrainingLoad({ load, estimated }) {
+  const [open, setOpen] = useState(false);
+  const tier = recoveryTier(load);
+  if (tier == null) return null;
+  return (
+    <div style={s('padding:22px 18px 0')}>
+      <div style={s('display:flex;align-items:center;justify-content:space-between')}>
+        <div style={s('display:flex;align-items:center;gap:8px')}><Spark icon={boltPath} /><span style={s('font-size:17px;font-weight:700')}>Training Load</span></div>
+        <span className="mono" style={s('font-size:22px;font-weight:700')}>{load}</span>
+      </div>
+      <div style={s('font-size:12.5px;color:var(--text2);margin-top:6px')}>Estimated recovery: <b style={s('color:var(--text)')}>{RECOVERY_BANDS[tier][1]}</b>{estimated ? ' · estimated from your FTP' : ''}</div>
+      <div style={s('display:flex;gap:5px;margin-top:13px')}>
+        {RECOVERY_BANDS.map(([range, lbl, color], i) => {
+          const on = i === tier;
+          return (
+            <div key={range} style={s(`flex:1;border-radius:9px;overflow:hidden;background:var(--bg2);border:${on ? `2px solid ${color}` : '1px solid var(--line)'};opacity:${on ? 1 : 0.55}`)}>
+              <div style={s(`height:6px;background:${color}`)} />
+              <div style={s('padding:6px 7px 8px')}>
+                <div className="mono" style={s('font-size:10.5px;font-weight:800;color:var(--text)')}>{range}</div>
+                <div style={s('font-size:9px;color:var(--text3);margin-top:2px;line-height:1.25')}>{lbl}</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="ctl" onClick={() => setOpen((o) => !o)} style={s('display:flex;align-items:center;gap:5px;margin-top:12px;font-size:12.5px;font-weight:700;color:var(--accent)')}>
+        How Training Load works
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}><path d="M6 9l6 6 6-6" /></svg>
+      </div>
+      {open && (
+        <div style={s('font-size:12.5px;color:var(--text2);line-height:1.55;margin-top:8px;background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:13px 14px')}>
+          Training Load compares your power through the ride to your FTP to gauge how much load the workout put on your body. It's a great way to judge how much rest you need — the guide above estimates how long until you're fully recovered.
+        </div>
+      )}
+    </div>
+  );
+}
+
+// A small band-gauge + expandable "how it works" — shared by Intensity (below) so the
+// effort metrics read consistently with Training Load.
+function BandCard({ heading, value, sub, bands, tier, explanation }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={s('padding:22px 18px 0')}>
+      <div style={s('display:flex;align-items:center;justify-content:space-between')}>
+        <div style={s('display:flex;align-items:center;gap:8px')}><Spark icon={boltPath} /><span style={s('font-size:17px;font-weight:700')}>{heading}</span></div>
+        <span className="mono" style={s('font-size:22px;font-weight:700')}>{value}</span>
+      </div>
+      <div style={s('font-size:12.5px;color:var(--text2);margin-top:6px')}>{sub}</div>
+      <div style={s('display:flex;gap:5px;margin-top:13px')}>
+        {bands.map(([range, lbl, color], i) => {
+          const on = i === tier;
+          return (
+            <div key={range} style={s(`flex:1;border-radius:9px;overflow:hidden;background:var(--bg2);border:${on ? `2px solid ${color}` : '1px solid var(--line)'};opacity:${on ? 1 : 0.55}`)}>
+              <div style={s(`height:6px;background:${color}`)} />
+              <div style={s('padding:6px 5px 8px')}>
+                <div className="mono" style={s('font-size:9.5px;font-weight:800;color:var(--text)')}>{range}</div>
+                <div style={s('font-size:8.5px;color:var(--text3);margin-top:2px;line-height:1.2')}>{lbl}</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="ctl" onClick={() => setOpen((o) => !o)} style={s('display:flex;align-items:center;gap:5px;margin-top:12px;font-size:12.5px;font-weight:700;color:var(--accent)')}>
+        How {heading} works
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}><path d="M6 9l6 6 6-6" /></svg>
+      </div>
+      {open && <div style={s('font-size:12.5px;color:var(--text2);line-height:1.55;margin-top:8px;background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:13px 14px')}>{explanation}</div>}
+    </div>
+  );
+}
+
+// ---- Intensity = Intensity Factor % (weighted-average power vs FTP) ----
+const INTENSITY_BANDS = [
+  ['≤65%', 'Endurance', 'var(--good)'],
+  ['65–80%', 'Moderate', 'var(--swim)'],
+  ['80–95%', 'Tempo', 'var(--warn)'],
+  ['95–105%', 'TT / Race', '#f97316'],
+  ['105%+', 'Short TT', 'var(--bad)'],
+];
+function intensityTier(pct) {
+  if (pct == null) return null;
+  if (pct <= 65) return 0;
+  if (pct <= 80) return 1;
+  if (pct <= 95) return 2;
+  if (pct <= 105) return 3;
+  return 4;
+}
+function Intensity({ pct }) {
+  const tier = intensityTier(pct);
+  if (tier == null) return null;
+  return (
+    <BandCard heading="Intensity" value={`${pct}%`} tier={tier} bands={INTENSITY_BANDS}
+      sub={<>Ride type: <b style={s('color:var(--text)')}>{['Endurance / Recovery', 'Moderate', 'Tempo', 'Time Trial / Race', 'Short TT / Race'][tier]}</b></>}
+      explanation="Intensity compares your Weighted Average Power for the ride to your FTP — e.g. 250 W at a 300 W FTP is 83%. Rides shorter than an hour can go over 100%." />
+  );
+}
+
+// ---- Relative Effort = HR-based TRIMP (Banister) — how hard you worked from heart rate ----
+// Exponential TRIMP over the recorded HR: Σ dt·HRr·0.64·e^(1.92·HRr), HRr = (HR−rest)/(max−rest).
+// No resting-HR setting yet, so we assume 60 bpm. Needs max HR (Settings → Training zones).
+function computeTrimp(track, maxHr, restHr = 60) {
+  if (!maxHr || maxHr <= restHr) return null;
+  let trimp = 0, prev = null, any = false;
+  for (const p of (track || [])) {
+    if (!Number.isFinite(p.offsetSec)) continue;
+    if (prev && Number.isFinite(p.heartRate)) {
+      const dtMin = (p.offsetSec - prev.offsetSec) / 60;
+      if (dtMin > 0 && dtMin < 1) {
+        const hrr = Math.min(1, Math.max(0, (p.heartRate - restHr) / (maxHr - restHr)));
+        trimp += dtMin * hrr * 0.64 * Math.exp(1.92 * hrr);
+        any = true;
+      }
+    }
+    prev = p;
+  }
+  return any ? Math.round(trimp) : null;
+}
+const reLabel = (v) => (v <= 50 ? 'Easy' : v <= 150 ? 'Moderate' : v <= 300 ? 'Hard' : 'Epic');
+function RelativeEffort({ score }) {
+  const [open, setOpen] = useState(false);
+  if (score == null) return null;
   return (
     <div style={s('padding:22px 18px 0')}>
       <div style={s('display:flex;align-items:center;justify-content:space-between')}>
         <div style={s('display:flex;align-items:center;gap:8px')}><Spark icon={boltPath} /><span style={s('font-size:17px;font-weight:700')}>Relative Effort</span></div>
-        <span className="mono" style={s('font-size:22px;font-weight:700')}>{load}</span>
+        <span className="mono" style={s('font-size:22px;font-weight:700')}>{score}</span>
       </div>
-      <div style={s('font-size:12.5px;color:var(--text2);margin-top:6px')}>From this ride's training load.</div>
-      <div style={s('margin-top:14px;border-radius:12px;overflow:hidden')}>
-        <div style={s('background:var(--bad);color:#fff;padding:9px 12px;font-size:11.5px;font-weight:700')}>Higher than average</div>
-        <div style={s('position:relative;background:#7c2fd6;color:#fff;padding:9px 12px;font-size:11.5px;font-weight:700')}>Your typical range<div style={s('position:absolute;right:12px;top:50%;transform:translateY(-50%);width:12px;height:12px;border-radius:50%;background:#fff;border:2px solid #7c2fd6')} /></div>
-        <div style={s('background:#a855f7;color:#fff;padding:9px 12px;font-size:11.5px;font-weight:700')}>Lower than average</div>
+      <div style={s('font-size:12.5px;color:var(--text2);margin-top:6px')}>From your heart-rate data — this ride reads as <b style={s('color:var(--text)')}>{reLabel(score)}</b>.</div>
+      <div className="ctl" onClick={() => setOpen((o) => !o)} style={s('display:flex;align-items:center;gap:5px;margin-top:12px;font-size:12.5px;font-weight:700;color:var(--accent)')}>
+        How Relative Effort works
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}><path d="M6 9l6 6 6-6" /></svg>
+      </div>
+      {open && (
+        <div style={s('font-size:12.5px;color:var(--text2);line-height:1.55;margin-top:8px;background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:13px 14px')}>
+          Relative Effort analyses your heart rate through the workout, relative to your maximum, to score exactly how hard you worked — the more time at full gas and the longer the activity, the higher the score. Inspired by TRIMP (Training Impulse), coined by Dr. Eric Bannister.
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---- fitness + matched rides (no source yet → SAMPLE) ----
+function StubTrends() {
+  return (
+    <div style={s('padding:16px 18px 0')}>
+      <div style={s('display:flex;align-items:center;gap:6px;margin-bottom:8px')}><span style={s(label)}>Trends</span><Sample /></div>
+      <div style={s('display:flex;gap:10px')}>
+        <div style={s('flex:1;background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:14px')}>
+          <div style={s('font-size:14px;font-weight:700')}>Fitness +3</div>
+          <div style={s('font-size:11px;color:var(--text3);margin-top:2px')}>Score <b className="mono" style={s('color:var(--text)')}>19</b></div>
+          <svg viewBox="0 0 120 54" preserveAspectRatio="none" style={{ width: '100%', height: 44, marginTop: 8, display: 'block' }}><polyline points="4,34 30,30 56,32 84,40 104,34 116,10" fill="none" stroke="var(--accent)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /><circle cx="116" cy="10" r="3" fill="var(--accent)" /></svg>
+        </div>
+        <div style={s('flex:1;background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:14px')}>
+          <div style={s('font-size:14px;font-weight:700')}>Matched Rides</div>
+          <div className="mono" style={s('font-size:11px;color:var(--text3);margin-top:2px')}>28.2 km/h · 17</div>
+          <svg viewBox="0 0 120 54" preserveAspectRatio="none" style={{ width: '100%', height: 44, marginTop: 8, display: 'block' }}><polyline points="4,18 34,16 62,20 90,30 116,26" fill="none" stroke="var(--swim)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /><circle cx="116" cy="26" r="3" fill="var(--accent)" /></svg>
+        </div>
       </div>
     </div>
   );
 }
 
-// ---- fitness + matched rides + goals (no source yet → SAMPLE) ----
-function StubTrends() {
+// ---- yearly distance goal (device-local): set a target, sum your activities this year ----
+function Goals({ myActivities }) {
+  const year = new Date().getFullYear();
+  const [goal, setGoal] = useState(() => { const v = parseInt(localStorage.getItem('squad.goalKm'), 10); return Number.isFinite(v) && v > 0 ? v : null; });
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const ridden = useMemo(() => Math.round((myActivities || []).reduce((sum, a) => {
+    const y = a.startUtc ? new Date(a.startUtc).getFullYear() : year;
+    if (y !== year) return sum;
+    let km = parseFloat(a.dist);
+    if (!Number.isFinite(km)) return sum;
+    if (a.distU === 'm') km /= 1000;
+    return sum + km;
+  }, 0)), [myActivities, year]);
+
+  const C = 2 * Math.PI * 24;
+  const dash = `${(Math.min(1, goal ? ridden / goal : 0) * C).toFixed(1)} ${C.toFixed(1)}`;
+  const startEdit = () => { setDraft(goal ? String(goal) : ''); setEditing(true); };
+  const save = () => { const v = parseInt(draft, 10); if (Number.isFinite(v) && v > 0) { localStorage.setItem('squad.goalKm', String(v)); setGoal(v); } setEditing(false); };
+
   return (
-    <>
-      <div style={s('padding:16px 18px 0')}>
-        <div style={s('display:flex;align-items:center;gap:6px;margin-bottom:8px')}><span style={s(label)}>Trends</span><Sample /></div>
-        <div style={s('display:flex;gap:10px')}>
-          <div style={s('flex:1;background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:14px')}>
-            <div style={s('font-size:14px;font-weight:700')}>Fitness +3</div>
-            <div style={s('font-size:11px;color:var(--text3);margin-top:2px')}>Score <b className="mono" style={s('color:var(--text)')}>19</b></div>
-            <svg viewBox="0 0 120 54" preserveAspectRatio="none" style={{ width: '100%', height: 44, marginTop: 8, display: 'block' }}><polyline points="4,34 30,30 56,32 84,40 104,34 116,10" fill="none" stroke="var(--accent)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /><circle cx="116" cy="10" r="3" fill="var(--accent)" /></svg>
-          </div>
-          <div style={s('flex:1;background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:14px')}>
-            <div style={s('font-size:14px;font-weight:700')}>Matched Rides</div>
-            <div className="mono" style={s('font-size:11px;color:var(--text3);margin-top:2px')}>28.2 km/h · 17</div>
-            <svg viewBox="0 0 120 54" preserveAspectRatio="none" style={{ width: '100%', height: 44, marginTop: 8, display: 'block' }}><polyline points="4,18 34,16 62,20 90,30 116,26" fill="none" stroke="var(--swim)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /><circle cx="116" cy="26" r="3" fill="var(--accent)" /></svg>
-          </div>
+    <div style={s('padding:16px 18px 0')}>
+      <div style={s(label + ';margin-bottom:8px')}>Goal · {year}</div>
+      <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:15px 16px;display:flex;align-items:center;gap:15px')}>
+        <div style={s('position:relative;width:58px;height:58px;flex:none')}>
+          <svg width="58" height="58" viewBox="0 0 58 58" style={{ transform: 'rotate(-90deg)' }}><circle cx="29" cy="29" r="24" fill="none" stroke="var(--bg4)" strokeWidth="5" /><circle cx="29" cy="29" r="24" fill="none" stroke="var(--good)" strokeWidth="5" strokeLinecap="round" strokeDasharray={dash} /></svg>
+          <div style={s('position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:16px')}>🚴</div>
+        </div>
+        <div style={s('flex:1;min-width:0')}>
+          {editing ? (
+            <div style={s('display:flex;align-items:center;gap:8px')}>
+              <input value={draft} onChange={(e) => setDraft(e.target.value.replace(/[^\d]/g, ''))} onKeyDown={(e) => { if (e.key === 'Enter') save(); }} inputMode="numeric" placeholder="Goal km" autoFocus
+                style={s('width:96px;background:var(--bg3);border:1px solid var(--line);border-radius:9px;padding:8px 10px;font-size:13px;color:var(--text);outline:none;font-family:inherit')} />
+              <div className="ctl" onClick={save} style={s('padding:8px 13px;border-radius:9px;background:var(--accent);color:var(--accent-ink);font-size:12px;font-weight:700')}>Save</div>
+            </div>
+          ) : goal ? (
+            <>
+              <div style={s('font-size:14px;font-weight:700')}>This year · {Math.max(0, goal - ridden).toLocaleString()} km to go</div>
+              <div className="mono" style={s('font-size:11.5px;color:var(--text2);margin-top:2px')}>{ridden.toLocaleString()} / {goal.toLocaleString()} km</div>
+              <div className="ctl" onClick={startEdit} style={s('font-size:11px;font-weight:700;color:var(--accent);margin-top:6px')}>Edit goal</div>
+            </>
+          ) : (
+            <>
+              <div style={s('font-size:14px;font-weight:700')}>Set a distance goal</div>
+              <div style={s('font-size:11.5px;color:var(--text2);margin-top:2px')}>{ridden.toLocaleString()} km so far this year</div>
+              <div className="ctl" onClick={startEdit} style={s('font-size:11px;font-weight:700;color:var(--accent);margin-top:6px')}>Set goal</div>
+            </>
+          )}
         </div>
       </div>
-      <div style={s('padding:16px 18px 0')}>
-        <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:15px 16px;display:flex;align-items:center;gap:15px')}>
-          <div style={s('position:relative;width:58px;height:58px;flex:none')}>
-            <svg width="58" height="58" viewBox="0 0 58 58" style={{ transform: 'rotate(-90deg)' }}><circle cx="29" cy="29" r="24" fill="none" stroke="var(--bg4)" strokeWidth="5" /><circle cx="29" cy="29" r="24" fill="none" stroke="var(--good)" strokeWidth="5" strokeLinecap="round" strokeDasharray="87 151" /></svg>
-            <div style={s('position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:16px')}>🚴</div>
-          </div>
-          <div style={s('flex:1')}><div style={s('display:flex;align-items:center;gap:6px')}><span style={s('font-size:14px;font-weight:700')}>This year · 1,672 km to go</span><Sample /></div><div className="mono" style={s('font-size:11.5px;color:var(--text2);margin-top:2px')}>2,328 / 4,000 km ridden</div></div>
-        </div>
-      </div>
-    </>
+    </div>
   );
 }
 
@@ -313,28 +497,35 @@ function PowerCurve({ curve }) {
 }
 
 // ---- static sensor trace charts (real; area sparkline + axis) ----
-function SensorTraces({ traces, totalSec }) {
-  if (!traces.length) return null;
+// Each chart carries the elevation profile as a faint grey backdrop for context (the
+// shape of the climb behind HR/power/speed), matching the design.
+function SensorTraces({ traces, totalSec, elevValues }) {
   const W = 320, H = 88;
+  const areaFor = (values) => {
+    const pts = values.map((v, i) => [i, v]).filter(([, v]) => v != null && Number.isFinite(v));
+    if (pts.length < 2) return null;
+    const ys = pts.map(([, v]) => v), min = Math.min(...ys), max = Math.max(...ys), span = (max - min) || 1;
+    const n = (values.length - 1) || 1;
+    const X = (i) => (i / n) * W, Y = (v) => (H - 2) - ((v - min) / span) * (H - 6);
+    const line = pts.map(([i, v]) => `${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(' ');
+    return { line, area: `${X(pts[0][0]).toFixed(1)},${H} ${line} ${X(pts[pts.length - 1][0]).toFixed(1)},${H}`, min, max, avg: ys.reduce((a, b) => a + b, 0) / ys.length };
+  };
+  const elev = areaFor(elevValues || []);
+  if (!traces.length) return null;
   const ax = [1 / 6, 1 / 2, 5 / 6].map((f) => fmtDur(totalSec * f));
   return (
     <div style={s('padding:16px 18px 0;display:flex;flex-direction:column;gap:12px')}>
       {traces.map((t) => {
-        const pts = t.values.map((v, i) => [i, v]).filter(([, v]) => v != null && Number.isFinite(v));
-        if (pts.length < 2) return null;
-        const ys = pts.map(([, v]) => v), min = Math.min(...ys), max = Math.max(...ys), span = (max - min) || 1;
-        const n = (t.values.length - 1) || 1;
-        const X = (i) => (i / n) * W, Y = (v) => (H - 2) - ((v - min) / span) * (H - 6);
-        const line = pts.map(([i, v]) => `${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(' ');
-        const area = `${X(pts[0][0]).toFixed(1)},${H} ${line} ${X(pts[pts.length - 1][0]).toFixed(1)},${H}`;
+        const g = areaFor(t.values);
+        if (!g) return null;
         const f = t.fmt || ((x) => Math.round(x));
-        const avg = ys.reduce((a, b) => a + b, 0) / ys.length;
         return (
           <div key={t.key} style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:14px 14px 8px')}>
-            <div style={s('display:flex;align-items:baseline;justify-content:space-between')}><span style={s('font-size:15px;font-weight:700')}>{t.title}</span><span className="mono" style={s('font-size:11.5px;color:var(--text3)')}>avg {f(avg)} · max {f(max)} {t.unit}</span></div>
+            <div style={s('display:flex;align-items:baseline;justify-content:space-between')}><span style={s('font-size:15px;font-weight:700')}>{t.title}</span><span className="mono" style={s('font-size:11.5px;color:var(--text3)')}>avg {f(g.avg)} · max {f(g.max)} {t.unit}</span></div>
             <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: '100%', height: H, marginTop: 8, display: 'block' }}>
-              <polygon points={area} fill={t.stroke} opacity="0.28" />
-              <polyline points={line} fill="none" stroke={t.stroke} strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
+              {elev && t.key !== 'elev' && <polygon points={elev.area} fill="rgba(255,255,255,.07)" />}
+              <polygon points={g.area} fill={t.stroke} opacity="0.28" />
+              <polyline points={g.line} fill="none" stroke={t.stroke} strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
             </svg>
             <div style={s('position:relative;height:13px')}>{ax.map((lbl, i) => <span key={i} className="mono" style={s(`position:absolute;left:${[16, 48, 80][i]}%;font-size:9px;color:var(--text3)`)}>{lbl}</span>)}</div>
           </div>
@@ -430,7 +621,16 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
   const traces = useMemo(() => buildTraces(frames), [frames]);
   const powerValues = useMemo(() => frames.map((f) => f.power), [frames]);
   const hrValues = useMemo(() => frames.map((f) => f.hr), [frames]);
+  const elevValues = useMemo(() => frames.map((f) => f.elev), [frames]);
   const analytics = useActivityAnalytics(track, laps, a?.sport);
+  const relEffort = useMemo(() => computeTrimp(track, analytics.zones.maxHr), [track, analytics.zones.maxHr]);
+
+  // Opening an activity should always start at the top, not wherever the previous
+  // screen was scrolled to (the shell reuses one scroll container).
+  useEffect(() => {
+    const scr = document.querySelector('.scr');
+    if (scr) scr.scrollTop = 0;
+  }, [a?.id]);
 
   const doDelete = async () => {
     if (!a || deleting) return;
@@ -457,29 +657,39 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
   }
 
   const totalSec = frames.length ? (frames[frames.length - 1].offsetSec ?? 0) : 0;
-  const { zones, np, ifactor, pwZones, hZones, workKJ, hasPower } = analytics;
+  const { zones, np, ifactor, pwZones, hZones, workKJ } = analytics;
   const avgPower = avgOf(powerValues), maxPower = maxOf(powerValues);
   const avgHr = avgOf(hrValues), maxHr = maxOf(hrValues);
 
-  const powerZoneRows = pwZones ? zoneRows(pwZones, POWER_COLORS, PWR_ZONE_NAMES, PWR_ZONE_FRACS, zones.ftp) : null;
+  // Training Load = TSS. Prefer the device's value (a.load); when it's missing but we have
+  // power + the athlete's FTP, compute it: hours × IF² × 100 (NP relative to FTP).
+  const computedTss = (np != null && zones.ftp && totalSec > 0)
+    ? Math.round((totalSec / 3600) * (np / zones.ftp) ** 2 * 100)
+    : null;
+  const effLoad = a.load > 0 ? a.load : computedTss;
+  // Real power = an actual power stream (runs / no-power rides have none, so every
+  // power-derived section stays hidden rather than showing zeros).
+  const hasRealPower = (np != null && np > 0) || (avgPower != null && avgPower > 0) || analytics.curve.length > 0;
+  const intensityPct = (hasRealPower && ifactor != null) ? Math.round(ifactor * 100) : null;
+
+  const powerZoneRows = (hasRealPower && pwZones) ? zoneRows(pwZones, POWER_COLORS, PWR_ZONE_NAMES, PWR_ZONE_FRACS, zones.ftp) : null;
   const hrZoneRows = hZones ? zoneRows(hZones, HR_COLORS, HR_ZONE_NAMES, HR_ZONE_FRACS, zones.maxHr) : null;
   const zoneInsight = (rows) => rows.map((z) => `${z.pct}% ${z.name.toLowerCase()}`).join(', ') + '.';
 
-  const powerStats = [
-    avgPower != null && ['Avg Power', `${avgPower} W`],
-    maxPower != null && ['Max Power', `${maxPower} W`],
-    np != null && ['Normalized Power', `${np} W`],
-    ifactor != null && ['Intensity Factor', ifactor.toFixed(2)],
+  const powerStats = !hasRealPower ? [] : [
+    avgPower > 0 && ['Avg Power', `${avgPower} W`],
+    maxPower > 0 && ['Max Power', `${maxPower} W`],
+    np > 0 && ['Normalized Power', `${np} W`],
     workKJ >= 1 && ['Work', `${Math.round(workKJ)} kJ`],
   ].filter(Boolean);
 
   return (
-    <div style={s('padding:0 0 40px;animation:floatUp .35s ease')}>
+    <div style={s('padding:0 0 120px;animation:floatUp .35s ease')}>
       <ActivityHero a={a} route={route} frames={frames} hasMap={hasMap} status={status}
         onBack={() => actions.go(state.activityBack || 'activities')} onDelete={() => setConfirmDel(true)} />
 
       <AthleteTitle a={a} token={token} onAthlete={actions.openAthlete} />
-      <MetricHero a={a} />
+      <MetricHero a={a} load={effLoad} />
       <AIInsight />
       <DeviceWeather />
 
@@ -488,14 +698,17 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
         <ActivityInteractions activity={a} token={token} getToken={getToken} meId={meId} />
       </div>
 
-      <RelativeEffort load={a.load} />
+      <TrainingLoad load={effLoad} estimated={!(a.load > 0) && computedTss != null} />
+      <Intensity pct={intensityPct} />
+      <RelativeEffort score={relEffort} />
       <StubTrends />
+      <Goals myActivities={vm.myActivities} />
 
       <ActivityPhotos activityId={a.id} isMe={a.isMe} token={token} getToken={getToken} />
 
-      <WorkoutAnalysis powerValues={powerValues} />
+      {hasRealPower && <WorkoutAnalysis powerValues={powerValues} />}
       <PowerCurve curve={analytics.curve} />
-      <SensorTraces traces={traces} totalSec={totalSec} />
+      <SensorTraces traces={traces} totalSec={totalSec} elevValues={elevValues} />
 
       {/* power stats + zones */}
       {(powerStats.length > 0 || powerZoneRows) && (
@@ -522,7 +735,7 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
           insight={hrZoneRows ? <><b style={s('color:var(--text)')}>Distribution:</b> {zoneInsight(hrZoneRows)}</> : null} insightColor="var(--bad)" />
       )}
 
-      {hasPower && !zones.ftp && (
+      {hasRealPower && !zones.ftp && (
         <div style={s('padding:12px 18px 0;font-size:11px;color:var(--text3);line-height:1.5')}>Set your FTP &amp; max HR in <b>Settings → Training zones</b> to unlock power / heart-rate zones and Intensity Factor.</div>
       )}
 
@@ -531,8 +744,8 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
 
       {confirmDel && (
         <>
-          <div className="ctl" onClick={() => !deleting && setConfirmDel(false)} style={s('position:absolute;inset:0;background:rgba(0,0,0,.55);z-index:50;animation:floatUp .2s ease')} />
-          <div className="scr" style={s('position:absolute;left:18px;right:18px;top:50%;transform:translateY(-50%);z-index:51;background:var(--bg);border:1px solid var(--line2);border-radius:20px;padding:20px;animation:floatUp .25s ease')}>
+          <div className="ctl" onClick={() => !deleting && setConfirmDel(false)} style={s('position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50;animation:floatUp .2s ease')} />
+          <div className="scr" style={s('position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(90%,420px);z-index:51;background:var(--bg);border:1px solid var(--line2);border-radius:20px;padding:20px;animation:floatUp .25s ease')}>
             <div style={s('font-size:17px;font-weight:700')}>Delete this training?</div>
             <div style={s('font-size:13px;color:var(--text2);line-height:1.5;margin-top:8px')}>{a.title} · {a.when}. This removes it from your activities, feed and leaderboard. You can re-import it later.</div>
             <div style={s('display:flex;gap:10px;margin-top:18px')}>

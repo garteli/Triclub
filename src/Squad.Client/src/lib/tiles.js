@@ -42,7 +42,7 @@ export function fitView(points, W, H, pad = 22) {
 
 // Tiles covering the box, positioned as percentages of the design box so they scale
 // with the container. left/top/size are % strings ready for inline styles.
-export function tilesFor(view) {
+export function tilesFor(view, style) {
   const { z, originX, originY, W, H } = view;
   const n = Math.pow(2, z);
   const x0 = Math.floor(originX / TILE), x1 = Math.floor((originX + W) / TILE);
@@ -54,7 +54,7 @@ export function tilesFor(view) {
       const wx = ((x % n) + n) % n; // wrap east/west
       out.push({
         key: `${z}/${x}/${y}`,
-        url: tileUrl(wx, y, z),
+        url: tileUrl(wx, y, z, style),
         left: ((x * TILE - originX) / W) * 100,
         top: ((y * TILE - originY) / H) * 100,
         wpct: (TILE / W) * 100,
@@ -65,12 +65,14 @@ export function tilesFor(view) {
   return out;
 }
 
-// CARTO Voyager basemap (retina) — a clean, light street map (soft greens, light
-// roads), free for reasonable use. Subdomain rotation a–d. Swap the style segment for
-// 'light_all' (Positron, more minimal/grayscale) or 'dark_all' if the look changes.
-export function tileUrl(x, y, z) {
+// CARTO basemaps (retina, free for reasonable use, subdomain rotation a–d). Selectable
+// styles: 'voyager' (default, clean street map), 'light' (Positron, minimal grayscale),
+// 'dark' (dark matter).
+const TILE_STYLES = { voyager: 'voyager', light: 'light_all', dark: 'dark_all' };
+export function tileUrl(x, y, z, style = 'voyager') {
+  const seg = TILE_STYLES[style] || TILE_STYLES.voyager;
   const sub = 'abcd'[(x + y) % 4];
-  return `https://${sub}.basemaps.cartocdn.com/rastertiles/voyager/${z}/${x}/${y}@2x.png`;
+  return `https://${sub}.basemaps.cartocdn.com/rastertiles/${seg}/${z}/${x}/${y}@2x.png`;
 }
 
 export const TILE_ATTRIBUTION = '© OpenStreetMap · © CARTO';

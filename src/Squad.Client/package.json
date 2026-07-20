@@ -24,6 +24,7 @@
     "@microsoft/signalr": "^8.0.7",
     "@perfood/capacitor-healthkit": "^1.0.0",
     "fflate": "^0.8.3",
+    "leaflet": "^1.9.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

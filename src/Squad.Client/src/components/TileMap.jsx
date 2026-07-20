@@ -23,6 +23,7 @@ export default function TileMap({
   pad = 24,
   radius = 20,
   fill = false,
+  style: mapStyle = 'voyager',
   children,
   scrubPoints,
   onScrub,
@@ -50,7 +51,7 @@ export default function TileMap({
   // fitView + tilesFor do real work (zoom search, trig, tile grid). Memoise so an
   // animation that re-renders this component every frame doesn't recompute the basemap.
   const view = useMemo(() => fitView(points, vw, vh, pad), [points, vw, vh, pad]);
-  const tiles = useMemo(() => tilesFor(view), [view]);
+  const tiles = useMemo(() => tilesFor(view, mapStyle), [view, mapStyle]);
 
   const overlayRef = useRef(null);
   const interactive = Array.isArray(scrubPoints) && scrubPoints.length > 1 && typeof onScrub === 'function';
