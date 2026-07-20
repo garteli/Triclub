@@ -30,7 +30,7 @@ export default function Messages({ vm, actions, getToken, meId }) {
     : 'background:var(--bg2);border:1px solid var(--line);color:var(--text);border-radius:15px 15px 15px 4px;padding:10px 13px;font-size:13px;line-height:1.4';
 
   return (
-    <div style={s('padding:6px 0 120px;animation:floatUp .35s ease;display:flex;flex-direction:column;height:100%')}>
+    <div style={s('padding:6px 0 0;animation:floatUp .35s ease;display:flex;flex-direction:column;height:calc(100dvh - max(env(safe-area-inset-top),12px) - 108px)')}>
       {/* header */}
       <div style={s('display:flex;align-items:center;gap:11px;padding:2px 18px 12px;border-bottom:1px solid var(--line)')}>
         <div className="ctl" onClick={() => actions.go('dash')} style={s('width:32px;height:32px;border-radius:9px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center')}>

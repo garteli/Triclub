@@ -164,13 +164,20 @@ export default function FeedActivityCard({ a, onOpen, onAthlete, token, getToken
       {/* attached / in-ride photos */}
       <FeedPhotos activityId={a.id} token={token} getToken={getToken} />
 
-      {/* kudos footer */}
+      {/* kudos footer — your own activity shows a read-only count (no self-kudos) */}
       <div style={s('display:flex;align-items:center;gap:10px;margin-top:14px;padding-top:13px;border-top:1px solid var(--line)')}>
-        <span style={s('flex:1;font-size:12.5px;color:var(--text2)')}>{kudos > 0 ? `${kudos} kudos` : 'Be the first to give kudos!'}</span>
-        <div className="ctl" onClick={toggleKudos} title={kudoed ? 'Remove kudos' : 'Give kudos'} style={s(`display:flex;align-items:center;justify-content:center;gap:5px;min-width:38px;height:32px;padding:0 10px;border-radius:9px;${kudoed ? 'background:var(--accent);border:1px solid var(--accent);color:var(--accent-ink)' : 'background:var(--bg3);border:1px solid var(--line);color:var(--text2)'};opacity:${busy ? 0.6 : 1};transition:background .15s`)}>
-          <svg width="17" height="17" viewBox="0 0 24 24" fill={kudoed ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10v11H4a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1zM7 10l4-7a2 2 0 0 1 2 2v3h5a2 2 0 0 1 2 2.3l-1.3 7a2 2 0 0 1-2 1.7H7" /></svg>
-          {kudos > 0 && <span className="mono" style={s('font-size:11px;font-weight:700')}>{kudos}</span>}
-        </div>
+        <span style={s('flex:1;font-size:12.5px;color:var(--text2)')}>{kudos > 0 ? `${kudos} kudos` : (a.isMe ? 'No kudos yet' : 'Be the first to give kudos!')}</span>
+        {a.isMe ? (
+          <div title="Kudos" style={s('display:flex;align-items:center;justify-content:center;gap:5px;min-width:38px;height:32px;padding:0 10px;border-radius:9px;background:var(--bg3);border:1px solid var(--line);color:var(--text3)')}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10v11H4a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1zM7 10l4-7a2 2 0 0 1 2 2v3h5a2 2 0 0 1 2 2.3l-1.3 7a2 2 0 0 1-2 1.7H7" /></svg>
+            {kudos > 0 && <span className="mono" style={s('font-size:11px;font-weight:700')}>{kudos}</span>}
+          </div>
+        ) : (
+          <div className="ctl" onClick={toggleKudos} title={kudoed ? 'Remove kudos' : 'Give kudos'} style={s(`display:flex;align-items:center;justify-content:center;gap:5px;min-width:38px;height:32px;padding:0 10px;border-radius:9px;${kudoed ? 'background:var(--accent);border:1px solid var(--accent);color:var(--accent-ink)' : 'background:var(--bg3);border:1px solid var(--line);color:var(--text2)'};opacity:${busy ? 0.6 : 1};transition:background .15s`)}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill={kudoed ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10v11H4a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1zM7 10l4-7a2 2 0 0 1 2 2v3h5a2 2 0 0 1 2 2.3l-1.3 7a2 2 0 0 1-2 1.7H7" /></svg>
+            {kudos > 0 && <span className="mono" style={s('font-size:11px;font-weight:700')}>{kudos}</span>}
+          </div>
+        )}
         <div className="ctl" onClick={(e) => { stop(e); onOpen(a.id); }} title="Comments" style={s('display:flex;align-items:center;justify-content:center;gap:5px;min-width:38px;height:32px;padding:0 10px;border-radius:9px;background:var(--bg3);border:1px solid var(--line);color:var(--text2)')}>
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9 9 0 0 1-4-.9L3 21l1.9-5a8.4 8.4 0 0 1-.9-4 8.5 8.5 0 0 1 17 0z" /></svg>
           {a.comments > 0 && <span className="mono" style={s('font-size:11px;font-weight:700')}>{a.comments}</span>}

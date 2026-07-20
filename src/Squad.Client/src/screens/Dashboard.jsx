@@ -1,6 +1,7 @@
 import { s, html } from '../lib/style.js';
 import Avatar from '../components/Avatar.jsx';
 import FeedActivityCard from '../components/FeedActivityCard.jsx';
+import { useNotifications } from '../hooks/useNotifications.js';
 
 // Last 7 days of squad activities for the main-page feed. Live rows carry a real
 // startUtc (kept when a row can't be dated, e.g. seed data), newest first.
@@ -51,7 +52,7 @@ function SquadRail({ squad, rtl, onOpen }) {
   );
 }
 
-function DashboardEN({ vm, state, go, openAthlete, openActivity, getToken }) {
+function DashboardEN({ vm, state, go, openAthlete, openActivity, getToken, notifUnread = 0 }) {
   const dashB = state.dashVar === 'b';
   const token = getToken?.() ?? null;
   const recent = last7Days(vm.activities);
@@ -69,7 +70,7 @@ function DashboardEN({ vm, state, go, openAthlete, openActivity, getToken }) {
           </div>
           <div className="ctl" onClick={() => go('notifs')} style={s('width:38px;height:38px;border-radius:12px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;position:relative')}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
-            <div style={s('position:absolute;top:8px;right:9px;width:7px;height:7px;border-radius:50%;background:var(--accent);border:1.5px solid var(--bg2)')} />
+            {notifUnread > 0 && <div style={s('position:absolute;top:8px;right:9px;width:7px;height:7px;border-radius:50%;background:var(--accent);border:1.5px solid var(--bg2)')} />}
           </div>
           <div className="ctl" onClick={() => go('profile')}><Avatar photo={vm.me.photo} initials={vm.me.initials} color={vm.me.color} size={38} radius={12} fontSize={14} /></div>
         </div>
@@ -175,7 +176,7 @@ function DashboardEN({ vm, state, go, openAthlete, openActivity, getToken }) {
   );
 }
 
-function DashboardHE({ vm, go, openAthlete, openActivity, getToken }) {
+function DashboardHE({ vm, go, openAthlete, openActivity, getToken, notifUnread = 0 }) {
   const token = getToken?.() ?? null;
   const recent = last7Days(vm.activities);
   return (
@@ -188,7 +189,7 @@ function DashboardHE({ vm, go, openAthlete, openActivity, getToken }) {
         <div style={s('display:flex;align-items:center;gap:10px;flex-direction:row-reverse')}>
           <div className="ctl" onClick={() => go('notifs')} style={s('width:38px;height:38px;border-radius:12px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;position:relative')}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
-            <div style={s('position:absolute;top:8px;right:9px;width:7px;height:7px;border-radius:50%;background:var(--accent);border:1.5px solid var(--bg2)')} />
+            {notifUnread > 0 && <div style={s('position:absolute;top:8px;right:9px;width:7px;height:7px;border-radius:50%;background:var(--accent);border:1.5px solid var(--bg2)')} />}
           </div>
           <div className="ctl" onClick={() => go('profile')}><Avatar photo={vm.me.photo} initials={vm.me.initials} color={vm.me.color} size={38} radius={12} fontSize={14} /></div>
         </div>
@@ -254,7 +255,11 @@ function DashboardHE({ vm, go, openAthlete, openActivity, getToken }) {
 }
 
 export default function Dashboard({ vm, state, actions, getToken }) {
+  // Real unread count so the bell badge only shows when there's actually something to
+  // read — previously the dot was hard-coded on, hence "badge but no notifications".
+  const { items: notifItems } = useNotifications({ getToken, enabled: !!getToken });
+  const notifUnread = notifItems.filter((n) => n.unread).length;
   return state.lang === 'he'
-    ? <DashboardHE vm={vm} go={actions.go} openAthlete={actions.openAthlete} openActivity={actions.openActivity} getToken={getToken} />
-    : <DashboardEN vm={vm} state={state} go={actions.go} openAthlete={actions.openAthlete} openActivity={actions.openActivity} getToken={getToken} />;
+    ? <DashboardHE vm={vm} go={actions.go} openAthlete={actions.openAthlete} openActivity={actions.openActivity} getToken={getToken} notifUnread={notifUnread} />
+    : <DashboardEN vm={vm} state={state} go={actions.go} openAthlete={actions.openAthlete} openActivity={actions.openActivity} getToken={getToken} notifUnread={notifUnread} />;
 }

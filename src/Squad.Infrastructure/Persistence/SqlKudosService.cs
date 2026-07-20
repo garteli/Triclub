@@ -20,14 +20,24 @@ public sealed class SqlKudosService(string connectionString) : IKudosService
         await using var conn = new SqlConnection(connectionString);
 
         // Visibility gate: the activity must belong to a member of the caller's squad.
+        // Also fetch the owner so we can block self-kudos (you can't kudos your own ride).
         const string visible = """
-            SELECT 1 FROM dbo.Activity a
+            SELECT a.AthleteId FROM dbo.Activity a
               JOIN dbo.Athlete ath ON ath.Id = a.AthleteId
              WHERE a.Id = @activityId AND ath.SquadId = @squadId;
             """;
-        var ok = await conn.ExecuteScalarAsync<int?>(
+        var owner = await conn.ExecuteScalarAsync<Guid?>(
             new CommandDefinition(visible, new { activityId, squadId }, cancellationToken: ct));
-        if (ok is null) return null;
+        if (owner is null) return null;
+
+        // Self-kudos is not allowed: leave any existing count untouched and report not-kudoed.
+        if (give && owner.Value == athleteId)
+        {
+            var own = await conn.ExecuteScalarAsync<int>(new CommandDefinition(
+                "SELECT COUNT(*) FROM dbo.ActivityKudos WHERE ActivityId = @activityId;",
+                new { activityId }, cancellationToken: ct));
+            return new KudosState(own, false);
+        }
 
         var sql = give
             ? """

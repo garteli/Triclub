@@ -86,13 +86,22 @@ export default function ActivityInteractions({ activity, token, getToken, meId }
 
   return (
     <div style={s('padding:20px 18px 0')}>
-      {/* kudos */}
+      {/* kudos — you can't kudos your own activity, so it's read-only on yours */}
       <div style={s('display:flex;align-items:center;gap:10px;background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:11px 13px')}>
-        <div className="ctl" onClick={toggleKudos} title={kudoed ? 'Remove kudos' : 'Give kudos'} style={s(`display:flex;align-items:center;gap:7px;padding:8px 13px;border-radius:11px;font-size:13px;font-weight:700;${kudoed ? 'background:var(--accent);border:1px solid var(--accent);color:var(--accent-ink)' : 'background:var(--bg3);border:1px solid var(--line);color:var(--text)'};opacity:${busyK ? 0.6 : 1};transition:background .15s`)}>
-          <svg width="17" height="17" viewBox="0 0 24 24" fill={kudoed ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10v11H4a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1zM7 10l4-7a2 2 0 0 1 2 2v3h5a2 2 0 0 1 2 2.3l-1.3 7a2 2 0 0 1-2 1.7H7" /></svg>
-          {kudoed ? 'Kudoed' : 'Kudos'}
-        </div>
-        <span style={s('flex:1;font-size:12.5px;color:var(--text2)')}>{kudos > 0 ? `${kudos} ${kudos === 1 ? 'kudos' : 'kudos'}` : 'Be the first to give kudos'}</span>
+        {a.isMe ? (
+          <div style={s('display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--text2)')}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10v11H4a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1zM7 10l4-7a2 2 0 0 1 2 2v3h5a2 2 0 0 1 2 2.3l-1.3 7a2 2 0 0 1-2 1.7H7" /></svg>
+            <span>{kudos > 0 ? `${kudos} kudos` : 'No kudos yet'}</span>
+          </div>
+        ) : (
+          <>
+            <div className="ctl" onClick={toggleKudos} title={kudoed ? 'Remove kudos' : 'Give kudos'} style={s(`display:flex;align-items:center;gap:7px;padding:8px 13px;border-radius:11px;font-size:13px;font-weight:700;${kudoed ? 'background:var(--accent);border:1px solid var(--accent);color:var(--accent-ink)' : 'background:var(--bg3);border:1px solid var(--line);color:var(--text)'};opacity:${busyK ? 0.6 : 1};transition:background .15s`)}>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill={kudoed ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M7 10v11H4a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1zM7 10l4-7a2 2 0 0 1 2 2v3h5a2 2 0 0 1 2 2.3l-1.3 7a2 2 0 0 1-2 1.7H7" /></svg>
+              {kudoed ? 'Kudoed' : 'Kudos'}
+            </div>
+            <span style={s('flex:1;font-size:12.5px;color:var(--text2)')}>{kudos > 0 ? `${kudos} kudos` : 'Be the first to give kudos'}</span>
+          </>
+        )}
       </div>
 
       {/* comments */}
