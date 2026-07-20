@@ -50,4 +50,7 @@
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
         android:usesPermissionFlags="neverForLocation" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+    <!-- Peer ranging: advertise this phone's GUID for pack positioning (SquadPeerBeacon) -->
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
 </manifest>

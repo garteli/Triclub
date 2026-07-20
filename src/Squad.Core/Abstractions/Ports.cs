@@ -95,4 +95,9 @@ public interface IRideSessionState
     bool TryGet(Guid rideId, Guid athleteId, out RiderUpdate? update);
     void Remove(Guid rideId, Guid athleteId);
     IReadOnlyCollection<RiderUpdate> Snapshot(Guid rideId);
+
+    // Phone-to-phone BLE ranges, keyed by (observer, peer) so the newest range for each
+    // ordered pair overwrites the last. A future pack-position fusion pass reads these.
+    void RecordPeerRange(Guid rideId, PeerRangeObservation obs);
+    IReadOnlyCollection<PeerRangeObservation> PeerRanges(Guid rideId);
 }

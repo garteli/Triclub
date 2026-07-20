@@ -60,6 +60,10 @@ export function useRideTelemetry({ t, active, riders = [], recorder, sensors }) 
       riders,
       radar: groupRadar(riders),
       you: riders.find((r) => r.you) || null,
+      // Pack-fusion spacing (from phone-to-phone BLE ranging, when active): your fused gap to
+      // the nearest teammate, and whether any rider's position is BLE-refined this tick.
+      gap: riders.find((r) => r.you)?.gapM ?? null,
+      packFused: riders.some((r) => r.fused),
     });
   }, [t, active]); // eslint-disable-line react-hooks/exhaustive-deps
 

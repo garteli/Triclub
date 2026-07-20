@@ -220,6 +220,97 @@ Split radar packets aren't reassembled yet (marked TODO in `ble.js`).
 
 ---
 
+# Peer ranging — phone-to-phone BLE for pack position
+
+Live-ride pack positioning ranges riders against each other directly: every phone
+**advertises** its athlete GUID over BLE and **scans** for teammates' beacons, turning
+the received signal strength (RSSI) into a rough inter-rider distance. The server fuses
+those peer ranges with GPS+heading to place riders in the pack; with no peer signal it
+falls back to GPS+heading alone.
+
+Two halves, two different mechanisms:
+
+| Half | Mechanism | Where |
+|---|---|---|
+| **Scan** | `@capacitor-community/bluetooth-le` `requestLEScan` (reads RSSI + manufacturer data) | `lib/peerRangingSource.native.js` |
+| **Advertise** | custom `SquadPeerBeacon` plugin (**broadcasting** manufacturer data — no community/web API can do this) | `ios/App/App/SquadPeerBeaconPlugin.swift`, `android/.../SquadPeerBeaconPlugin.java` |
+
+## The wire format (keep both plugins in lockstep)
+
+The beacon is a single BLE **manufacturer-specific data** field:
+
+- **Company id `0xFFFF`** (the "not assigned" range, for local/experimental use).
+- **Payload: the athlete GUID as 16 raw bytes** in *canonical* (big-endian / RFC-4122
+  textual) order — i.e. `550e8400-e29b-41d4-a716-446655440000` → `55 0e 84 00 e2 9b 41 d4
+  a7 16 44 66 55 44 00 00`. This is **not** .NET's `Guid.ToByteArray()` mixed-endian order.
+
+`bytesToGuid`/`guidToBytes` in `peerRangingSource.native.js` and `guidToBytes` in both
+native plugins all implement this exact order. Change one, change all three or ranging
+silently reads garbage athlete ids.
+
+Company id byte order on the wire is little-endian, but the community scanner strips the
+2 bytes and hands back only the 16-byte payload keyed by company id (`"65535"`), so the
+JS side never sees the company bytes.
+
+## JS API (`registerPlugin('SquadPeerBeacon')`)
+
+```js
+await SquadPeerBeacon.advertise({ manufacturerId: 0xFFFF, athleteId });  // resolves once actually advertising
+await SquadPeerBeacon.stop();
+```
+
+`advertise` rejects if Bluetooth is off, the peripheral role is unsupported, permission
+is denied, or the athlete id isn't a valid GUID.
+
+## iOS
+
+`CBPeripheralManager.startAdvertising` with `CBAdvertisementDataManufacturerDataKey`. The
+plugin auto-registers via `CAPBridgedPlugin` (no manual wiring) and reuses the existing
+`NSBluetoothAlwaysUsageDescription` string in `Info.plist`.
+
+**Foreground-reliable only.** iOS drops the manufacturer-data key when the app is
+backgrounded (the advertisement is shifted into an "overflow" area only other iOS
+CoreBluetooth apps can read, not generic scanners) — so a backgrounded phone stops being
+*seen* by teammates, though it keeps *scanning* fine. This is an Apple platform limitation;
+pack ranging degrades to GPS+heading for backgrounded riders. We deliberately do **not**
+add the `bluetooth-peripheral` background mode, since it wouldn't restore the stripped
+manufacturer data and would invite App Store review questions.
+
+## Android
+
+`BluetoothLeAdvertiser.startAdvertising` with `AdvertiseData.addManufacturerData(0xFFFF,
+guidBytes)`, low-latency / high-TX, non-connectable. The plugin is registered in
+`MainActivity.onCreate` (`registerPlugin(SquadPeerBeaconPlugin.class)`).
+
+Needs `BLUETOOTH_ADVERTISE` (already in `AndroidManifest.xml`) — a **runtime** permission
+on Android 12+ (API 31), which the plugin requests lazily on the first `advertise()` call.
+Advertising works background/foreground alike, unlike iOS.
+
+## How it's wired (end to end)
+
+- **`usePeerRanging`** (`src/hooks/usePeerRanging.js`) runs only while a live ride is
+  **active**: it advertises this athlete's GUID and scans for teammates, throttling each
+  peer's range to one uplink every few seconds.
+- Source selection mirrors the location/sensor split — `peerRangingSource.web.js` (inert,
+  `supported:false`) statically, `peerRangingSource.native.js` dynamically inside the shell.
+- It pushes `{ peerId, rssi, distanceM }` through **`useLiveRide.pushPeerRange`** →
+  SignalR **`RideHub.PushPeerRange`**, which resolves the observer from the connection
+  (never the payload) and records the range into `IRideSessionState` (`RecordPeerRange` /
+  `PeerRanges`). `App.jsx` gates it on `rideActive` and exposes `live.peerRanging`.
+- **Not yet done — pack-position fusion.** The server *records* ranges but still derives
+  positions straight from GPS (`riderMoved`); a fusion pass that folds `PeerRanges(rideId)`
+  into in-pack spacing is the `TODO(pack-fusion)` marker in `RideHub`. No UI consumes
+  `live.peerRanging.peers` yet either.
+
+## Verify
+
+Requires **two real devices** (emulators have no BLE radio; iOS Simulator can't
+advertise). Sign in as two athletes, start a live ride on both, and confirm each phone's
+RSSI-based spacing tracks as you walk them apart/together. On web the source is inert
+(`mode: 'unsupported'`) and pack position stays on the GPS+heading fallback.
+
+---
+
 # Native social sign-in (Google & Apple)
 
 Google and Apple **block their web sign-in SDKs inside the app's embedded webview**

@@ -3,6 +3,7 @@ import { useTick } from './hooks/useTick.js';
 import { useLiveRide } from './hooks/useLiveRide.js';
 import { useSensors } from './hooks/useSensors.js';
 import { useRideRecorder } from './hooks/useRideRecorder.js';
+import { usePeerRanging } from './hooks/usePeerRanging.js';
 import { useRideTelemetry } from './hooks/useRideTelemetry.js';
 import { useLivePages } from './hooks/useLivePages.js';
 import { useSquadFeed } from './hooks/useSquadFeed.js';
@@ -289,12 +290,15 @@ export default function App() {
   const sensors = useSensors();
   const liveRide = useLiveRide(squadId, { getToken, meId: session?.athleteId, enabled: onRide && !!squadId });
   const recorder = useRideRecorder({ pushTelemetry: liveRide.pushTelemetry, sensors, getToken, onSaved: () => setRefreshSignal((n) => n + 1) });
+  // Phone-to-phone BLE ranging (native only): advertise this athlete + scan teammates for
+  // pack position while a ride is active. Inert on web — no-op that leaves GPS+heading in charge.
+  const peerRanging = usePeerRanging({ athleteId: session?.athleteId, active: rideActive, pushPeerRange: liveRide.pushPeerRange });
   const tel = useRideTelemetry({ t, active: rideActive, riders: liveRide.riders, recorder, sensors });
 
   // Garmin Edge–style live-ride pages (configurable fields, auto-rotate, edit).
   const livePages = useLivePages(t, rideActive);
 
-  const live = { riders: liveRide.riders, status: liveRide.status, pushTelemetry: liveRide.pushTelemetry, recorder, sensors, tel, livePages };
+  const live = { riders: liveRide.riders, status: liveRide.status, pushTelemetry: liveRide.pushTelemetry, recorder, sensors, tel, livePages, peerRanging };
 
   const Screen = screens[state.screen] || Dashboard;
   const dir = state.lang === 'he' ? 'rtl' : 'ltr';

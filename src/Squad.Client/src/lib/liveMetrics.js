@@ -19,7 +19,7 @@ export const metricCatalog = {
   pwr: { label: 'Power', unit: 'W' }, avgpwr: { label: 'Avg Power', unit: 'W' }, np: { label: 'Norm Power', unit: 'W' },
   cad: { label: 'Cadence', unit: 'rpm' }, grad: { label: 'Gradient', unit: '%' }, elev: { label: 'Elevation', unit: 'm' },
   elevgain: { label: 'Elev Gain', unit: 'm' }, kcal: { label: 'Calories', unit: 'kcal' }, temp: { label: 'Temp', unit: '°C' },
-  gap: { label: 'Gap to last', unit: 'm' },
+  gap: { label: 'Pack gap', unit: 'm' },
   gear: { label: 'Gear', unit: '' }, gearratio: { label: 'Gear Ratio', unit: '' }, di2: { label: 'Di2 Battery', unit: '%' },
 };
 
@@ -33,7 +33,9 @@ export function liveMetricValues(tel) {
     hr: { v: r0(tel?.hr), color: hrCol }, avghr: { v: r0(tel?.avghr) },
     pwr: { v: r0(tel?.pwr) }, avgpwr: { v: r0(tel?.avgpwr) }, np: { v: DASH },
     cad: { v: r0(tel?.cad) }, grad: { v: DASH }, elev: { v: r0(tel?.elev) }, elevgain: { v: r0(tel?.elevGainM) },
-    kcal: { v: r0(tel?.kcal) }, temp: { v: DASH }, gap: { v: DASH, color: 'var(--behind)' },
+    kcal: { v: r0(tel?.kcal) }, temp: { v: DASH },
+    // Fused metres to the nearest teammate (phone-to-phone BLE ranging). "—" until ranged.
+    gap: { v: r0(tel?.gap), color: tel?.gap == null ? 'var(--behind)' : 'var(--good)' },
     // No gearing/Di2 sensor source yet.
     gear: { v: DASH }, gearratio: { v: DASH }, di2: { v: DASH },
   };

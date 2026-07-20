@@ -8,6 +8,10 @@ public sealed class InMemoryRideSessionState : IRideSessionState
 {
     private readonly ConcurrentDictionary<Guid, ConcurrentDictionary<Guid, RiderUpdate>> _rides = new();
 
+    // Peer BLE ranges per ride, keyed by (observer, peer) so the latest range for each
+    // ordered pair replaces the prior one.
+    private readonly ConcurrentDictionary<Guid, ConcurrentDictionary<(Guid Observer, Guid Peer), PeerRangeObservation>> _peerRanges = new();
+
     private ConcurrentDictionary<Guid, RiderUpdate> Ride(Guid rideId)
         => _rides.GetOrAdd(rideId, _ => new ConcurrentDictionary<Guid, RiderUpdate>());
 
@@ -26,8 +30,22 @@ public sealed class InMemoryRideSessionState : IRideSessionState
             riders.TryRemove(athleteId, out _);
             if (riders.IsEmpty) _rides.TryRemove(rideId, out _);
         }
+        // Drop any ranges this rider observed or was observed in, so a left rider stops
+        // anchoring the pack.
+        if (_peerRanges.TryGetValue(rideId, out var ranges))
+        {
+            foreach (var key in ranges.Keys)
+                if (key.Observer == athleteId || key.Peer == athleteId) ranges.TryRemove(key, out _);
+            if (ranges.IsEmpty) _peerRanges.TryRemove(rideId, out _);
+        }
     }
 
     public IReadOnlyCollection<RiderUpdate> Snapshot(Guid rideId)
         => _rides.TryGetValue(rideId, out var riders) ? riders.Values.ToArray() : Array.Empty<RiderUpdate>();
+
+    public void RecordPeerRange(Guid rideId, PeerRangeObservation obs)
+        => _peerRanges.GetOrAdd(rideId, _ => new())[(obs.ObserverId, obs.PeerId)] = obs;
+
+    public IReadOnlyCollection<PeerRangeObservation> PeerRanges(Guid rideId)
+        => _peerRanges.TryGetValue(rideId, out var ranges) ? ranges.Values.ToArray() : Array.Empty<PeerRangeObservation>();
 }
