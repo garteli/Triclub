@@ -1,45 +1,153 @@
-import { useEffect, useRef } from 'react';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { s } from '../lib/style.js';
+import AuthedAvatar from './AuthedAvatar.jsx';
 
-// Full-screen interactive route map (Leaflet) — pinch/drag to pan, pinch/scroll/buttons
-// to zoom. Uses the same CARTO basemaps as the rest of the app. `style` selects the
-// basemap ('voyager' | 'light' | 'dark'); `route` is an [lat,lon][] track.
+// Full-screen 3D route map (MapLibre GL): our CARTO basemap draped over free AWS terrain
+// DEM tiles, with a 2D/3D pitch toggle, compass, basemap layers, replay, and an athlete
+// sheet — the Strava-style full page. MapLibre is lazy-loaded so it never touches the main
+// bundle. Portaled to <body> so it's a true viewport overlay (and reliably exitable).
 const TILE_SEG = { voyager: 'voyager', light: 'light_all', dark: 'dark_all' };
+const MAP_STYLES = ['voyager', 'light', 'dark'];
+const glass = 'background:rgba(20,23,29,.82);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.14);color:#fff';
+const validPts = (route) => (route || []).filter((p) => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]));
+const baseTiles = (style) => ['a', 'b', 'c', 'd'].map((sd) => `https://${sd}.basemaps.cartocdn.com/rastertiles/${TILE_SEG[style] || 'voyager'}/{z}/{x}/{y}.png`);
 
-export default function FullMap({ route, style = 'voyager', onClose }) {
+const buildStyle = (style) => ({
+  version: 8,
+  sources: {
+    base: { type: 'raster', tiles: baseTiles(style), tileSize: 256, attribution: '© OpenStreetMap · © CARTO' },
+    dem: { type: 'raster-dem', tiles: ['https://elevation-tiles-prod.s3.amazonaws.com/terrarium/{z}/{x}/{y}.png'], tileSize: 256, encoding: 'terrarium', maxzoom: 14 },
+  },
+  layers: [{ id: 'base', type: 'raster', source: 'base' }],
+});
+
+export default function FullMap({ route, style: initialStyle = 'voyager', a, token, onClose }) {
   const elRef = useRef(null);
   const mapRef = useRef(null);
+  const headRef = useRef(null);
+  const rafRef = useRef(0);
+  const [mapStyle, setMapStyle] = useState(initialStyle);
+  const [is3D, setIs3D] = useState(true);
+  const [bearing, setBearing] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
-    const map = L.map(elRef.current, { zoomControl: false, attributionControl: true, zoomSnap: 0.5 });
-    mapRef.current = map;
-    L.control.zoom({ position: 'bottomright' }).addTo(map);
-    L.tileLayer(`https://{s}.basemaps.cartocdn.com/rastertiles/${TILE_SEG[style] || 'voyager'}/{z}/{x}/{y}{r}.png`, {
-      subdomains: 'abcd', maxZoom: 20, detectRetina: true, attribution: '© OpenStreetMap · © CARTO',
-    }).addTo(map);
+    let map, cancelled = false;
+    (async () => {
+      try {
+        const maplibregl = (await import('maplibre-gl')).default;
+        await import('maplibre-gl/dist/maplibre-gl.css');
+        if (cancelled || !elRef.current) return;
+        const pts = validPts(route);
+        map = new maplibregl.Map({
+          container: elRef.current, style: buildStyle(mapStyle),
+          center: pts.length ? [pts[0][1], pts[0][0]] : [34.9, 32.0],
+          zoom: 10, pitch: 62, bearing: 0, maxPitch: 80, attributionControl: true,
+        });
+        mapRef.current = map;
+        map.on('rotate', () => setBearing(map.getBearing()));
+        map.on('error', (e) => { const m = e?.error?.message || String(e?.error || e); if (!/tile|404|Failed to fetch|AbortError/i.test(m)) console.error('MAPLIBRE', m); }); // ignore benign tile 404s
+        map.on('load', () => {
+          try { map.setTerrain({ source: 'dem', exaggeration: 1.4 }); } catch { /* no webgl2 terrain */ }
+          if (pts.length > 1) {
+            map.addSource('route', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: pts.map(([la, lo]) => [lo, la]) } } });
+            map.addLayer({ id: 'route', type: 'line', source: 'route', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#ff6a2c', 'line-width': 4 } });
+            new maplibregl.Marker({ color: '#4fe08b' }).setLngLat([pts[0][1], pts[0][0]]).addTo(map);
+            new maplibregl.Marker({ color: '#ff5d5d' }).setLngLat([pts[pts.length - 1][1], pts[pts.length - 1][0]]).addTo(map);
+            const b = new maplibregl.LngLatBounds();
+            pts.forEach(([la, lo]) => b.extend([lo, la]));
+            map.fitBounds(b, { padding: { top: 90, bottom: 170, left: 40, right: 40 }, pitch: 62, bearing: 0, duration: 0 });
+          }
+        });
+        setTimeout(() => map && map.resize(), 80);
+      } catch { if (!cancelled) setError(true); }
+    })();
+    return () => { cancelled = true; cancelAnimationFrame(rafRef.current); if (map) map.remove(); mapRef.current = null; headRef.current = null; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route]);
 
-    const pts = (route || []).filter((p) => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]));
-    if (pts.length > 1) {
-      const line = L.polyline(pts, { color: '#ff6a2c', weight: 4, lineJoin: 'round', lineCap: 'round' }).addTo(map);
-      L.circleMarker(pts[0], { radius: 6, color: '#fff', weight: 2.5, fillColor: '#4fe08b', fillOpacity: 1 }).addTo(map);
-      L.circleMarker(pts[pts.length - 1], { radius: 6, color: '#fff', weight: 2.5, fillColor: '#ff5d5d', fillOpacity: 1 }).addTo(map);
-      map.fitBounds(line.getBounds(), { padding: [46, 46] });
-    } else {
-      map.setView([32.72, 35.53], 12);
+  useEffect(() => { const src = mapRef.current?.getSource('base'); if (src) src.setTiles(baseTiles(mapStyle)); }, [mapStyle]);
+
+  const cycleStyle = () => setMapStyle((st) => MAP_STYLES[(MAP_STYLES.indexOf(st) + 1) % MAP_STYLES.length]);
+  const toggle3D = () => { const m = mapRef.current; if (!m) return; const next = !is3D; setIs3D(next); m.easeTo({ pitch: next ? 62 : 0, duration: 600 }); };
+  const resetNorth = () => mapRef.current?.easeTo({ bearing: 0, duration: 400 });
+
+  const togglePlay = async () => {
+    const m = mapRef.current, pts = validPts(route);
+    if (!m || pts.length < 2) return;
+    if (playing) { cancelAnimationFrame(rafRef.current); setPlaying(false); return; }
+    if (!headRef.current) {
+      const maplibregl = (await import('maplibre-gl')).default;
+      const el = document.createElement('div');
+      el.style.cssText = 'width:16px;height:16px;border-radius:50%;background:#111;border:2px solid #fff;box-shadow:0 0 0 2px rgba(0,0,0,.3)';
+      headRef.current = new maplibregl.Marker({ element: el }).setLngLat([pts[0][1], pts[0][0]]).addTo(m);
     }
-    // The container mounts inside a just-shown overlay; make sure Leaflet measured it.
-    const t = setTimeout(() => map.invalidateSize(), 60);
-    return () => { clearTimeout(t); map.remove(); mapRef.current = null; };
-  }, [route, style]);
+    setPlaying(true);
+    let start = null;
+    const step = (ts) => {
+      if (start == null) start = ts;
+      const p = Math.min(1, (ts - start) / 22000);
+      const [la, lo] = pts[Math.min(pts.length - 1, Math.floor(p * (pts.length - 1)))];
+      headRef.current.setLngLat([lo, la]);
+      if (p < 1) rafRef.current = requestAnimationFrame(step); else setPlaying(false);
+    };
+    rafRef.current = requestAnimationFrame(step);
+  };
 
-  return (
-    <div style={s('position:fixed;inset:0;z-index:60;background:var(--bg)')}>
+  const overlay = (
+    <div style={s('position:fixed;inset:0;z-index:4000;background:var(--bg)')}>
       <div ref={elRef} style={{ position: 'absolute', inset: 0 }} />
-      <div className="ctl" onClick={onClose} title="Close" style={s('position:absolute;top:16px;left:16px;z-index:1000;width:40px;height:40px;border-radius:50%;background:rgba(20,23,29,.85);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;color:#fff')}>
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+      {error && <div style={s('position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:13px;text-align:center;padding:0 30px')}>3D map couldn’t load here (needs WebGL).</div>}
+
+      {/* back (exit) */}
+      <div className="ctl" onClick={onClose} title="Close" style={s(`position:absolute;top:16px;left:16px;z-index:1200;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;${glass}`)}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round"><path d="M15 6l-6 6 6 6" /></svg>
       </div>
+      {/* Save Route + overflow (visual) */}
+      <div style={s('position:absolute;top:16px;right:16px;z-index:1200;display:flex;gap:8px')}>
+        <div className="ctl" style={s(`height:40px;padding:0 14px;border-radius:20px;display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;${glass}`)}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" /></svg>Save Route
+        </div>
+        <div className="ctl" style={s(`width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;letter-spacing:1px;${glass}`)}>···</div>
+      </div>
+      {/* layers · 2D/3D · compass */}
+      <div style={s('position:absolute;top:66px;right:16px;z-index:1200;display:flex;flex-direction:column;gap:8px')}>
+        <div className="ctl" onClick={cycleStyle} title={`Map: ${mapStyle}`} style={s(`width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;${glass}`)}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"><path d="M12 2l9 5-9 5-9-5z" /><path d="M3 12l9 5 9-5M3 17l9 5 9-5" /></svg>
+        </div>
+        <div className="ctl" onClick={toggle3D} title={is3D ? 'Switch to 2D' : 'Switch to 3D'} style={s(`width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;${glass}`)}>{is3D ? '2D' : '3D'}</div>
+        <div className="ctl" onClick={resetNorth} title="Reset north" style={s(`width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;${glass}`)}>
+          <svg width="20" height="20" viewBox="0 0 24 24" style={{ transform: `rotate(${-bearing}deg)` }}><path d="M12 3l3.2 8H8.8z" fill="var(--bad)" /><path d="M12 21l-3.2-8h6.4z" fill="#fff" /></svg>
+        </div>
+      </div>
+      {/* play (route replay) */}
+      {validPts(route).length > 1 && (
+        <button onClick={togglePlay} aria-label={playing ? 'Pause replay' : 'Play replay'}
+          style={s('position:absolute;right:16px;bottom:120px;z-index:1200;width:54px;height:54px;border-radius:50%;border:none;background:var(--accent);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;box-shadow:0 8px 20px -6px color-mix(in srgb,var(--accent) 60%,transparent)')}>
+          {playing
+            ? <svg width="20" height="20" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1.2" fill="var(--accent-ink)" /><rect x="14" y="4" width="4" height="16" rx="1.2" fill="var(--accent-ink)" /></svg>
+            : <svg width="22" height="22" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="var(--accent-ink)" /></svg>}
+        </button>
+      )}
+
+      {/* athlete sheet */}
+      {a && (
+        <div style={s('position:absolute;left:0;right:0;bottom:0;z-index:1200;background:var(--bg);border-radius:18px 18px 0 0;border-top:1px solid var(--line);padding:10px 18px calc(16px + env(safe-area-inset-bottom))')}>
+          <div style={s('width:40px;height:4px;border-radius:3px;background:var(--line2);margin:0 auto 12px')} />
+          <div style={s('display:flex;align-items:center;gap:11px')}>
+            <AuthedAvatar avatarUrl={a.avatarUrl} token={token} initials={a.initials} color={a.color} size={40} radius={12} fontSize={14} />
+            <div style={s('flex:1;min-width:0')}>
+              <div style={s('font-size:14px;font-weight:700')}>{a.athleteName}</div>
+              <div style={s('font-size:11.5px;color:var(--text2)')}>{[a.when, a.location].filter(Boolean).join(' · ')}</div>
+            </div>
+            <div style={s(`background:color-mix(in srgb,${a.sportColor} 16%,transparent);color:${a.sportColor};font-size:10px;font-weight:700;padding:4px 9px;border-radius:7px;text-transform:uppercase;flex:none`)}>{a.sport}</div>
+          </div>
+        </div>
+      )}
     </div>
   );
+
+  return createPortal(overlay, document.body);
 }

@@ -685,7 +685,7 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
 
   return (
     <div style={s('padding:0 0 120px;animation:floatUp .35s ease')}>
-      <ActivityHero a={a} route={route} frames={frames} hasMap={hasMap} status={status}
+      <ActivityHero a={a} route={route} frames={frames} hasMap={hasMap} status={status} token={token}
         onBack={() => actions.go(state.activityBack || 'activities')} onDelete={() => setConfirmDel(true)} />
 
       <AthleteTitle a={a} token={token} onAthlete={actions.openAthlete} />

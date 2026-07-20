@@ -14,7 +14,7 @@ const MAP_STYLES = ['voyager', 'light', 'dark'];
 // per the design (no data source yet); back, overflow→delete and play are live.
 const glass = 'background:rgba(20,23,29,.72);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.1);color:#fff';
 
-export default function ActivityHero({ a, route, frames, hasMap, status, onBack, onDelete }) {
+export default function ActivityHero({ a, route, frames, hasMap, status, token, onBack, onDelete }) {
   const playback = usePlayback(frames.length);
   const { index, playing, toggle, seek, pause } = playback;
   const n = frames.length;
@@ -112,7 +112,7 @@ export default function ActivityHero({ a, route, frames, hasMap, status, onBack,
       </TileMap>
       </div>
       {controls}
-      {full && <FullMap route={route} style={mapStyle} onClose={() => setFull(false)} />}
+      {full && <FullMap route={route} style={mapStyle} a={a} token={token} onClose={() => setFull(false)} />}
     </div>
   );
 }
