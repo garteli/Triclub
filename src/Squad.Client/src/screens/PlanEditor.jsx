@@ -28,6 +28,13 @@ const sportGlyph = (sp) => html(
 
 const durHours = (dur) => { const p = (dur || '0:00').split(':'); return (+p[0] || 0) + (+p[1] || 0) / 60; };
 
+// ── plan-schedule date math (weeks are Monday-anchored) ──
+const MS_DAY = 86400000;
+const addDays = (d, n) => new Date(d.getTime() + n * MS_DAY);
+const mondayOf = (d) => { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); return addDays(x, -((x.getDay() + 6) % 7)); };
+const parseDate = (v) => { if (!v) return null; const [y, m, dd] = v.split('-').map(Number); return (y && m && dd) ? new Date(y, m - 1, dd) : null; };
+const fmtMD = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
 // Initials fallback when the roster row doesn't carry them (e.g. "You").
 const initialsOf = (m) => m.initials || (m.name || '?').split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
 
@@ -102,6 +109,9 @@ function SessionSheet({ editor, onField, onSave, onDelete, onClose }) {
 
 export default function PlanEditor({ vm, actions }) {
   const [planName, setPlanName] = useState('');
+  const [anchorType, setAnchorType] = useState('start'); // 'start' | 'target'
+  const [anchorDate, setAnchorDate] = useState('');      // yyyy-mm-dd (start date, or race/target day)
+  const [totalWeeks, setTotalWeeks] = useState('');      // length of the block, in weeks
   const [week, setWeek] = useState(1);
   const [weekTitle, setWeekTitle] = useState('');
   const [targetHrs, setTargetHrs] = useState('');
@@ -126,6 +136,19 @@ export default function PlanEditor({ vm, actions }) {
   const hrsPct = Math.min(100, Math.round(totHrs / (+targetHrs || 1) * 100));
   const loadPct = Math.min(100, Math.round(totLoad / (+targetLoad || 1) * 100));
   const assignedCount = roster.filter((a) => a.on).length;
+
+  // ── derived plan schedule (real calendar dates from the anchor + length) ──
+  const nWeeks = (+totalWeeks > 0) ? Math.floor(+totalWeeks) : null;
+  const anchor = parseDate(anchorDate);
+  // 'start' anchors week 1; 'target' (race day) anchors the LAST week, so we count back.
+  const startMonday = anchor
+    ? (anchorType === 'target' ? addDays(mondayOf(anchor), -(((nWeeks || 1) - 1) * 7)) : mondayOf(anchor))
+    : null;
+  const weekStart = startMonday ? addDays(startMonday, (week - 1) * 7) : null;
+  const weekEnd = weekStart ? addDays(weekStart, 6) : null;
+  const weekRange = weekStart ? `${fmtMD(weekStart)} – ${fmtMD(weekEnd)}` : null;
+  const blockEnd = (startMonday && nWeeks) ? addDays(startMonday, nWeeks * 7 - 1) : null;
+  const clampWeek = (w) => Math.max(1, nWeeks ? Math.min(nWeeks, w) : w);
 
   // ── session editing ──
   const openSession = (day, id) => {
@@ -171,17 +194,50 @@ export default function PlanEditor({ vm, actions }) {
         {/* plan name */}
         <input value={planName} onChange={(e) => setPlanName(e.target.value)} placeholder="Plan name"
           style={s('width:100%;background:transparent;border:none;font-family:inherit;font-size:23px;font-weight:700;letter-spacing:-.5px;color:var(--text);outline:none;margin-top:6px;padding:0')} />
-        <div style={s('font-size:11.5px;color:var(--accent);font-weight:700;margin-bottom:4px')}>{vm?.squadName || 'Your club'} · training block</div>
+        <div style={s('font-size:11.5px;color:var(--accent);font-weight:700;margin-bottom:4px')}>{vm?.squadName || 'Your club'} · {nWeeks ? nWeeks + '-week' : 'training'} block</div>
+
+        {/* plan schedule: anchor (start OR target/race day) + length */}
+        <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:14px 15px;margin-top:12px')}>
+          <div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:700;margin-bottom:9px')}>Plan schedule</div>
+          <div style={s('display:flex;gap:6px;background:var(--bg3);border:1px solid var(--line);border-radius:11px;padding:4px')}>
+            {[['start', 'Start date'], ['target', 'Target day']].map(([id, label]) => (
+              <div key={id} className="ctl" onClick={() => setAnchorType(id)}
+                style={s('flex:1;text-align:center;padding:8px;border-radius:8px;font-size:12px;font-weight:600;' + (anchorType === id ? 'background:var(--accent);color:var(--accent-ink)' : 'color:var(--text2)'))}>{label}</div>
+            ))}
+          </div>
+          <div style={s('display:flex;gap:10px;margin-top:10px')}>
+            <div style={s('flex:1.4')}>
+              <div style={s('font-size:9.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;font-weight:600;margin-bottom:5px')}>{anchorType === 'target' ? 'Race / target day' : 'Start date'}</div>
+              <input value={anchorDate} onChange={(e) => setAnchorDate(e.target.value)} type="date"
+                style={s('width:100%;background:var(--bg3);border:1px solid var(--line);border-radius:11px;padding:10px 12px;font-size:14px;color:var(--text);outline:none;font-family:inherit')} />
+            </div>
+            <div style={s('flex:1')}>
+              <div style={s('font-size:9.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;font-weight:600;margin-bottom:5px')}>Total weeks</div>
+              <input value={totalWeeks} onChange={(e) => { setTotalWeeks(e.target.value); setWeek((w) => { const n = (+e.target.value > 0) ? Math.floor(+e.target.value) : null; return Math.max(1, n ? Math.min(n, w) : w); }); }} type="number" min="1" placeholder="—"
+                style={s('width:100%;background:var(--bg3);border:1px solid var(--line);border-radius:11px;padding:10px 12px;font-size:14px;color:var(--text);outline:none;font-family:inherit')} />
+            </div>
+          </div>
+          {startMonday && (
+            <div style={s('font-size:11.5px;color:var(--text2);margin-top:10px')}>
+              {blockEnd
+                ? <>Runs <span style={s('color:var(--text);font-weight:600')}>{fmtMD(startMonday)} → {fmtMD(blockEnd)}</span> · {nWeeks} week{nWeeks === 1 ? '' : 's'}{anchorType === 'target' && anchor ? ` · targets ${fmtMD(anchor)}` : ''}</>
+                : <>Starts week of <span style={s('color:var(--text);font-weight:600')}>{fmtMD(startMonday)}</span> · set total weeks</>}
+            </div>
+          )}
+        </div>
 
         {/* week meta: title + targets + focus */}
         <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:14px 15px;margin-top:12px')}>
           <div style={s('display:flex;align-items:center;justify-content:space-between;margin-bottom:9px')}>
-            <span style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:700')}>Week {week}</span>
+            <div>
+              <span style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:700')}>Week {week}{nWeeks ? ' of ' + nWeeks : ''}</span>
+              {weekRange && <div style={s('font-size:12.5px;color:var(--text);font-weight:600;margin-top:2px')}>{weekRange}</div>}
+            </div>
             <div style={s('display:flex;gap:6px')}>
-              <div className="ctl" onClick={() => setWeek((w) => Math.max(1, w - 1))} style={s('width:26px;height:26px;border-radius:8px;background:var(--bg3);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--text2)')}>
+              <div className="ctl" onClick={() => setWeek((w) => clampWeek(w - 1))} style={s('width:26px;height:26px;border-radius:8px;background:var(--bg3);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--text2)')}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M15 6l-6 6 6 6" /></svg>
               </div>
-              <div className="ctl" onClick={() => setWeek((w) => w + 1)} style={s('width:26px;height:26px;border-radius:8px;background:var(--bg3);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--text2)')}>
+              <div className="ctl" onClick={() => setWeek((w) => clampWeek(w + 1))} style={s('width:26px;height:26px;border-radius:8px;background:var(--bg3);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--text2)')}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M9 6l6 6-6 6" /></svg>
               </div>
             </div>
@@ -264,12 +320,13 @@ export default function PlanEditor({ vm, actions }) {
         </div>
 
         <div style={s('display:flex;flex-direction:column;gap:12px;margin-top:16px')}>
-          {DAYS.map((day) => {
+          {DAYS.map((day, di) => {
             const list = daySessions(day);
+            const dayDate = weekStart ? addDays(weekStart, di) : null;
             return (
               <div key={day}>
                 <div style={s('display:flex;align-items:center;justify-content:space-between;margin-bottom:7px')}>
-                  <span style={s('font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text2)')}>{day}</span>
+                  <span style={s('font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text2)')}>{day}{dayDate ? <span style={s('color:var(--text3);font-weight:600;letter-spacing:0;text-transform:none;margin-left:7px')}>{fmtMD(dayDate)}</span> : null}</span>
                   <div className="ctl" onClick={() => openSession(day, null)} style={s('display:flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;color:var(--accent)')}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>Add
                   </div>
