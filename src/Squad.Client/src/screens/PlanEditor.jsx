@@ -34,6 +34,11 @@ const addDays = (d, n) => new Date(d.getTime() + n * MS_DAY);
 const mondayOf = (d) => { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); return addDays(x, -((x.getDay() + 6) % 7)); };
 const parseDate = (v) => { if (!v) return null; const [y, m, dd] = v.split('-').map(Number); return (y && m && dd) ? new Date(y, m - 1, dd) : null; };
 const fmtMD = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+const toISO = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+// One week's editable content. Sessions, targets and title are PER WEEK — keyed by
+// week number in the `weeks` map — so navigating weeks loads that week's own data.
+const BLANK_WEEK = { title: '', targetHrs: '', targetLoad: '', focus: '', sessions: {} };
 
 // Initials fallback when the roster row doesn't carry them (e.g. "You").
 const initialsOf = (m) => m.initials || (m.name || '?').split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
@@ -107,19 +112,20 @@ function SessionSheet({ editor, onField, onSave, onDelete, onClose }) {
   );
 }
 
-export default function PlanEditor({ vm, actions }) {
+export default function PlanEditor({ vm, actions, onPublishPlan }) {
   const [planName, setPlanName] = useState('');
   const [anchorType, setAnchorType] = useState('start'); // 'start' | 'target'
   const [anchorDate, setAnchorDate] = useState('');      // yyyy-mm-dd (start date, or race/target day)
   const [totalWeeks, setTotalWeeks] = useState('');      // length of the block, in weeks
   const [week, setWeek] = useState(1);
-  const [weekTitle, setWeekTitle] = useState('');
-  const [targetHrs, setTargetHrs] = useState('');
-  const [targetLoad, setTargetLoad] = useState('');
-  const [focus, setFocus] = useState('');
-  const [sessions, setSessions] = useState({}); // day -> [session]
+  const [weeks, setWeeks] = useState({}); // weekNum -> { title, targetHrs, targetLoad, focus, sessions:{day:[...]} }
   const [assigned, setAssigned] = useState({}); // athleteId -> bool (default: assigned)
-  const [editor, setEditor] = useState(null); // null | { id, day, sport, title, dur, load, z, note }
+  const [editor, setEditor] = useState(null); // null | { id, day, week, sport, title, dur, load, z, note }
+  const [pub, setPub] = useState({ status: 'idle', msg: '' }); // idle | busy | done | error
+
+  // The current week's editable slice, and a setter for one of its fields.
+  const cur = weeks[week] || BLANK_WEEK;
+  const setWeekField = (k, v) => setWeeks((p) => ({ ...p, [week]: { ...(p[week] || BLANK_WEEK), [k]: v } }));
 
   // Real squad roster (empty until the live leaderboard/roster loads). No fake athletes.
   const roster = (vm?.squad ?? []).map((m) => ({
@@ -128,13 +134,13 @@ export default function PlanEditor({ vm, actions }) {
     on: assigned[m.id] !== false, // default assigned
   }));
 
-  // ── derived totals ──
-  const daySessions = (d) => sessions[d] || [];
+  // ── derived totals (for the current week) ──
+  const daySessions = (d) => cur.sessions[d] || [];
   const totLoad = DAYS.reduce((n, d) => n + daySessions(d).reduce((a, x) => a + (+x.load || 0), 0), 0);
   const totHrs = DAYS.reduce((n, d) => n + daySessions(d).reduce((a, x) => a + durHours(x.dur), 0), 0);
   const sessCount = DAYS.reduce((n, d) => n + daySessions(d).length, 0);
-  const hrsPct = Math.min(100, Math.round(totHrs / (+targetHrs || 1) * 100));
-  const loadPct = Math.min(100, Math.round(totLoad / (+targetLoad || 1) * 100));
+  const hrsPct = Math.min(100, Math.round(totHrs / (+cur.targetHrs || 1) * 100));
+  const loadPct = Math.min(100, Math.round(totLoad / (+cur.targetLoad || 1) * 100));
   const assignedCount = roster.filter((a) => a.on).length;
 
   // ── derived plan schedule (real calendar dates from the anchor + length) ──
@@ -150,30 +156,74 @@ export default function PlanEditor({ vm, actions }) {
   const blockEnd = (startMonday && nWeeks) ? addDays(startMonday, nWeeks * 7 - 1) : null;
   const clampWeek = (w) => Math.max(1, nWeeks ? Math.min(nWeeks, w) : w);
 
-  // ── session editing ──
+  // ── session editing (scoped to the week the sheet was opened on) ──
   const openSession = (day, id) => {
     const sess = id ? daySessions(day).find((x) => x.id === id) : null;
-    setEditor(sess ? { ...sess, day } : { id: null, day, sport: 'Bike', title: '', dur: '1:00', load: '', z: '', note: '' });
+    setEditor(sess ? { ...sess, day, week } : { id: null, day, week, sport: 'Bike', title: '', dur: '1:00', load: '', z: '', note: '' });
   };
   const editField = (k, v) => setEditor((e) => ({ ...e, [k]: v }));
   const saveSession = () => {
-    setSessions((prev) => {
-      const list = (prev[editor.day] || []).slice();
+    setWeeks((prev) => {
+      const wk = prev[editor.week] || BLANK_WEEK;
+      const list = (wk.sessions[editor.day] || []).slice();
+      const { week: _w, ...body } = editor;
       if (editor.id) {
         const i = list.findIndex((x) => x.id === editor.id);
-        if (i >= 0) list[i] = { ...editor };
+        if (i >= 0) list[i] = { ...body };
       } else {
-        list.push({ ...editor, id: 'x' + Date.now() });
+        list.push({ ...body, id: 'x' + Date.now() });
       }
-      return { ...prev, [editor.day]: list };
+      return { ...prev, [editor.week]: { ...wk, sessions: { ...wk.sessions, [editor.day]: list } } };
     });
     setEditor(null);
   };
   const deleteSession = () => {
-    setSessions((prev) => ({ ...prev, [editor.day]: (prev[editor.day] || []).filter((x) => x.id !== editor.id) }));
+    setWeeks((prev) => {
+      const wk = prev[editor.week] || BLANK_WEEK;
+      return { ...prev, [editor.week]: { ...wk, sessions: { ...wk.sessions, [editor.day]: (wk.sessions[editor.day] || []).filter((x) => x.id !== editor.id) } } };
+    });
     setEditor(null);
   };
   const toggleAthlete = (id) => setAssigned((a) => ({ ...a, [id]: a[id] === false }));
+
+  // ── publish the whole plan to each assigned athlete (real dates → PlannedWorkout) ──
+  const publish = async () => {
+    if (pub.status === 'busy') return;
+    if (!anchor || !startMonday || !nWeeks) { setPub({ status: 'error', msg: 'Set a start/target date and total weeks first.' }); return; }
+    const athleteIds = roster.filter((a) => a.on).map((a) => a.id);
+    if (!athleteIds.length) { setPub({ status: 'error', msg: 'Assign at least one athlete.' }); return; }
+    const workouts = [];
+    for (const [wnStr, wk] of Object.entries(weeks)) {
+      const wn = +wnStr;
+      if (wn < 1 || wn > nWeeks) continue;
+      const wkMon = addDays(startMonday, (wn - 1) * 7);
+      DAYS.forEach((day, di) => {
+        (wk.sessions?.[day] || []).forEach((x) => {
+          workouts.push({
+            date: toISO(addDays(wkMon, di)),
+            discipline: (x.sport || 'rest').toLowerCase(),
+            title: (x.title || 'Session').slice(0, 80),
+            sub: (x.z || '').slice(0, 120),
+            durationMin: Math.round(durHours(x.dur) * 60),
+            load: +x.load || 0,
+          });
+        });
+      });
+    }
+    if (!workouts.length) { setPub({ status: 'error', msg: 'Add at least one session before publishing.' }); return; }
+    if (!onPublishPlan) { setPub({ status: 'error', msg: 'Sign in as a coach to publish.' }); return; }
+    setPub({ status: 'busy', msg: '' });
+    try {
+      const res = await onPublishPlan({
+        athleteIds, planName: planName || null,
+        startDate: toISO(startMonday), weeks: nWeeks, workouts,
+      });
+      const n = res?.published ?? athleteIds.length;
+      setPub({ status: 'done', msg: `Published to ${n} athlete${n === 1 ? '' : 's'}.` });
+    } catch (e) {
+      setPub({ status: 'error', msg: e?.message || 'Could not publish. Try again.' });
+    }
+  };
 
   return (
     <>
@@ -242,22 +292,22 @@ export default function PlanEditor({ vm, actions }) {
               </div>
             </div>
           </div>
-          <input value={weekTitle} onChange={(e) => setWeekTitle(e.target.value)} placeholder="Week title"
+          <input value={cur.title} onChange={(e) => setWeekField('title', e.target.value)} placeholder="Week title"
             style={s('width:100%;background:var(--bg3);border:1px solid var(--line);border-radius:11px;padding:11px 13px;font-size:15px;font-weight:700;color:var(--text);outline:none;font-family:inherit')} />
           <div style={s('display:flex;gap:10px;margin-top:10px')}>
             <div style={s('flex:1')}>
               <div style={s('font-size:9.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;font-weight:600;margin-bottom:5px')}>Target hours</div>
-              <input value={targetHrs} onChange={(e) => setTargetHrs(e.target.value)} type="number" placeholder="—"
+              <input value={cur.targetHrs} onChange={(e) => setWeekField('targetHrs', e.target.value)} type="number" placeholder="—"
                 style={s('width:100%;background:var(--bg3);border:1px solid var(--line);border-radius:11px;padding:10px 12px;font-size:14px;color:var(--text);outline:none;font-family:inherit')} />
             </div>
             <div style={s('flex:1')}>
               <div style={s('font-size:9.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;font-weight:600;margin-bottom:5px')}>Target load</div>
-              <input value={targetLoad} onChange={(e) => setTargetLoad(e.target.value)} type="number" placeholder="—"
+              <input value={cur.targetLoad} onChange={(e) => setWeekField('targetLoad', e.target.value)} type="number" placeholder="—"
                 style={s('width:100%;background:var(--bg3);border:1px solid var(--line);border-radius:11px;padding:10px 12px;font-size:14px;color:var(--text);outline:none;font-family:inherit')} />
             </div>
           </div>
           <div style={s('font-size:9.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;font-weight:600;margin:12px 0 5px')}>Week focus</div>
-          <textarea value={focus} onChange={(e) => setFocus(e.target.value)} placeholder="What this week is about…"
+          <textarea value={cur.focus} onChange={(e) => setWeekField('focus', e.target.value)} placeholder="What this week is about…"
             style={s('width:100%;min-height:52px;resize:vertical;background:var(--bg3);border:1px solid var(--line);border-radius:11px;padding:10px 12px;font-size:13px;color:var(--text);outline:none;line-height:1.5;font-family:inherit')} />
         </div>
 
@@ -265,12 +315,12 @@ export default function PlanEditor({ vm, actions }) {
         <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:13px 15px;margin-top:12px')}>
           <div style={s('display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:6px')}>
             <span style={s('color:var(--text2)')}>Planned hours</span>
-            <span className="mono" style={s('font-weight:700')}>{totHrs.toFixed(1)} / {targetHrs || '—'}h</span>
+            <span className="mono" style={s('font-weight:700')}>{totHrs.toFixed(1)} / {cur.targetHrs || '—'}h</span>
           </div>
           <div style={s('height:7px;border-radius:4px;background:var(--bg4);overflow:hidden')}><div style={s('height:100%;width:' + hrsPct + '%;background:var(--accent);border-radius:4px')} /></div>
           <div style={s('display:flex;justify-content:space-between;font-size:11.5px;margin:11px 0 6px')}>
             <span style={s('color:var(--text2)')}>Planned load</span>
-            <span className="mono" style={s('font-weight:700')}>{totLoad} / {targetLoad || '—'}</span>
+            <span className="mono" style={s('font-weight:700')}>{totLoad} / {cur.targetLoad || '—'}</span>
           </div>
           <div style={s('height:7px;border-radius:4px;background:var(--bg4);overflow:hidden')}><div style={s('height:100%;width:' + loadPct + '%;background:var(--bike);border-radius:4px')} /></div>
         </div>
@@ -357,8 +407,19 @@ export default function PlanEditor({ vm, actions }) {
           })}
         </div>
 
-        <div className="ctl" style={s('background:var(--accent);color:var(--accent-ink);text-align:center;padding:14px;border-radius:14px;font-weight:700;font-size:14px;margin-top:18px')}>Publish to {assignedCount} athlete{assignedCount === 1 ? '' : 's'}</div>
-        <div style={s('text-align:center;font-size:11px;color:var(--text3);margin-top:8px;line-height:1.5')}>Assigned athletes get this week's sessions and targets, and are notified when you publish.</div>
+        <div className={pub.status === 'busy' ? undefined : 'ctl'} onClick={pub.status === 'busy' ? undefined : publish}
+          style={s('background:var(--accent);color:var(--accent-ink);text-align:center;padding:14px;border-radius:14px;font-weight:700;font-size:14px;margin-top:18px;' + (pub.status === 'busy' ? 'opacity:.6' : ''))}>
+          {pub.status === 'busy' ? 'Publishing…' : `Publish to ${assignedCount} athlete${assignedCount === 1 ? '' : 's'}`}
+        </div>
+        {pub.status === 'done' ? (
+          <div style={s('display:flex;align-items:center;justify-content:center;gap:7px;text-align:center;font-size:12px;color:var(--good);font-weight:600;margin-top:10px')}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>{pub.msg}
+          </div>
+        ) : pub.status === 'error' ? (
+          <div style={s('text-align:center;font-size:12px;color:var(--bad);font-weight:600;margin-top:10px')}>{pub.msg}</div>
+        ) : (
+          <div style={s('text-align:center;font-size:11px;color:var(--text3);margin-top:8px;line-height:1.5')}>Assigned athletes get the plan's sessions on their calendar and are notified when you publish.</div>
+        )}
       </div>
 
       {editor && <SessionSheet editor={editor} onField={editField} onSave={saveSession} onDelete={deleteSession} onClose={() => setEditor(null)} />}

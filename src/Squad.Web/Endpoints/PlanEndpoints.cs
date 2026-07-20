@@ -4,17 +4,70 @@ using Squad.Core;
 
 namespace Squad.Web;
 
+/// <summary>Payload a coach posts to publish a multi-week plan onto athletes' calendars.</summary>
+public sealed record PublishPlanRequest(
+    Guid[]? AthleteIds, string? PlanName, DateTime? StartDate, int? Weeks, PublishWorkoutDto[]? Workouts);
+
+public sealed record PublishWorkoutDto(
+    DateTime Date, string? Discipline, string? Title, string? Sub, int DurationMin, int Load);
+
 /// <summary>
 /// The signed-in athlete's weekly training plan (Mon..Sun of the current week).
 /// Per-row status is derived from the date: past = done, today = today,
 /// future = planned, rest days = rest. No plan assigned = empty week.
+/// A coach can publish a plan (POST) onto their squad athletes' calendars.
 /// </summary>
 public static class PlanEndpoints
 {
+    private static readonly HashSet<string> AllowedDisciplines =
+        new(StringComparer.OrdinalIgnoreCase) { "bike", "swim", "run", "gym", "rest" };
+
     public static IEndpointRouteBuilder MapPlan(this IEndpointRouteBuilder app)
     {
         app.MapGet("/api/plan", GetPlan).RequireAuthorization();
+        app.MapPost("/api/plan/publish", PublishPlan).RequireAuthorization();
         return app;
+    }
+
+    private static async Task<IResult> PublishPlan(HttpContext http, PublishPlanRequest req, IPlanService plans, CancellationToken ct)
+    {
+        var claim = http.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? http.User.FindFirstValue("sub");
+        if (!Guid.TryParse(claim, out var coachId)) return Results.Unauthorized();
+
+        var athleteIds = (req.AthleteIds ?? Array.Empty<Guid>()).Where(g => g != Guid.Empty).Distinct().ToArray();
+        if (athleteIds.Length == 0) return Results.BadRequest(new { error = "Assign at least one athlete." });
+
+        var workouts = (req.Workouts ?? Array.Empty<PublishWorkoutDto>()).Select(MapWorkout).ToList();
+        if (workouts.Count == 0) return Results.BadRequest(new { error = "Add at least one session before publishing." });
+
+        // Clear the whole block span (so sessions removed since last publish vanish),
+        // falling back to the min..max of the workout dates when no start/length is given.
+        DateTime spanStart, spanEnd;
+        if (req.StartDate is { } sd && req.Weeks is > 0)
+        {
+            spanStart = sd.Date;
+            spanEnd = sd.Date.AddDays(req.Weeks.Value * 7 - 1);
+        }
+        else
+        {
+            spanStart = workouts.Min(w => w.Date);
+            spanEnd = workouts.Max(w => w.Date);
+        }
+
+        var published = await plans.PublishAsync(coachId, athleteIds, spanStart, spanEnd, workouts, ct);
+        if (published == 0) return Results.BadRequest(new { error = "None of the selected athletes are in a squad you coach." });
+        return Results.Ok(new { published });
+    }
+
+    private static PlannedWorkoutWrite MapWorkout(PublishWorkoutDto w)
+    {
+        var disc = AllowedDisciplines.Contains(w.Discipline ?? "") ? w.Discipline!.ToLowerInvariant() : "rest";
+        var title = (w.Title ?? "").Trim();
+        if (title.Length == 0) title = "Session";
+        if (title.Length > 80) title = title[..80];
+        var sub = string.IsNullOrWhiteSpace(w.Sub) ? null : (w.Sub!.Length > 120 ? w.Sub[..120] : w.Sub);
+        return new PlannedWorkoutWrite(w.Date.Date, disc, title, sub,
+            Math.Clamp(w.DurationMin, 0, 24 * 60), Math.Clamp(w.Load, 0, 100_000));
     }
 
     private static async Task<IResult> GetPlan(HttpContext http, IPlanService plans, CancellationToken ct)
