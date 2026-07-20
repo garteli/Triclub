@@ -745,7 +745,7 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
       {confirmDel && (
         <>
           <div className="ctl" onClick={() => !deleting && setConfirmDel(false)} style={s('position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50;animation:floatUp .2s ease')} />
-          <div className="scr" style={s('position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(90%,420px);z-index:51;background:var(--bg);border:1px solid var(--line2);border-radius:20px;padding:20px;animation:floatUp .25s ease')}>
+          <div className="scr" style={s('position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(90%,420px);z-index:51;background:var(--bg);border:1px solid var(--line2);border-radius:20px;padding:20px;animation:floatUpCenter .25s ease')}>
             <div style={s('font-size:17px;font-weight:700')}>Delete this training?</div>
             <div style={s('font-size:13px;color:var(--text2);line-height:1.5;margin-top:8px')}>{a.title} · {a.when}. This removes it from your activities, feed and leaderboard. You can re-import it later.</div>
             <div style={s('display:flex;gap:10px;margin-top:18px')}>
