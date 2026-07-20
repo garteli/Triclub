@@ -152,11 +152,22 @@ public interface INotificationService
 public sealed record PlannedWorkoutRow(
     Guid Id, DateTime WorkoutDate, string Discipline, string Title, string? Sub, int DurationMin, int Load);
 
+/// <summary>A workout a coach is publishing onto an athlete's calendar (no id/athlete yet — the
+/// service fans it out to each assigned athlete on the given date).</summary>
+public sealed record PlannedWorkoutWrite(
+    DateTime Date, string Discipline, string Title, string? Sub, int DurationMin, int Load);
+
 public interface IPlanService
 {
     /// <summary>The athlete's plan for the Monday..Sunday week containing <paramref name="weekStart"/>,
     /// seeding a template week the first time it's requested.</summary>
     Task<IReadOnlyList<PlannedWorkoutRow>> GetWeekAsync(Guid athleteId, DateTime weekStart, CancellationToken ct);
+
+    /// <summary>Publish a coach's plan: replace each assigned athlete's PlannedWorkout rows in
+    /// [spanStart..spanEnd] with <paramref name="workouts"/>. Only athletes who are members of a
+    /// squad OWNED by <paramref name="coachId"/> are written. Returns how many athletes got the plan.</summary>
+    Task<int> PublishAsync(Guid coachId, IReadOnlyList<Guid> athleteIds, DateTime spanStart, DateTime spanEnd,
+        IReadOnlyList<PlannedWorkoutWrite> workouts, CancellationToken ct);
 }
 
 /// <summary>Result of verifying a provider id_token: the identity, or a diagnostic error reason.</summary>

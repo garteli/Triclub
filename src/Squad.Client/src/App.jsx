@@ -14,6 +14,7 @@ import { usePlan } from './hooks/usePlan.js';
 import { useGarminSync } from './hooks/useGarminSync.js';
 import { createSquad, joinSquad } from './lib/squads.js';
 import { recordPayment, markPaymentPaid, waivePayment } from './lib/payments.js';
+import { publishPlan } from './lib/plan.js';
 // import { useLiveRide } from './hooks/useLiveRide.js'; // swap in for real telemetry
 import { buildViewModel } from './lib/viewModel.js';
 import { loadSession, saveSession, clearSession, enrollBiometric, fetchMe, getProfile } from './lib/auth.js';
@@ -224,6 +225,14 @@ export default function App() {
     },
   }), [session?.token]);
 
+  // Coach plan publishing — writes each assigned athlete's PlannedWorkout rows.
+  // Rebuilt on token change; passed down as onPublishPlan (like squadOps/paymentOps).
+  const onPublishPlan = useCallback(async (body) => {
+    const result = await publishPlan(session?.token, body);
+    setRefreshSignal((n) => n + 1); // refresh the plan surface for the coach's own view
+    return result;
+  }, [session?.token]);
+
   // Pull-to-refresh: re-pull every live surface (feed snapshot, leaderboard,
   // activities, squads, profile) by bumping the shared signal, and hold the
   // spinner briefly so the gesture reads as doing work even on a fast network.
@@ -380,6 +389,7 @@ export default function App() {
           onJoinSquad={authed ? squadOps.onJoinSquad : undefined}
           onCreateSquad={authed ? squadOps.onCreateSquad : undefined}
           payments={authed ? paymentOps : undefined}
+          onPublishPlan={authed ? onPublishPlan : undefined}
           meId={session?.athleteId} />
       </Phone>
     </div>
