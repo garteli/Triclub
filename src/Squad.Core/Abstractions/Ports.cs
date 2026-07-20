@@ -72,6 +72,11 @@ public interface IActivityReadService
     /// <summary>Delete one of the caller's OWN activities (scoped to the owner) plus its raw
     /// payload, so the same source workout can be re-imported later. True if a row was removed.</summary>
     Task<bool> DeleteAsync(Guid activityId, Guid athleteId, CancellationToken ct);
+
+    /// <summary>The decompressed GPS/sensor track for one activity, visible only within the
+    /// given squad. Null when the activity isn't in that squad or has no stored track (e.g.
+    /// an indoor session with no GPS). Hydrated on demand — it's the heavy blob the list omits.</summary>
+    Task<IReadOnlyList<TrackPoint>?> GetTrackAsync(Guid activityId, Guid squadId, CancellationToken ct);
 }
 
 /// <summary>An activity summary joined to athlete display fields; drives both the list card and the detail metrics.</summary>

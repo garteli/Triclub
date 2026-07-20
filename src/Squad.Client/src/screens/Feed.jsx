@@ -5,6 +5,7 @@ import AuthedAvatar from '../components/AuthedAvatar.jsx';
 import AuthedImage from '../components/AuthedImage.jsx';
 import { deleteActivity } from '../hooks/useActivities.js';
 import { useActivityPhotos } from '../hooks/useActivityPhotos.js';
+import ActivityDetailAnalysis from '../components/ActivityDetailAnalysis.jsx';
 import { downscaleToJpeg, captureNativePhoto, isNativePlatform, uploadActivityPhoto } from '../lib/photos.js';
 
 // Activity photos: gallery of what's attached (or captured in-ride), plus an
@@ -134,13 +135,8 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged }) {
       {/* activity photos (attached or captured in-ride) + add-photos on your own */}
       <ActivityPhotos activityId={a.id} isMe={a.isMe} token={token} getToken={getToken} />
 
-      {/* detailed analysis needs the full recording stream (not ingested yet) */}
-      <div style={s('padding:20px 18px 0')}>
-        <div style={s('background:var(--bg2);border:1px dashed var(--line2);border-radius:16px;padding:18px;text-align:center')}>
-          <div style={s('font-size:13px;font-weight:600')}>Detailed analysis coming</div>
-          <div style={s('font-size:12px;color:var(--text3);line-height:1.5;margin-top:4px')}>Route map, heart-rate &amp; power traces, splits and laps appear here once the full recording is synced from your device or a FIT file.</div>
-        </div>
-      </div>
+      {/* route map + HR/power/speed/elevation traces from the ingested recording */}
+      <ActivityDetailAnalysis activityId={a.id} getToken={getToken} />
 
       {/* reactions */}
       <div style={s('padding:20px 18px 0')}>

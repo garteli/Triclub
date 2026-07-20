@@ -7,7 +7,10 @@
 // ===========================================================================
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.IO.Compression;
 using System.Linq;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
@@ -45,6 +48,28 @@ public sealed class SqlActivityReadService(string connectionString) : IActivityR
         var rows = await conn.QueryAsync<ActivitySummaryRow>(
             new CommandDefinition(sql, new { squadId }, cancellationToken: ct));
         return rows.ToList();
+    }
+
+    public async Task<IReadOnlyList<TrackPoint>?> GetTrackAsync(Guid activityId, Guid squadId, CancellationToken ct)
+    {
+        // Squad-scoped: only activities owned by a member of the caller's squad are visible.
+        const string sql = """
+            SELECT a.TrackBlob
+              FROM dbo.Activity a
+              JOIN dbo.Athlete ath ON ath.Id = a.AthleteId
+             WHERE a.Id = @activityId AND ath.SquadId = @squadId;
+            """;
+
+        await using var conn = new SqlConnection(connectionString);
+        var blob = await conn.ExecuteScalarAsync<byte[]?>(
+            new CommandDefinition(sql, new { activityId, squadId }, cancellationToken: ct));
+        if (blob is null || blob.Length == 0) return null; // not visible, or no GPS/sensor track
+
+        // Mirror SqlActivityRepository.GzipTrack: gzipped JSON of List<TrackPoint>.
+        await using var input = new MemoryStream(blob);
+        await using var gzip = new GZipStream(input, CompressionMode.Decompress);
+        var track = await JsonSerializer.DeserializeAsync<List<TrackPoint>>(gzip, cancellationToken: ct);
+        return track;
     }
 
     public async Task<bool> DeleteAsync(Guid activityId, Guid athleteId, CancellationToken ct)
