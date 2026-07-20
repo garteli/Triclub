@@ -28,7 +28,9 @@ public sealed class SqlSquadService(string connectionString) : ISquadService
                s.OwnerId,
                ISNULL((SELECT TOP 1 jr.Status FROM dbo.JoinRequest jr
                        WHERE jr.SquadId = s.Id AND jr.AthleteId = @me
-                       ORDER BY jr.CreatedUtc DESC), 'none') AS RequestStatus
+                       ORDER BY jr.CreatedUtc DESC), 'none') AS RequestStatus,
+               CASE WHEN s.LogoBlob   IS NOT NULL THEN '/api/images/squads/' + LOWER(CONVERT(varchar(36), s.Id)) + '/logo'   END AS LogoUrl,
+               CASE WHEN s.BannerBlob IS NOT NULL THEN '/api/images/squads/' + LOWER(CONVERT(varchar(36), s.Id)) + '/banner' END AS BannerUrl
         FROM dbo.Squad s
         """;
 
@@ -161,6 +163,125 @@ public sealed class SqlSquadService(string connectionString) : ISquadService
             new { squadId, athleteId }, cancellationToken: ct));
         return updated > 0 ? applicant : null;
     }
+
+    // ----- owner management: details/pricing, roster, images -----------------
+
+    public async Task<bool> UpdateAsync(Guid squadId, Guid ownerId, SquadUpdate f, CancellationToken ct)
+    {
+        await using var conn = new SqlConnection(connectionString);
+        await conn.OpenAsync(ct);
+        if (!await OwnsSquad(conn, squadId, ownerId, ct)) return false;
+
+        // COALESCE leaves any field the owner didn't send (null) unchanged. Empty
+        // string is a real value here (e.g. clearing PerLabel for a free club).
+        var updated = await conn.ExecuteAsync(new CommandDefinition("""
+            UPDATE dbo.Squad SET
+                Name        = COALESCE(@Name, Name),
+                Discipline  = COALESCE(@Discipline, Discipline),
+                Location    = COALESCE(@Location, Location),
+                Level       = COALESCE(@Level, Level),
+                Kind        = COALESCE(@Kind, Kind),
+                Price       = COALESCE(@Price, Price),
+                PerLabel    = COALESCE(@PerLabel, PerLabel),
+                Color       = COALESCE(@Color, Color),
+                Description = COALESCE(@Description, Description)
+            WHERE Id = @squadId;
+            """, new { squadId, f.Name, f.Discipline, f.Location, f.Level, f.Kind, f.Price, f.PerLabel, f.Color, f.Description },
+            cancellationToken: ct));
+        return updated > 0;
+    }
+
+    public async Task<IReadOnlyList<SquadMember>?> GetMembersAsync(Guid squadId, Guid ownerId, CancellationToken ct)
+    {
+        await using var conn = new SqlConnection(connectionString);
+        await conn.OpenAsync(ct);
+        if (!await OwnsSquad(conn, squadId, ownerId, ct)) return null;
+
+        var rows = await conn.QueryAsync<SquadMember>(new CommandDefinition("""
+            SELECT m.AthleteId, a.DisplayName AS Name, a.Initials, a.AvatarColor, m.Role, m.JoinedUtc,
+                   CASE WHEN a.AvatarBlob IS NOT NULL
+                        THEN '/api/images/avatars/' + LOWER(CONVERT(varchar(36), a.Id)) END AS AvatarUrl
+            FROM dbo.Membership m
+            JOIN dbo.Athlete a ON a.Id = m.AthleteId
+            WHERE m.SquadId = @squadId
+            ORDER BY CASE m.Role WHEN 'owner' THEN 0 WHEN 'coach' THEN 1 ELSE 2 END, a.DisplayName;
+            """, new { squadId }, cancellationToken: ct));
+        return rows.ToList();
+    }
+
+    public async Task<AddMemberOutcome> AddMemberByEmailAsync(Guid squadId, string email, Guid ownerId, CancellationToken ct)
+    {
+        await using var conn = new SqlConnection(connectionString);
+        await conn.OpenAsync(ct);
+        if (!await OwnsSquad(conn, squadId, ownerId, ct)) return AddMemberOutcome.NotOwner;
+
+        // SQL Server's default collation is case-insensitive, so this matches regardless of case.
+        var athleteId = await conn.QuerySingleOrDefaultAsync<Guid?>(new CommandDefinition(
+            "SELECT Id FROM dbo.Athlete WHERE Email = @email;", new { email }, cancellationToken: ct));
+        if (athleteId is not { } aid) return AddMemberOutcome.AthleteNotFound;
+
+        if (await conn.ExecuteScalarAsync<int>(new CommandDefinition(
+                "SELECT CASE WHEN EXISTS (SELECT 1 FROM dbo.Membership WHERE SquadId=@squadId AND AthleteId=@aid) THEN 1 ELSE 0 END;",
+                new { squadId, aid }, cancellationToken: ct)) == 1)
+            return AddMemberOutcome.AlreadyMember;
+
+        // Add to the roster only — don't hijack the athlete's active squad (Athlete.SquadId).
+        await conn.ExecuteAsync(new CommandDefinition(
+            "INSERT INTO dbo.Membership (SquadId, AthleteId, Role) VALUES (@squadId, @aid, 'member');",
+            new { squadId, aid }, cancellationToken: ct));
+        return AddMemberOutcome.Added;
+    }
+
+    public async Task<bool> RemoveMemberAsync(Guid squadId, Guid athleteId, Guid ownerId, CancellationToken ct)
+    {
+        if (athleteId == ownerId) return false; // the owner can't remove themselves
+        await using var conn = new SqlConnection(connectionString);
+        await conn.OpenAsync(ct);
+        if (!await OwnsSquad(conn, squadId, ownerId, ct)) return false;
+
+        await using var tx = (SqlTransaction)await conn.BeginTransactionAsync(ct);
+        var deleted = await conn.ExecuteAsync(new CommandDefinition(
+            "DELETE FROM dbo.Membership WHERE SquadId=@squadId AND AthleteId=@athleteId AND Role <> 'owner';",
+            new { squadId, athleteId }, tx, cancellationToken: ct));
+        if (deleted == 0) { await tx.RollbackAsync(ct); return false; }
+
+        // Athlete.SquadId is NOT NULL: if this was their active squad, move them to the
+        // landing club so their feed/leaderboard stays valid (skip when this IS landing).
+        await conn.ExecuteAsync(new CommandDefinition(
+            "UPDATE dbo.Athlete SET SquadId=@landing WHERE Id=@athleteId AND SquadId=@squadId AND @squadId<>@landing;",
+            new { athleteId, squadId, landing = Squads.Landing }, tx, cancellationToken: ct));
+
+        await tx.CommitAsync(ct);
+        return true;
+    }
+
+    public async Task<string?> GetImageBlobAsync(Guid squadId, string kind, CancellationToken ct)
+    {
+        if (ImageColumn(kind) is not { } column) return null;
+        await using var conn = new SqlConnection(connectionString);
+        return await conn.QuerySingleOrDefaultAsync<string?>(new CommandDefinition(
+            $"SELECT {column} FROM dbo.Squad WHERE Id = @squadId;", new { squadId }, cancellationToken: ct));
+    }
+
+    public async Task<bool> SetImageBlobAsync(Guid squadId, string kind, string? blobName, Guid ownerId, CancellationToken ct)
+    {
+        if (ImageColumn(kind) is not { } column) return false;
+        await using var conn = new SqlConnection(connectionString);
+        await conn.OpenAsync(ct);
+        if (!await OwnsSquad(conn, squadId, ownerId, ct)) return false;
+        await conn.ExecuteAsync(new CommandDefinition(
+            $"UPDATE dbo.Squad SET {column} = @blobName WHERE Id = @squadId;",
+            new { squadId, blobName }, cancellationToken: ct));
+        return true;
+    }
+
+    // Whitelist kind → column so the interpolated column name is never user-controlled.
+    private static string? ImageColumn(string kind) => kind switch
+    {
+        "logo" => "LogoBlob",
+        "banner" => "BannerBlob",
+        _ => null,
+    };
 
     private static async Task<bool> OwnsSquad(SqlConnection conn, Guid squadId, Guid ownerId, CancellationToken ct)
         => await conn.ExecuteScalarAsync<int>(new CommandDefinition(

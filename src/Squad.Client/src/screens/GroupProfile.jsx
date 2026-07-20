@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { s } from '../lib/style.js';
+import AuthedImage from '../components/AuthedImage.jsx';
 
 const Back = ({ onClick }) => (
   <div className="ctl" onClick={onClick} style={s('width:34px;height:34px;border-radius:10px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center')}>
@@ -7,13 +8,19 @@ const Back = ({ onClick }) => (
   </div>
 );
 
-export default function GroupProfile({ vm, actions, onJoinSquad, payments, meId }) {
+export default function GroupProfile({ vm, actions, onJoinSquad, payments, meId, getToken }) {
   const g = vm.selGroupData;
   const a = vm.applyState;
   // Live mode: real squads from the API (onJoinSquad wired). The mock apply→pay
   // state machine below is only used in the no-session prototype.
   const live = !!onJoinSquad;
   const isOwner = live && !!meId && !!g.owner && String(g.owner).toLowerCase() === String(meId).toLowerCase();
+  const [token, setToken] = useState(null);
+  useEffect(() => {
+    let ok = true;
+    Promise.resolve(getToken?.()).then((t) => { if (ok) setToken(t || null); });
+    return () => { ok = false; };
+  }, [getToken]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const join = async () => {
@@ -29,11 +36,18 @@ export default function GroupProfile({ vm, actions, onJoinSquad, payments, meId 
     <div style={s('padding:6px 0 120px;animation:floatUp .35s ease')}>
       <div style={s('padding:2px 18px 0')}><Back onClick={() => actions.go('discover')} /></div>
 
-      {/* banner */}
+      {/* banner — uploaded image when set, else the discipline-tinted gradient */}
       <div style={s(`margin:12px 18px 0;height:96px;border-radius:18px;background:linear-gradient(135deg,${g.color},color-mix(in srgb,${g.color} 40%, var(--bg3)));position:relative;overflow:hidden`)}>
-        <div style={s('position:absolute;right:-10px;bottom:-16px;opacity:.25')}>
-          <svg width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="#0c0e11" strokeWidth="1.6"><circle cx="5.5" cy="17.5" r="3.5" /><circle cx="18.5" cy="17.5" r="3.5" /><path d="M15 17.5l-3-6.5H8.5m6.5 0l-2.5 6.5M9.5 6.5h3l2 4.5" /></svg>
-        </div>
+        {g.bannerUrl
+          ? <AuthedImage url={g.bannerUrl} token={token} style="position:absolute;inset:0;width:100%;height:100%" />
+          : (
+            <div style={s('position:absolute;right:-10px;bottom:-16px;opacity:.25')}>
+              <svg width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="#0c0e11" strokeWidth="1.6"><circle cx="5.5" cy="17.5" r="3.5" /><circle cx="18.5" cy="17.5" r="3.5" /><path d="M15 17.5l-3-6.5H8.5m6.5 0l-2.5 6.5M9.5 6.5h3l2 4.5" /></svg>
+            </div>
+          )}
+        {g.logoUrl && (
+          <AuthedImage url={g.logoUrl} token={token} style="position:absolute;left:12px;bottom:12px;width:48px;height:48px;border-radius:13px;border:2px solid var(--bg2);box-shadow:0 2px 8px rgba(0,0,0,.35)" />
+        )}
       </div>
 
       <div style={s('padding:14px 18px 0')}>
@@ -93,6 +107,17 @@ export default function GroupProfile({ vm, actions, onJoinSquad, payments, meId 
             </>
           );
         })()}
+
+        {/* owner: manage the group page (branding, details, pricing, members) */}
+        {live && isOwner && (
+          <div className="ctl" onClick={actions.openManage} style={s('display:flex;align-items:center;gap:11px;background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:12px 13px;margin-top:12px')}>
+            <div style={s('width:36px;height:36px;border-radius:11px;background:var(--accent-dim);flex:none;display:flex;align-items:center;justify-content:center')}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
+            </div>
+            <div style={s('flex:1')}><div style={s('font-size:13px;font-weight:700')}>Manage group</div><div style={s('font-size:11px;color:var(--text2)')}>Logo, banner, details, pricing &amp; members</div></div>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.4" strokeLinecap="round"><path d="M9 6l6 6-6 6" /></svg>
+          </div>
+        )}
 
         {/* ride-payment ledger entry points (live) */}
         {live && payments && isOwner && (

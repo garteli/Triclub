@@ -78,12 +78,30 @@ public sealed record SquadSummary(
     string? Price, string? PerLabel, string Color, string? Rating, string? Description,
     int MemberCount, bool IsMember, Guid? OwnerId,
     // Caller's join-request state on a gated squad: none | pending | approved | declined.
-    string RequestStatus = "none");
+    string RequestStatus = "none",
+    // Proxy paths to the club's logo / banner images (null when unset → gradient fallback).
+    string? LogoUrl = null, string? BannerUrl = null);
 
 /// <summary>Fields for creating a squad (from the Register-a-group wizard).</summary>
 public sealed record SquadCreate(
     string Name, string Discipline, string? Location, string? Level, string Kind,
     string? Price, string? PerLabel, string Color, string? Description);
+
+/// <summary>An owner's edit to a squad's details / pricing. Null fields are left unchanged.</summary>
+public sealed record SquadUpdate(
+    string? Name, string? Discipline, string? Location, string? Level, string? Kind,
+    string? Price, string? PerLabel, string? Color, string? Description);
+
+/// <summary>One roster member as the owner sees it in the manage-group screen.</summary>
+public sealed record SquadMember(
+    Guid AthleteId, string Name, string Initials, string AvatarColor, string Role,
+    DateTimeOffset JoinedUtc, string? AvatarUrl = null);
+
+/// <summary>Result of an owner adding a member by email.</summary>
+public enum AddMemberOutcome { Added, AlreadyMember, AthleteNotFound, NotOwner }
+
+/// <summary>Body for the owner's "add member by email" call.</summary>
+public sealed record AddMemberRequest(string Email);
 
 public interface ISquadService
 {
@@ -102,6 +120,22 @@ public interface ISquadService
     Task<string?> ApproveRequestAsync(Guid squadId, Guid athleteId, Guid ownerId, CancellationToken ct);
     /// <summary>Owner declines a request; returns the applicant's name (null if not owner / no request).</summary>
     Task<string?> DeclineRequestAsync(Guid squadId, Guid athleteId, Guid ownerId, CancellationToken ct);
+
+    // ----- owner management: details/pricing, roster, images -----
+
+    /// <summary>Owner edits the squad's details / pricing. Returns false if the caller doesn't own it.</summary>
+    Task<bool> UpdateAsync(Guid squadId, Guid ownerId, SquadUpdate fields, CancellationToken ct);
+    /// <summary>The squad's roster (owner-only). Null if the caller doesn't own it.</summary>
+    Task<IReadOnlyList<SquadMember>?> GetMembersAsync(Guid squadId, Guid ownerId, CancellationToken ct);
+    /// <summary>Owner adds a registered athlete (by email) to the roster.</summary>
+    Task<AddMemberOutcome> AddMemberByEmailAsync(Guid squadId, string email, Guid ownerId, CancellationToken ct);
+    /// <summary>Owner removes a member. Returns false if not owner, or the target is the owner / not a member.</summary>
+    Task<bool> RemoveMemberAsync(Guid squadId, Guid athleteId, Guid ownerId, CancellationToken ct);
+
+    /// <summary>The blob name of the squad's logo/banner image (kind = "logo" | "banner"), or null.</summary>
+    Task<string?> GetImageBlobAsync(Guid squadId, string kind, CancellationToken ct);
+    /// <summary>Owner sets (or clears, when null) the squad's logo/banner blob name. False if not owner.</summary>
+    Task<bool> SetImageBlobAsync(Guid squadId, string kind, string? blobName, Guid ownerId, CancellationToken ct);
 }
 
 public enum JoinOutcome { Joined, Requested, AlreadyMember, AlreadyRequested }

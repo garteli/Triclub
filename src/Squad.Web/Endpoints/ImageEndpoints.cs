@@ -26,7 +26,71 @@ public static class ImageEndpoints
         app.MapPost("/api/activities/photos", UploadActivityPhoto).DisableAntiforgery().RequireAuthorization();
         app.MapGet("/api/activities/{activityId:guid}/photos", ListActivityPhotos).RequireAuthorization();
         app.MapGet("/api/images/activity/{photoId:guid}", GetActivityPhoto).RequireAuthorization();
+
+        // Squad logo + banner (owner-managed branding on the Group page)
+        foreach (var kind in new[] { "logo", "banner" })
+        {
+            var k = kind; // capture per-iteration
+            app.MapPost($"/api/squads/{{squadId:guid}}/{k}",
+                (Guid squadId, IFormFile file, HttpContext http, IImageStore images, ISquadService squads, CancellationToken ct)
+                    => UploadSquadImage(squadId, k, file, http, images, squads, ct))
+                .DisableAntiforgery().RequireAuthorization();
+            app.MapDelete($"/api/squads/{{squadId:guid}}/{k}",
+                (Guid squadId, HttpContext http, IImageStore images, ISquadService squads, CancellationToken ct)
+                    => DeleteSquadImage(squadId, k, http, images, squads, ct))
+                .RequireAuthorization();
+            app.MapGet($"/api/images/squads/{{squadId:guid}}/{k}",
+                (Guid squadId, HttpContext http, IImageStore images, ISquadService squads, CancellationToken ct)
+                    => GetSquadImage(squadId, k, http, images, squads, ct))
+                .RequireAuthorization();
+        }
         return app;
+    }
+
+    // ---- squad logo / banner -------------------------------------------------
+
+    private static async Task<IResult> UploadSquadImage(
+        Guid squadId, string kind, IFormFile file, HttpContext http, IImageStore images, ISquadService squads, CancellationToken ct)
+    {
+        var me = ActivityIntakeEndpoints.ResolveAthleteId(http.User);
+        if (me is null) return Results.Unauthorized();
+        if (!TryValidate(file, out var err)) return Results.BadRequest(err);
+
+        var previous = await squads.GetImageBlobAsync(squadId, kind, ct);
+        string blobName;
+        await using (var stream = file.OpenReadStream())
+            blobName = await images.SaveAsync($"squad-{kind}", stream, file.ContentType, ct);
+
+        // Owner check happens on write: if it fails, delete the just-saved orphan blob.
+        if (!await squads.SetImageBlobAsync(squadId, kind, blobName, me.Value, ct))
+        {
+            await images.DeleteAsync(blobName, ct);
+            return Results.NotFound(new { error = "Squad not found, or you don't manage it." });
+        }
+        if (!string.IsNullOrEmpty(previous)) await images.DeleteAsync(previous, ct); // best-effort cleanup
+        return Results.Ok(new { url = $"/api/images/squads/{squadId:D}/{kind}".ToLowerInvariant() });
+    }
+
+    private static async Task<IResult> DeleteSquadImage(
+        Guid squadId, string kind, HttpContext http, IImageStore images, ISquadService squads, CancellationToken ct)
+    {
+        var me = ActivityIntakeEndpoints.ResolveAthleteId(http.User);
+        if (me is null) return Results.Unauthorized();
+
+        var previous = await squads.GetImageBlobAsync(squadId, kind, ct);
+        if (!await squads.SetImageBlobAsync(squadId, kind, null, me.Value, ct))
+            return Results.NotFound(new { error = "Squad not found, or you don't manage it." });
+        if (!string.IsNullOrEmpty(previous)) await images.DeleteAsync(previous, ct);
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> GetSquadImage(
+        Guid squadId, string kind, HttpContext http, IImageStore images, ISquadService squads, CancellationToken ct)
+    {
+        if (ActivityIntakeEndpoints.ResolveAthleteId(http.User) is null) return Results.Unauthorized();
+        var blobName = await squads.GetImageBlobAsync(squadId, kind, ct);
+        if (string.IsNullOrEmpty(blobName)) return Results.NotFound();
+        return await StreamBlob(images, blobName, ct);
     }
 
     // ---- avatars -------------------------------------------------------------
