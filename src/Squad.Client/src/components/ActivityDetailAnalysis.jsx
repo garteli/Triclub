@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { s } from '../lib/style.js';
-import TileMap from './TileMap.jsx';
-import { toPathD } from '../lib/tiles.js';
+import ActivityReplay from './ActivityReplay.jsx';
 import { useActivityTrack } from '../hooks/useActivityTrack.js';
 import { loadZones } from '../lib/zones.js';
 import {
@@ -94,45 +93,6 @@ function totalWorkKJ(track) {
   return j / 1000;
 }
 
-// Normalized sparkline over `values` (null entries are line gaps).
-function Sparkline({ values, stroke, fill, H = 42 }) {
-  const W = 320;
-  const pts = values.map((v, i) => [i, v]).filter(([, v]) => v != null && Number.isFinite(v));
-  if (pts.length < 2) return null;
-  const n = (values.length - 1) || 1;
-  const ys = pts.map(([, v]) => v);
-  const min = Math.min(...ys), max = Math.max(...ys), span = (max - min) || 1;
-  const X = (i) => (i / n) * W;
-  const Y = (v) => (H - 3) - ((v - min) / span) * (H - 6);
-  const line = pts.map(([i, v], k) => `${k ? 'L' : 'M'}${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(' ');
-  const area = `${line} L${X(pts[pts.length - 1][0]).toFixed(1)},${H} L${X(pts[0][0]).toFixed(1)},${H} Z`;
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: '100%', height: H, display: 'block' }}>
-      <path d={area} fill={fill} opacity="0.13" />
-      <path d={line} fill="none" stroke={stroke} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-    </svg>
-  );
-}
-
-function Trace({ title, unit, values, stroke, fill, fmt }) {
-  const nums = values.filter((v) => v != null && Number.isFinite(v));
-  if (nums.length < 2) return null;
-  const avg = nums.reduce((a, b) => a + b, 0) / nums.length;
-  const max = Math.max(...nums);
-  const f = fmt || ((x) => Math.round(x));
-  return (
-    <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:12px 13px;margin-top:10px')}>
-      <div style={s('display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px')}>
-        <div style={s('font-size:12px;font-weight:700')}>{title}</div>
-        <div className="mono" style={s('font-size:11px;color:var(--text3)')}>
-          avg <b style={s('color:var(--text)')}>{f(avg)}</b> · max {f(max)}{unit ? ` ${unit}` : ''}
-        </div>
-      </div>
-      <Sparkline values={values} stroke={stroke} fill={fill} />
-    </div>
-  );
-}
-
 // Strava-style segment table: one row per lap (device laps) or per km/100m (computed
 // splits). Each row is { index, meters, sec, avgHr, gain, partial }; a bar scaled to the
 // fastest row makes pace variation read at a glance.
@@ -221,21 +181,41 @@ export default function ActivityDetailAnalysis({ activityId, sport, getToken }) 
   const isSwim = sport === 'Swim';
   const isFoot = sport === 'Run';
 
-  const routePts = useMemo(() => {
-    const gps = (track || []).filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lon));
-    return sample(gps, 500).map((p) => [p.lat, p.lon]);
+  // One downsampled frame array drives the whole animated replay — the map marker, the
+  // progressive route, and every chart cursor share this single index space. Map positions
+  // carry forward through gaps (and back-fill at the head) so a brief GPS dropout doesn't
+  // strand the marker; the metric fields keep nulls so chart gaps still read as gaps.
+  const frames = useMemo(() => {
+    const t = sample(track || [], 600);
+    const fr = t.map((p) => ({
+      lat: Number.isFinite(p.lat) ? p.lat : null,
+      lon: Number.isFinite(p.lon) ? p.lon : null,
+      offsetSec: Number.isFinite(p.offsetSec) ? p.offsetSec : null,
+      hr: p.heartRate ?? null,
+      power: p.powerW ?? null,
+      speed: p.speedMps != null ? p.speedMps * 3.6 : null, // m/s → km/h
+      cadence: p.cadence ?? null,
+      elev: p.elevM ?? null,
+    }));
+    let lat = null, lon = null;
+    for (const f of fr) {
+      if (f.lat != null && f.lon != null) { lat = f.lat; lon = f.lon; }
+      f.mLat = lat; f.mLon = lon;
+    }
+    const first = fr.find((f) => f.mLat != null);
+    if (first) for (const f of fr) { if (f.mLat == null) { f.mLat = first.mLat; f.mLon = first.mLon; } }
+    return fr;
   }, [track]);
 
-  const series = useMemo(() => {
-    const t = sample(track || [], 400);
-    return {
-      hr: t.map((p) => p.heartRate ?? null),
-      power: t.map((p) => p.powerW ?? null),
-      speed: t.map((p) => (p.speedMps != null ? p.speedMps * 3.6 : null)), // m/s → km/h
-      cadence: t.map((p) => p.cadence ?? null),
-      elev: t.map((p) => p.elevM ?? null),
-    };
-  }, [track]);
+  const gpsCount = useMemo(() => frames.reduce((n, f) => n + (f.lat != null ? 1 : 0), 0), [frames]);
+  const route = useMemo(() => frames.map((f) => [f.mLat, f.mLon]), [frames]);
+  const series = useMemo(() => ({
+    hr: frames.map((f) => f.hr),
+    power: frames.map((f) => f.power),
+    speed: frames.map((f) => f.speed),
+    cadence: frames.map((f) => f.cadence),
+    elev: frames.map((f) => f.elev),
+  }), [frames]);
 
   // Split distance by sport: swim 100m, ride 5km, run (and everything else) 1km.
   const splitUnit = isSwim ? 100 : sport === 'Bike' ? 5000 : 1000;
@@ -276,7 +256,7 @@ export default function ActivityDetailAnalysis({ activityId, sport, getToken }) 
     );
   }
 
-  const hasMap = routePts.length >= 2;
+  const hasMap = gpsCount >= 2;
   const traces = [
     { key: 'hr', title: 'Heart rate', unit: 'bpm', stroke: 'var(--bad)', fill: 'var(--bad)', values: series.hr },
     { key: 'power', title: 'Power', unit: 'W', stroke: 'var(--accent)', fill: 'var(--accent)', values: series.power },
@@ -301,22 +281,8 @@ export default function ActivityDetailAnalysis({ activityId, sport, getToken }) 
     <div style={s('padding:20px 18px 0')}>
       <div style={s(label + ';margin-bottom:10px')}>Detailed analysis</div>
 
-      {hasMap && (
-        <TileMap points={routePts} radius={16} pad={26}>
-          {(project) => {
-            const d = toPathD(routePts, project);
-            const start = project(routePts[0][0], routePts[0][1]);
-            const end = project(routePts[routePts.length - 1][0], routePts[routePts.length - 1][1]);
-            return (
-              <>
-                <path d={d} fill="none" stroke="rgba(255,255,255,.9)" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
-                <path d={d} fill="none" stroke="var(--accent)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                <circle cx={start.x} cy={start.y} r="5" fill="var(--good)" stroke="#fff" strokeWidth="2" />
-                <circle cx={end.x} cy={end.y} r="5" fill="var(--bad)" stroke="#fff" strokeWidth="2" />
-              </>
-            );
-          }}
-        </TileMap>
+      {(hasMap || shown.length > 0) && (
+        <ActivityReplay frames={frames} route={route} hasMap={hasMap} traces={shown} />
       )}
 
       {workKJ >= 1 && (
@@ -324,10 +290,6 @@ export default function ActivityDetailAnalysis({ activityId, sport, getToken }) 
           Total work <b style={s('color:var(--text)')}>{Math.round(workKJ)}</b> kJ
         </div>
       )}
-
-      {shown.map((tr) => (
-        <Trace key={tr.key} title={tr.title} unit={tr.unit} values={tr.values} stroke={tr.stroke} fill={tr.fill} fmt={tr.fmt} />
-      ))}
 
       {/* Normalized Power / Intensity Factor + zone distributions + power curve */}
       {(np != null || ifactor != null) && (
