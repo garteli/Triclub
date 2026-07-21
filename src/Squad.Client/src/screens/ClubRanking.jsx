@@ -24,7 +24,7 @@ function ClubLogo({ emblem, color, size }) {
 
 const TAB_DEFS = [['load', 'Load'], ['vol', 'Volume'], ['members', 'Athletes'], ['streak', 'Avg streak']];
 
-export default function ClubRanking({ clubRanking, actions }) {
+export default function ClubRanking({ clubRanking }) {
   const [tab, setTab] = useState('load');
   const rows = clubRanking?.rows ?? [];
 
@@ -63,12 +63,6 @@ export default function ClubRanking({ clubRanking, actions }) {
 
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
-      {/* scope toggle — Club Ranking is its own screen; My Squad jumps to the individual board */}
-      <div style={s('display:flex;gap:3px;background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:3px;margin-bottom:14px')}>
-        <div style={s('flex:1;text-align:center;padding:9px 6px;border-radius:10px;font-size:12.5px;font-weight:700;background:var(--accent);color:var(--accent-ink)')}>Clubs</div>
-        <div className="ctl" onClick={() => actions.go('lb')} style={s('flex:1;text-align:center;padding:9px 6px;border-radius:10px;font-size:12.5px;font-weight:700;background:transparent;color:var(--text2)')}>My Squad</div>
-      </div>
-
       <div style={s('display:flex;align-items:center;justify-content:space-between;margin-bottom:6px')}>
         <div>
           <div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.6px;font-weight:600')}>This week · club vs club</div>
