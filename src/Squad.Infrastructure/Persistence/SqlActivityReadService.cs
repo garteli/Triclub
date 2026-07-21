@@ -36,14 +36,17 @@ public sealed class SqlActivityReadService(string connectionString) : IActivityR
                    CAST(a.AvgPowerWatts  AS float) AS AvgPowerWatts,
                    CAST(a.TrainingLoad   AS float) AS TrainingLoad,
                    CAST(a.Calories       AS float) AS Calories,
-                   a.DeviceName, a.WeatherJson,
                    CASE WHEN ath.AvatarBlob IS NOT NULL
                         THEN '/api/images/avatars/' + LOWER(CONVERT(varchar(36), a.AthleteId)) END AS AvatarUrl,
                    (SELECT COUNT(*) FROM dbo.ActivityKudos k WHERE k.ActivityId = a.Id) AS Kudos,
                    (SELECT COUNT(*) FROM dbo.ActivityComment c WHERE c.ActivityId = a.Id) AS Comments,
                    CAST(CASE WHEN EXISTS (SELECT 1 FROM dbo.ActivityKudos k2
                                           WHERE k2.ActivityId = a.Id AND k2.AthleteId = @me)
-                             THEN 1 ELSE 0 END AS bit) AS IKudoed
+                             THEN 1 ELSE 0 END AS bit) AS IKudoed,
+                   -- DeviceName + WeatherJson last: Dapper binds this record's constructor positionally
+                   -- by name, so the SELECT column order MUST match ActivitySummaryRow's parameter order
+                   -- (…IKudoed, DeviceName, WeatherJson) or materialization throws once a row exists.
+                   a.DeviceName, a.WeatherJson
             FROM dbo.Activity a
             JOIN dbo.Athlete ath ON ath.Id = a.AthleteId
             WHERE ath.SquadId = @squadId
