@@ -289,6 +289,8 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, ena
     restoredRef.current = true;
     const draft = loadDraft();
     const how = draftMode(draft);
+    console.log('[RIDEDIAG] restore: hasDraft=', !!draft, 'recording=', draft?.recording,
+      'pending=', !!draft?.pending, 'ageMs=', draft ? Date.now() - (draft.savedAt || 0) : null, 'how=', how);
     if (!how) return;
     samples.current = draft.samples || [];
     agg.current = draft.agg || null;
@@ -332,11 +334,11 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, ena
       pending: isRecording ? null : pending,
     });
     if (recording) {
-      const flush = () => saveDraft(snapshot(true));
+      const flush = () => { console.log('[RIDEDIAG] flush recording draft'); saveDraft(snapshot(true)); };
       flush();
       const id = setInterval(flush, 8000);
-      const onHide = () => { if (document.hidden) flush(); };
-      const onPageHide = () => flush();
+      const onHide = () => { console.log('[RIDEDIAG] visibilitychange hidden=', document.hidden); if (document.hidden) flush(); };
+      const onPageHide = () => { console.log('[RIDEDIAG] pagehide'); flush(); };
       document.addEventListener('visibilitychange', onHide);
       window.addEventListener('pagehide', onPageHide);
       return () => {
