@@ -35,13 +35,13 @@ public sealed class SqlPlanService(string connectionString) : IPlanService
         return rows.ToList();
     }
 
-    public async Task<int> PublishAsync(Guid coachId, Guid planId, string planName, IReadOnlyList<Guid> athleteIds,
+    public async Task<IReadOnlyList<Guid>> PublishAsync(Guid coachId, Guid planId, string planName, IReadOnlyList<Guid> athleteIds,
         DateTime spanStart, DateTime spanEnd, IReadOnlyList<PlannedWorkoutWrite> workouts, CancellationToken ct)
     {
         // Only publish to athletes who belong to a squad this coach OWNS — never trust the
         // caller-supplied id list on its own.
         var ids = athleteIds.Distinct().ToArray();
-        if (ids.Length == 0) return 0;
+        if (ids.Length == 0) return Array.Empty<Guid>();
 
         await using var conn = new SqlConnection(connectionString);
         await conn.OpenAsync(ct);
@@ -52,7 +52,7 @@ public sealed class SqlPlanService(string connectionString) : IPlanService
             JOIN dbo.Squad s ON s.Id = m.SquadId
             WHERE s.OwnerId = @coachId AND m.AthleteId IN @ids;
             """, new { coachId, ids }, cancellationToken: ct))).ToList();
-        if (allowed.Count == 0) return 0;
+        if (allowed.Count == 0) return Array.Empty<Guid>();
 
         var start = spanStart.Date;
         var end = spanEnd.Date;
@@ -78,7 +78,7 @@ public sealed class SqlPlanService(string connectionString) : IPlanService
             }
         }
         await tx.CommitAsync(ct);
-        return allowed.Count;
+        return allowed;
     }
 
     public async Task<int> UnpublishAsync(Guid coachId, Guid planId, CancellationToken ct)
