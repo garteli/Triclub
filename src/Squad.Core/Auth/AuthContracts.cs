@@ -250,6 +250,10 @@ public interface IPlanImportService
     /// <param name="anchorDate">yyyy-MM-dd the athlete gave, or null to let the model leave it blank.</param>
     Task<PlanImportResult> ImportAsync(
         byte[] pdfBytes, string fileName, string anchorType, string? anchorDate, CancellationToken ct);
+
+    /// <summary>Generate a plan from a catalog spec (no PDF) — a text prompt to the model, normalised
+    /// into the same CoachPlan doc shape. Used by the library seeder to build reusable templates.</summary>
+    Task<PlanImportResult> GeneratePlanAsync(PlanSpec spec, CancellationToken ct);
 }
 
 /// <summary>Result of verifying a provider id_token: the identity, or a diagnostic error reason.</summary>

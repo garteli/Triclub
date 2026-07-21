@@ -15,7 +15,12 @@ var clubFeeBps = builder.Configuration.GetValue<int?>("Payments:ClubFeeBps") ?? 
 // AI plan import (PDF → training plan). No key ⇒ the import feature is dark (endpoint 503).
 var aiApiKey = builder.Configuration["Ai:Anthropic:ApiKey"];
 var aiModel = builder.Configuration["Ai:Anthropic:Model"];
-builder.Services.AddSquadInfrastructure(sqlConnection, storageConnection, clubFeeBps, aiApiKey, aiModel);
+// Plan library seeding: only AI-generates the built-in plan templates when explicitly enabled
+// (PlanLibrary:Seed=true), optionally capped per run (PlanLibrary:SeedLimit) to roll out gradually.
+var seedLibrary = builder.Configuration.GetValue<bool>("PlanLibrary:Seed");
+var seedLimit = builder.Configuration.GetValue<int?>("PlanLibrary:SeedLimit") ?? 0;
+builder.Services.AddSquadInfrastructure(
+    sqlConnection, storageConnection, clubFeeBps, aiApiKey, aiModel, seedLibrary, seedLimit);
 
 // ---- realtime (feed + live ride) ----
 builder.Services.AddSignalR();

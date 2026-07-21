@@ -14,6 +14,9 @@ public sealed record PublishWorkoutDto(
 /// <summary>Create/update a coach's saved plan. Id null = create.</summary>
 public sealed record SavePlanRequest(Guid? Id, string? Name, string? Doc, Guid? SquadId);
 
+/// <summary>Adopt a library template into the caller's plans, stamping their start/target date.</summary>
+public sealed record AdoptTemplateRequest(string? AnchorType, string? AnchorDate);
+
 /// <summary>
 /// The signed-in athlete's weekly training plan (Mon..Sun of the current week,
 /// or of the week containing an optional ?weekStart=yyyy-MM-dd).
@@ -39,7 +42,68 @@ public static class PlanEndpoints
         // Async: POST submits a background job (202 + jobId); the client polls GET .../import/{jobId}.
         app.MapPost("/api/plan/import", SubmitPlanImport).DisableAntiforgery().RequireAuthorization();
         app.MapGet("/api/plan/import/{jobId:guid}", GetPlanImport).RequireAuthorization();
+        // Plan library: browse pre-generated templates, load one, or adopt it as your own plan.
+        app.MapGet("/api/plan/library", ListLibrary).RequireAuthorization();
+        app.MapGet("/api/plan/library/{id:guid}", GetLibraryTemplate).RequireAuthorization();
+        app.MapPost("/api/plan/library/{id:guid}/adopt", AdoptTemplate).RequireAuthorization();
         return app;
+    }
+
+    private static async Task<IResult> ListLibrary(IPlanTemplateStore templates, CancellationToken ct)
+    {
+        var list = await templates.ListAsync(ct);
+        return Results.Ok(list.Select(t => new
+        {
+            id = t.Id, distance = t.Distance, level = t.Level, goalLabel = t.GoalLabel,
+            name = t.Name, weeks = t.Weeks, sortOrder = t.SortOrder,
+        }));
+    }
+
+    private static async Task<IResult> GetLibraryTemplate(Guid id, IPlanTemplateStore templates, CancellationToken ct)
+    {
+        var t = await templates.GetAsync(id, ct);
+        return t is null
+            ? Results.NotFound(new { error = "Plan not found." })
+            : Results.Ok(new { id = t.Id, distance = t.Distance, goalLabel = t.GoalLabel, name = t.Name, weeks = t.Weeks, doc = t.Doc });
+    }
+
+    /// <summary>Copy a library template into the caller's own plans, stamping their anchor date.
+    /// Body: { anchorType?: "start"|"target", anchorDate?: "yyyy-MM-dd" }. → { id, name }.</summary>
+    private static async Task<IResult> AdoptTemplate(
+        HttpContext http, Guid id, AdoptTemplateRequest? req, IPlanTemplateStore templates, IPlanService plans, CancellationToken ct)
+    {
+        if (CallerId(http) is not { } ownerId) return Results.Unauthorized();
+        var t = await templates.GetAsync(id, ct);
+        if (t is null) return Results.NotFound(new { error = "Plan not found." });
+
+        var anchorType = string.Equals(req?.AnchorType, "target", StringComparison.OrdinalIgnoreCase) ? "target" : "start";
+        var anchorDate = req?.AnchorDate;
+        if (!string.IsNullOrWhiteSpace(anchorDate) && !DateOnly.TryParse(anchorDate,
+                System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out _))
+            anchorDate = null;
+
+        var doc = ApplyAnchor(t.Doc, anchorType, anchorDate);
+        var newId = await plans.SavePlanAsync(ownerId, null, t.Name, doc, null, ct);
+        return newId is null
+            ? Results.Problem("Couldn't adopt that plan.")
+            : Results.Ok(new { id = newId, name = t.Name });
+    }
+
+    // Stamp the chosen anchor onto the template's doc JSON so the adopted copy opens on the user's date.
+    private static string ApplyAnchor(string doc, string anchorType, string? anchorDate)
+    {
+        try
+        {
+            var node = System.Text.Json.Nodes.JsonNode.Parse(doc);
+            if (node is not null)
+            {
+                node["anchorType"] = anchorType;
+                node["anchorDate"] = anchorDate ?? "";
+                return node.ToJsonString();
+            }
+        }
+        catch (System.Text.Json.JsonException) { /* fall through — save the doc as-is */ }
+        return doc;
     }
 
     private const long MaxPdfBytes = 15 * 1024 * 1024; // 15 MB

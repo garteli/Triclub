@@ -22,9 +22,14 @@ public static class InfrastructureServiceCollectionExtensions
     /// <param name="aiApiKey">Anthropic API key for PDF plan import. Null/empty ⇒ the import feature
     /// reports "not configured" instead of running.</param>
     /// <param name="aiModel">Anthropic model id for plan import (default claude-sonnet-5).</param>
+    /// <param name="seedPlanLibrary">When true, a startup worker AI-generates any missing library plan
+    /// templates (gated so generation only runs when explicitly enabled).</param>
+    /// <param name="seedPlanLibraryLimit">Max templates to generate per run (0 = all). Lets the library be
+    /// rolled out a few plans at a time.</param>
     public static IServiceCollection AddSquadInfrastructure(
         this IServiceCollection services, string sqlConnectionString, string? storageConnectionString = null,
-        int paymentsClubFeeBps = 1000, string? aiApiKey = null, string? aiModel = null)
+        int paymentsClubFeeBps = 1000, string? aiApiKey = null, string? aiModel = null,
+        bool seedPlanLibrary = false, int seedPlanLibraryLimit = 0)
     {
         // Collection-surface adapters (resolved by Source in the worker).
         services.AddSingleton<ISourceAdapter, FitUploadAdapter>();
@@ -76,6 +81,14 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddSingleton<PlanImportQueue>(_ => new PlanImportQueue(aiConfigured));
         services.AddSingleton<IPlanImportQueue>(sp => sp.GetRequiredService<PlanImportQueue>());
         services.AddHostedService<PlanImportWorker>();
+
+        // Plan library: pre-generated, adoptable templates + a startup seeder (AI-generates missing ones,
+        // gated by config so it only runs when explicitly turned on).
+        services.AddScoped<IPlanTemplateStore>(_ => new SqlPlanTemplateStore(sqlConnectionString));
+        services.AddHostedService(sp => new PlanLibrarySeeder(
+            sp.GetRequiredService<IServiceScopeFactory>(),
+            sp.GetRequiredService<ILogger<PlanLibrarySeeder>>(),
+            seedPlanLibrary, seedPlanLibraryLimit));
 
         // Image blobs: Azure Blob Storage in prod (connection string set), else the
         // local filesystem fallback under {ContentRoot}/App_Data/images for dev.
