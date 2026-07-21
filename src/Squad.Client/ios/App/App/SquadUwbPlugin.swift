@@ -60,6 +60,7 @@ public class SquadUwbPlugin: CAPPlugin, CAPBridgedPlugin {
                 call.reject("Couldn't create a discovery token")
                 return
             }
+            NSLog("[SquadUwb] startPeer(%@) — session created, token issued", athleteId)
             call.resolve(["athleteId": athleteId, "token": data.base64EncodedString()])
         }
     }
@@ -76,6 +77,7 @@ public class SquadUwbPlugin: CAPPlugin, CAPBridgedPlugin {
                 return
             }
             session.run(NINearbyPeerConfiguration(peerToken: token))
+            NSLog("[SquadUwb] receivePeerToken(%@) — session running against peer token", athleteId)
             call.resolve()
         }
     }
@@ -112,15 +114,46 @@ final class NIDelegate: NSObject, NISessionDelegate {
                 data["dirY"] = Double(dir.y)
                 data["dirZ"] = Double(dir.z)
             }
+            NSLog("[SquadUwb] nearby %@ dist=%@ dir=%@", athleteId,
+                  obj.distance.map { String(format: "%.2fm", $0) } ?? "—",
+                  obj.direction.map { String(format: "(%.2f,%.2f,%.2f)", $0.x, $0.y, $0.z) } ?? "nil")
             emit("nearby", data)
         }
     }
 
+    // iOS 16+: tells us WHY there's no direction yet (needs sweeping/movement/etc.) so the UI can
+    // coach the user. Only fires with camera assistance on some devices; harmless where it doesn't.
+    @available(iOS 16.0, *)
+    func session(_ session: NISession, didUpdateAlgorithmConvergence convergence: NIAlgorithmConvergence, for object: NINearbyObject?) {
+        var reasons: [String] = []
+        var converged = false
+        switch convergence.status {
+        case .converged:
+            converged = true
+        case .notConverged(let rs):
+            for r in rs {
+                switch r {
+                case .insufficientHorizontalSweep: reasons.append("sweep-left-right")
+                case .insufficientVerticalSweep: reasons.append("sweep-up-down")
+                case .insufficientMovement: reasons.append("move-around")
+                case .insufficientLighting: reasons.append("more-light")
+                @unknown default: reasons.append("unknown")
+                }
+            }
+        @unknown default:
+            break
+        }
+        NSLog("[SquadUwb] convergence %@ converged=%@ reasons=%@", athleteId, converged ? "yes" : "no", reasons.joined(separator: ","))
+        emit("convergence", ["athleteId": athleteId, "converged": converged, "reasons": reasons])
+    }
+
     func session(_ session: NISession, didRemove nearbyObjects: [NINearbyObject], reason: NINearbyObject.RemovalReason) {
+        NSLog("[SquadUwb] lost %@ (%@)", athleteId, "\(reason)")
         emit("lost", ["athleteId": athleteId, "reason": "\(reason)"])
     }
 
     func session(_ session: NISession, didInvalidateWith error: Error) {
+        NSLog("[SquadUwb] invalidated %@: %@", athleteId, error.localizedDescription)
         emit("error", ["athleteId": athleteId, "message": error.localizedDescription])
     }
 

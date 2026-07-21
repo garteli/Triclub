@@ -23,6 +23,8 @@ export function createUwbSource() {
     stop: () => SquadUwb.stop().catch(() => {}),
     async onNearby(cb) { handles.push(await SquadUwb.addListener('nearby', cb)); },
     async onLost(cb) { handles.push(await SquadUwb.addListener('lost', cb)); },
+    // iOS 16+ convergence hints ({ athleteId, converged, reasons[] }) — why direction isn't ready yet.
+    async onConvergence(cb) { handles.push(await SquadUwb.addListener('convergence', cb)); },
     removeAll() { handles.forEach((h) => { try { h.remove?.(); } catch { /* ignore */ } }); handles.length = 0; },
   };
 }

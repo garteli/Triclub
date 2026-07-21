@@ -45,7 +45,14 @@ export function useUwbRanging({ athleteId, active, riders = [], pushUwbToken, on
       await src.onNearby((e) => {
         if (!e?.athleteId) return;
         const dir = e.dirX != null ? { x: e.dirX, y: e.dirY, z: e.dirZ } : null;
-        setPeers((prev) => ({ ...prev, [e.athleteId]: { distanceM: e.distanceM ?? null, dir, bearing: uwbBearing(dir), ts: e.ts } }));
+        setPeers((prev) => ({
+          ...prev,
+          [e.athleteId]: { ...prev[e.athleteId], distanceM: e.distanceM ?? null, dir, bearing: uwbBearing(dir), ts: e.ts ?? Date.now() },
+        }));
+      });
+      await src.onConvergence((e) => {
+        if (!e?.athleteId) return;
+        setPeers((prev) => ({ ...prev, [e.athleteId]: { ...prev[e.athleteId], converged: !!e.converged, reasons: e.reasons || [] } }));
       });
       await src.onLost((e) => {
         if (!e?.athleteId) return;
