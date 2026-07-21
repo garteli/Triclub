@@ -11,7 +11,7 @@ const validPts = (route) => (route || []).filter((p) => Array.isArray(p) && Numb
 // play (route replay at 4×). Falls back to a gradient panel when there's no GPS.
 const glass = 'background:rgba(20,23,29,.72);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.1);color:#fff';
 
-export default function ActivityHero({ a, route, frames, hasMap, status, token, onBack, onDelete }) {
+export default function ActivityHero({ a, route, frames, hasMap, status, token, onBack, onDelete, onSaveRoute }) {
   const [mapStyle, setMapStyle] = useState('voyager');
   const [is3D, setIs3D] = useState(false);
   const [full, setFull] = useState(false);
@@ -55,12 +55,14 @@ export default function ActivityHero({ a, route, frames, hasMap, status, token, 
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round"><path d="M15 6l-6 6 6 6" /></svg>
         </div>
       )}
-      {/* Save Route + overflow */}
+      {/* Save Route (→ save this activity's track as a course) + overflow */}
       <div style={s('position:absolute;top:16px;right:16px;z-index:3;display:flex;gap:8px')}>
-        <div className="ctl" style={s(`height:38px;padding:0 14px;border-radius:19px;display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;${glass}`)}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" /></svg>
-          Save Route
-        </div>
+        {onSaveRoute && (
+          <div className="ctl" onClick={onSaveRoute} style={s(`height:38px;padding:0 14px;border-radius:19px;display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;${glass}`)}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" /></svg>
+            Save Route
+          </div>
+        )}
         <div className="ctl" onClick={a.isMe ? onDelete : undefined} title={a.isMe ? 'Delete training' : undefined} style={s(`width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;letter-spacing:1px;font-size:13px;${glass}`)}>···</div>
       </div>
       {/* layers (cycle basemap) + 3D (inline terrain tilt) */}

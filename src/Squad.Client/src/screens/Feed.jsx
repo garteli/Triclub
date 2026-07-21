@@ -661,18 +661,16 @@ const courseDistKm = (pts) => {
 };
 
 // Turn this activity's recorded GPS track into a saved course (owner-scoped to the caller), so it
-// can be followed on a live ride or attached to a planned session. Only shows when there's a real
-// map track and a courses API is wired.
-function SaveAsCourse({ route, defaultName, courses }) {
-  const [mode, setMode] = useState('idle'); // idle | naming | saving | saved | error
-  const [name, setName] = useState('');
+// can be followed on a live ride or attached to a planned session. Opened by the hero's "Save Route"
+// button; `onClose` dismisses the panel.
+function SaveAsCourse({ route, defaultName, courses, onClose }) {
+  const [mode, setMode] = useState('naming'); // naming | saving | saved | error
+  const [name, setName] = useState(defaultName || 'Route');
   const [msg, setMsg] = useState('');
-  const canSave = !!courses?.save && Array.isArray(route) && route.length >= 2;
-  if (!canSave) return null;
   const km = courseDistKm(route);
 
-  const open = () => { setName(defaultName || 'Route'); setMsg(''); setMode('naming'); };
   const doSave = async () => {
+    if (mode === 'saving') return;
     setMode('saving'); setMsg('');
     try {
       await courses.save((name || defaultName || 'Route').trim(), route, km || null);
@@ -682,31 +680,22 @@ function SaveAsCourse({ route, defaultName, courses }) {
 
   return (
     <div style={s('padding:16px 18px 0')}>
-      {mode === 'idle' && (
-        <div className="ctl" onClick={open}
-          style={s('display:flex;align-items:center;justify-content:center;gap:8px;background:var(--bg2);border:1px solid var(--line);color:var(--text);border-radius:14px;padding:13px;font-weight:700;font-size:13.5px')}>
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
-          Save route as course
+      {mode === 'saved' ? (
+        <div style={s('display:flex;align-items:center;gap:8px;background:color-mix(in srgb,var(--good) 12%,var(--bg2));border:1px solid color-mix(in srgb,var(--good) 30%,transparent);border-radius:14px;padding:13px 14px')}>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--good)" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
+          <div style={s('flex:1;font-size:13px;color:var(--text);font-weight:600')}>Saved to your courses — follow it on a live ride.</div>
+          <div className="ctl" onClick={onClose} style={s('font-size:12.5px;font-weight:700;color:var(--text2)')}>Done</div>
         </div>
-      )}
-
-      {(mode === 'naming' || mode === 'saving' || mode === 'error') && (
+      ) : (
         <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:14px')}>
           <div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:8px')}>Save as course · {route.length} pts · {km.toFixed(1)} km</div>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Course name" disabled={mode === 'saving'}
             style={s('width:100%;box-sizing:border-box;background:var(--bg3);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:14px;color:var(--text);outline:none;font-family:inherit')} />
           {msg && <div style={s('font-size:12px;color:var(--bad);font-weight:600;margin-top:9px')}>{msg}</div>}
           <div style={s('display:flex;gap:10px;margin-top:12px')}>
-            <div className="ctl" onClick={mode === 'saving' ? undefined : () => setMode('idle')} style={s('flex:1;text-align:center;padding:11px;border-radius:12px;font-weight:700;font-size:13.5px;background:var(--bg3);border:1px solid var(--line);color:var(--text2)')}>Cancel</div>
+            <div className="ctl" onClick={mode === 'saving' ? undefined : onClose} style={s('flex:1;text-align:center;padding:11px;border-radius:12px;font-weight:700;font-size:13.5px;background:var(--bg3);border:1px solid var(--line);color:var(--text2)')}>Cancel</div>
             <div className="ctl" onClick={mode === 'saving' ? undefined : doSave} style={s(`flex:1;text-align:center;padding:11px;border-radius:12px;font-weight:700;font-size:13.5px;background:var(--accent);color:var(--accent-ink);opacity:${mode === 'saving' ? 0.7 : 1}`)}>{mode === 'saving' ? 'Saving…' : 'Save course'}</div>
           </div>
-        </div>
-      )}
-
-      {mode === 'saved' && (
-        <div style={s('display:flex;align-items:center;gap:8px;background:color-mix(in srgb,var(--good) 12%,var(--bg2));border:1px solid color-mix(in srgb,var(--good) 30%,transparent);border-radius:14px;padding:13px 14px')}>
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--good)" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
-          <div style={s('flex:1;font-size:13px;color:var(--text);font-weight:600')}>Saved to your courses — follow it on a live ride.</div>
         </div>
       )}
     </div>
@@ -718,6 +707,7 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
   const token = getToken?.() ?? null;
   const [confirmDel, setConfirmDel] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [saveOpen, setSaveOpen] = useState(false);
 
   const { track, laps, matched, status } = useActivityTrack(a?.id, { getToken });
   const frames = useMemo(() => buildFrames(track), [track]);
@@ -787,9 +777,10 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
   return (
     <div style={s('padding:0 0 120px;animation:floatUp .35s ease')}>
       <ActivityHero a={a} route={route} frames={frames} hasMap={hasMap} status={status} token={token}
-        onDelete={() => setConfirmDel(true)} />
+        onDelete={() => setConfirmDel(true)}
+        onSaveRoute={hasMap && live?.courses?.save ? () => setSaveOpen(true) : undefined} />
 
-      {hasMap && <SaveAsCourse route={route} defaultName={a.title} courses={live?.courses} />}
+      {saveOpen && hasMap && <SaveAsCourse route={route} defaultName={a.title} courses={live?.courses} onClose={() => setSaveOpen(false)} />}
 
       <AthleteTitle a={a} token={token} onAthlete={actions.openAthlete} />
       <MetricHero a={a} load={effLoad} />
