@@ -33,6 +33,16 @@ export const listMembers = (token, id) => req(`/api/squads/${id}/members`, { tok
 export const addMember = (token, id, email) => req(`/api/squads/${id}/members`, { method: 'POST', token, body: { email } });
 export const removeMember = (token, id, athleteId) => req(`/api/squads/${id}/members/${athleteId}`, { method: 'DELETE', token });
 
+// Group targets: coach (owner) sets club target races; members browse + adopt.
+// listSquadTargets → [{ id, name, date, location, url }]
+export const listSquadTargets = (token, id) => req(`/api/squads/${id}/targets`, { token });
+// body: { url } (AI extracts name/date/location) OR { name, date, location } → the created target.
+export const addSquadTarget = (token, id, body) => req(`/api/squads/${id}/targets`, { method: 'POST', token, body });
+export const removeSquadTarget = (token, id, targetId) => req(`/api/squads/${id}/targets/${targetId}`, { method: 'DELETE', token });
+// Adopt a group target as MY goal race (reuses the profile goal endpoint with explicit fields).
+export const adoptTargetAsGoal = (token, target) =>
+  req('/api/profile/goal', { method: 'POST', token, body: { name: target.name, date: target.date, location: target.location, url: target.url } });
+
 // Logo / banner upload. dataUrl is a downscaled JPEG (see lib/photos.js downscaleToJpeg).
 // kind is 'logo' | 'banner'. Returns { url }.
 export async function uploadSquadImage(token, id, kind, blob) {

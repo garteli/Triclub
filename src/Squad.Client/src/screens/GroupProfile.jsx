@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { s } from '../lib/style.js';
 import AuthedImage from '../components/AuthedImage.jsx';
+import GroupTargets from '../components/GroupTargets.jsx';
 
 const Back = ({ onClick }) => (
   <div className="ctl" onClick={onClick} style={s('width:34px;height:34px;border-radius:10px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center')}>
@@ -150,6 +151,9 @@ export default function GroupProfile({ vm, actions, onJoinSquad, payments, meId,
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.4" strokeLinecap="round"><path d="M9 6l6 6-6 6" /></svg>
           </div>
         )}
+
+        {/* group target races — members can add one to their own goals */}
+        {live && <GroupTargets squadId={g.id} getToken={getToken} mode="adopt" />}
 
         {/* apply / status (mock prototype only) */}
         {!live && a.notApplied && (
