@@ -96,12 +96,38 @@ export function useRideTelemetry({ t, active, riders = [], recorder, sensors }) 
     const recording = !!recorder?.recording;
     const now = new Date();
 
+    // Put THIS device's own position on the map straight from the local GPS fix — don't wait for
+    // the hub to echo it back. Without this a solo ride (no teammates streaming) shows "Waiting
+    // for GPS…" forever even with a good fix. Full rider shape so the map + rider list all render.
+    const hubYou = riders.find((r) => r.you) || null;
+    const haveFix = fix.lat != null && fix.lon != null;
+    const localYou = haveFix ? {
+      athleteId: hubYou?.athleteId ?? 'you',
+      you: true,
+      name: hubYou?.name ?? 'You',
+      initials: hubYou?.initials ?? 'You',
+      color: hubYou?.color ?? 'var(--accent)',
+      lat: fix.lat, lon: fix.lon,
+      gapM: hubYou?.gapM ?? null,
+      fused: hubYou?.fused ?? false,
+      spd: (spd ?? 0).toFixed(1),
+      hr: hr != null ? Math.round(hr) : 0,
+      powerW: pwr ?? null,
+      radar: fix.radar ?? hubYou?.radar ?? null,
+      dist: (dist ?? 0).toFixed(1),
+      hrPct: hr != null ? Math.min(100, Math.round(((hr - 110) / 70) * 100)) : 0,
+      hrColor: hubYou?.hrColor ?? 'var(--good)',
+      dropped: false,
+      rowBg: 'background:var(--accent-dim);border:1px solid color-mix(in srgb,var(--accent) 40%,transparent)',
+    } : null;
+    const allRiders = localYou ? [localYou, ...riders.filter((r) => !r.you)] : riders;
+
     // Who's on the front this tick = whoever has covered the most distance (furthest up the
     // road). Only meaningful with a group, so lead time only accrues when ≥2 riders stream.
     let leaderId = null;
-    if (riders.length > 1) {
+    if (allRiders.length > 1) {
       let best = -Infinity;
-      for (const r of riders) {
+      for (const r of allRiders) {
         const d = parseFloat(r.dist) || 0;
         if (d > best) { best = d; leaderId = r.athleteId; }
       }
@@ -111,7 +137,7 @@ export function useRideTelemetry({ t, active, riders = [], recorder, sensors }) 
     const samples = leadSamples.current;
     const leadPctById = {};
     for (const id of Object.keys(leadCount.current)) leadPctById[id] = leadCount.current[id] / samples;
-    const youId = riders.find((r) => r.you)?.athleteId ?? null;
+    const youId = (localYou ?? hubYou)?.athleteId ?? null;
     const peloton = {
       leaderId, samples, leadPctById,
       youLeadPct: youId != null && samples ? (leadCount.current[youId] || 0) / samples : null,
@@ -119,7 +145,7 @@ export function useRideTelemetry({ t, active, riders = [], recorder, sensors }) 
 
     setTel({
       // "live" = we have a real feed: this device is recording, or teammates are streaming.
-      live: recording || riders.length > 0,
+      live: recording || allRiders.length > 0,
       recording,
       elapsed,
       clock: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
@@ -134,14 +160,14 @@ export function useRideTelemetry({ t, active, riders = [], recorder, sensors }) 
       maxElevM: maxElev.current != null ? Math.round(maxElev.current) : null,
       kcal: avgpwr != null ? Math.round((avgpwr * elapsed) / 1000 * 1.02) : null, // kJ≈kcal for cycling
       hist: { spd: [...hist.current.spd], hr: [...hist.current.hr], pwr: [...hist.current.pwr] },
-      riders,
-      radar: groupRadar(riders),
+      riders: allRiders,
+      radar: groupRadar(allRiders),
       peloton,
-      you: riders.find((r) => r.you) || null,
+      you: localYou ?? hubYou,
       // Pack-fusion spacing (from phone-to-phone BLE ranging, when active): your fused gap to
       // the nearest teammate, and whether any rider's position is BLE-refined this tick.
-      gap: riders.find((r) => r.you)?.gapM ?? null,
-      packFused: riders.some((r) => r.fused),
+      gap: (localYou ?? hubYou)?.gapM ?? null,
+      packFused: allRiders.some((r) => r.fused),
     });
   }, [t, active]); // eslint-disable-line react-hooks/exhaustive-deps
 
