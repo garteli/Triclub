@@ -37,6 +37,8 @@
 	<string>Domestique Team connects to your heart-rate strap, power meter, and radar.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Domestique Team uses your camera to take a profile photo.</string>
+	<key>NSNearbyInteractionUsageDescription</key>
+	<string>Domestique Team uses Ultra-Wideband to show the precise distance and direction to teammates during a live ride.</string>
 	<key>NSHealthShareUsageDescription</key>
 	<string>Domestique Team reads your workouts from Apple Health to add them to your training log and squad feed.</string>
 	<key>NSHealthUpdateUsageDescription</key>

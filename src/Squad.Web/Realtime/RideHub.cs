@@ -138,6 +138,22 @@ public sealed class RideHub(IAthleteDirectory directory, IRideSessionState state
         return Task.CompletedTask;
     }
 
+    /// <summary>Relay a UWB (Nearby Interaction) discovery token from the caller to a specific
+    /// teammate so the two devices can open a precise-ranging session. The token is opaque; the
+    /// sender's identity is taken from the connection, never the payload. Fanned out to the whole
+    /// ride group with an explicit <c>to</c> so the intended recipient's client can filter for it.</summary>
+    public async Task ShareUwbToken(Guid rideId, Guid toAthleteId, string token)
+    {
+        var fromAthleteId = ResolveAthleteId(Context.User);
+        if (fromAthleteId is null || string.IsNullOrEmpty(token)) return;
+        await Clients.Group(RideGroup(rideId)).SendAsync("uwbToken", new
+        {
+            from = fromAthleteId.Value,
+            to = toAthleteId,
+            token,
+        });
+    }
+
     private static Guid? ResolveAthleteId(ClaimsPrincipal? user)
     {
         var claim = user?.FindFirstValue(ClaimTypes.NameIdentifier) ?? user?.FindFirstValue("sub");

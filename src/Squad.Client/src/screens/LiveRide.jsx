@@ -1,6 +1,7 @@
 import { s } from '../lib/style.js';
 import RideRecorder from '../components/RideRecorder.jsx';
 import LivePages from '../components/LivePages.jsx';
+import UwbReadout from '../components/UwbReadout.jsx';
 import { gearComponentsFromSensors } from '../lib/liveMetrics.js';
 
 const Back = ({ onClick }) => (
@@ -109,6 +110,9 @@ function Active({ actions, live }) {
       {!recording && (
         <div style={s('margin:0 12px 8px;padding:9px 12px;border-radius:12px;background:var(--bg2);border:1px solid var(--line);font-size:11.5px;color:var(--text3);text-align:center')}>Not recording — go back and tap <b style={s('color:var(--text2)')}>Start recording</b> to see your live numbers.</div>
       )}
+
+      {/* precise UWB distance/direction to teammates (native + U1 devices; hidden otherwise) */}
+      <UwbReadout uwb={live?.uwb} riders={live?.riders} />
 
       <LivePages tel={tel} lp={live?.livePages} />
     </div>

@@ -45,6 +45,7 @@ export function useLiveRide(rideId, { hubUrl = API_BASE + '/hubs/ride', getToken
   const [byId, setById] = useState({});
   const [status, setStatus] = useState('idle'); // 'idle' | 'live' | 'offline'
   const connRef = useRef(null);
+  const uwbSubs = useRef(new Set()); // subscribers to relayed UWB discovery tokens
 
   useEffect(() => {
     if (!enabled || !rideId) return;
@@ -60,6 +61,8 @@ export function useLiveRide(rideId, { hubUrl = API_BASE + '/hubs/ride', getToken
     conn.on('snapshot', (list) => setById(Object.fromEntries((list ?? []).map((u) => [u.athleteId, u]))));
     conn.on('riderMoved', upsert);
     conn.on('riderLeft', (athleteId) => setById((prev) => { const n = { ...prev }; delete n[athleteId]; return n; }));
+    // UWB discovery-token relay (Nearby Interaction handshake) — dispatched to subscribers.
+    conn.on('uwbToken', (msg) => uwbSubs.current.forEach((cb) => { try { cb(msg); } catch { /* ignore */ } }));
     conn.onreconnected(() => { setStatus('live'); conn.invoke('JoinRide', rideId).catch(() => {}); });
     conn.onclose(() => setStatus('offline'));
 
@@ -89,9 +92,17 @@ export function useLiveRide(rideId, { hubUrl = API_BASE + '/hubs/ride', getToken
     [rideId],
   );
 
+  // UWB (Nearby Interaction) token exchange: send our discovery token to a specific teammate,
+  // and subscribe to tokens relayed to us. Both are best-effort (older backend → no-op).
+  const pushUwbToken = useCallback(
+    (toAthleteId, token) => connRef.current?.invoke('ShareUwbToken', rideId, toAthleteId, token).catch(() => {}),
+    [rideId],
+  );
+  const onUwbToken = useCallback((cb) => { uwbSubs.current.add(cb); return () => uwbSubs.current.delete(cb); }, []);
+
   // Memoised on the raw hub state so the reference only changes when a rider actually
   // moves/joins/leaves — lets useRideTelemetry re-render the map on each position update
   // (not on every unrelated App render).
   const riders = useMemo(() => Object.values(byId).map((u) => mapLiveRider(u, meId)), [byId, meId]);
-  return { riders, status, pushTelemetry, pushPeerRange };
+  return { riders, status, pushTelemetry, pushPeerRange, pushUwbToken, onUwbToken };
 }

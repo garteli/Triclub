@@ -356,3 +356,46 @@ step 1 first so the profile is ready, then re-wire in the same or a follow-up bu
   `npm ci` → `npm run build` → `npx cap sync ios`, which pulls the plugin's iOS pod
   automatically. Push/commit → TestFlight build carries native Google + Apple sign-in.
 - `.npmrc` sets `legacy-peer-deps=true` so `npm ci` tolerates the mixed Capacitor peer ranges.
+
+---
+
+## Ultra-Wideband (UWB) precise ranging — SCAFFOLD (unverified on hardware)
+
+BLE RSSI only gives a rough *distance* — no direction, and it can't resolve ~50 cm. For exact
+**distance + direction (front/back, left/right)** between two Apple devices, the app has a
+scaffold built on Apple's **NearbyInteraction** (the U1/U2 chip, same tech as AirTag Precision
+Finding). It runs **only on the native iOS app** and only between UWB-capable devices
+(**iPhone 11+ / iPad Pro 2020+**). On web and non-UWB devices it is completely inert and the
+ride falls back to BLE + GPS.
+
+**Status: written but NOT yet verified on hardware** — it needs the native iOS build plus two
+UWB devices on the same ride to test. Treat the numbers as unproven until then.
+
+### Pieces
+- `ios/App/App/SquadUwbPlugin.swift` — the Capacitor plugin. One `NISession` per peer; exposes
+  `isSupported`, `startPeer` (→ this device's base64 discovery token), `receivePeerToken`, `stop`;
+  emits a `nearby` event `{ athleteId, distanceM, dirX, dirY, dirZ, ts }`.
+- `Info.plist` → `NSNearbyInteractionUsageDescription` (already added).
+- `src/lib/uwbSource.native.js` — JS wrapper + `uwbBearing()` (direction vector → label/angle).
+- `src/hooks/useUwbRanging.js` — drives the per-peer token handshake over the ride hub and
+  collects `{ distanceM, dir, bearing }` per teammate.
+- `RideHub.cs` `ShareUwbToken(rideId, toAthleteId, token)` + client `pushUwbToken`/`onUwbToken`
+  (`useLiveRide`) relay the discovery tokens between the two devices.
+- `components/UwbReadout.jsx` — the live-ride strip showing each teammate's exact distance + a
+  direction arrow. Hidden unless UWB peers exist.
+
+### Build & test
+1. `npm run build && npx cap sync ios` (the plugin is a local file in the App target — no pod).
+2. Open `ios/App` in Xcode, run on a **real** U1 device (UWB is unavailable in the Simulator).
+3. Accept the Nearby Interaction permission prompt on first ride.
+4. Put two UWB devices on the **same live ride** (same squad, both recording). Once both trade
+   discovery tokens over the hub, the **UWB** strip shows metre-accurate distance and an arrow
+   pointing at each teammate. `direction` stays null until the session converges and the devices
+   are oriented so the U1 antenna can resolve angle (distance appears first).
+
+### Notes / limits
+- Requires foreground (like the BLE beacon) and both peers UWB-capable; otherwise it silently
+  no-ops and BLE/GPS remain in charge.
+- Android UWB (`androidx.core.uwb`) is not implemented — very few Android phones have UWB.
+- The iOS TestFlight build blocker (Swift toolchain / FBSDKLoginKit, see the iOS build notes)
+  must be resolved before any of this can ship to a device.
