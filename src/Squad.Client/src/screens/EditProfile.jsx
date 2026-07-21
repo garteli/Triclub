@@ -8,6 +8,23 @@ import { loadImageFile } from '../lib/avatar.js';
 
 const SPORTS = ['Triathlon', 'Cycling', 'Running', 'Swimming'];
 const LEVELS = ['New to it', 'Intermediate', 'Advanced', 'Racing'];
+const GENDERS = ['Male', 'Female', 'Non-binary', 'Prefer not to say'];
+
+// Derive a 5-year age band ("35–39", or "U20" for under-20) from an ISO birth date.
+// AgeGroup is no longer edited by hand — it always follows the birth date.
+function ageGroupFromBirthDate(iso) {
+  if (!iso) return '';
+  const b = new Date(iso);
+  if (Number.isNaN(b.getTime())) return '';
+  const now = new Date();
+  let age = now.getFullYear() - b.getFullYear();
+  const m = now.getMonth() - b.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < b.getDate())) age -= 1;
+  if (age < 0 || age > 120) return '';
+  if (age < 20) return 'U20';
+  const lo = Math.floor(age / 5) * 5;
+  return `${lo}–${lo + 4}`;
+}
 
 // Edit your own profile. Seeds from vm.me (the persisted profile); on save writes
 // through PUT /api/profile, updates the app's profile state, and returns to Profile.
@@ -16,7 +33,9 @@ export default function EditProfile({ vm, actions, getToken, onProfileSaved }) {
   const [form, setForm] = useState({
     name: m.name, club: m.club, sport: m.sport, level: m.level,
     ftp: String(m.ftp ?? ''), weekly: m.weekly, bio: m.bio,
+    birthDate: m.birthDate || '', gender: m.gender || '', weight: String(m.weight ?? ''),
   });
+  const ageGroup = ageGroupFromBirthDate(form.birthDate);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [photoError, setPhotoError] = useState('');
@@ -53,12 +72,16 @@ export default function EditProfile({ vm, actions, getToken, onProfileSaved }) {
     setError(''); setBusy(true);
     try {
       const ftpNum = form.ftp === '' ? null : Number(form.ftp);
+      const weightNum = form.weight === '' ? null : Number(form.weight);
       const updated = await updateProfile(getToken(), {
         name: form.name, club: form.club, primarySport: form.sport, level: form.level,
         ftp: Number.isFinite(ftpNum) ? ftpNum : null, weeklyHours: form.weekly, bio: form.bio,
+        birthDate: form.birthDate || null, gender: form.gender || null,
+        weightKg: Number.isFinite(weightNum) ? weightNum : null,
+        ageGroup: ageGroup || null, // derived from birthDate, kept in sync server-side
       });
       onProfileSaved?.(updated);
-      actions.setMe({ ...form, ftp: form.ftp }); // instant local reflection
+      actions.setMe({ ...form, ftp: form.ftp, ageGroup }); // instant local reflection
       actions.go('profile');
     } catch (e) {
       setError(e.message || 'Could not save your profile.');
@@ -99,6 +122,15 @@ export default function EditProfile({ vm, actions, getToken, onProfileSaved }) {
       <Chips options={SPORTS} value={form.sport} onChange={set('sport')} />
       <FieldLabel>Experience</FieldLabel>
       <Chips options={LEVELS} value={form.level} onChange={set('level')} />
+
+      <div style={s('display:flex;gap:9px')}>
+        <div style={s('flex:1')}><Field label="Birth date" value={form.birthDate} onChange={set('birthDate')} type="date" mono /></div>
+        <div style={s('flex:1')}><Field label="Weight (kg)" value={form.weight} onChange={set('weight')} placeholder="72.5" type="number" mono /></div>
+      </div>
+      {ageGroup && <div style={s('font-size:11px;color:var(--text3);margin:6px 2px 0')}>Age group · <span className="mono" style={s('color:var(--text2)')}>{ageGroup}</span> (from birth date)</div>}
+
+      <FieldLabel>Gender</FieldLabel>
+      <Chips options={GENDERS} value={form.gender} onChange={set('gender')} />
 
       <div style={s('display:flex;gap:9px')}>
         <div style={s('flex:1')}><Field label="FTP (W)" value={form.ftp} onChange={set('ftp')} placeholder="271" type="number" mono /></div>

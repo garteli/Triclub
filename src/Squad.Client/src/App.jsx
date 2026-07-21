@@ -12,7 +12,7 @@ import { useActivities } from './hooks/useActivities.js';
 import { useSquads } from './hooks/useSquads.js';
 import { usePlan } from './hooks/usePlan.js';
 import { useGarminSync } from './hooks/useGarminSync.js';
-import { createSquad, joinSquad } from './lib/squads.js';
+import { createSquad, joinSquad, activateSquad } from './lib/squads.js';
 import { recordPayment, markPaymentPaid, waivePayment } from './lib/payments.js';
 import { publishPlan, listPlans, getPlan, savePlan, deletePlan } from './lib/plan.js';
 // import { useLiveRide } from './hooks/useLiveRide.js'; // swap in for real telemetry
@@ -188,6 +188,7 @@ export default function App() {
       // The athlete's active squad (name + logo/banner for the dashboard header).
       squadName: authed ? liveSquads.find((sq) => sq.id === squadId)?.name : undefined,
       activeSquad: authed ? liveSquads.find((sq) => sq.id === squadId) : null,
+      activeClubId: authed ? squadId : null,
     }),
     [state, t, liveFeed, liveLeaderboard, liveActivities, profile, liveSquads, livePlan, livePlanSummary, authed, squadId],
   );
@@ -214,7 +215,15 @@ export default function App() {
       setRefreshSignal((n) => n + 1);
       return created;
     },
-  }), [session?.token, refreshSession]);
+    // Switch the active club: persist server-side, then refresh the session so squadId
+    // (and everything keyed off it — header, feed, leaderboard, activities) follows.
+    onSwitchSquad: async (id) => {
+      if (id === session.squadId) return;
+      await activateSquad(session.token, id);
+      await refreshSession();
+      setRefreshSignal((n) => n + 1);
+    },
+  }), [session?.token, session?.squadId, refreshSession]);
 
   // Ride-payment ledger ops (need the bearer; rebuilt on token change). Passed down as
   // a `payments` prop, like squadOps — the app only tracks status, money moves off-app.
@@ -421,6 +430,7 @@ export default function App() {
           profile={profile} onProfileSaved={setProfile}
           onJoinSquad={authed ? squadOps.onJoinSquad : undefined}
           onCreateSquad={authed ? squadOps.onCreateSquad : undefined}
+          onSwitchSquad={authed ? squadOps.onSwitchSquad : undefined}
           payments={authed ? paymentOps : undefined}
           onPublishPlan={authed ? onPublishPlan : undefined}
           plans={authed ? planOps : undefined} plan={selectedPlan}

@@ -21,6 +21,7 @@ public sealed class SqlProfileService(string connectionString) : IProfileService
         const string sql = """
             SELECT Id, DisplayName AS Name, Initials, AvatarColor, Email, SquadId,
                    Club, AgeGroup, PrimarySport, Level, Ftp, WeeklyHours, Bio,
+                   BirthDate, Gender, WeightKg,
                    CASE WHEN AvatarBlob IS NOT NULL
                         THEN '/api/images/avatars/' + LOWER(CONVERT(varchar(36), Id)) END AS AvatarUrl
             FROM dbo.Athlete WHERE Id = @athleteId;
@@ -58,7 +59,10 @@ public sealed class SqlProfileService(string connectionString) : IProfileService
                 Level        = COALESCE(@Level, Level),
                 Ftp          = COALESCE(@Ftp, Ftp),
                 WeeklyHours  = COALESCE(@WeeklyHours, WeeklyHours),
-                Bio          = COALESCE(@Bio, Bio)
+                Bio          = COALESCE(@Bio, Bio),
+                BirthDate    = COALESCE(@BirthDate, BirthDate),
+                Gender       = COALESCE(@Gender, Gender),
+                WeightKg     = COALESCE(@WeightKg, WeightKg)
             WHERE Id = @athleteId;
             """;
         await using var conn = new SqlConnection(connectionString);
@@ -66,6 +70,7 @@ public sealed class SqlProfileService(string connectionString) : IProfileService
         {
             athleteId, name, initials,
             f.Club, f.AgeGroup, f.PrimarySport, f.Level, f.Ftp, f.WeeklyHours, f.Bio,
+            f.BirthDate, f.Gender, f.WeightKg,
         }, cancellationToken: ct));
     }
 }

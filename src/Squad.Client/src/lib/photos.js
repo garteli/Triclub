@@ -6,12 +6,9 @@
 // <input>; native iOS uses the Capacitor Camera plugin (dynamically imported so the
 // web bundle never loads it). Reads go through the authenticated proxy, same as avatars.
 
-import { Capacitor } from '@capacitor/core';
 import { loadImageFile, dataUrlToBlob } from './avatar.js';
 
-export function isNativePlatform() {
-  try { return Capacitor.isNativePlatform(); } catch { return false; }
-}
+export { isNativePlatform } from './platform.js';
 
 // Downscale a picked File/Blob to a JPEG data URL, preserving aspect ratio. Keeps
 // the upload small (a 1600px photo is a few hundred KB) and normalizes format.
