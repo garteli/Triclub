@@ -29,7 +29,7 @@ public sealed class AnthropicPlanImportService : IPlanImportService
 {
     private const string Endpoint = "https://api.anthropic.com/v1/messages";
     private const string ApiVersion = "2023-06-01";
-    private const int MaxTokens = 24000; // a detailed 12-week plan can be large; avoid mid-JSON truncation
+    private const int MaxTokens = 32000; // a detailed 16-week Ironman plan is large; avoid mid-JSON truncation
 
     private static readonly string[] Days = { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" };
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
@@ -231,6 +231,8 @@ public sealed class AnthropicPlanImportService : IPlanImportService
         - For triathlon distances (70.3, 140.6) balance Swim, Bike and Run across the week and include brick
           sessions; for run distances (5K/10K/Half/Marathon) centre on Run with optional Gym for strength.
         - Set planName to "{spec.Distance} — {spec.GoalLabel} ({spec.Weeks} weeks)".
+        - Keep each "note" to ONE concise line and "z" short — enough to guide the session, not a paragraph.
+          This keeps the whole plan within a single JSON response even for long (16-week) blocks.
 
         Return only the JSON object now.
         """;
