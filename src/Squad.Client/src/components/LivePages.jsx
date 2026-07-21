@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { s } from '../lib/style.js';
 import { metricCatalog, metricGroups, liveMetricValues, liveChartsView, liveRadarView, spreadRiders, pelotonView } from '../lib/liveMetrics.js';
-import TileMap from './TileMap.jsx';
+import LiveMapGL from './LiveMapGL.jsx';
 
 // ---- Group side column: teammates front→back on a rail + rear-radar vehicle blip ----
 function GroupColumn({ tel }) {
@@ -160,38 +160,7 @@ function FieldCell({ f, editing, actions, index }) {
         <>
           <div style={s('position:absolute;inset:0')}>
             {f.pts.length ? (
-              <TileMap points={f.pts} fill radius={0} pad={28}>
-                {(project) => {
-                  const line = (pts) => pts.map(([la, lo]) => { const p = project(la, lo); return `${p.x},${p.y}`; }).join(' ');
-                  return (
-                    <>
-                      {/* selected course route (dashed, muted) — the line to follow */}
-                      {f.course && f.course.length > 1 && (
-                        <polyline points={line(f.course)} fill="none" stroke="var(--text2)" strokeWidth="3" strokeOpacity="0.6" strokeDasharray="7 6" strokeLinecap="round" strokeLinejoin="round" />
-                      )}
-                      {/* your recorded breadcrumb so far (solid accent) */}
-                      {f.path && f.path.length > 1 && (
-                        <polyline points={line(f.path)} fill="none" stroke="var(--accent)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
-                      )}
-                      {/* riders — "you" drawn LAST so your marker is always on top of the pack */}
-                      {[...f.riders]
-                        .sort((a, b) => (a.you ? 1 : 0) - (b.you ? 1 : 0))
-                        .map((r, k) => {
-                          const p = project(r.lat, r.lon);
-                          if (r.you) {
-                            return (
-                              <g key={k}>
-                                <circle cx={p.x} cy={p.y} r={17} fill="var(--accent)" opacity="0.22" />
-                                <circle cx={p.x} cy={p.y} r={12} fill="var(--accent)" stroke="#fff" strokeWidth={4} />
-                              </g>
-                            );
-                          }
-                          return <circle key={k} cx={p.x} cy={p.y} r={6} fill={r.color} stroke="#fff" strokeWidth={2.5} />;
-                        })}
-                    </>
-                  );
-                }}
-              </TileMap>
+              <LiveMapGL pts={f.pts} course={f.course} path={f.path} riders={f.riders} interactive={!editing} />
             ) : (
               <div style={s('position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg3);color:var(--text3);font-size:11px;text-align:center;padding:0 16px')}>Waiting for GPS…</div>
             )}
