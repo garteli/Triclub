@@ -523,7 +523,7 @@ export default function App() {
   // Ultra-Wideband precise ranging (Apple Nearby Interaction, native + U1 devices only): exact
   // distance + direction to teammates. Inert on web / non-UWB — falls back to BLE + GPS.
   const uwb = useUwbRanging({ athleteId: session?.athleteId, active: rideActive, riders: liveRide.riders, pushUwbToken: liveRide.pushUwbToken, onUwbToken: liveRide.onUwbToken });
-  const tel = useRideTelemetry({ t, active: rideActive, riders: liveRide.riders, recorder, sensors });
+  const tel = useRideTelemetry({ t, active: rideActive, riders: liveRide.riders, recorder, sensors, me: profile });
 
   // Presence heartbeat: while on a ride, announce we're here every 2.5s even with no GPS fix, so
   // teammates register us as a peer and BLE/UWB ranging can engage regardless of GPS accuracy.

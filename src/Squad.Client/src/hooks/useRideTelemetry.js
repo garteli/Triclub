@@ -30,7 +30,7 @@ function power3s(arr) {
   return p.length ? Math.round(p.reduce((a, b) => a + b, 0) / p.length) : null;
 }
 
-export function useRideTelemetry({ t, active, riders = [], recorder, sensors }) {
+export function useRideTelemetry({ t, active, riders = [], recorder, sensors, me } = {}) {
   const startRef = useRef(null);
   const hist = useRef({ spd: [], hr: [], pwr: [], cad: [], elev: [], dist: [] });
   const gain = useRef(0);
@@ -112,9 +112,11 @@ export function useRideTelemetry({ t, active, riders = [], recorder, sensors }) 
     const localYou = haveFix ? {
       athleteId: hubYou?.athleteId ?? 'you',
       you: true,
-      name: hubYou?.name ?? 'You',
-      initials: hubYou?.initials ?? 'You',
-      color: hubYou?.color ?? 'var(--accent)',
+      // Use your real identity (from the hub echo, or your profile before it arrives) so your
+      // marker doesn't flip from a placeholder to your initials once the echo lands.
+      name: hubYou?.name ?? me?.name ?? 'You',
+      initials: hubYou?.initials ?? me?.initials ?? '··',
+      color: hubYou?.color ?? me?.avatarColor ?? 'var(--accent)',
       lat: fix.lat, lon: fix.lon,
       gapM: hubYou?.gapM ?? null,
       fused: hubYou?.fused ?? false,
