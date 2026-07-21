@@ -8,6 +8,7 @@ import { useActivityPhotos } from '../hooks/useActivityPhotos.js';
 import { useActivityTrack } from '../hooks/useActivityTrack.js';
 import { buildFrames, frameRoute, gpsFrameCount, buildTraces } from '../lib/activityFrames.js';
 import { haversineMeters } from '../lib/geo.js';
+import { courseNameFromPoints } from '../lib/courses.js';
 import { describeWeather } from '../lib/weather.js';
 import { useActivityAnalytics, fmtDur, pace, fmtEffortDur, CURVE_LABEL, DIST_LABEL } from '../hooks/useActivityAnalytics.js';
 import { PWR_ZONE_FRACS, PWR_ZONE_NAMES, HR_ZONE_FRACS, HR_ZONE_NAMES } from '../lib/powerAnalysis.js';
@@ -665,7 +666,8 @@ const courseDistKm = (pts) => {
 // button; `onClose` dismisses the panel.
 function SaveAsCourse({ route, defaultName, courses, onClose }) {
   const [mode, setMode] = useState('naming'); // naming | saving | saved | error
-  const [name, setName] = useState(defaultName || 'Route');
+  // Default the name from the route geometry itself (distance + loop/route), not the generic sport title.
+  const [name, setName] = useState(() => courseNameFromPoints(route) || defaultName || 'Route');
   const [msg, setMsg] = useState('');
   const km = courseDistKm(route);
 

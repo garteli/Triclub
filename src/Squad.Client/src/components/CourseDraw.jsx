@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { s } from '../lib/style.js';
 import { haversineMeters } from '../lib/geo.js';
+import { courseNameFromPoints } from '../lib/courses.js';
 
 // Draw a course by tapping points on an interactive map. Full-screen overlay; lazy-loads MapLibre
 // (never touches the main bundle). Tap to add a vertex, undo/clear, then name + save. `onSave(name,
@@ -92,7 +93,7 @@ export default function CourseDraw({ onCancel, onSave, initialCenter }) {
   const undo = () => setPoints(ptsRef.current.slice(0, -1));
   const clear = () => setPoints([]);
 
-  const startSave = () => { setName(`Route ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`); setError(''); setNaming(true); };
+  const startSave = () => { setName(courseNameFromPoints(ptsRef.current)); setError(''); setNaming(true); };
   const confirmSave = async () => {
     if (busy) return;
     setBusy(true); setError('');

@@ -1,5 +1,28 @@
 // Saved routes/courses API. Thin fetch wrappers; the caller supplies the bearer token.
 
+import { haversineMeters } from './geo.js';
+
+// Total length (km) of a [[lat,lon],…] polyline.
+export function routeKm(points) {
+  const pts = (points || []).filter((p) => Array.isArray(p) && p.length >= 2);
+  let m = 0;
+  for (let i = 1; i < pts.length; i++) m += haversineMeters({ lat: pts[i - 1][0], lon: pts[i - 1][1] }, { lat: pts[i][0], lon: pts[i][1] });
+  return m / 1000;
+}
+
+// A friendly default course name derived from the route geometry itself: total distance plus
+// whether it returns near its start (a loop) or runs point-to-point. e.g. "24 km loop", "8.5 km route".
+export function courseNameFromPoints(points) {
+  const pts = (points || []).filter((p) => Array.isArray(p) && p.length >= 2);
+  if (pts.length < 2) return 'Route';
+  const km = routeKm(pts);
+  const startEnd = haversineMeters({ lat: pts[0][0], lon: pts[0][1] }, { lat: pts[pts.length - 1][0], lon: pts[pts.length - 1][1] });
+  // "loop" when the end comes back near the start (within 200 m, or 5% of the ride for big loops).
+  const isLoop = pts.length > 3 && startEnd < Math.max(200, km * 1000 * 0.05);
+  const dist = km >= 10 ? Math.round(km) : Math.round(km * 10) / 10;
+  return `${dist} km ${isLoop ? 'loop' : 'route'}`;
+}
+
 async function req(path, { method = 'GET', token, body } = {}) {
   const res = await fetch(path, {
     method,
