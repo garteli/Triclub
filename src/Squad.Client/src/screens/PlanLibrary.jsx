@@ -16,13 +16,21 @@ const parseDoc = (doc) => {
   try { return typeof doc === 'string' ? JSON.parse(doc) : doc; } catch { return null; }
 };
 
+// First day of next week (next Monday) as yyyy-mm-dd — the default start date when adopting a plan.
+const nextMondayISO = () => {
+  const d = new Date();
+  const daysUntil = ((8 - d.getDay()) % 7) || 7; // Mon=1..Sun=0 → always next week's Monday
+  const m = new Date(d.getFullYear(), d.getMonth(), d.getDate() + daysUntil);
+  return `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, '0')}-${String(m.getDate()).padStart(2, '0')}`;
+};
+
 // Sport → accent colour (matches the editor palette).
 const SPORT_COLOR = { Bike: 'var(--bike)', Swim: 'var(--swim)', Run: 'var(--run)', Gym: '#c68bff', Rest: 'var(--text3)' };
 
 // ── Preview + adopt bottom sheet ──────────────────────────────────────────────
 function PreviewSheet({ template, onClose, onAdopt }) {
   const [anchorType, setAnchorType] = useState('start'); // 'start' | 'target'
-  const [anchorDate, setAnchorDate] = useState('');
+  const [anchorDate, setAnchorDate] = useState(nextMondayISO); // default: first day of next week
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
