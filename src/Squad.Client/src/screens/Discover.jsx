@@ -46,9 +46,8 @@ export default function Discover({ vm, actions, getToken }) {
 
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
-      <div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.6px;font-weight:600')}>Find your squad</div>
-      <div style={s('display:flex;align-items:center;justify-content:space-between;margin-top:2px')}>
-        <div style={s('font-size:23px;font-weight:700;letter-spacing:-.5px')}>Discover Groups</div>
+      {/* title lives in the global app header; keep the location tag */}
+      <div style={s('display:flex;align-items:center;justify-content:flex-end')}>
         <div style={s('display:flex;align-items:center;gap:5px;font-size:11px;color:var(--accent);font-weight:600')}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 21s7-6.6 7-12a7 7 0 0 0-14 0c0 5.4 7 12 7 12z" /><circle cx="12" cy="9" r="2.5" /></svg>
           Northern

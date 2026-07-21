@@ -92,12 +92,7 @@ export default function EditProfile({ vm, actions, getToken, onProfileSaved }) {
 
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
-      {/* header */}
-      <div style={s('display:flex;align-items:center;gap:10px')}>
-        <Back onClick={() => actions.go('settings')} />
-        <div style={s('font-size:20px;font-weight:700')}>Edit profile</div>
-      </div>
-
+      {/* title + back now in the global app header */}
       {/* avatar */}
       <div style={s('display:flex;flex-direction:column;align-items:center;margin-top:18px')}>
         <div className="ctl" onClick={() => fileRef.current?.click()} style={s('position:relative')}>
