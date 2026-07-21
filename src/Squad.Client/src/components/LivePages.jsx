@@ -52,7 +52,7 @@ function FieldCell({ f, editing, actions, index }) {
         <>
           <div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;font-weight:600')}>{f.label}</div>
           <div style={s('display:flex;align-items:baseline;gap:4px;margin-top:auto;min-width:0')}>
-            <span className={'mono live-metric-val' + (f.hero ? ' hero' : '')} style={s(`--vf:${f.vf}px;color:${f.color}`)}>{f.value}</span>
+            <span className={'mono live-metric-val' + (f.hero ? ' hero' : '')} style={s(`--vf:${f.vf}px;--vfw:${f.vfw}cqw;color:${f.color}`)}>{f.value}</span>
             {f.unit && <span className="mono" style={s('font-size:12px;color:var(--text2);font-weight:600')}>{f.unit}</span>}
           </div>
         </>
@@ -216,9 +216,13 @@ export default function LivePages({ tel, lp }) {
     const val = mv[tok] || { v: '—' };
     const vs = hero ? big + 10 : big;
     const color = val.color || (hero ? 'var(--accent)' : 'var(--text)');
-    // vf is the px fallback (count-based); the .live-metric-val class scales it up to
-    // fill the tile via container queries where supported.
-    return { ...base, kind: 'metric', hero, label: m.label, unit: m.unit, value: val.v, vf: vs, color };
+    // Character-aware sizing so a long value (e.g. a 7-char "2:51:45" timer) fills the tile
+    // width without clipping: --vfw is the container-query width cap (shrinks with length),
+    // and --vf (the px fallback for browsers without container queries) is reduced too.
+    const chars = Math.max(1, String(val.v ?? '').length);
+    const vfw = Math.min(hero ? 24 : 30, Math.round((hero ? 105 : 140) / chars));
+    const vf = Math.min(vs, Math.round((hero ? 300 : 210) / chars));
+    return { ...base, kind: 'metric', hero, label: m.label, unit: m.unit, value: val.v, vf, vfw, color };
   });
 
   // Horizontal swipe to change pages (left → next, right → prev). Skipped while
