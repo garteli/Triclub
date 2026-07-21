@@ -16,14 +16,13 @@ using Squad.Core;
 namespace Squad.Infrastructure;
 
 /// <summary>
-/// <see cref="IPlanImportService"/> backed by the Anthropic Messages API. The uploaded PDF is sent
-/// to Claude as a native document block (no server-side PDF parsing) with a strict extraction prompt,
-/// and the model returns the plan as JSON in the CoachPlan editor's schema. We then re-build that JSON
+/// <see cref="IPlanImportService"/> backed by the Anthropic Messages API: generates a training plan from
+/// a <see cref="PlanSpec"/> and returns it as JSON in the CoachPlan editor's schema. We re-build that JSON
 /// from scratch server-side (<see cref="Normalize"/>) so the client can always load it even if the model
 /// drifts on shapes — days, sport names, durations and ids are coerced to exactly what the editor expects.
 ///
-/// Not configured (no API key) ⇒ <see cref="Configured"/> is false and the endpoint reports it honestly
-/// rather than fabricating a plan. Set Ai:Anthropic:ApiKey (and optionally Ai:Anthropic:Model) in config.
+/// Not configured (no API key) ⇒ <see cref="Configured"/> is false. Set Ai:Anthropic:ApiKey (and
+/// optionally Ai:Anthropic:Model) in config.
 /// </summary>
 public sealed class AnthropicPlanImportService : IPlanImportService
 {
@@ -48,29 +47,6 @@ public sealed class AnthropicPlanImportService : IPlanImportService
     }
 
     public bool Configured => _apiKey is not null;
-
-    public async Task<PlanImportResult> ImportAsync(
-        byte[] pdfBytes, string fileName, string anchorType, string? anchorDate, CancellationToken ct)
-    {
-        if (_apiKey is null)
-            return PlanImportResult.Fail("AI plan import isn't configured on the server.");
-        if (pdfBytes is null || pdfBytes.Length == 0)
-            return PlanImportResult.Fail("The PDF was empty.");
-
-        var anchor = anchorType == "target" ? "target" : "start";
-        var content = new object[]
-        {
-            new { type = "document", source = new { type = "base64", media_type = "application/pdf", data = Convert.ToBase64String(pdfBytes) } },
-            new { type = "text", text = ImportUserPrompt(anchor, anchorDate) },
-        };
-
-        var (text, fail) = await CompleteAsync(SchemaSystemPrompt, content, "import", ct);
-        if (fail is not null) return PlanImportResult.Fail(fail);
-        if (!TryExtractJson(text!, out var modelJson))
-            return PlanImportResult.Fail("Couldn't read a plan out of that PDF. Is it a training plan?");
-
-        return BuildResult(modelJson, anchor, anchorDate, SanitizeName(System.IO.Path.GetFileNameWithoutExtension(fileName)), "import");
-    }
 
     public async Task<PlanImportResult> GeneratePlanAsync(PlanSpec spec, CancellationToken ct)
     {
@@ -204,16 +180,6 @@ public sealed class AnthropicPlanImportService : IPlanImportService
         - Keep the plan's own week/day structure. If the plan is a flat list of days or dates, group them into
           consecutive 7-day weeks in order and map each day onto Mon..Sun within its week.
         """;
-
-    private static string ImportUserPrompt(string anchor, string? anchorDate)
-    {
-        var when = string.IsNullOrWhiteSpace(anchorDate)
-            ? "The athlete gave no anchor date."
-            : anchor == "target"
-                ? $"The athlete set the goal/race day to {anchorDate}; the plan builds toward it."
-                : $"The athlete set the plan's week 1 to begin on {anchorDate}.";
-        return $"Import this training plan into the JSON schema. {when} Return only the JSON object now.";
-    }
 
     private static string GenerateUserPrompt(PlanSpec spec) => $"""
         Build a complete, realistic {spec.Weeks}-week {spec.Distance} training plan for an athlete targeting

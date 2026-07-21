@@ -69,11 +69,9 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IGoalStore>(_ => new SqlGoalStore(sqlConnectionString));
         services.AddScoped<IProfileStatsService>(_ => new SqlProfileStatsService(sqlConnectionString));
 
-        // AI plan import (PDF → CoachPlan doc via Anthropic). Runs in a background worker (not an
-        // HTTP request), so the AI call isn't bound by Azure's ~230s front-end cap — a long multi-week
-        // extraction gets a generous 300s. Unconfigured (no key) ⇒ Configured=false and the endpoint
-        // reports an honest "not set up", never a fake plan.
-        var aiConfigured = !string.IsNullOrWhiteSpace(aiApiKey);
+        // AI plan generation (spec → CoachPlan doc via Anthropic), used by the library seeder. The
+        // named client gets a generous 420s timeout — a detailed 16-week plan is a slow single call
+        // and the seeder runs off the request thread. Unconfigured (no key) ⇒ Configured=false.
         services.AddHttpClient("anthropic", c => c.Timeout = TimeSpan.FromSeconds(420));
         services.AddScoped<IPlanImportService>(sp => new AnthropicPlanImportService(
             sp.GetRequiredService<IHttpClientFactory>().CreateClient("anthropic"),
@@ -87,11 +85,6 @@ public static class InfrastructureServiceCollectionExtensions
             sp.GetRequiredService<IHttpClientFactory>().CreateClient("anthropic"),
             aiApiKey, aiModel,
             sp.GetRequiredService<ILogger<AnthropicRaceInfoService>>()));
-
-        // Async import: an in-memory job queue the endpoint submits to, drained by a hosted worker.
-        services.AddSingleton<PlanImportQueue>(_ => new PlanImportQueue(aiConfigured));
-        services.AddSingleton<IPlanImportQueue>(sp => sp.GetRequiredService<PlanImportQueue>());
-        services.AddHostedService<PlanImportWorker>();
 
         // Plan library: pre-generated, adoptable templates + a startup seeder (AI-generates missing ones,
         // gated by config so it only runs when explicitly turned on).
