@@ -45,16 +45,36 @@ function ImportModal({ plans, onClose, onImported }) {
 
   const busy = phase === 'working';
 
+  // Submit the PDF, then poll the background job until it's done/errors (or we give up).
   const start = async () => {
     if (!file || busy) return;
-    if (!plans?.importPdf) { setError('Sign in as a coach to import.'); setPhase('error'); return; }
+    if (!plans?.importPdf || !plans?.importStatus) { setError('Sign in as a coach to import.'); setPhase('error'); return; }
     setError('');
     setPhase('working');
     try {
-      const res = await plans.importPdf(file, { anchorType, anchorDate: anchorDate || undefined });
-      setResult(res);
-      setStepIdx(IMPORT_STEPS.length - 1);
-      setPhase('done');
+      const { jobId } = await plans.importPdf(file, { anchorType, anchorDate: anchorDate || undefined });
+      if (!jobId) throw new Error('Import did not start. Try again.');
+
+      const deadline = Date.now() + 5 * 60 * 1000; // give a long plan up to 5 minutes
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        await new Promise((r) => setTimeout(r, 2500));
+        let job;
+        try {
+          job = await plans.importStatus(jobId);
+        } catch {
+          if (Date.now() > deadline) throw new Error('Lost track of the import. Try again.');
+          continue; // transient (e.g. cold start) — keep polling
+        }
+        if (job?.status === 'done') {
+          setResult({ id: job.planId, name: job.name });
+          setStepIdx(IMPORT_STEPS.length - 1);
+          setPhase('done');
+          return;
+        }
+        if (job?.status === 'error') throw new Error(job.error || 'Could not import that PDF.');
+        if (Date.now() > deadline) throw new Error('That plan is taking too long. Try again or use a shorter plan.');
+      }
     } catch (e) {
       setError(e?.message || 'Could not import that PDF.');
       setPhase('error');
