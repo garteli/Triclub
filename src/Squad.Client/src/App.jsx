@@ -8,6 +8,7 @@ import { useRideTelemetry } from './hooks/useRideTelemetry.js';
 import { useLivePages } from './hooks/useLivePages.js';
 import { useSquadFeed } from './hooks/useSquadFeed.js';
 import { useLeaderboard } from './hooks/useLeaderboard.js';
+import { useClubRanking } from './hooks/useClubRanking.js';
 import { useActivities } from './hooks/useActivities.js';
 import { useSquads } from './hooks/useSquads.js';
 import { usePlan } from './hooks/usePlan.js';
@@ -36,6 +37,7 @@ import Plan from './screens/Plan.jsx';
 import PlanEditor from './screens/PlanEditor.jsx';
 import PlansList from './screens/PlansList.jsx';
 import Leaderboard from './screens/Leaderboard.jsx';
+import ClubRanking from './screens/ClubRanking.jsx';
 import Feed from './screens/Feed.jsx';
 import Segments from './screens/Segments.jsx';
 import Coach from './screens/Coach.jsx';
@@ -80,7 +82,7 @@ const initialState = {
 };
 
 const screens = {
-  dash: Dashboard, ride: LiveRide, plan: Plan, plans: PlansList, planeditor: PlanEditor, lb: Leaderboard,
+  dash: Dashboard, ride: LiveRide, plan: Plan, plans: PlansList, planeditor: PlanEditor, lb: Leaderboard, clubrank: ClubRanking,
   feed: Feed, seg: Segments, coach: Coach, profile: Profile,
   discover: Discover, group: GroupProfile, manage: ManageGroup, pay: Checkout, recordpay: RidePayment, ledger: CoachLedger, requests: JoinRequests, chat: Messages,
   settings: Settings, welcome: Welcome, register: Register, login: Login, newgroup: CreateGroup,
@@ -113,6 +115,7 @@ const HEADER_META = {
   activities: { title: 'Activities' },
   discover: { title: 'Discover' },
   seg: { title: 'Segments' },
+  clubrank: { title: 'Club Ranking' },
   plans: { title: 'Training plans' },
   sensors: { title: 'Connected sensors' },
   upload: { title: 'Upload' },
@@ -221,6 +224,9 @@ export default function App() {
     onLeaderboardChanged: () => setRefreshSignal((n) => n + 1),
   });
   const { rows: liveLeaderboard } = useLeaderboard(authed ? squadId : null, { getToken, refreshSignal });
+  // Cross-club board (own screen, reached from the Ranks scope toggle). Fetched once
+  // signed in and re-pulled on the shared data-refresh signal, like the squad board.
+  const clubRanking = useClubRanking({ getToken, refreshSignal, enabled: authed });
   const { items: liveActivities } = useActivities({ getToken, enabled: authed, refreshSignal });
   const { items: liveSquads } = useSquads({ getToken, enabled: authed, refreshSignal });
   // Monday (local) of the week the plan screen is viewing — current week shifted by the
@@ -554,6 +560,7 @@ export default function App() {
         <Screen key={state.screen === 'planeditor' ? `pe-${selectedPlan?.id || 'new'}` : state.screen}
           vm={vm} state={state} actions={actions} live={live} tick={t} livePages={livePages}
           getToken={getToken} onDataChanged={() => setRefreshSignal((n) => n + 1)}
+          clubRanking={clubRanking}
           profile={profile} onProfileSaved={setProfile}
           onJoinSquad={authed ? squadOps.onJoinSquad : undefined}
           onCreateSquad={authed ? squadOps.onCreateSquad : undefined}

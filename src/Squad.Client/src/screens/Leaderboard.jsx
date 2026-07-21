@@ -9,6 +9,12 @@ export default function Leaderboard({ vm, state, actions, getToken }) {
   const daysToReset = 7 - dayIdx;
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
+      {/* scope toggle — Clubs jumps to the cross-club ranking (its own screen) */}
+      <div style={s('display:flex;gap:3px;background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:3px;margin-bottom:14px')}>
+        <div style={s('flex:1;text-align:center;padding:9px 6px;border-radius:10px;font-size:12.5px;font-weight:700;background:var(--accent);color:var(--accent-ink)')}>My Squad</div>
+        <div className="ctl" onClick={() => actions.go('clubrank')} style={s('flex:1;text-align:center;padding:9px 6px;border-radius:10px;font-size:12.5px;font-weight:700;background:transparent;color:var(--text2)')}>Clubs</div>
+      </div>
+
       <div style={s('display:flex;align-items:center;justify-content:space-between;margin-bottom:6px')}>
         <div><div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.6px;font-weight:600')}>This week</div><div style={s('font-size:23px;font-weight:700;letter-spacing:-.5px')}>Domestique Team Ranks</div></div>
         <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:11px;padding:7px 10px;text-align:center')}><div className="mono" style={s('font-size:13px;font-weight:700;color:var(--accent)')}>{daysToReset}d</div><div style={s('font-size:9px;color:var(--text3);text-transform:uppercase')}>resets</div></div>
