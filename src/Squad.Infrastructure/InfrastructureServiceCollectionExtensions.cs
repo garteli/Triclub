@@ -74,7 +74,7 @@ public static class InfrastructureServiceCollectionExtensions
         // extraction gets a generous 300s. Unconfigured (no key) ⇒ Configured=false and the endpoint
         // reports an honest "not set up", never a fake plan.
         var aiConfigured = !string.IsNullOrWhiteSpace(aiApiKey);
-        services.AddHttpClient("anthropic", c => c.Timeout = TimeSpan.FromSeconds(300));
+        services.AddHttpClient("anthropic", c => c.Timeout = TimeSpan.FromSeconds(420));
         services.AddScoped<IPlanImportService>(sp => new AnthropicPlanImportService(
             sp.GetRequiredService<IHttpClientFactory>().CreateClient("anthropic"),
             aiApiKey, aiModel,
