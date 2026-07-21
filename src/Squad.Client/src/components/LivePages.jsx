@@ -129,10 +129,21 @@ function FieldCell({ f, editing, actions, index }) {
           <div style={s('position:absolute;inset:0')}>
             {f.pts.length ? (
               <TileMap points={f.pts} fill radius={0} pad={28}>
-                {(project) => f.riders.map((r, k) => {
-                  const p = project(r.lat, r.lon);
-                  return <circle key={k} cx={p.x} cy={p.y} r={r.you ? 9 : 6} fill={r.you ? 'var(--accent)' : r.color} stroke="#fff" strokeWidth={r.you ? 3 : 2.5} />;
-                })}
+                {(project) => [...f.riders]
+                  // Draw "you" LAST so your marker is always on top of the pack, never hidden behind a teammate.
+                  .sort((a, b) => (a.you ? 1 : 0) - (b.you ? 1 : 0))
+                  .map((r, k) => {
+                    const p = project(r.lat, r.lon);
+                    if (r.you) {
+                      return (
+                        <g key={k}>
+                          <circle cx={p.x} cy={p.y} r={17} fill="var(--accent)" opacity="0.22" />
+                          <circle cx={p.x} cy={p.y} r={12} fill="var(--accent)" stroke="#fff" strokeWidth={4} />
+                        </g>
+                      );
+                    }
+                    return <circle key={k} cx={p.x} cy={p.y} r={6} fill={r.color} stroke="#fff" strokeWidth={2.5} />;
+                  })}
               </TileMap>
             ) : (
               <div style={s('position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg3);color:var(--text3);font-size:11px;text-align:center;padding:0 16px')}>Waiting for GPS…</div>
