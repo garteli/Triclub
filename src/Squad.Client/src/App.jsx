@@ -393,8 +393,9 @@ export default function App() {
   const patch = (p) => setState((s) => ({ ...s, ...p }));
 
   const actions = useMemo(() => ({
-    // navigation: landing on the ride tab always returns to its lobby
-    go: (id) => setState((s) => ({ ...s, screen: id, rideState: id === 'ride' ? 'lobby' : s.rideState })),
+    // navigation: landing on the ride tab returns to its lobby ONLY when no ride is in progress;
+    // an active ride is preserved so you drop back into it (and it keeps running while you're away).
+    go: (id) => setState((s) => ({ ...s, screen: id, rideState: (id === 'ride' && s.rideState !== 'active') ? 'lobby' : s.rideState })),
     // Global Back: handle in-screen "back" first (an open applicant detail closes to the
     // list), then pop the nav trail to the previous distinct screen (dashboard if empty).
     // Leaving checkout also clears the pending pay plan (its old back was a cancel).
@@ -403,7 +404,7 @@ export default function App() {
       const h = historyRef.current;
       if (h[h.length - 1] === s.screen) h.pop(); // drop current
       const prev = h[h.length - 1] || 'dash';
-      const next = { ...s, screen: prev, rideState: prev === 'ride' ? 'lobby' : s.rideState };
+      const next = { ...s, screen: prev, rideState: (prev === 'ride' && s.rideState !== 'active') ? 'lobby' : s.rideState };
       if (s.screen === 'pay') next.payPlan = null;
       return next;
     }),
@@ -512,18 +513,26 @@ export default function App() {
   // ride is active with a fix/sensors, or teammates are streaming. The squad shares
   // one ride channel (rideId = squadId).
   const onRide = state.screen === 'ride';
-  const rideActive = onRide && state.rideState === 'active';
+  // rideSessionActive persists across navigation + refresh (state.rideState is saved/restored), so
+  // the ride keeps running while you're on other screens. rideActive is just the display flag for
+  // the full-screen active pages.
+  const rideSessionActive = state.rideState === 'active';
+  const rideActive = onRide && rideSessionActive;
   const sensors = useSensors();
-  const liveRide = useLiveRide(squadId, { getToken, meId: session?.athleteId, enabled: onRide && !!squadId });
+  // Keep the ride hub connected while on the ride screen OR while a ride is live anywhere.
+  const liveRide = useLiveRide(squadId, { getToken, meId: session?.athleteId, enabled: (onRide || rideSessionActive) && !!squadId });
   // throttleMs 500 → broadcast position ~2×/s (as fast as GPS delivers) so the peloton moves smoothly.
   const recorder = useRideRecorder({ pushTelemetry: liveRide.pushTelemetry, sensors, getToken, onSaved: () => setRefreshSignal((n) => n + 1), enabled: authed, throttleMs: 500 });
+  // A ride is "live" whenever it's active OR still recording — independent of which screen you're on,
+  // so sensors, ranging, the hub, telemetry, wake lock and presence all keep running as you navigate.
+  const rideLive = rideSessionActive || recorder.recording;
   // Phone-to-phone BLE ranging (native only): advertise this athlete + scan teammates for
-  // pack position while a ride is active. Inert on web — no-op that leaves GPS+heading in charge.
-  const peerRanging = usePeerRanging({ athleteId: session?.athleteId, active: rideActive, pushPeerRange: liveRide.pushPeerRange });
+  // pack position while a ride is live. Inert on web — no-op that leaves GPS+heading in charge.
+  const peerRanging = usePeerRanging({ athleteId: session?.athleteId, active: rideLive, pushPeerRange: liveRide.pushPeerRange });
   // Ultra-Wideband precise ranging (Apple Nearby Interaction, native + U1 devices only): exact
   // distance + direction to teammates. Inert on web / non-UWB — falls back to BLE + GPS.
-  const uwb = useUwbRanging({ athleteId: session?.athleteId, active: rideActive, riders: liveRide.riders, pushUwbToken: liveRide.pushUwbToken, onUwbToken: liveRide.onUwbToken });
-  const tel = useRideTelemetry({ t, active: rideActive, riders: liveRide.riders, recorder, sensors, me: profile });
+  const uwb = useUwbRanging({ athleteId: session?.athleteId, active: rideLive, riders: liveRide.riders, pushUwbToken: liveRide.pushUwbToken, onUwbToken: liveRide.onUwbToken });
+  const tel = useRideTelemetry({ t, active: rideLive, riders: liveRide.riders, recorder, sensors, me: profile });
 
   // Presence heartbeat: while on a ride, announce we're here every 2.5s even with no GPS fix, so
   // teammates register us as a peer and BLE/UWB ranging can engage regardless of GPS accuracy.
@@ -532,7 +541,7 @@ export default function App() {
   const recorderRef = useRef(recorder);
   recorderRef.current = recorder;
   useEffect(() => {
-    if (!rideActive || typeof liveRide.pushTelemetry !== 'function') return undefined;
+    if (!rideLive || typeof liveRide.pushTelemetry !== 'function') return undefined;
     const beat = () => {
       const r = recorderRef.current;
       liveRide.pushTelemetry({ lat: r?.lastFix?.lat ?? null, lon: r?.lastFix?.lon ?? null, distanceKm: r?.distanceKm ?? null });
@@ -540,12 +549,12 @@ export default function App() {
     beat();
     const id = setInterval(beat, 2500);
     return () => clearInterval(id);
-  }, [rideActive, liveRide.pushTelemetry]);
+  }, [rideLive, liveRide.pushTelemetry]);
 
   // Garmin Edge–style live-ride pages (configurable fields, auto-rotate, edit).
   const livePages = useLivePages(t, rideActive);
-  // Keep the screen awake for the whole live-ride display — recording or just watching.
-  useWakeLock(rideActive);
+  // Keep the screen awake for the whole ride — recording or watching — even on other screens.
+  useWakeLock(rideLive);
 
   const live = { riders: liveRide.riders, status: liveRide.status, pushTelemetry: liveRide.pushTelemetry, recorder, sensors, tel, livePages, peerRanging, uwb };
 
