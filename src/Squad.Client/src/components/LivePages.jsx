@@ -122,6 +122,9 @@ function PelotonField({ v }) {
 // ---- a single field cell (metric / chart / map) with edit overlays ----
 function FieldCell({ f, editing, actions, index }) {
   const stop = (e) => { if (e && e.stopPropagation) e.stopPropagation(); };
+  // Long-press-to-edit is armed on every tile EXCEPT the map — holding on the map is a pan/
+  // interaction gesture, not an intent to enter edit mode (enter edit from another tile instead).
+  const armLongPress = () => { if (!editing && f.kind !== 'map') actions.pressStart(); };
   return (
     <div
       className={'ctl' + (f.kind === 'metric' ? ' live-tile' : '')}
@@ -129,7 +132,7 @@ function FieldCell({ f, editing, actions, index }) {
       onDragStart={() => actions.onDragStart(index)}
       onDragOver={(e) => e.preventDefault()}
       onDrop={() => actions.onDropAt(index)}
-      onPointerDown={() => { if (!editing) actions.pressStart(); }}
+      onPointerDown={armLongPress}
       onPointerUp={actions.pressEnd}
       onPointerLeave={actions.pressEnd}
       style={s(f.cellStyle)}
@@ -319,7 +322,10 @@ export default function LivePages({ tel, lp, uwb }) {
   // threshold counts; vertical scrolls and taps are ignored.
   const swipe = useRef(null);
   const onRowPointerDown = (e) => {
-    swipe.current = editFields ? null : { x: e.clientX, y: e.clientY };
+    // Don't start a page-swipe from the interactive map — a horizontal drag there pans the map,
+    // not the pager. Change pages from the swipe strip below the tiles instead.
+    if (editFields || (e.target?.closest && e.target.closest('.maplibregl-map'))) { swipe.current = null; return; }
+    swipe.current = { x: e.clientX, y: e.clientY };
   };
   const onRowPointerUp = (e) => {
     const start = swipe.current;
@@ -343,6 +349,20 @@ export default function LivePages({ tel, lp, uwb }) {
           {fields.map((f, i) => <FieldCell key={i} f={f} index={i} editing={editFields} actions={actions} />)}
         </div>
       </div>
+
+      {/* Bottom pager strip — a dedicated swipe/tap area to change pages. It's the way to switch
+          pages on the map page (where a swipe on the tile pans the map, not the pager). */}
+      {!editFields && pages.length > 1 && (
+        <div style={s('flex:none;display:flex;flex-direction:column;align-items:center;gap:5px;padding:8px 12px 2px;touch-action:pan-y')}
+          onPointerDown={onRowPointerDown} onPointerUp={onRowPointerUp}>
+          <div style={s('font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.9px;color:var(--text3)')}>{page.name} · swipe to change</div>
+          <div style={s('display:flex;gap:7px;align-items:center')}>
+            {pages.map((p, i) => (
+              <div key={i} onClick={() => actions.goPage(i)} style={s(`width:8px;height:8px;border-radius:50%;cursor:pointer;transition:all .15s;${i === pageIdx ? 'background:var(--accent);transform:scale(1.35)' : 'background:var(--line2)'}`)} />
+            ))}
+          </div>
+        </div>
+      )}
 
       {editFields && <EditPanel page={page} actions={actions} />}
 
