@@ -184,6 +184,7 @@ public interface INotificationService
 {
     Task AddAsync(Guid recipientId, string kind, Guid? actorId, string actorName, string text, CancellationToken ct);
     Task<IReadOnlyList<Notification>> GetRecentAsync(Guid recipientId, int take, CancellationToken ct);
+    Task MarkReadAsync(Guid recipientId, Guid notificationId, CancellationToken ct);
     Task MarkAllReadAsync(Guid recipientId, CancellationToken ct);
 }
 

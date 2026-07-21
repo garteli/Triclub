@@ -37,12 +37,18 @@ export function useRideTelemetry({ t, active, riders = [], recorder, sensors }) 
   const drop = useRef(0);
   const maxElev = useRef(null);
   const prevElev = useRef(null);
+  // Peloton lead accounting: how many samples each rider has spent at the front of the
+  // pack (furthest up the road), plus the total sampled while the group had ≥2 riders.
+  // A sample ≈ one tick ≈ one second, so leadCount/samples is a real "% of time in lead".
+  const leadCount = useRef({});
+  const leadSamples = useRef(0);
   const [tel, setTel] = useState(null);
 
   useEffect(() => {
     if (!active) {
       startRef.current = null; hist.current = { spd: [], hr: [], pwr: [], cad: [], elev: [], dist: [] };
-      gain.current = 0; drop.current = 0; maxElev.current = null; prevElev.current = null; setTel(null);
+      gain.current = 0; drop.current = 0; maxElev.current = null; prevElev.current = null;
+      leadCount.current = {}; leadSamples.current = 0; setTel(null);
       return;
     }
     if (startRef.current == null) startRef.current = Date.now();
@@ -90,6 +96,27 @@ export function useRideTelemetry({ t, active, riders = [], recorder, sensors }) 
     const recording = !!recorder?.recording;
     const now = new Date();
 
+    // Who's on the front this tick = whoever has covered the most distance (furthest up the
+    // road). Only meaningful with a group, so lead time only accrues when ≥2 riders stream.
+    let leaderId = null;
+    if (riders.length > 1) {
+      let best = -Infinity;
+      for (const r of riders) {
+        const d = parseFloat(r.dist) || 0;
+        if (d > best) { best = d; leaderId = r.athleteId; }
+      }
+      leadSamples.current += 1;
+      if (leaderId != null) leadCount.current[leaderId] = (leadCount.current[leaderId] || 0) + 1;
+    }
+    const samples = leadSamples.current;
+    const leadPctById = {};
+    for (const id of Object.keys(leadCount.current)) leadPctById[id] = leadCount.current[id] / samples;
+    const youId = riders.find((r) => r.you)?.athleteId ?? null;
+    const peloton = {
+      leaderId, samples, leadPctById,
+      youLeadPct: youId != null && samples ? (leadCount.current[youId] || 0) / samples : null,
+    };
+
     setTel({
       // "live" = we have a real feed: this device is recording, or teammates are streaming.
       live: recording || riders.length > 0,
@@ -109,6 +136,7 @@ export function useRideTelemetry({ t, active, riders = [], recorder, sensors }) 
       hist: { spd: [...hist.current.spd], hr: [...hist.current.hr], pwr: [...hist.current.pwr] },
       riders,
       radar: groupRadar(riders),
+      peloton,
       you: riders.find((r) => r.you) || null,
       // Pack-fusion spacing (from phone-to-phone BLE ranging, when active): your fused gap to
       // the nearest teammate, and whether any rider's position is BLE-refined this tick.

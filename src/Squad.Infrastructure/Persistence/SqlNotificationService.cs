@@ -40,6 +40,15 @@ public sealed class SqlNotificationService(string connectionString) : INotificat
         return rows.ToList();
     }
 
+    public async Task MarkReadAsync(Guid recipientId, Guid notificationId, CancellationToken ct)
+    {
+        // Scoped to the recipient so an athlete can only mark their own notifications read.
+        await using var conn = new SqlConnection(connectionString);
+        await conn.ExecuteAsync(new CommandDefinition(
+            "UPDATE dbo.Notification SET IsRead = 1 WHERE Id = @notificationId AND RecipientId = @recipientId AND IsRead = 0;",
+            new { recipientId, notificationId }, cancellationToken: ct));
+    }
+
     public async Task MarkAllReadAsync(Guid recipientId, CancellationToken ct)
     {
         await using var conn = new SqlConnection(connectionString);
