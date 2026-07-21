@@ -105,10 +105,12 @@ export default function CourseDraw({ onCancel, onSave, initialCenter }) {
   return (
     <div style={s('position:fixed;inset:0;z-index:60;background:var(--bg);display:flex;flex-direction:column')}>
       {/* header */}
-      <div style={s('flex:none;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--line2)')}>
-        <div className="ctl" onClick={busy ? undefined : onCancel} style={s('font-size:13px;color:var(--text2);font-weight:700')}>Cancel</div>
+      {/* Header sits below the status bar / notch: the fixed overlay covers the safe-area, so pad the
+          top by env(safe-area-inset-top) or "Cancel" lands under the notch and can't be tapped. */}
+      <div style={s('flex:none;display:flex;align-items:center;justify-content:space-between;padding:calc(12px + env(safe-area-inset-top)) 8px 12px;border-bottom:1px solid var(--line2)')}>
+        <div className="ctl" onClick={busy ? undefined : onCancel} style={s('font-size:13px;color:var(--text2);font-weight:700;padding:6px 10px')}>Cancel</div>
         <div style={s('font-size:15px;font-weight:700')}>Draw a course</div>
-        <div style={s('font-size:12px;color:var(--text3);font-weight:600;min-width:52px;text-align:right')}>{pts.length} · {km.toFixed(1)}km</div>
+        <div style={s('font-size:12px;color:var(--text3);font-weight:600;min-width:56px;text-align:right;padding-right:8px')}>{pts.length} · {km.toFixed(1)}km</div>
       </div>
 
       {/* map */}
