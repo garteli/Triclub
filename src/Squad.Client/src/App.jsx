@@ -12,6 +12,7 @@ import { useActivities } from './hooks/useActivities.js';
 import { useSquads } from './hooks/useSquads.js';
 import { usePlan } from './hooks/usePlan.js';
 import { useGarminSync } from './hooks/useGarminSync.js';
+import { useHealthSync } from './hooks/useHealthSync.js';
 import { createSquad, joinSquad, activateSquad } from './lib/squads.js';
 import { recordPayment, markPaymentPaid, waivePayment } from './lib/payments.js';
 import { publishPlan, listPlans, getPlan, savePlan, deletePlan } from './lib/plan.js';
@@ -28,6 +29,7 @@ import ControlDock from './components/ControlDock.jsx';
 import Phone from './components/Phone.jsx';
 import BootSplash from './components/BootSplash.jsx';
 import AppHeader from './components/AppHeader.jsx';
+import SyncToast from './components/SyncToast.jsx';
 import Dashboard from './screens/Dashboard.jsx';
 import LiveRide from './screens/LiveRide.jsx';
 import Plan from './screens/Plan.jsx';
@@ -186,11 +188,13 @@ export default function App() {
   // any new activities on launch (and right after connecting). No-op on web / when signed
   // out. New activities land in the same ingest pipeline as .fit uploads, so the feed,
   // leaderboard and Activities list refresh via the shared data-refresh signal.
-  useGarminSync({
+  const garminSync = useGarminSync({
     getToken,
     onDataChanged: () => setRefreshSignal((n) => n + 1),
     syncOnLaunch: authed,
   });
+  // Apple Health (native only) — wellness + activities import. `available` is false on web.
+  const healthSync = useHealthSync({ getToken, onDataChanged: () => setRefreshSignal((n) => n + 1) });
 
   // Latest session for the (deps-[]) actions closure — so setAvatar can read the
   // current token without rebuilding the whole actions object.
@@ -343,6 +347,24 @@ export default function App() {
     setRefreshSignal((n) => n + 1);
     await new Promise((resolve) => setTimeout(resolve, 650));
   }, []);
+
+  // Header sync: pull from every connected source (Garmin + Apple Health — native only) and
+  // refresh the feed/leaderboard/activities. On web the source syncs are unavailable, so only
+  // the refresh runs. `syncActive` drives the SyncToast for the whole combined operation.
+  const [syncActive, setSyncActive] = useState(false);
+  const onSync = useCallback(async () => {
+    if (syncActive) return;
+    setSyncActive(true);
+    try {
+      const jobs = [];
+      if (garminSync.available && garminSync.connected) jobs.push(garminSync.run({ force: true }));
+      if (healthSync.available) jobs.push(healthSync.run());
+      jobs.push(onRefresh());
+      await Promise.all(jobs);
+    } finally {
+      setSyncActive(false);
+    }
+  }, [syncActive, garminSync, healthSync, onRefresh]);
 
   const patch = (p) => setState((s) => ({ ...s, ...p }));
 
@@ -505,7 +527,7 @@ export default function App() {
   const appHeader = headerMeta && !(state.screen === 'ride' && rideActive)
     ? (
       <AppHeader vm={vm} actions={actions} getToken={getToken} notifUnread={notifUnread}
-        title={headerTitle} showBack={!headerMeta.root} rtl={state.lang === 'he'} onSync={onRefresh}
+        title={headerTitle} showBack={!headerMeta.root} rtl={state.lang === 'he'} onSync={onSync}
         onSwitchSquad={authed ? squadOps.onSwitchSquad : undefined} />
     )
     : null;
@@ -513,6 +535,7 @@ export default function App() {
   return (
     <div className="app-shell">
       {booting && <BootSplash hiding={splashHiding} />}
+      {authed && <SyncToast garmin={garminSync} health={healthSync} active={syncActive} />}
       {/* Dev-only prototype harness (screen switcher / theme toggles); never shipped. */}
       {import.meta.env.DEV && <ControlDock state={state} actions={actions} />}
       <Phone theme={state.theme} accent={state.accent} lang={state.lang} dir={dir} screen={state.screen} go={actions.go}
