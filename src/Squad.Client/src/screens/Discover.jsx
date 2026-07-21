@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { s } from '../lib/style.js';
 import EmptyState from '../components/EmptyState.jsx';
 import AuthedImage from '../components/AuthedImage.jsx';
@@ -18,15 +18,32 @@ const GroupMark = ({ g, token }) => (
     : <div style={s(`width:46px;height:46px;border-radius:13px;background:${g.color};flex:none;display:flex;align-items:center;justify-content:center`)}><GroupBike /></div>
 );
 
+// Chip label → the discipline it keeps. 'All' matches everything; the rest match a
+// club whose `disc` string contains the chip (so "Triathlon" catches "Triathlon", etc.).
 const filters = ['All', 'Cycling', 'Triathlon', 'Swim'];
 
 export default function Discover({ vm, actions, getToken }) {
   const [token, setToken] = useState(null);
+  const [query, setQuery] = useState('');
+  const [active, setActive] = useState('All');
   useEffect(() => {
     let ok = true;
     Promise.resolve(getToken?.()).then((t) => { if (ok) setToken(t || null); });
     return () => { ok = false; };
   }, [getToken]);
+
+  // Client-side search + discipline filter over the loaded groups. Case-insensitive
+  // free-text over name / location / discipline, ANDed with the active chip.
+  const groups = vm.nearbyGroups;
+  const shown = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return groups.filter((g) => {
+      const byChip = active === 'All' || (g.disc || '').toLowerCase().includes(active.toLowerCase());
+      const byText = !q || [g.name, g.loc, g.disc].some((v) => (v || '').toLowerCase().includes(q));
+      return byChip && byText;
+    });
+  }, [groups, query, active]);
+
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
       <div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.6px;font-weight:600')}>Find your squad</div>
@@ -41,22 +58,40 @@ export default function Discover({ vm, actions, getToken }) {
       {/* search */}
       <div style={s('display:flex;align-items:center;gap:9px;background:var(--bg2);border:1px solid var(--line);border-radius:13px;padding:11px 13px;margin-top:14px')}>
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth="2"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4-4" /></svg>
-        <span style={s('font-size:13px;color:var(--text3)')}>Search clubs, sport, city…</span>
+        <input
+          className="dsearch"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search clubs, sport, city…"
+          autoComplete="off"
+          style={s('flex:1;min-width:0;background:transparent;border:none;outline:none;padding:0;font-size:13px;color:var(--text);font-family:inherit')}
+        />
+        {query && (
+          <div className="ctl" onClick={() => setQuery('')} aria-label="Clear search" style={s('flex:none;display:flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:var(--bg4);color:var(--text3)')}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </div>
+        )}
       </div>
 
       {/* filters */}
       <div style={s('display:flex;gap:7px;margin-top:12px;flex-wrap:wrap')}>
-        {filters.map((f, i) => (
-          <div key={f} style={s('padding:6px 12px;border-radius:9px;font-size:11.5px;font-weight:600;' + (i === 0 ? 'background:var(--accent);color:var(--accent-ink)' : 'background:var(--bg2);border:1px solid var(--line);color:var(--text2)'))}>{f}</div>
-        ))}
+        {filters.map((f) => {
+          const on = active === f;
+          return (
+            <div key={f} className="ctl" onClick={() => setActive(f)} style={s('padding:6px 12px;border-radius:9px;font-size:11.5px;font-weight:600;' + (on ? 'background:var(--accent);color:var(--accent-ink)' : 'background:var(--bg2);border:1px solid var(--line);color:var(--text2)'))}>{f}</div>
+          );
+        })}
       </div>
 
       {/* group list */}
       <div style={s('display:flex;flex-direction:column;gap:11px;margin-top:16px')}>
-        {vm.nearbyGroups.length === 0 && (
+        {groups.length === 0 && (
           <EmptyState icon="🔍" title="No groups nearby" sub="New clubs and coached groups will appear here as they join." />
         )}
-        {vm.nearbyGroups.map((g) => (
+        {groups.length > 0 && shown.length === 0 && (
+          <EmptyState icon="🔍" title="No matches" sub="Try a different search or clear the filters to see every group." />
+        )}
+        {shown.map((g) => (
           <div key={g.id} className="ctl" onClick={() => actions.openGroup(g.id)} style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:13px 14px;display:flex;gap:12px;align-items:center')}>
             <GroupMark g={g} token={token} />
             <div style={s('flex:1;min-width:0')}>
