@@ -447,7 +447,11 @@ export default function App() {
       : { ...s, planMonthOffset: s.planMonthOffset + dir })),
     planToday: () => patch({ planWeekOffset: 0, planMonthOffset: 0 }),
     toggleCoach: () => setState((s) => ({ ...s, coachView: !s.coachView })),
-    openWorkout: (workoutKey) => patch({ showWorkout: true, workoutKey }),
+    // Accepts either a discipline key (legacy) or the full plan row; the row carries any
+    // coach-attached course through to the workout sheet's "Start now".
+    openWorkout: (rowOrKey) => patch(typeof rowOrKey === 'string'
+      ? { showWorkout: true, workoutKey: rowOrKey, workoutRow: null }
+      : { showWorkout: true, workoutKey: rowOrKey?.wk, workoutRow: rowOrKey || null }),
     closeWorkout: () => patch({ showWorkout: false }),
     // leaderboard
     setLbTab: (lbTab) => patch({ lbTab }),
@@ -533,6 +537,11 @@ export default function App() {
   const courseOps = useMemo(() => ({
     list: () => listCourses(session?.token),
     select: async (id) => { if (!id) { setSelectedCourse(null); return null; } const c = await getCourse(session?.token, id); setSelectedCourse(c); return c; },
+    // Fetch a course's full geometry WITHOUT selecting it (the coach editor embeds the points into a plan).
+    load: (id) => getCourse(session?.token, id),
+    // Select a course directly from embedded {name, points} — used when an athlete starts a planned ride
+    // whose coach attached a route (they don't own the coach's Course, so there's no id to fetch).
+    setCourse: (course) => setSelectedCourse(course?.points?.length ? course : null),
     clear: () => setSelectedCourse(null),
     save: (name, points, distanceKm) => createCourse(session?.token, { name, points, distanceKm }),
     remove: (id) => deleteCourse(session?.token, id),

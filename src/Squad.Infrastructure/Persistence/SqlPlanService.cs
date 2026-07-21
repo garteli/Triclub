@@ -25,8 +25,9 @@ public sealed class SqlPlanService(string connectionString) : IPlanService
 
         await using var conn = new SqlConnection(connectionString);
 
+        // Column order MUST match the PlannedWorkoutRow constructor (Dapper positional binding).
         var rows = await conn.QueryAsync<PlannedWorkoutRow>(new CommandDefinition("""
-            SELECT Id, WorkoutDate, Discipline, Title, Sub, DurationMin, Load
+            SELECT Id, WorkoutDate, Discipline, Title, Sub, DurationMin, Load, CourseName, CoursePoints
             FROM dbo.PlannedWorkout
             WHERE AthleteId=@athleteId AND WorkoutDate BETWEEN @monday AND @sunday
             ORDER BY WorkoutDate;
@@ -70,10 +71,10 @@ public sealed class SqlPlanService(string connectionString) : IPlanService
             foreach (var w in workouts)
             {
                 await conn.ExecuteAsync(new CommandDefinition("""
-                    INSERT INTO dbo.PlannedWorkout (Id, AthleteId, WorkoutDate, Discipline, Title, Sub, DurationMin, Load, PlanId, PlanName)
-                    VALUES (NEWID(), @athleteId, @Date, @Discipline, @Title, @Sub, @DurationMin, @Load, @planId, @name);
+                    INSERT INTO dbo.PlannedWorkout (Id, AthleteId, WorkoutDate, Discipline, Title, Sub, DurationMin, Load, PlanId, PlanName, CourseName, CoursePoints)
+                    VALUES (NEWID(), @athleteId, @Date, @Discipline, @Title, @Sub, @DurationMin, @Load, @planId, @name, @CourseName, @CoursePoints);
                     """,
-                    new { athleteId, w.Date, w.Discipline, w.Title, w.Sub, w.DurationMin, w.Load, planId, name },
+                    new { athleteId, w.Date, w.Discipline, w.Title, w.Sub, w.DurationMin, w.Load, planId, name, w.CourseName, w.CoursePoints },
                     tx, cancellationToken: ct));
             }
         }

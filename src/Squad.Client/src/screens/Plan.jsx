@@ -89,7 +89,13 @@ const seg = (active) =>
     ? 'flex:1;text-align:center;padding:7px 6px;border-radius:9px;font-size:11.5px;font-weight:600;background:var(--accent,#d6ff3f);color:#141a05'
     : 'flex:1;text-align:center;padding:7px 6px;border-radius:9px;font-size:11.5px;font-weight:600;background:rgba(255,255,255,.06);color:#c8ccd2';
 
-function WorkoutSheet({ wkDetail, actions }) {
+function WorkoutSheet({ wkDetail, actions, live }) {
+  const course = wkDetail.course;
+  // Start the ride, pre-selecting the coach's route if one is attached (it draws on the live map).
+  const startNow = () => {
+    if (course?.points?.length) live?.courses?.setCourse?.(course);
+    actions.go('ride');
+  };
   return (
     <>
       <div className="ctl" onClick={actions.closeWorkout} style={s('position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50;animation:floatUp .2s ease')} />
@@ -122,8 +128,20 @@ function WorkoutSheet({ wkDetail, actions }) {
           <div style={s('width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#37c0ff,#5a86ff);flex:none;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff')}>C</div>
           <div style={s('font-size:12.5px;color:var(--text2);line-height:1.5')}><span style={s('color:var(--text);font-weight:600')}>Coach:</span> {wkDetail.note}</div>
         </div>
+        {course && (
+          <div style={s('display:flex;align-items:center;gap:10px;background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:12px 13px;margin-top:14px')}>
+            <div style={s('width:30px;height:30px;border-radius:9px;background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent);flex:none;display:flex;align-items:center;justify-content:center')}>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
+            </div>
+            <div style={s('flex:1;min-width:0')}>
+              <div style={s('font-size:9.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.7px;font-weight:600')}>Route to follow</div>
+              <div style={s('font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>{course.name}</div>
+            </div>
+            <div style={s('font-size:11px;color:var(--text3);flex:none')}>{course.points.length} pts</div>
+          </div>
+        )}
         <div style={s('display:flex;gap:9px;margin-top:16px')}>
-          <div className="ctl" onClick={() => actions.go('ride')} style={s('flex:1;background:var(--accent);color:var(--accent-ink);text-align:center;padding:14px;border-radius:13px;font-weight:700;font-size:14px')}>Start now</div>
+          <div className="ctl" onClick={startNow} style={s('flex:1;background:var(--accent);color:var(--accent-ink);text-align:center;padding:14px;border-radius:13px;font-weight:700;font-size:14px')}>Start now</div>
           <div className="ctl" onClick={actions.closeWorkout} style={s('width:56px;background:var(--bg3);border:1px solid var(--line);border-radius:13px;display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:13px;font-weight:600')}>Close</div>
         </div>
       </div>
@@ -135,7 +153,7 @@ function WorkoutSheet({ wkDetail, actions }) {
 const dowLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 const legend = [['Bike', 'var(--bike)'], ['Swim', 'var(--swim)'], ['Run', 'var(--run)'], ['Gym', 'var(--gym)']];
 
-export default function Plan({ vm, state, actions, planMine }) {
+export default function Plan({ vm, state, actions, planMine, live }) {
   const week = state.planView === 'week';
   const [showMine, setShowMine] = useState(false);
   const coachToggleStyle = state.coachView
@@ -201,7 +219,7 @@ export default function Plan({ vm, state, actions, planMine }) {
             )}
             <div style={s('display:flex;flex-direction:column;gap:9px')}>
               {vm.plan.map((p) => (
-                <div key={p.day} className="ctl" onClick={() => actions.openWorkout(p.wk)} style={s(`background:var(--bg2);border:1px solid ${p.rowBorder};border-radius:16px;padding:12px 13px;display:flex;gap:12px;align-items:center`)}>
+                <div key={p.day} className="ctl" onClick={() => actions.openWorkout(p)} style={s(`background:var(--bg2);border:1px solid ${p.rowBorder};border-radius:16px;padding:12px 13px;display:flex;gap:12px;align-items:center`)}>
                   <div style={s('flex:none;width:38px;text-align:center')}><div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600')}>{p.day}</div><div className="mono" style={s('font-size:17px;font-weight:700')}>{p.date}</div></div>
                   <div style={s('width:1px;height:34px;background:var(--line)')} />
                   <div style={s(`width:36px;height:36px;border-radius:11px;background:color-mix(in srgb,${p.color} 16%,transparent);color:${p.color};flex:none;display:flex;align-items:center;justify-content:center`)} dangerouslySetInnerHTML={html(p.iconHtml)} />
@@ -233,7 +251,7 @@ export default function Plan({ vm, state, actions, planMine }) {
         )}
       </div>
 
-      {state.showWorkout && <WorkoutSheet wkDetail={vm.wkDetail} actions={actions} />}
+      {state.showWorkout && <WorkoutSheet wkDetail={vm.wkDetail} actions={actions} live={live} />}
       {showMine && planMine && <MyPlansSheet planMine={planMine} onClose={() => setShowMine(false)} />}
     </>
   );

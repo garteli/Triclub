@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text.Json;
 
 using Squad.Core;
 
@@ -10,7 +11,8 @@ public sealed record PublishPlanRequest(
     Guid[]? AthleteIds, Guid? PlanId, string? PlanName, DateTime? StartDate, int? Weeks, PublishWorkoutDto[]? Workouts);
 
 public sealed record PublishWorkoutDto(
-    DateTime Date, string? Discipline, string? Title, string? Sub, int DurationMin, int Load);
+    DateTime Date, string? Discipline, string? Title, string? Sub, int DurationMin, int Load,
+    string? CourseName, double[][]? CoursePoints);
 
 /// <summary>Create/update a coach's saved plan. Id null = create.</summary>
 public sealed record SavePlanRequest(Guid? Id, string? Name, string? Doc, Guid? SquadId);
@@ -232,6 +234,10 @@ public static class PlanEndpoints
         return Results.Ok(new { removed });
     }
 
+    // A route embedded in a plan only needs enough points to draw the line; cap it so a
+    // 20k-point course can't bloat every athlete's row (and blow the saved-doc size limit).
+    private const int MaxCoursePoints = 600;
+
     private static PlannedWorkoutWrite MapWorkout(PublishWorkoutDto w)
     {
         var disc = AllowedDisciplines.Contains(w.Discipline ?? "") ? w.Discipline!.ToLowerInvariant() : "rest";
@@ -239,8 +245,43 @@ public static class PlanEndpoints
         if (title.Length == 0) title = "Session";
         if (title.Length > 80) title = title[..80];
         var sub = string.IsNullOrWhiteSpace(w.Sub) ? null : (w.Sub!.Length > 120 ? w.Sub[..120] : w.Sub);
+        var (courseName, coursePoints) = SanitizeCourse(w.CourseName, w.CoursePoints);
         return new PlannedWorkoutWrite(w.Date.Date, disc, title, sub,
-            Math.Clamp(w.DurationMin, 0, 24 * 60), Math.Clamp(w.Load, 0, 100_000));
+            Math.Clamp(w.DurationMin, 0, 24 * 60), Math.Clamp(w.Load, 0, 100_000), courseName, coursePoints);
+    }
+
+    // Validate a coach-attached course: keep in-range [lat,lon] pairs, downsample to a drawable
+    // cap, and serialize to JSON. Returns (null, null) when there's no usable route.
+    private static (string? name, string? pointsJson) SanitizeCourse(string? name, double[][]? points)
+    {
+        if (points is null) return (null, null);
+        var clean = points.Where(p => p is { Length: >= 2 }
+                && p[0] is >= -90 and <= 90 && p[1] is >= -180 and <= 180)
+            .Select(p => new[] { p[0], p[1] })
+            .ToArray();
+        if (clean.Length < 2) return (null, null);
+
+        if (clean.Length > MaxCoursePoints)
+        {
+            // Even stride, always keeping the last point so the route still closes/ends correctly.
+            var step = (double)(clean.Length - 1) / (MaxCoursePoints - 1);
+            var sampled = new double[MaxCoursePoints][];
+            for (var i = 0; i < MaxCoursePoints; i++) sampled[i] = clean[(int)Math.Round(i * step)];
+            clean = sampled;
+        }
+
+        var cn = (name ?? "Course").Trim();
+        if (cn.Length == 0) cn = "Course";
+        if (cn.Length > 120) cn = cn[..120];
+        return (cn, JsonSerializer.Serialize(clean));
+    }
+
+    // Turn stored course JSON back into a [[lat,lon],…] element for the client (null if absent/corrupt).
+    private static JsonElement? ParsePoints(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return null;
+        try { using var doc = JsonDocument.Parse(json); return doc.RootElement.Clone(); }
+        catch (JsonException) { return null; }
     }
 
     private static async Task<IResult> GetPlan(HttpContext http, IPlanService plans, CancellationToken ct)
@@ -279,6 +320,9 @@ public static class PlanEndpoints
                 durationMin = r.DurationMin,
                 load = r.Load,
                 status,
+                courseName = r.CourseName,
+                // Pass the stored JSON through as a parsed [[lat,lon],…] array (null when no course).
+                coursePoints = ParsePoints(r.CoursePoints),
             };
         }).ToList();
 

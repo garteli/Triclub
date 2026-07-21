@@ -31,6 +31,15 @@ IF COL_LENGTH('dbo.PlannedWorkout', 'PlanId') IS NULL
 IF COL_LENGTH('dbo.PlannedWorkout', 'PlanName') IS NULL
     ALTER TABLE dbo.PlannedWorkout ADD PlanName NVARCHAR(120) NULL;
 
+-- Optional course a coach attaches to a session: a rider follows it on the live map.
+-- The route geometry is EMBEDDED here (CoursePoints = JSON [[lat,lon],…]) rather than
+-- referenced by id, so an athlete can draw it without access to the coach's owner-scoped
+-- Course row. Nullable/additive/idempotent — only outdoor sessions carry one.
+IF COL_LENGTH('dbo.PlannedWorkout', 'CourseName') IS NULL
+    ALTER TABLE dbo.PlannedWorkout ADD CourseName NVARCHAR(120) NULL;
+IF COL_LENGTH('dbo.PlannedWorkout', 'CoursePoints') IS NULL
+    ALTER TABLE dbo.PlannedWorkout ADD CoursePoints NVARCHAR(MAX) NULL;
+
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_PlannedWorkout_Athlete_Plan' AND object_id = OBJECT_ID('dbo.PlannedWorkout'))
 CREATE INDEX IX_PlannedWorkout_Athlete_Plan ON dbo.PlannedWorkout (AthleteId, PlanId);
 
