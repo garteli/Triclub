@@ -14,14 +14,11 @@ export const Back = ({ onClick }) => (
 );
 
 // Back button + title, and an optional lead paragraph under it.
-export const Header = ({ title, sub, onBack }) => (
-  <>
-    <div style={s('display:flex;align-items:center;gap:10px')}>
-      <Back onClick={onBack} />
-      <div style={s('font-size:20px;font-weight:700')}>{title}</div>
-    </div>
-    {sub && <div style={s('font-size:12.5px;color:var(--text2);margin-top:8px;line-height:1.5')}>{sub}</div>}
-  </>
+// The title + Back now live in the global app header (see AppHeader / HEADER_META); this
+// keeps only the optional lead paragraph. `title`/`onBack` are accepted but unused so the
+// call sites don't need to change.
+export const Header = ({ sub }) => (
+  sub ? <div style={s('font-size:12.5px;color:var(--text2);margin-top:2px;line-height:1.5')}>{sub}</div> : null
 );
 
 export const SectionLabel = ({ children }) => <div style={s(labelCss)}>{children}</div>;

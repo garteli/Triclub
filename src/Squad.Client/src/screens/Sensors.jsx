@@ -120,11 +120,8 @@ export default function Sensors({ actions }) {
 
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
-      <div style={s('display:flex;align-items:center;gap:10px')}>
-        <Back onClick={() => actions.go('settings')} />
-        <div style={s('font-size:20px;font-weight:700')}>Connected sensors</div>
-      </div>
-      <div style={s('font-size:12.5px;color:var(--text2);margin-top:8px;line-height:1.5')}>
+      {/* title + back now in the global app header */}
+      <div style={s('font-size:12.5px;color:var(--text2);margin-top:2px;line-height:1.5')}>
         Pair Bluetooth sensors to record real heart rate, power, cadence and speed. Tap Connect to scan — remembered sensors reconnect automatically next time.
       </div>
 

@@ -29,14 +29,7 @@ export default function Settings({ vm, state, actions }) {
   const me = vm.me;
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
-      {/* header */}
-      <div style={s('display:flex;align-items:center;gap:10px')}>
-        <div className="ctl" onClick={() => actions.go('profile')} style={s('width:34px;height:34px;border-radius:10px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center')}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round"><path d="M15 6l-6 6 6 6" /></svg>
-        </div>
-        <div style={s('font-size:20px;font-weight:700')}>Settings</div>
-      </div>
-
+      {/* title + back now in the global app header */}
       {/* account */}
       <div className="ctl" onClick={() => actions.go('editprofile')} style={s(card + ';display:flex;align-items:center;gap:13px;padding:13px 14px;margin-top:16px')}>
         <Avatar photo={me.photo} initials={me.initials} color={me.color} size={46} radius={14} fontSize={16} />

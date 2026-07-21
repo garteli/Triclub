@@ -96,6 +96,24 @@ const HEADER_META = {
   lb: { root: true },
   coach: { root: true },
   notifs: { title: 'Notifications' },
+  // Settings family (share components/SettingsUI Header, now title-less).
+  units: { title: 'Units' },
+  zones: { title: 'Training zones' },
+  notifprefs: { title: 'Notifications' },
+  privacy: { title: 'Privacy' },
+  help: { title: 'Help & feedback' },
+  legal: { title: 'Terms & privacy' },
+  // Profile cluster.
+  profile: { title: 'Profile' },
+  settings: { title: 'Settings' },
+  editprofile: { title: 'Edit profile' },
+  // Content pages.
+  activities: { title: 'Activities' },
+  discover: { title: 'Discover' },
+  seg: { title: 'Segments' },
+  plans: { title: 'Training plans' },
+  sensors: { title: 'Connected sensors' },
+  upload: { title: 'Upload' },
 };
 
 export default function App() {

@@ -12,10 +12,7 @@ import GarminSync from '../components/GarminSync.jsx';
 export default function UploadActivity({ actions, getToken, onDataChanged }) {
   return (
     <div style={s('animation:floatUp .35s ease')}>
-      <div style={s('display:flex;align-items:center;gap:12px;padding:6px 18px 0')}>
-        <Back onClick={() => actions.go('activities')} />
-        <div style={s('font-size:15px;font-weight:700')}>Back to activities</div>
-      </div>
+      {/* back now in the global app header */}
       <ActivityUpload
         getToken={getToken}
         onUploaded={(result) => { if (result?.status === 'queued') onDataChanged?.(); }}

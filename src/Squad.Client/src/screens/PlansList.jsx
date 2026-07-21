@@ -52,16 +52,7 @@ export default function PlansList({ plans, actions }) {
 
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
-      {/* header */}
-      <div style={s('display:flex;align-items:center;gap:10px')}>
-        <div className="ctl" onClick={() => actions.go('plan')} style={s('width:30px;height:30px;border-radius:9px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;flex:none')}>
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round"><path d="M15 6l-6 6 6 6" /></svg>
-        </div>
-        <div style={s('flex:1')}>
-          <div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.6px;font-weight:600')}>Coach</div>
-          <div style={s('font-size:23px;font-weight:700;letter-spacing:-.5px')}>Training plans</div>
-        </div>
-      </div>
+      {/* title + back now in the global app header */}
 
       {/* new plan */}
       <div className="ctl" onClick={() => plans?.create?.()} style={s('display:flex;align-items:center;gap:10px;background:var(--accent);color:var(--accent-ink);border-radius:14px;padding:13px 15px;font-weight:700;font-size:14px;margin-top:16px')}>

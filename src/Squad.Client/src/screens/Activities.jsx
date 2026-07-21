@@ -35,8 +35,8 @@ export default function Activities({ vm, actions, getToken }) {
 
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
-      <div style={s('display:flex;align-items:flex-end;justify-content:space-between;gap:10px')}>
-        <div><div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.6px;font-weight:600')}>Feed</div><div style={s('font-size:23px;font-weight:700;letter-spacing:-.5px')}>Activities</div></div>
+      {/* title lives in the global app header; keep the upload action */}
+      <div style={s('display:flex;justify-content:flex-end')}>
         <div className="ctl" onClick={() => actions.go('upload')} style={s('display:flex;align-items:center;gap:6px;background:var(--accent);color:var(--accent-ink);font-size:12.5px;font-weight:700;padding:9px 13px;border-radius:11px;flex:none')}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 16V4M6 10l6-6 6 6" /></svg>
           Upload
