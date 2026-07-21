@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as signalR from '@microsoft/signalr';
 import { API_BASE } from '../lib/apiBase.js';
 
@@ -89,6 +89,9 @@ export function useLiveRide(rideId, { hubUrl = API_BASE + '/hubs/ride', getToken
     [rideId],
   );
 
-  const riders = Object.values(byId).map((u) => mapLiveRider(u, meId));
+  // Memoised on the raw hub state so the reference only changes when a rider actually
+  // moves/joins/leaves — lets useRideTelemetry re-render the map on each position update
+  // (not on every unrelated App render).
+  const riders = useMemo(() => Object.values(byId).map((u) => mapLiveRider(u, meId)), [byId, meId]);
   return { riders, status, pushTelemetry, pushPeerRange };
 }
