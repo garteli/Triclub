@@ -51,6 +51,27 @@ public sealed record LeaderboardRow
     public string? AvatarUrl { get; init; }
 }
 
+/// <summary>
+/// One club's weekly standing in the cross-club ranking. Load = ΣTSS of the club's
+/// members; VolumeHours = ΣMovingTime; Members = roster size; Streak = the club's
+/// average member streak (whole days); Move = load-rank change vs last week; Emblem is a
+/// deterministic decorative glyph (peak|wave|wheel|bolt). You flags the caller's own club.
+/// </summary>
+public sealed record ClubRankingRow
+{
+    public Guid SquadId { get; init; }
+    public string Name { get; init; } = "";
+    public string Initials { get; init; } = "";
+    public string Color { get; init; } = "#ff6a2c";
+    public string Emblem { get; init; } = "peak";
+    public bool You { get; init; }
+    public double Load { get; init; }
+    public double VolumeHours { get; init; }
+    public int Members { get; init; }
+    public int Streak { get; init; }
+    public int Move { get; init; }
+}
+
 // ----- Live ride -----
 
 /// <summary>What a rider's own device streams up during a live ride.</summary>

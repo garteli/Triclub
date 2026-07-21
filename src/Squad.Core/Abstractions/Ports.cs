@@ -50,6 +50,13 @@ public interface ILeaderboardService
     Task<IReadOnlyList<LeaderboardRow>> GetWeeklyAsync(Guid squadId, Guid? me, DateTimeOffset asOf, CancellationToken ct);
 }
 
+/// <summary>Ranks every club (squad with members) against each other for the current week.
+/// <paramref name="me"/> is the caller, so the row for their active club is flagged You.</summary>
+public interface IClubRankingService
+{
+    Task<IReadOnlyList<ClubRankingRow>> GetWeeklyAsync(Guid? me, DateTimeOffset asOf, CancellationToken ct);
+}
+
 /// <summary>Recent committed activities for a squad — the initial feed load the hub then tops up live.
 /// <paramref name="me"/> is the caller, so each row can report whether they've kudoed it.</summary>
 public interface IFeedReadService
