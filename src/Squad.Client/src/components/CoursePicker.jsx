@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { s } from '../lib/style.js';
 import { parseGpx } from '../lib/courses.js';
 import { haversineMeters } from '../lib/geo.js';
+import CourseDraw from './CourseDraw.jsx';
 
 // Pick a saved route to follow on the live map, save the ride you just recorded as a course,
 // or import a GPX. `courses` is the ops object from App (list/select/clear/save/remove/ridePath/selected).
@@ -17,6 +18,7 @@ export default function CoursePicker({ courses, onClose }) {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [naming, setNaming] = useState(null); // { source:'ride'|'gpx', points, name }
+  const [drawing, setDrawing] = useState(false); // draw-on-map overlay open
   const gpxRef = useRef(null);
 
   const selectedId = courses?.selected?.id ?? null;
@@ -68,6 +70,14 @@ export default function CoursePicker({ courses, onClose }) {
       if (created?.id) await courses.select(created.id); // follow the freshly-saved course
     } catch (e) { setError(e?.message || 'Could not save the course.'); }
     finally { setBusy(false); }
+  };
+
+  // Save a course drawn on the map, then follow it (the CourseDraw overlay owns its own busy/error UI).
+  const saveDrawn = async (name, points, km) => {
+    const created = await courses.save(name, points, km);
+    setDrawing(false);
+    await load();
+    if (created?.id) await courses.select(created.id);
   };
 
   return (
@@ -132,10 +142,20 @@ export default function CoursePicker({ courses, onClose }) {
                 </div>
                 <input ref={gpxRef} type="file" accept=".gpx,application/gpx+xml,text/xml" style={s('display:none')} onChange={onGpx} />
               </div>
+              <div className="ctl" onClick={() => { setError(''); setDrawing(true); }} style={s('display:flex;align-items:center;justify-content:center;gap:7px;background:var(--bg2);border:1px solid var(--line);color:var(--text);border-radius:13px;padding:12px;font-weight:700;font-size:13px;margin-top:10px')}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>Draw on map
+              </div>
             </>
           )}
         </div>
       </div>
+
+      {drawing && (
+        <CourseDraw
+          onCancel={() => setDrawing(false)}
+          onSave={saveDrawn}
+          initialCenter={courses?.ridePath?.()?.[0] || courses?.selected?.points?.[0]} />
+      )}
     </>
   );
 }
