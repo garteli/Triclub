@@ -16,7 +16,7 @@ import { useGarminSync } from './hooks/useGarminSync.js';
 import { useHealthSync } from './hooks/useHealthSync.js';
 import { createSquad, joinSquad, activateSquad } from './lib/squads.js';
 import { recordPayment, markPaymentPaid, waivePayment } from './lib/payments.js';
-import { publishPlan, unpublishPlan, listMyPlans, removeMyPlan, listPlans, getPlan, savePlan, deletePlan, importPlanPdf, getImportStatus, listLibrary, getLibraryTemplate, adoptTemplate } from './lib/plan.js';
+import { publishPlan, unpublishPlan, listMyPlans, removeMyPlan, listPlans, getPlan, savePlan, deletePlan, listLibrary, getLibraryTemplate, adoptTemplate } from './lib/plan.js';
 // import { useLiveRide } from './hooks/useLiveRide.js'; // swap in for real telemetry
 import { buildViewModel } from './lib/viewModel.js';
 import { loadSession, saveSession, clearSession, enrollBiometric, fetchMe, getProfile } from './lib/auth.js';
@@ -348,9 +348,6 @@ export default function App() {
     create: () => { setSelectedPlan(null); setState((s) => ({ ...s, screen: 'planeditor' })); },
     save: (body) => savePlan(session?.token, body),
     remove: (id) => deletePlan(session?.token, id),
-    // Import a PDF → AI builds a plan in the background; submit returns a jobId the modal polls.
-    importPdf: (file, opts) => importPlanPdf(session?.token, file, opts),
-    importStatus: (jobId) => getImportStatus(session?.token, jobId),
     // Plan library: browse pre-built templates, preview one, adopt it into your plans.
     library: () => listLibrary(session?.token),
     libraryTemplate: (id) => getLibraryTemplate(session?.token, id),

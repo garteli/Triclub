@@ -256,20 +256,14 @@ public sealed record PlanImportResult(bool Ok, string? Doc, string? Name, string
     public static PlanImportResult Fail(string error) => new(false, null, null, error);
 }
 
-/// <summary>Turns an uploaded PDF training plan into a saved-plan JSON doc via an AI model.
-/// <see cref="Configured"/> is false when no provider/API key is set, so the endpoint can
-/// report an honest "not configured" instead of pretending to import.</summary>
+/// <summary>Generates training plans via an AI model (used by the plan-library seeder).
+/// <see cref="Configured"/> is false when no provider/API key is set.</summary>
 public interface IPlanImportService
 {
     bool Configured { get; }
 
-    /// <param name="anchorType">"start" (plan begins on anchorDate) or "target" (anchorDate is race day).</param>
-    /// <param name="anchorDate">yyyy-MM-dd the athlete gave, or null to let the model leave it blank.</param>
-    Task<PlanImportResult> ImportAsync(
-        byte[] pdfBytes, string fileName, string anchorType, string? anchorDate, CancellationToken ct);
-
-    /// <summary>Generate a plan from a catalog spec (no PDF) — a text prompt to the model, normalised
-    /// into the same CoachPlan doc shape. Used by the library seeder to build reusable templates.</summary>
+    /// <summary>Generate a plan from a catalog spec — a text prompt to the model, normalised into the
+    /// CoachPlan doc shape. Used by the library seeder to build reusable templates.</summary>
     Task<PlanImportResult> GeneratePlanAsync(PlanSpec spec, CancellationToken ct);
 }
 
