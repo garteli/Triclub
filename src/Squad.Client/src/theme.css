@@ -127,8 +127,10 @@ body {
 }
 @supports (font-size: 1cqmin) {
   .live-tile { container-type: size; }
-  .live-metric-val { font-size: max(var(--vf, 34px), min(30cqw, 46cqh)); }
-  .live-metric-val.hero { font-size: max(var(--vf, 44px), min(23cqw, 56cqh)); }
+  /* Size to the smaller of the character-aware width cap (--vfw, set per value in
+     LivePages) and a height cap — never a --vf floor, so a long value can't overflow. */
+  .live-metric-val { font-size: min(var(--vfw, 30cqw), 46cqh); }
+  .live-metric-val.hero { font-size: min(var(--vfw, 23cqw), 56cqh); }
 }
 
 /* app shell — fills the viewport, centers the app column. */

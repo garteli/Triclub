@@ -119,8 +119,8 @@ export default function EditProfile({ vm, actions, getToken, onProfileSaved }) {
       <Chips options={LEVELS} value={form.level} onChange={set('level')} />
 
       <div style={s('display:flex;gap:9px')}>
-        <div style={s('flex:1')}><Field label="Birth date" value={form.birthDate} onChange={set('birthDate')} type="date" mono /></div>
-        <div style={s('flex:1')}><Field label="Weight (kg)" value={form.weight} onChange={set('weight')} placeholder="72.5" type="number" mono /></div>
+        <div style={s('flex:1;min-width:0')}><Field label="Birth date" value={form.birthDate} onChange={set('birthDate')} type="date" mono /></div>
+        <div style={s('flex:1;min-width:0')}><Field label="Weight (kg)" value={form.weight} onChange={set('weight')} placeholder="72.5" type="number" mono /></div>
       </div>
       {ageGroup && <div style={s('font-size:11px;color:var(--text3);margin:6px 2px 0')}>Age group · <span className="mono" style={s('color:var(--text2)')}>{ageGroup}</span> (from birth date)</div>}
 

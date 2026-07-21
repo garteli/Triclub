@@ -1,6 +1,5 @@
 import { s } from '../lib/style.js';
 import { unitsLabel } from '../lib/prefs.js';
-import Avatar from '../components/Avatar.jsx';
 
 const label = 'font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.3px;font-weight:600;margin:22px 2px 10px';
 const card = 'background:var(--bg2);border:1px solid var(--line);border-radius:16px';
@@ -26,22 +25,11 @@ const NavRow = ({ children, danger, last, onClick }) => (
 
 export default function Settings({ vm, state, actions }) {
   const { theme, accent, lang, units } = state;
-  const me = vm.me;
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
       {/* title + back now in the global app header */}
-      {/* account */}
-      <div className="ctl" onClick={() => actions.go('editprofile')} style={s(card + ';display:flex;align-items:center;gap:13px;padding:13px 14px;margin-top:16px')}>
-        <Avatar photo={me.photo} initials={me.initials} color={me.color} size={46} radius={14} fontSize={16} />
-        <div style={s('flex:1')}>
-          <div style={s('font-size:15px;font-weight:700')}>{me.name}</div>
-          <div style={s('font-size:11.5px;color:var(--text2)')}>{me.club} · Age-group {me.ageGroup}</div>
-        </div>
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth="2" strokeLinecap="round"><path d="M9 6l6 6-6 6" /></svg>
-      </div>
-
       {/* appearance */}
-      <div style={s(label)}>Appearance</div>
+      <div style={s(label + ';margin-top:16px')}>Appearance</div>
       <div style={s(card + ';padding:14px 15px')}>
         <div style={s(rowLabel)}>Theme</div>
         <div style={s('display:flex;gap:7px')}>
