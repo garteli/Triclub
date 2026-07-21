@@ -17,6 +17,7 @@ import { usePlan } from './hooks/usePlan.js';
 import { useGarminSync } from './hooks/useGarminSync.js';
 import { useHealthSync } from './hooks/useHealthSync.js';
 import { createSquad, joinSquad, activateSquad } from './lib/squads.js';
+import { listCourses, getCourse, createCourse, deleteCourse } from './lib/courses.js';
 import { recordPayment, markPaymentPaid, waivePayment } from './lib/payments.js';
 import { publishPlan, unpublishPlan, listMyPlans, removeMyPlan, listPlans, getPlan, savePlan, deletePlan, listLibrary, getLibraryTemplate, adoptTemplate } from './lib/plan.js';
 // import { useLiveRide } from './hooks/useLiveRide.js'; // swap in for real telemetry
@@ -526,13 +527,25 @@ export default function App() {
   // A ride is "live" whenever it's active OR still recording — independent of which screen you're on,
   // so sensors, ranging, the hub, telemetry, wake lock and presence all keep running as you navigate.
   const rideLive = rideSessionActive || recorder.recording;
+  // Saved routes/courses: pick one to follow on the live map (its geometry draws on the map, and it
+  // can be attached to a planned ride by a coach). save() turns the just-recorded path into a course.
+  const [selectedCourse, setSelectedCourse] = useState(null); // { id, name, points:[[lat,lon],…] } | null
+  const courseOps = useMemo(() => ({
+    list: () => listCourses(session?.token),
+    select: async (id) => { if (!id) { setSelectedCourse(null); return null; } const c = await getCourse(session?.token, id); setSelectedCourse(c); return c; },
+    clear: () => setSelectedCourse(null),
+    save: (name, points, distanceKm) => createCourse(session?.token, { name, points, distanceKm }),
+    remove: (id) => deleteCourse(session?.token, id),
+    ridePath: () => recorder?.getPath?.(2000) || [],
+    selected: selectedCourse,
+  }), [session?.token, recorder, selectedCourse]);
   // Phone-to-phone BLE ranging (native only): advertise this athlete + scan teammates for
   // pack position while a ride is live. Inert on web — no-op that leaves GPS+heading in charge.
   const peerRanging = usePeerRanging({ athleteId: session?.athleteId, active: rideLive, pushPeerRange: liveRide.pushPeerRange });
   // Ultra-Wideband precise ranging (Apple Nearby Interaction, native + U1 devices only): exact
   // distance + direction to teammates. Inert on web / non-UWB — falls back to BLE + GPS.
   const uwb = useUwbRanging({ athleteId: session?.athleteId, active: rideLive, riders: liveRide.riders, pushUwbToken: liveRide.pushUwbToken, onUwbToken: liveRide.onUwbToken });
-  const tel = useRideTelemetry({ t, active: rideLive, riders: liveRide.riders, recorder, sensors, me: profile });
+  const tel = useRideTelemetry({ t, active: rideLive, riders: liveRide.riders, recorder, sensors, me: profile, course: selectedCourse?.points });
 
   // Presence heartbeat: while on a ride, announce we're here every 2.5s even with no GPS fix, so
   // teammates register us as a peer and BLE/UWB ranging can engage regardless of GPS accuracy.
@@ -556,7 +569,7 @@ export default function App() {
   // Keep the screen awake for the whole ride — recording or watching — even on other screens.
   useWakeLock(rideLive);
 
-  const live = { riders: liveRide.riders, status: liveRide.status, pushTelemetry: liveRide.pushTelemetry, recorder, sensors, tel, livePages, peerRanging, uwb };
+  const live = { riders: liveRide.riders, status: liveRide.status, pushTelemetry: liveRide.pushTelemetry, recorder, sensors, tel, livePages, peerRanging, uwb, courses: courseOps, course: selectedCourse };
 
   // Unread count for the global header's bell badge.
   const notif = useNotifications({ getToken, enabled: authed });
