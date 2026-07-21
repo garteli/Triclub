@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { s } from '../lib/style.js';
-import { parseGpx } from '../lib/courses.js';
+import { parseGpx, courseNameFromPoints } from '../lib/courses.js';
 import { haversineMeters } from '../lib/geo.js';
 import CourseDraw from './CourseDraw.jsx';
 
@@ -46,7 +46,7 @@ export default function CoursePicker({ courses, onClose }) {
   const startSaveRide = () => {
     const pts = courses.ridePath?.() || [];
     if (pts.length < 2) { setError('No ride recorded yet to save as a course.'); return; }
-    setNaming({ source: 'ride', points: pts, name: `Route ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` });
+    setNaming({ source: 'ride', points: pts, name: courseNameFromPoints(pts) });
   };
 
   const onGpx = async (e) => {
