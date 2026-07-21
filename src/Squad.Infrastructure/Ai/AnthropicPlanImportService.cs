@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -79,6 +80,7 @@ public sealed class AnthropicPlanImportService : IPlanImportService
         };
 
         AnthropicResponse? resp;
+        string rawJson = "";
         try
         {
             using var req = new HttpRequestMessage(HttpMethod.Post, Endpoint)
@@ -97,7 +99,8 @@ public sealed class AnthropicPlanImportService : IPlanImportService
                 return PlanImportResult.Fail(FriendlyError((int)res.StatusCode, raw));
             }
 
-            resp = await res.Content.ReadFromJsonAsync<AnthropicResponse>(Json, ct);
+            rawJson = await res.Content.ReadAsStringAsync(ct);
+            resp = JsonSerializer.Deserialize<AnthropicResponse>(rawJson, Json);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -118,7 +121,15 @@ public sealed class AnthropicPlanImportService : IPlanImportService
 
         var text = resp?.Text();
         if (string.IsNullOrWhiteSpace(text))
+        {
+            // 200 OK but no text block — capture what actually came back to diagnose (stop_reason,
+            // content block types, first chunk of the raw body).
+            _log.LogWarning("Anthropic plan import returned no text. stop_reason={Stop} types=[{Types}] raw={Raw}",
+                resp?.StopReason ?? "(none)",
+                resp?.Content is null ? "(null content)" : string.Join(",", resp.Content.Select(b => b.Type ?? "?")),
+                Truncate(rawJson, 1200));
             return PlanImportResult.Fail("The AI returned an empty response. Try again.");
+        }
 
         if (!TryExtractJson(text, out var modelJson))
             return PlanImportResult.Fail("Couldn't read a plan out of that PDF. Is it a training plan?");
@@ -415,6 +426,7 @@ public sealed class AnthropicPlanImportService : IPlanImportService
     private sealed class AnthropicResponse
     {
         [JsonPropertyName("content")] public List<ContentBlock>? Content { get; set; }
+        [JsonPropertyName("stop_reason")] public string? StopReason { get; set; }
 
         public string Text()
         {
