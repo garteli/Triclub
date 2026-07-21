@@ -99,9 +99,16 @@ public sealed class AnthropicPlanImportService : IPlanImportService
 
             resp = await res.Content.ReadFromJsonAsync<AnthropicResponse>(Json, ct);
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw; // the caller/client actually aborted the request — let it propagate
+        }
         catch (OperationCanceledException)
         {
-            throw;
+            // HttpClient.Timeout elapsed (thrown as a TaskCanceledException while ct is NOT
+            // cancelled) — a slow/large PDF, not a client abort. Report it, don't 500.
+            _log.LogWarning("Anthropic plan import timed out after {Seconds}s", _http.Timeout.TotalSeconds);
+            return PlanImportResult.Fail("The AI took too long to read that PDF. Try again, or split a very long plan into smaller parts.");
         }
         catch (Exception ex)
         {

@@ -85,8 +85,12 @@ public sealed class SqlPlanService(string connectionString) : IPlanService
     public async Task<IReadOnlyList<CoachPlanSummary>> ListPlansAsync(Guid ownerId, CancellationToken ct)
     {
         await using var conn = new SqlConnection(connectionString);
+        // CAST UpdatedUtc to datetimeoffset so Dapper can always materialise the record's
+        // DateTimeOffset param — some deployments created the column as datetime(2), which
+        // otherwise comes back as System.DateTime and fails materialisation. No-op if it's
+        // already datetimeoffset.
         var rows = await conn.QueryAsync<CoachPlanSummary>(new CommandDefinition("""
-            SELECT Id, Name, UpdatedUtc FROM dbo.CoachPlan
+            SELECT Id, Name, CAST(UpdatedUtc AS datetimeoffset(0)) AS UpdatedUtc FROM dbo.CoachPlan
             WHERE OwnerId = @ownerId ORDER BY UpdatedUtc DESC;
             """, new { ownerId }, cancellationToken: ct));
         return rows.ToList();
@@ -96,7 +100,7 @@ public sealed class SqlPlanService(string connectionString) : IPlanService
     {
         await using var conn = new SqlConnection(connectionString);
         return await conn.QuerySingleOrDefaultAsync<CoachPlanDoc>(new CommandDefinition("""
-            SELECT Id, Name, Doc, UpdatedUtc FROM dbo.CoachPlan
+            SELECT Id, Name, Doc, CAST(UpdatedUtc AS datetimeoffset(0)) AS UpdatedUtc FROM dbo.CoachPlan
             WHERE Id = @planId AND OwnerId = @ownerId;
             """, new { planId, ownerId }, cancellationToken: ct));
     }

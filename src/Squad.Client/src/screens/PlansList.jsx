@@ -129,7 +129,7 @@ function ImportModal({ plans, onClose, onImported }) {
         {phase === 'working' && (
           <div style={s('margin-top:20px')}>
             <div style={s('font-size:13.5px;font-weight:600;color:var(--text)')}>{IMPORT_STEPS[stepIdx]}</div>
-            <div style={s('font-size:11.5px;color:var(--text3);margin-top:3px')}>This can take up to a minute for a long plan.</div>
+            <div style={s('font-size:11.5px;color:var(--text3);margin-top:3px')}>This can take a couple of minutes for a long plan — keep this open.</div>
             <div style={s('position:relative;height:6px;border-radius:4px;background:var(--bg3);overflow:hidden;margin-top:14px')}>
               <div style={s('position:absolute;top:0;left:0;height:100%;width:30%;border-radius:4px;background:var(--accent);animation:indet 1.1s ease-in-out infinite')} />
             </div>
