@@ -54,8 +54,17 @@ export default function Discover({ vm, actions, getToken }) {
         </div>
       </div>
 
+      {/* club-vs-club ranking entry — this week's cross-club board */}
+      <div className="ctl" onClick={() => actions.go('clubrank')} style={s('display:flex;align-items:center;gap:11px;background:var(--accent-dim);border:1px solid color-mix(in srgb,var(--accent) 40%,transparent);border-radius:16px;padding:13px 14px;margin-top:10px')}>
+        <div style={s('width:38px;height:38px;border-radius:11px;background:var(--accent);flex:none;display:flex;align-items:center;justify-content:center')}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-ink)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 21h8M12 17v4M6 4h12v5a6 6 0 0 1-12 0V4zM6 6H3v2a3 3 0 0 0 3 3M18 6h3v2a3 3 0 0 1-3 3" /></svg>
+        </div>
+        <div style={s('flex:1;min-width:0')}><div style={s('font-size:13.5px;font-weight:700')}>Club Ranking</div><div style={s('font-size:11.5px;color:var(--text2)')}>See how clubs stack up this week</div></div>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round"><path d="M9 6l6 6-6 6" /></svg>
+      </div>
+
       {/* search */}
-      <div style={s('display:flex;align-items:center;gap:9px;background:var(--bg2);border:1px solid var(--line);border-radius:13px;padding:11px 13px;margin-top:14px')}>
+      <div style={s('display:flex;align-items:center;gap:9px;background:var(--bg2);border:1px solid var(--line);border-radius:13px;padding:11px 13px;margin-top:12px')}>
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth="2"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4-4" /></svg>
         <input
           className="dsearch"
