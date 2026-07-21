@@ -51,3 +51,11 @@ export async function importPlanPdf(token, file, { anchorType = 'start', anchorD
 
 // Poll an import job. → { status: 'pending'|'running'|'done'|'error', planId?, name?, error? }.
 export const getImportStatus = (token, jobId) => req(`/api/plan/import/${jobId}`, { token });
+
+// ── Plan library: browse pre-generated templates and adopt one as your own plan ──
+// → [{ id, distance, level, goalLabel, name, weeks, sortOrder }]
+export const listLibrary = (token) => req('/api/plan/library', { token });
+// → { id, distance, goalLabel, name, weeks, doc }
+export const getLibraryTemplate = (token, id) => req(`/api/plan/library/${id}`, { token });
+// body: { anchorType:'start'|'target', anchorDate?:'yyyy-mm-dd' } → { id, name }
+export const adoptTemplate = (token, id, body) => req(`/api/plan/library/${id}/adopt`, { method: 'POST', token, body });

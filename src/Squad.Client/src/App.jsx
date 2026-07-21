@@ -16,7 +16,7 @@ import { useGarminSync } from './hooks/useGarminSync.js';
 import { useHealthSync } from './hooks/useHealthSync.js';
 import { createSquad, joinSquad, activateSquad } from './lib/squads.js';
 import { recordPayment, markPaymentPaid, waivePayment } from './lib/payments.js';
-import { publishPlan, listPlans, getPlan, savePlan, deletePlan, importPlanPdf, getImportStatus } from './lib/plan.js';
+import { publishPlan, listPlans, getPlan, savePlan, deletePlan, importPlanPdf, getImportStatus, listLibrary, getLibraryTemplate, adoptTemplate } from './lib/plan.js';
 // import { useLiveRide } from './hooks/useLiveRide.js'; // swap in for real telemetry
 import { buildViewModel } from './lib/viewModel.js';
 import { loadSession, saveSession, clearSession, enrollBiometric, fetchMe, getProfile } from './lib/auth.js';
@@ -36,6 +36,7 @@ import LiveRide from './screens/LiveRide.jsx';
 import Plan from './screens/Plan.jsx';
 import PlanEditor from './screens/PlanEditor.jsx';
 import PlansList from './screens/PlansList.jsx';
+import PlanLibrary from './screens/PlanLibrary.jsx';
 import Leaderboard from './screens/Leaderboard.jsx';
 import ClubRanking from './screens/ClubRanking.jsx';
 import Feed from './screens/Feed.jsx';
@@ -82,7 +83,7 @@ const initialState = {
 };
 
 const screens = {
-  dash: Dashboard, ride: LiveRide, plan: Plan, plans: PlansList, planeditor: PlanEditor, lb: Leaderboard, clubrank: ClubRanking,
+  dash: Dashboard, ride: LiveRide, plan: Plan, plans: PlansList, planeditor: PlanEditor, planlibrary: PlanLibrary, lb: Leaderboard, clubrank: ClubRanking,
   feed: Feed, seg: Segments, coach: Coach, profile: Profile,
   discover: Discover, group: GroupProfile, manage: ManageGroup, pay: Checkout, recordpay: RidePayment, ledger: CoachLedger, requests: JoinRequests, chat: Messages,
   settings: Settings, welcome: Welcome, register: Register, login: Login, newgroup: CreateGroup,
@@ -117,6 +118,7 @@ const HEADER_META = {
   seg: { title: 'Segments' },
   clubrank: { title: 'Club Ranking' },
   plans: { title: 'Training plans' },
+  planlibrary: { title: 'Plan library' },
   sensors: { title: 'Connected sensors' },
   upload: { title: 'Upload' },
   // Coach/group management.
@@ -349,6 +351,10 @@ export default function App() {
     // Import a PDF → AI builds a plan in the background; submit returns a jobId the modal polls.
     importPdf: (file, opts) => importPlanPdf(session?.token, file, opts),
     importStatus: (jobId) => getImportStatus(session?.token, jobId),
+    // Plan library: browse pre-built templates, preview one, adopt it into your plans.
+    library: () => listLibrary(session?.token),
+    libraryTemplate: (id) => getLibraryTemplate(session?.token, id),
+    adopt: (id, opts) => adoptTemplate(session?.token, id, opts),
   }), [session?.token]);
 
   // Pull-to-refresh: re-pull every live surface (feed snapshot, leaderboard,
