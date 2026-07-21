@@ -161,21 +161,36 @@ function FieldCell({ f, editing, actions, index }) {
           <div style={s('position:absolute;inset:0')}>
             {f.pts.length ? (
               <TileMap points={f.pts} fill radius={0} pad={28}>
-                {(project) => [...f.riders]
-                  // Draw "you" LAST so your marker is always on top of the pack, never hidden behind a teammate.
-                  .sort((a, b) => (a.you ? 1 : 0) - (b.you ? 1 : 0))
-                  .map((r, k) => {
-                    const p = project(r.lat, r.lon);
-                    if (r.you) {
-                      return (
-                        <g key={k}>
-                          <circle cx={p.x} cy={p.y} r={17} fill="var(--accent)" opacity="0.22" />
-                          <circle cx={p.x} cy={p.y} r={12} fill="var(--accent)" stroke="#fff" strokeWidth={4} />
-                        </g>
-                      );
-                    }
-                    return <circle key={k} cx={p.x} cy={p.y} r={6} fill={r.color} stroke="#fff" strokeWidth={2.5} />;
-                  })}
+                {(project) => {
+                  const line = (pts) => pts.map(([la, lo]) => { const p = project(la, lo); return `${p.x},${p.y}`; }).join(' ');
+                  return (
+                    <>
+                      {/* selected course route (dashed, muted) — the line to follow */}
+                      {f.course && f.course.length > 1 && (
+                        <polyline points={line(f.course)} fill="none" stroke="var(--text2)" strokeWidth="3" strokeOpacity="0.6" strokeDasharray="7 6" strokeLinecap="round" strokeLinejoin="round" />
+                      )}
+                      {/* your recorded breadcrumb so far (solid accent) */}
+                      {f.path && f.path.length > 1 && (
+                        <polyline points={line(f.path)} fill="none" stroke="var(--accent)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
+                      )}
+                      {/* riders — "you" drawn LAST so your marker is always on top of the pack */}
+                      {[...f.riders]
+                        .sort((a, b) => (a.you ? 1 : 0) - (b.you ? 1 : 0))
+                        .map((r, k) => {
+                          const p = project(r.lat, r.lon);
+                          if (r.you) {
+                            return (
+                              <g key={k}>
+                                <circle cx={p.x} cy={p.y} r={17} fill="var(--accent)" opacity="0.22" />
+                                <circle cx={p.x} cy={p.y} r={12} fill="var(--accent)" stroke="#fff" strokeWidth={4} />
+                              </g>
+                            );
+                          }
+                          return <circle key={k} cx={p.x} cy={p.y} r={6} fill={r.color} stroke="#fff" strokeWidth={2.5} />;
+                        })}
+                    </>
+                  );
+                }}
               </TileMap>
             ) : (
               <div style={s('position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg3);color:var(--text3);font-size:11px;text-align:center;padding:0 16px')}>Waiting for GPS…</div>
@@ -306,10 +321,14 @@ export default function LivePages({ tel, lp, uwb }) {
     if (tok === 'map') {
       // Real rider positions from the hub (those with a GPS fix). Empty → "Waiting for GPS".
       const riders = (tel?.riders || []).filter((r) => r.lat != null && r.lon != null);
-      const pts = riders.map((r) => [r.lat, r.lon]);
+      // Your recorded breadcrumb + the selected course route (each [lat,lon]).
+      const path = (tel?.path || []).filter((p) => p && p[0] != null && p[1] != null);
+      const course = (tel?.course || []).filter((p) => p && p[0] != null && p[1] != null);
+      // Frame the view on everything present so the whole route + pack fit.
+      const pts = [...riders.map((r) => [r.lat, r.lon]), ...path, ...course];
       // Phone-to-phone BLE pack-spacing readout, shown only when fusion is live this tick.
       const packGap = tel?.packFused ? (tel?.gap != null ? Math.round(tel.gap) : null) : null;
-      return { ...base, kind: 'map', label: 'Route', riders, pts, packFused: !!tel?.packFused, packGap };
+      return { ...base, kind: 'map', label: 'Route', riders, path, course, pts, packFused: !!tel?.packFused, packGap };
     }
     if (tok === 'peloton') return { ...base, kind: 'peloton', v: { ...pelotonView(tel), uwb } };
     if (charts[tok]) { const c = charts[tok]; return { ...base, kind: 'chart', label: c.label, value: c.cur, unit: c.unit, color: c.color, pts: c.pts, area: c.area }; }
