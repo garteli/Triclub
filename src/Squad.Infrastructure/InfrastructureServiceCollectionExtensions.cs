@@ -62,9 +62,10 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IHealthDailyStore>(_ => new SqlHealthDailyStore(sqlConnectionString));
 
         // AI plan import (PDF → CoachPlan doc via Anthropic). The named client gets a long timeout —
-        // a multi-page-PDF extraction is a slow single call. Unconfigured (no key) ⇒ the service reports
-        // Configured=false and the endpoint returns an honest "not configured", never a fake plan.
-        services.AddHttpClient("anthropic", c => c.Timeout = TimeSpan.FromSeconds(120));
+        // a multi-page-PDF extraction is a slow single call. 180s stays safely under Azure App
+        // Service's ~230s front-end request cap while giving big plans room. Unconfigured (no key)
+        // ⇒ the service reports Configured=false and the endpoint returns an honest "not configured".
+        services.AddHttpClient("anthropic", c => c.Timeout = TimeSpan.FromSeconds(180));
         services.AddScoped<IPlanImportService>(sp => new AnthropicPlanImportService(
             sp.GetRequiredService<IHttpClientFactory>().CreateClient("anthropic"),
             aiApiKey, aiModel,
