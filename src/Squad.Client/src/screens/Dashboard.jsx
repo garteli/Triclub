@@ -95,29 +95,6 @@ function DashboardEN({ vm, go, openAthlete, openActivity, getToken, onSwitchSqua
   const recent = last7Days(vm.activities);
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .4s ease')}>
-      {/* header — club logo + name only (no banner image on the dashboard) */}
-      <div style={s('display:flex;align-items:center;justify-content:space-between;margin-bottom:18px')}>
-        <div style={s('display:flex;align-items:center;gap:11px;min-width:0')}>
-          {vm.squadLogo && <AuthedImage url={vm.squadLogo} token={token} style="width:40px;height:40px;border-radius:12px;flex:none" />}
-          <ClubSwitcher vm={vm} token={token} onSwitch={onSwitchSquad}>
-            <div style={s('min-width:0')}>
-              <div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.6px;font-weight:600')}>Domestique Team</div>
-              <div style={s('font-size:23px;font-weight:700;letter-spacing:-.6px;line-height:1.05;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>{vm.squadName || 'Your squad'}</div>
-            </div>
-          </ClubSwitcher>
-        </div>
-        <div style={s('display:flex;align-items:center;gap:10px')}>
-          <div className="ctl" onClick={() => go('discover')} style={s('width:38px;height:38px;border-radius:12px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center')}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M15.5 8.5l-2 5-5 2 2-5z" /></svg>
-          </div>
-          <div className="ctl" onClick={() => go('notifs')} style={s('width:38px;height:38px;border-radius:12px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;position:relative')}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
-            {notifUnread > 0 && <div style={s('position:absolute;top:8px;right:9px;width:7px;height:7px;border-radius:50%;background:var(--accent);border:1.5px solid var(--bg2)')} />}
-          </div>
-          <div className="ctl" onClick={() => go('profile')}><Avatar photo={vm.me.photo} initials={vm.me.initials} color={vm.me.color} size={38} radius={12} fontSize={14} /></div>
-        </div>
-      </div>
-
       {/* today hero — driven by the real plan (empty state when none) */}
       {(() => {
         const todayWk = vm.plan.find((p) => p.status === 'today');
@@ -190,25 +167,6 @@ function DashboardHE({ vm, go, openAthlete, openActivity, getToken, onSwitchSqua
   const recent = last7Days(vm.activities);
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .4s ease;text-align:right')}>
-      <div style={s('display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-direction:row-reverse')}>
-        <div style={s('display:flex;align-items:center;gap:11px;flex-direction:row-reverse;min-width:0')}>
-          {vm.squadLogo && <AuthedImage url={vm.squadLogo} token={token} style="width:40px;height:40px;border-radius:12px;flex:none" />}
-          <ClubSwitcher vm={vm} token={token} rtl onSwitch={onSwitchSquad}>
-            <div style={s('min-width:0;text-align:right')}>
-              <div style={s('font-size:11px;color:var(--text3);letter-spacing:.5px;font-weight:600')}>המועדון</div>
-              <div style={s('font-size:23px;font-weight:700;letter-spacing:-.3px;line-height:1.05;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>{vm.squadName || 'המועדון שלך'}</div>
-            </div>
-          </ClubSwitcher>
-        </div>
-        <div style={s('display:flex;align-items:center;gap:10px;flex-direction:row-reverse')}>
-          <div className="ctl" onClick={() => go('notifs')} style={s('width:38px;height:38px;border-radius:12px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;position:relative')}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
-            {notifUnread > 0 && <div style={s('position:absolute;top:8px;right:9px;width:7px;height:7px;border-radius:50%;background:var(--accent);border:1.5px solid var(--bg2)')} />}
-          </div>
-          <div className="ctl" onClick={() => go('profile')}><Avatar photo={vm.me.photo} initials={vm.me.initials} color={vm.me.color} size={38} radius={12} fontSize={14} /></div>
-        </div>
-      </div>
-
       {(() => {
         const todayWk = vm.plan.find((p) => p.status === 'today');
         return (

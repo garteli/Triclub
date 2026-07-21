@@ -57,6 +57,18 @@ body {
 .scr::-webkit-scrollbar { width: 0; }
 .hscroll::-webkit-scrollbar { height: 0; }
 
+/* Persistent global header: sticks to the top of the scroll port, carries the safe-area
+   top inset, and sits above scrolling content. */
+.appheader {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  padding: max(env(safe-area-inset-top), 10px) 16px 9px;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--line);
+}
+
 .dsearch::placeholder { color: var(--text3); opacity: 1; }
 
 @keyframes spin { to { transform: rotate(360deg); } }

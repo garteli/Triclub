@@ -30,20 +30,16 @@ export default function Notifications({ actions, getToken }) {
 
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
-      {/* header */}
-      <div style={s('display:flex;align-items:center;gap:10px')}>
-        <div className="ctl" onClick={() => actions.go('dash')} style={s('width:34px;height:34px;border-radius:10px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;flex:none')}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round"><path d="M15 6l-6 6 6 6" /></svg>
+      {/* title + back now live in the global app header; keep the unread/mark-all row */}
+      {unread > 0 && (
+        <div style={s('display:flex;align-items:center;justify-content:space-between')}>
+          <div style={s('font-size:11.5px;color:var(--text2)')}>{unread} new</div>
+          <div className="ctl" onClick={markAll} style={s('font-size:12px;font-weight:600;color:var(--accent)')}>Mark all read</div>
         </div>
-        <div style={s('flex:1')}>
-          <div style={s('font-size:20px;font-weight:700')}>Notifications</div>
-          {unread > 0 && <div style={s('font-size:11.5px;color:var(--text2)')}>{unread} new</div>}
-        </div>
-        {unread > 0 && <div className="ctl" onClick={markAll} style={s('font-size:12px;font-weight:600;color:var(--accent)')}>Mark all read</div>}
-      </div>
+      )}
 
       {/* list */}
-      <div style={s('display:flex;flex-direction:column;gap:9px;margin-top:16px')}>
+      <div style={s('display:flex;flex-direction:column;gap:9px;margin-top:12px')}>
         {notifications.length === 0 && (
           <div style={s('font-size:12.5px;color:var(--text3);background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:22px;text-align:center')}>You're all caught up — no notifications yet.</div>
         )}
