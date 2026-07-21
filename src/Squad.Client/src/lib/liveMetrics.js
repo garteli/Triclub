@@ -7,8 +7,10 @@ const f1 = (v) => (v == null ? DASH : v.toFixed(1));
 const r0 = (v) => (v == null ? DASH : String(Math.round(v)));
 const mmss = (s) => {
   if (s == null) return DASH;
-  const m = Math.floor(s / 60), ss = s % 60;
-  return String(m).padStart(2, '0') + ':' + String(ss).padStart(2, '0');
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = s % 60;
+  // Roll into hours past 60 min (h:mm:ss) so the Timer tile matches the elapsed header
+  // instead of showing e.g. 157:18 for a 2h37m ride.
+  return (h > 0 ? h + ':' + String(m).padStart(2, '0') : String(m)) + ':' + String(ss).padStart(2, '0');
 };
 
 // Selectable data fields, modelled on the Garmin data-field catalogue and grouped by

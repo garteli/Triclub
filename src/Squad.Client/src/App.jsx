@@ -125,9 +125,11 @@ const HEADER_META = {
   group: { title: (vm) => vm.selGroupData?.name || 'Group' },
   recordpay: { title: 'Record a payment' },
   chat: { title: 'Squad chat' },
-  // Intentionally NOT global-header screens (they have immersive layouts or semantic in-screen
-  // backs the global Back can't replace): feed (hero + overlay back), requests (closeApplicant),
-  // planeditor, checkout (cancelPay), and the full-screen active ride.
+  feed: { title: 'Activity' },
+  pay: { title: 'Checkout' },
+  requests: { title: 'Join requests' },
+  planeditor: { title: 'Plan editor' },
+  // The full-screen active ride is intentionally NOT here — it's a chrome-free immersive page.
 };
 
 export default function App() {
@@ -373,12 +375,17 @@ export default function App() {
   const actions = useMemo(() => ({
     // navigation: landing on the ride tab always returns to its lobby
     go: (id) => setState((s) => ({ ...s, screen: id, rideState: id === 'ride' ? 'lobby' : s.rideState })),
-    // Global Back: pop the nav trail to the previous distinct screen (dashboard if empty).
+    // Global Back: handle in-screen "back" first (an open applicant detail closes to the
+    // list), then pop the nav trail to the previous distinct screen (dashboard if empty).
+    // Leaving checkout also clears the pending pay plan (its old back was a cancel).
     back: () => setState((s) => {
+      if (s.screen === 'requests' && s.selApplicant) return { ...s, selApplicant: null };
       const h = historyRef.current;
       if (h[h.length - 1] === s.screen) h.pop(); // drop current
       const prev = h[h.length - 1] || 'dash';
-      return { ...s, screen: prev, rideState: prev === 'ride' ? 'lobby' : s.rideState };
+      const next = { ...s, screen: prev, rideState: prev === 'ride' ? 'lobby' : s.rideState };
+      if (s.screen === 'pay') next.payPlan = null;
+      return next;
     }),
     // appearance / language — persisted to localStorage via savePrefs (survive reload)
     setTheme: (theme) => setState((s) => savePrefs({ ...s, theme })),

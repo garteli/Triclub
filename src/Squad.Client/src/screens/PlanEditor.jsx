@@ -262,17 +262,8 @@ export default function PlanEditor({ vm, actions, plan, plans, onPublishPlan }) 
   return (
     <>
       <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
-        {/* eyebrow + back + save */}
-        <div style={s('display:flex;align-items:center;gap:10px')}>
-          <div className="ctl" onClick={() => actions.go('plans')} style={s('width:30px;height:30px;border-radius:9px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;flex:none')}>
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round"><path d="M15 6l-6 6 6 6" /></svg>
-          </div>
-          <div style={s('flex:1;display:flex;align-items:center;gap:8px')}>
-            <div style={s('width:22px;height:22px;border-radius:7px;background:var(--accent);display:flex;align-items:center;justify-content:center')}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--accent-ink)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>
-            </div>
-            <span style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.6px;font-weight:600')}>Coach · Plan editor</span>
-          </div>
+        {/* back + title now in the global app header; keep the save control */}
+        <div style={s('display:flex;align-items:center;justify-content:flex-end')}>
           <div className={save.status === 'busy' ? undefined : 'ctl'} onClick={save.status === 'busy' ? undefined : savePlanNow}
             style={s('flex:none;font-size:12.5px;font-weight:700;padding:8px 15px;border-radius:10px;' + (save.status === 'saved' ? 'background:color-mix(in srgb,var(--good) 16%,transparent);color:var(--good)' : 'background:var(--bg3);border:1px solid var(--line2);color:var(--text)'))}>
             {save.status === 'busy' ? 'Saving…' : save.status === 'saved' ? 'Saved ✓' : 'Save'}

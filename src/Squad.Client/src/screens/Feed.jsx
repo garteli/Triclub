@@ -683,11 +683,7 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
   if (!a) {
     return (
       <div style={s('padding:6px 0 120px;animation:floatUp .35s ease')}>
-        <div style={s('display:flex;align-items:center;gap:11px;padding:2px 18px 12px')}>
-          <div className="ctl" onClick={() => actions.go(state.activityBack || 'activities')} style={s('width:34px;height:34px;border-radius:10px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;flex:none')}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round"><path d="M15 6l-6 6 6 6" /></svg>
-          </div>
-        </div>
+        {/* back now in the global app header */}
         <EmptyState icon="🚴" title="Activity not found" sub="This activity isn't available. Record a ride or sync from Apple Health to see it here." />
       </div>
     );
@@ -723,7 +719,7 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
   return (
     <div style={s('padding:0 0 120px;animation:floatUp .35s ease')}>
       <ActivityHero a={a} route={route} frames={frames} hasMap={hasMap} status={status} token={token}
-        onBack={() => actions.go(state.activityBack || 'activities')} onDelete={() => setConfirmDel(true)} />
+        onDelete={() => setConfirmDel(true)} />
 
       <AthleteTitle a={a} token={token} onAthlete={actions.openAthlete} />
       <MetricHero a={a} load={effLoad} />
