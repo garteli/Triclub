@@ -3,13 +3,7 @@ import { s } from '../lib/style.js';
 export default function Checkout({ vm, actions }) {
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
-      <div style={s('display:flex;align-items:center;gap:10px')}>
-        <div className="ctl" onClick={actions.cancelPay} style={s('width:34px;height:34px;border-radius:10px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center')}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round"><path d="M15 6l-6 6 6 6" /></svg>
-        </div>
-        <div style={s('font-size:20px;font-weight:700')}>Checkout</div>
-      </div>
-
+      {/* title + back now in the global app header (Back clears the pending pay plan) */}
       {/* order summary */}
       <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:15px 16px;margin-top:16px;display:flex;align-items:center;justify-content:space-between')}>
         <div><div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:600')}>{vm.selGroupData.name}</div><div style={s('font-size:16px;font-weight:700;margin-top:2px')}>{vm.payTitle}</div></div>

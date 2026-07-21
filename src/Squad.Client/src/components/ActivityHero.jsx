@@ -49,10 +49,12 @@ export default function ActivityHero({ a, route, frames, hasMap, status, token, 
 
   const controls = (
     <>
-      {/* back */}
-      <div className="ctl" onClick={onBack} style={s(`position:absolute;top:16px;left:16px;z-index:3;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;${glass}`)}>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round"><path d="M15 6l-6 6 6 6" /></svg>
-      </div>
+      {/* back — only when a handler is given (the global app header provides it otherwise) */}
+      {onBack && (
+        <div className="ctl" onClick={onBack} style={s(`position:absolute;top:16px;left:16px;z-index:3;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;${glass}`)}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round"><path d="M15 6l-6 6 6 6" /></svg>
+        </div>
+      )}
       {/* Save Route + overflow */}
       <div style={s('position:absolute;top:16px;right:16px;z-index:3;display:flex;gap:8px')}>
         <div className="ctl" style={s(`height:38px;padding:0 14px;border-radius:19px;display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;${glass}`)}>

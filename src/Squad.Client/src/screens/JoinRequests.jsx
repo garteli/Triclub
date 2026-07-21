@@ -6,9 +6,8 @@ function LiveRequests({ getToken, actions }) {
   const { items, approve, decline } = useJoinRequests({ getToken, enabled: !!getToken });
   return (
     <>
-      <div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.6px;font-weight:600')}>Coach · manager</div>
-      <div style={s('display:flex;align-items:center;justify-content:space-between;margin-top:2px')}>
-        <div style={s('font-size:23px;font-weight:700;letter-spacing:-.5px')}>Join Requests</div>
+      {/* title now in the global app header; keep the pending count */}
+      <div style={s('display:flex;align-items:center;justify-content:flex-end')}>
         <div style={s('background:var(--accent);color:var(--accent-ink);font-size:12px;font-weight:700;padding:4px 10px;border-radius:9px')}><span className="mono">{items.length}</span> pending</div>
       </div>
       {items.length === 0 ? (
@@ -42,9 +41,8 @@ const statTiles = [
 function ApplicantList({ vm, actions }) {
   return (
     <>
-      <div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.6px;font-weight:600')}>Coach · manager</div>
-      <div style={s('display:flex;align-items:center;justify-content:space-between;margin-top:2px')}>
-        <div style={s('font-size:23px;font-weight:700;letter-spacing:-.5px')}>Join Requests</div>
+      {/* title now in the global app header; keep the pending count */}
+      <div style={s('display:flex;align-items:center;justify-content:flex-end')}>
         <div style={s('background:var(--accent);color:var(--accent-ink);font-size:12px;font-weight:700;padding:4px 10px;border-radius:9px')}><span className="mono">{vm.pendingCount}</span> pending</div>
       </div>
       <div style={s('display:flex;flex-direction:column;gap:11px;margin-top:16px')}>
@@ -72,13 +70,8 @@ function ApplicantDetail({ vm, actions }) {
   const a = vm.selApplicant;
   return (
     <>
-      <div style={s('display:flex;align-items:center;gap:10px')}>
-        <div className="ctl" onClick={actions.closeApplicant} style={s('width:34px;height:34px;border-radius:10px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center')}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round"><path d="M15 6l-6 6 6 6" /></svg>
-        </div>
-        <div style={s('font-size:13px;color:var(--text3);font-weight:600')}>Review applicant</div>
-      </div>
-      <div style={s('display:flex;gap:13px;align-items:center;margin-top:14px')}>
+      {/* back (closes the applicant) now handled by the global app header */}
+      <div style={s('display:flex;gap:13px;align-items:center;margin-top:2px')}>
         <div style={s(`width:56px;height:56px;border-radius:16px;background:${a.color};flex:none;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;color:#0c0e11`)}>{a.initials}</div>
         <div style={s('flex:1')}><div style={s('font-size:19px;font-weight:700')}>{a.name}</div><div style={s('font-size:12px;color:var(--text2)')}>applied {a.when} · {a.races} races logged</div></div>
       </div>
