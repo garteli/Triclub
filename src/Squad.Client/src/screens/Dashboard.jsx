@@ -95,9 +95,7 @@ function DashboardEN({ vm, go, openAthlete, openActivity, getToken, onSwitchSqua
   const recent = last7Days(vm.activities);
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .4s ease')}>
-      {/* club banner (owner-uploaded) — a branded header strip when set */}
-      {vm.squadBanner && <AuthedImage url={vm.squadBanner} token={token} style="height:88px;border-radius:16px;margin-bottom:14px" />}
-      {/* header */}
+      {/* header — club logo + name only (no banner image on the dashboard) */}
       <div style={s('display:flex;align-items:center;justify-content:space-between;margin-bottom:18px')}>
         <div style={s('display:flex;align-items:center;gap:11px;min-width:0')}>
           {vm.squadLogo && <AuthedImage url={vm.squadLogo} token={token} style="width:40px;height:40px;border-radius:12px;flex:none" />}
@@ -192,7 +190,6 @@ function DashboardHE({ vm, go, openAthlete, openActivity, getToken, onSwitchSqua
   const recent = last7Days(vm.activities);
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .4s ease;text-align:right')}>
-      {vm.squadBanner && <AuthedImage url={vm.squadBanner} token={token} style="height:88px;border-radius:16px;margin-bottom:14px" />}
       <div style={s('display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-direction:row-reverse')}>
         <div style={s('display:flex;align-items:center;gap:11px;flex-direction:row-reverse;min-width:0')}>
           {vm.squadLogo && <AuthedImage url={vm.squadLogo} token={token} style="width:40px;height:40px;border-radius:12px;flex:none" />}
