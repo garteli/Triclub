@@ -38,7 +38,11 @@ public class SquadUwbPlugin: CAPPlugin, CAPBridgedPlugin {
     // UWB-capable hardware — iOS 16+ must use deviceCapabilities.supportsPreciseDistanceMeasurement.
     private static var uwbSupported: Bool {
         if #available(iOS 16.0, *) {
-            return NISession.deviceCapabilities.supportsPreciseDistanceMeasurement
+            let caps = NISession.deviceCapabilities
+            NSLog("[SquadUwb] supportsPreciseDistanceMeasurement=%@ (deprecated isSupported=%@)",
+                  caps.supportsPreciseDistanceMeasurement ? "true" : "false",
+                  NISession.isSupported ? "true" : "false")
+            return caps.supportsPreciseDistanceMeasurement
         } else if #available(iOS 14.0, *) {
             return NISession.isSupported
         }

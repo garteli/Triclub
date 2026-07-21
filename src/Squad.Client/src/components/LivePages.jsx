@@ -34,16 +34,48 @@ function GroupColumn({ tel }) {
 }
 
 // ---- Peloton field: 2D pack spread (fore-aft × lateral) + "% time in lead" board ----
+// Precise UWB (Nearby Interaction) status + per-teammate distances, shown on the peloton
+// view. Doubles as the on-device diagnostic: it always renders the UWB state so you can
+// see whether the U1/U2 radio is supported, searching, or actively ranging.
+function UwbBar({ uwb }) {
+  const supported = !!uwb?.supported;
+  const peers = uwb?.peers || {};
+  const rows = Object.keys(peers)
+    .map((id) => ({ id, ...peers[id] }))
+    .filter((p) => p.distanceM != null)
+    .sort((a, b) => a.distanceM - b.distanceM);
+
+  let status;
+  if (!supported) status = { text: 'UWB not available on this device', color: 'var(--text3)' };
+  else if (rows.length === 0) status = { text: 'UWB · searching for a teammate…', color: 'var(--warn)' };
+  else status = { text: `UWB · ranging ${rows.length}`, color: 'var(--good)' };
+
+  return (
+    <div style={s('flex:none;display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px')}>
+      <span style={s(`font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:${status.color}`)}>{status.text}</span>
+      {rows.map((p) => (
+        <span key={p.id} className="mono" style={s('font-size:10px;font-weight:700;color:var(--text);background:var(--bg3);border:1px solid var(--line);border-radius:9px;padding:2px 7px')}>
+          {p.distanceM.toFixed(2)} m{p.dir ? ' ›' : ''}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function PelotonField({ v }) {
   if (!v || v.empty) {
     return (
-      <div style={s('position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg3);color:var(--text3);font-size:11px;text-align:center;padding:0 18px')}>
-        Waiting for teammates — the pack spread appears once riders are streaming.
-      </div>
+      <>
+        <UwbBar uwb={v?.uwb} />
+        <div style={s('flex:1;display:flex;align-items:center;justify-content:center;background:var(--bg3);border-radius:11px;color:var(--text3);font-size:11px;text-align:center;padding:0 18px')}>
+          Waiting for teammates — the pack spread appears once riders are streaming.
+        </div>
+      </>
     );
   }
   return (
     <>
+      <UwbBar uwb={v.uwb} />
       <div style={s('display:flex;justify-content:space-between;align-items:baseline;flex:none')}>
         <div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;font-weight:600')}>Peloton</div>
         <div className="mono" style={s('font-size:10px;color:var(--text2);font-weight:600')}>
@@ -244,7 +276,7 @@ function PickerSheet({ page, slot, actions }) {
 }
 
 // ---- the unified full-screen rotating page system ----
-export default function LivePages({ tel, lp }) {
+export default function LivePages({ tel, lp, uwb }) {
   const { pages, pageIdx, editFields, picker, autoRotate, actions } = lp;
   const page = pages[pageIdx];
   const side = page.side || 'none';
@@ -279,7 +311,7 @@ export default function LivePages({ tel, lp }) {
       const packGap = tel?.packFused ? (tel?.gap != null ? Math.round(tel.gap) : null) : null;
       return { ...base, kind: 'map', label: 'Route', riders, pts, packFused: !!tel?.packFused, packGap };
     }
-    if (tok === 'peloton') return { ...base, kind: 'peloton', v: pelotonView(tel) };
+    if (tok === 'peloton') return { ...base, kind: 'peloton', v: { ...pelotonView(tel), uwb } };
     if (charts[tok]) { const c = charts[tok]; return { ...base, kind: 'chart', label: c.label, value: c.cur, unit: c.unit, color: c.color, pts: c.pts, area: c.area }; }
     const m = metricCatalog[tok] || { label: tok, unit: '' };
     const val = mv[tok] || { v: '—' };
