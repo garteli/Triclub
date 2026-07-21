@@ -4,9 +4,10 @@ using Squad.Core;
 
 namespace Squad.Web;
 
-/// <summary>Payload a coach posts to publish a multi-week plan onto athletes' calendars.</summary>
+/// <summary>Payload a coach posts to publish a plan (whole plan or a single week) onto athletes'
+/// calendars. PlanId links the published rows back to the coach's saved plan (for unpublish/remove).</summary>
 public sealed record PublishPlanRequest(
-    Guid[]? AthleteIds, string? PlanName, DateTime? StartDate, int? Weeks, PublishWorkoutDto[]? Workouts);
+    Guid[]? AthleteIds, Guid? PlanId, string? PlanName, DateTime? StartDate, int? Weeks, PublishWorkoutDto[]? Workouts);
 
 public sealed record PublishWorkoutDto(
     DateTime Date, string? Discipline, string? Title, string? Sub, int DurationMin, int Load);
@@ -33,6 +34,11 @@ public static class PlanEndpoints
     {
         app.MapGet("/api/plan", GetPlan).RequireAuthorization();
         app.MapPost("/api/plan/publish", PublishPlan).RequireAuthorization();
+        // Coach pulls a published plan back off all athletes' calendars.
+        app.MapPost("/api/plan/plans/{id:guid}/unpublish", UnpublishPlan).RequireAuthorization();
+        // An athlete's own assigned plans + removing one from their calendar.
+        app.MapGet("/api/plan/mine", ListMyPlans).RequireAuthorization();
+        app.MapDelete("/api/plan/mine/{planId:guid}", RemoveMyPlan).RequireAuthorization();
         // A coach's own saved plans (they can have many).
         app.MapGet("/api/plan/plans", ListPlans).RequireAuthorization();
         app.MapGet("/api/plan/plans/{id:guid}", GetPlanDoc).RequireAuthorization();
@@ -228,9 +234,44 @@ public static class PlanEndpoints
             spanEnd = workouts.Max(w => w.Date);
         }
 
-        var published = await plans.PublishAsync(coachId, athleteIds, spanStart, spanEnd, workouts, ct);
+        // Stamp the source plan onto the rows so it can be unpublished/removed. The client sends the
+        // saved plan's id; fall back to a fresh id if it was never saved (rows still group together).
+        var planId = req.PlanId is { } pid && pid != Guid.Empty ? pid : Guid.NewGuid();
+        var planName = (req.PlanName ?? "Training plan").Trim();
+        if (planName.Length == 0) planName = "Training plan";
+        if (planName.Length > 120) planName = planName[..120];
+
+        var published = await plans.PublishAsync(coachId, planId, planName, athleteIds, spanStart, spanEnd, workouts, ct);
         if (published == 0) return Results.BadRequest(new { error = "None of the selected athletes are in a squad you coach." });
         return Results.Ok(new { published });
+    }
+
+    private static async Task<IResult> UnpublishPlan(HttpContext http, Guid id, IPlanService plans, CancellationToken ct)
+    {
+        if (CallerId(http) is not { } coachId) return Results.Unauthorized();
+        var removed = await plans.UnpublishAsync(coachId, id, ct);
+        return Results.Ok(new { unpublished = removed });
+    }
+
+    private static async Task<IResult> ListMyPlans(HttpContext http, IPlanService plans, CancellationToken ct)
+    {
+        if (CallerId(http) is not { } athleteId) return Results.Unauthorized();
+        var list = await plans.ListAthletePlansAsync(athleteId, ct);
+        return Results.Ok(list.Select(p => new
+        {
+            planId = p.PlanId,
+            name = p.PlanName,
+            firstDate = p.FirstDate.ToString("yyyy-MM-dd"),
+            lastDate = p.LastDate.ToString("yyyy-MM-dd"),
+            sessions = p.Sessions,
+        }));
+    }
+
+    private static async Task<IResult> RemoveMyPlan(HttpContext http, Guid planId, IPlanService plans, CancellationToken ct)
+    {
+        if (CallerId(http) is not { } athleteId) return Results.Unauthorized();
+        var removed = await plans.RemoveAthletePlanAsync(athleteId, planId, ct);
+        return Results.Ok(new { removed });
     }
 
     private static PlannedWorkoutWrite MapWorkout(PublishWorkoutDto w)

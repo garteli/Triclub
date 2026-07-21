@@ -23,6 +23,17 @@ CREATE TABLE dbo.PlannedWorkout (
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_PlannedWorkout_Athlete_Date' AND object_id = OBJECT_ID('dbo.PlannedWorkout'))
 CREATE INDEX IX_PlannedWorkout_Athlete_Date ON dbo.PlannedWorkout (AthleteId, WorkoutDate);
 
+-- Link published rows back to the source CoachPlan so a plan can be unpublished (coach) or
+-- removed by an athlete, and so an athlete can see which plan a session belongs to. Nullable:
+-- legacy rows predate this. Additive/idempotent.
+IF COL_LENGTH('dbo.PlannedWorkout', 'PlanId') IS NULL
+    ALTER TABLE dbo.PlannedWorkout ADD PlanId UNIQUEIDENTIFIER NULL;
+IF COL_LENGTH('dbo.PlannedWorkout', 'PlanName') IS NULL
+    ALTER TABLE dbo.PlannedWorkout ADD PlanName NVARCHAR(120) NULL;
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_PlannedWorkout_Athlete_Plan' AND object_id = OBJECT_ID('dbo.PlannedWorkout'))
+CREATE INDEX IX_PlannedWorkout_Athlete_Plan ON dbo.PlannedWorkout (AthleteId, PlanId);
+
 -- ---------------------------------------------------------------------------
 --  CoachPlan — a coach's saved, editable plan (name + JSON doc of the whole
 --  multi-week block + assignment). A coach can have many. Publishing a plan

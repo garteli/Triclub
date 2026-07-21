@@ -204,17 +204,34 @@ public sealed record CoachPlanSummary(Guid Id, string Name, DateTimeOffset Updat
 /// <summary>A coach's saved plan with its full JSON doc.</summary>
 public sealed record CoachPlanDoc(Guid Id, string Name, string Doc, DateTimeOffset UpdatedUtc);
 
+/// <summary>A plan an athlete currently has on their calendar (grouped from PlannedWorkout by PlanId),
+/// so they can see and remove it.</summary>
+public sealed record AthletePlanSummary(
+    Guid PlanId, string PlanName, DateTime FirstDate, DateTime LastDate, int Sessions);
+
 public interface IPlanService
 {
     /// <summary>The athlete's plan for the Monday..Sunday week containing <paramref name="weekStart"/>,
     /// seeding a template week the first time it's requested.</summary>
     Task<IReadOnlyList<PlannedWorkoutRow>> GetWeekAsync(Guid athleteId, DateTime weekStart, CancellationToken ct);
 
-    /// <summary>Publish a coach's plan: replace each assigned athlete's PlannedWorkout rows in
-    /// [spanStart..spanEnd] with <paramref name="workouts"/>. Only athletes who are members of a
-    /// squad OWNED by <paramref name="coachId"/> are written. Returns how many athletes got the plan.</summary>
-    Task<int> PublishAsync(Guid coachId, IReadOnlyList<Guid> athleteIds, DateTime spanStart, DateTime spanEnd,
-        IReadOnlyList<PlannedWorkoutWrite> workouts, CancellationToken ct);
+    /// <summary>Publish a coach's plan (whole plan or a single week — the caller sets the span):
+    /// replace each assigned athlete's PlannedWorkout rows in [spanStart..spanEnd] with
+    /// <paramref name="workouts"/>, stamped with <paramref name="planId"/>/<paramref name="planName"/> so
+    /// the plan can later be unpublished or removed. Only athletes who are members of a squad OWNED by
+    /// <paramref name="coachId"/> are written. Returns how many athletes got the plan.</summary>
+    Task<int> PublishAsync(Guid coachId, Guid planId, string planName, IReadOnlyList<Guid> athleteIds,
+        DateTime spanStart, DateTime spanEnd, IReadOnlyList<PlannedWorkoutWrite> workouts, CancellationToken ct);
+
+    /// <summary>Unpublish a plan the coach owns: remove every athlete's PlannedWorkout rows stamped with
+    /// <paramref name="planId"/>. Returns how many rows were removed (0 if not owned / nothing published).</summary>
+    Task<int> UnpublishAsync(Guid coachId, Guid planId, CancellationToken ct);
+
+    /// <summary>The plans an athlete currently has on their calendar (grouped by PlanId).</summary>
+    Task<IReadOnlyList<AthletePlanSummary>> ListAthletePlansAsync(Guid athleteId, CancellationToken ct);
+
+    /// <summary>An athlete removes a plan from their OWN calendar (deletes only their rows for that PlanId).</summary>
+    Task<int> RemoveAthletePlanAsync(Guid athleteId, Guid planId, CancellationToken ct);
 
     // ----- a coach's saved plans (their own working copies) -----
     /// <summary>List a coach's saved plans, most-recently-updated first.</summary>

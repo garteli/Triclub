@@ -16,7 +16,7 @@ import { useGarminSync } from './hooks/useGarminSync.js';
 import { useHealthSync } from './hooks/useHealthSync.js';
 import { createSquad, joinSquad, activateSquad } from './lib/squads.js';
 import { recordPayment, markPaymentPaid, waivePayment } from './lib/payments.js';
-import { publishPlan, listPlans, getPlan, savePlan, deletePlan, importPlanPdf, getImportStatus, listLibrary, getLibraryTemplate, adoptTemplate } from './lib/plan.js';
+import { publishPlan, unpublishPlan, listMyPlans, removeMyPlan, listPlans, getPlan, savePlan, deletePlan, importPlanPdf, getImportStatus, listLibrary, getLibraryTemplate, adoptTemplate } from './lib/plan.js';
 // import { useLiveRide } from './hooks/useLiveRide.js'; // swap in for real telemetry
 import { buildViewModel } from './lib/viewModel.js';
 import { loadSession, saveSession, clearSession, enrollBiometric, fetchMe, getProfile } from './lib/auth.js';
@@ -355,6 +355,14 @@ export default function App() {
     library: () => listLibrary(session?.token),
     libraryTemplate: (id) => getLibraryTemplate(session?.token, id),
     adopt: (id, opts) => adoptTemplate(session?.token, id, opts),
+    // Pull a published plan back off the squad's calendars.
+    unpublish: async (id) => { const r = await unpublishPlan(session?.token, id); setRefreshSignal((n) => n + 1); return r; },
+  }), [session?.token]);
+
+  // Athlete-side: the plans currently on my calendar, and removing one from just my own.
+  const planMineOps = useMemo(() => ({
+    list: () => listMyPlans(session?.token),
+    remove: async (planId) => { const r = await removeMyPlan(session?.token, planId); setRefreshSignal((n) => n + 1); return r; },
   }), [session?.token]);
 
   // Pull-to-refresh: re-pull every live surface (feed snapshot, leaderboard,
@@ -574,6 +582,7 @@ export default function App() {
           payments={authed ? paymentOps : undefined}
           onPublishPlan={authed ? onPublishPlan : undefined}
           plans={authed ? planOps : undefined} plan={selectedPlan}
+          planMine={authed ? planMineOps : undefined}
           meId={session?.athleteId} />
       </Phone>
     </div>

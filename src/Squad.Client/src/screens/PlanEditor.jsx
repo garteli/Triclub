@@ -134,6 +134,8 @@ export default function PlanEditor({ vm, actions, plan, plans, onPublishPlan }) 
   const [editor, setEditor] = useState(null); // null | { id, day, week, sport, title, dur, load, z, note }
   const [pub, setPub] = useState({ status: 'idle', msg: '' }); // idle | busy | done | error
   const [save, setSave] = useState({ status: 'idle', msg: '' }); // idle | busy | saved | error
+  const [unpub, setUnpub] = useState({ status: 'idle', msg: '' }); // idle | busy | done | error
+  const [confirmUnpub, setConfirmUnpub] = useState(false);
 
   // The current week's editable slice, and a setter for one of its fields.
   const cur = weeks[week] || BLANK_WEEK;
@@ -217,20 +219,32 @@ export default function PlanEditor({ vm, actions, plan, plans, onPublishPlan }) 
     try { await persist(); } catch (e) { setSave({ status: 'error', msg: e?.message || 'Could not save.' }); }
   };
 
-  // ── publish the whole plan to each assigned athlete (real dates → PlannedWorkout) ──
-  const publish = async () => {
-    if (pub.status === 'busy') return;
-    if (!anchor || !startMonday || !nWeeks) { setPub({ status: 'error', msg: 'Set a start/target date and total weeks first.' }); return; }
-    const athleteIds = roster.filter((a) => a.on).map((a) => a.id);
-    if (!athleteIds.length) { setPub({ status: 'error', msg: 'Assign at least one athlete.' }); return; }
-    const workouts = [];
+  // ── save a copy under the coach's account, and continue editing the copy ──
+  const duplicate = async () => {
+    if (save.status === 'busy') return;
+    if (!plans?.save) { setSave({ status: 'error', msg: 'Sign in as a coach to save.' }); return; }
+    setSave({ status: 'busy', msg: '' });
+    try {
+      const res = await plans.save({ id: null, name: (planName || 'Untitled plan') + ' (copy)', doc: buildDoc() });
+      setSave({ status: 'saved', msg: 'Copied' });
+      setTimeout(() => setSave((sv) => (sv.status === 'saved' ? { status: 'idle', msg: '' } : sv)), 1800);
+      if (res?.id && plans.open) plans.open(res.id); // remount the editor on the new copy
+    } catch (e) {
+      setSave({ status: 'error', msg: e?.message || 'Could not save a copy.' });
+    }
+  };
+
+  // Build the workout list for a scope: 'all' weeks, or a single week number.
+  const workoutsFor = (scope) => {
+    const out = [];
     for (const [wnStr, wk] of Object.entries(weeks)) {
       const wn = +wnStr;
       if (wn < 1 || wn > nWeeks) continue;
+      if (scope !== 'all' && wn !== scope) continue;
       const wkMon = addDays(startMonday, (wn - 1) * 7);
       DAYS.forEach((day, di) => {
         (wk.sessions?.[day] || []).forEach((x) => {
-          workouts.push({
+          out.push({
             date: toISO(addDays(wkMon, di)),
             discipline: (x.sport || 'rest').toLowerCase(),
             title: (x.title || 'Session').slice(0, 80),
@@ -241,32 +255,64 @@ export default function PlanEditor({ vm, actions, plan, plans, onPublishPlan }) 
         });
       });
     }
-    if (!workouts.length) { setPub({ status: 'error', msg: 'Add at least one session before publishing.' }); return; }
+    return out;
+  };
+
+  // ── publish the whole plan, or just one week, to each assigned athlete ──
+  const doPublish = async (scope) => { // scope: 'all' | <week number>
+    if (pub.status === 'busy') return;
+    if (!anchor || !startMonday || !nWeeks) { setPub({ status: 'error', msg: 'Set a start/target date and total weeks first.' }); return; }
+    const athleteIds = roster.filter((a) => a.on).map((a) => a.id);
+    if (!athleteIds.length) { setPub({ status: 'error', msg: 'Assign at least one athlete.' }); return; }
+    const oneWeek = scope !== 'all';
+    const workouts = workoutsFor(scope);
+    if (!workouts.length) { setPub({ status: 'error', msg: oneWeek ? `Week ${scope} has no sessions to publish.` : 'Add at least one session before publishing.' }); return; }
     if (!onPublishPlan) { setPub({ status: 'error', msg: 'Sign in as a coach to publish.' }); return; }
     setPub({ status: 'busy', msg: '' });
     try {
-      // Publishing also saves the coach's working copy first (best-effort — a save
-      // hiccup shouldn't block delivering the plan to athletes).
-      try { await persist(); } catch { /* keep going; the athlete write is the primary action */ }
+      // Save the coach's working copy first so the published rows carry its plan id (best-effort).
+      let id = planId;
+      try { id = await persist(); } catch { /* keep going; the athlete write is the primary action */ }
+      const startDate = oneWeek ? toISO(addDays(startMonday, (scope - 1) * 7)) : toISO(startMonday);
       const res = await onPublishPlan({
-        athleteIds, planName: planName || null,
-        startDate: toISO(startMonday), weeks: nWeeks, workouts,
+        athleteIds, planId: id || planId || undefined, planName: planName || null,
+        startDate, weeks: oneWeek ? 1 : nWeeks, workouts,
       });
       const n = res?.published ?? athleteIds.length;
-      setPub({ status: 'done', msg: `Published to ${n} athlete${n === 1 ? '' : 's'}.` });
+      setPub({ status: 'done', msg: oneWeek ? `Week ${scope} published to ${n} athlete${n === 1 ? '' : 's'}.` : `Published to ${n} athlete${n === 1 ? '' : 's'}.` });
     } catch (e) {
       setPub({ status: 'error', msg: e?.message || 'Could not publish. Try again.' });
+    }
+  };
+
+  // ── unpublish: pull the plan back off every assigned athlete's calendar ──
+  const unpublish = async () => {
+    if (unpub.status === 'busy') return;
+    if (!planId) { setUnpub({ status: 'error', msg: 'Save the plan first — nothing has been published yet.' }); setConfirmUnpub(false); return; }
+    if (!plans?.unpublish) { setUnpub({ status: 'error', msg: 'Sign in as a coach.' }); setConfirmUnpub(false); return; }
+    setUnpub({ status: 'busy', msg: '' });
+    try {
+      const r = await plans.unpublish(planId);
+      setConfirmUnpub(false);
+      setUnpub({ status: 'done', msg: r?.unpublished ? 'Removed from every athlete.' : 'This plan wasn’t published.' });
+    } catch (e) {
+      setConfirmUnpub(false);
+      setUnpub({ status: 'error', msg: e?.message || 'Could not unpublish.' });
     }
   };
 
   return (
     <>
       <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
-        {/* back + title now in the global app header; keep the save control */}
-        <div style={s('display:flex;align-items:center;justify-content:flex-end')}>
+        {/* back + title now in the global app header; keep the save controls */}
+        <div style={s('display:flex;align-items:center;justify-content:flex-end;gap:8px')}>
+          <div className={save.status === 'busy' ? undefined : 'ctl'} onClick={save.status === 'busy' ? undefined : duplicate}
+            style={s('flex:none;font-size:12.5px;font-weight:700;padding:8px 13px;border-radius:10px;background:var(--bg3);border:1px solid var(--line2);color:var(--text2);display:flex;align-items:center;gap:6px')}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>Copy
+          </div>
           <div className={save.status === 'busy' ? undefined : 'ctl'} onClick={save.status === 'busy' ? undefined : savePlanNow}
             style={s('flex:none;font-size:12.5px;font-weight:700;padding:8px 15px;border-radius:10px;' + (save.status === 'saved' ? 'background:color-mix(in srgb,var(--good) 16%,transparent);color:var(--good)' : 'background:var(--bg3);border:1px solid var(--line2);color:var(--text)'))}>
-            {save.status === 'busy' ? 'Saving…' : save.status === 'saved' ? 'Saved ✓' : 'Save'}
+            {save.status === 'busy' ? 'Saving…' : save.status === 'saved' ? (save.msg || 'Saved') + ' ✓' : 'Save'}
           </div>
         </div>
         {save.status === 'error' && <div style={s('font-size:11.5px;color:var(--bad);font-weight:600;margin-top:8px')}>{save.msg}</div>}
@@ -437,9 +483,14 @@ export default function PlanEditor({ vm, actions, plan, plans, onPublishPlan }) 
           })}
         </div>
 
-        <div className={pub.status === 'busy' ? undefined : 'ctl'} onClick={pub.status === 'busy' ? undefined : publish}
+        {/* publish: whole plan (primary) or just the current week */}
+        <div className={pub.status === 'busy' ? undefined : 'ctl'} onClick={pub.status === 'busy' ? undefined : () => doPublish('all')}
           style={s('background:var(--accent);color:var(--accent-ink);text-align:center;padding:14px;border-radius:14px;font-weight:700;font-size:14px;margin-top:18px;' + (pub.status === 'busy' ? 'opacity:.6' : ''))}>
-          {pub.status === 'busy' ? 'Publishing…' : `Publish to ${assignedCount} athlete${assignedCount === 1 ? '' : 's'}`}
+          {pub.status === 'busy' ? 'Publishing…' : `Publish whole plan to ${assignedCount} athlete${assignedCount === 1 ? '' : 's'}`}
+        </div>
+        <div className={pub.status === 'busy' ? undefined : 'ctl'} onClick={pub.status === 'busy' ? undefined : () => doPublish(week)}
+          style={s('text-align:center;padding:12px;border-radius:13px;font-weight:700;font-size:13.5px;margin-top:9px;background:var(--bg2);border:1px solid var(--line2);color:var(--text);' + (pub.status === 'busy' ? 'opacity:.6' : ''))}>
+          Publish week {week} only
         </div>
         {pub.status === 'done' ? (
           <div style={s('display:flex;align-items:center;justify-content:center;gap:7px;text-align:center;font-size:12px;color:var(--good);font-weight:600;margin-top:10px')}>
@@ -448,11 +499,33 @@ export default function PlanEditor({ vm, actions, plan, plans, onPublishPlan }) 
         ) : pub.status === 'error' ? (
           <div style={s('text-align:center;font-size:12px;color:var(--bad);font-weight:600;margin-top:10px')}>{pub.msg}</div>
         ) : (
-          <div style={s('text-align:center;font-size:11px;color:var(--text3);margin-top:8px;line-height:1.5')}>Assigned athletes get the plan's sessions on their calendar and are notified when you publish.</div>
+          <div style={s('text-align:center;font-size:11px;color:var(--text3);margin-top:8px;line-height:1.5')}>Assigned athletes get the sessions on their calendar. Publish the whole block, or push a single week at a time.</div>
         )}
+
+        {/* unpublish: pull the plan back off athletes' calendars */}
+        <div className="ctl" onClick={() => { setUnpub({ status: 'idle', msg: '' }); setConfirmUnpub(true); }}
+          style={s('text-align:center;font-size:12px;font-weight:700;color:var(--bad);margin-top:16px;padding:6px')}>
+          Unpublish — remove from all athletes
+        </div>
+        {unpub.status === 'done' && <div style={s('text-align:center;font-size:12px;color:var(--good);font-weight:600;margin-top:2px')}>{unpub.msg}</div>}
+        {unpub.status === 'error' && <div style={s('text-align:center;font-size:12px;color:var(--bad);font-weight:600;margin-top:2px')}>{unpub.msg}</div>}
       </div>
 
       {editor && <SessionSheet editor={editor} onField={editField} onSave={saveSession} onDelete={deleteSession} onClose={() => setEditor(null)} />}
+
+      {confirmUnpub && (
+        <>
+          <div className="ctl" onClick={unpub.status === 'busy' ? undefined : () => setConfirmUnpub(false)} style={s('position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50;animation:floatUp .2s ease')} />
+          <div className="scr" style={s('position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(90%,420px);z-index:51;background:var(--bg);border:1px solid var(--line2);border-radius:20px;padding:20px;animation:floatUpCenter .25s ease')}>
+            <div style={s('font-size:17px;font-weight:700')}>Unpublish this plan?</div>
+            <div style={s('font-size:13px;color:var(--text2);line-height:1.5;margin-top:8px')}>Its sessions will be removed from every assigned athlete's calendar. Your saved plan is kept — you can re-publish anytime.</div>
+            <div style={s('display:flex;gap:10px;margin-top:18px')}>
+              <div className="ctl" onClick={unpub.status === 'busy' ? undefined : () => setConfirmUnpub(false)} style={s(`flex:1;text-align:center;padding:12px;border-radius:12px;font-weight:700;font-size:14px;background:var(--bg3);border:1px solid var(--line);color:var(--text2);opacity:${unpub.status === 'busy' ? 0.5 : 1}`)}>Cancel</div>
+              <div className="ctl" onClick={unpub.status === 'busy' ? undefined : unpublish} style={s(`flex:1;text-align:center;padding:12px;border-radius:12px;font-weight:700;font-size:14px;background:var(--bad);color:#fff;opacity:${unpub.status === 'busy' ? 0.7 : 1}`)}>{unpub.status === 'busy' ? 'Removing…' : 'Unpublish'}</div>
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 }
