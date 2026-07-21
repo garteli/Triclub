@@ -165,9 +165,14 @@ public sealed class SqlPlanService(string connectionString) : IPlanService
     public async Task<bool> DeletePlanAsync(Guid ownerId, Guid planId, CancellationToken ct)
     {
         await using var conn = new SqlConnection(connectionString);
-        var removed = await conn.ExecuteAsync(new CommandDefinition(
-            "DELETE FROM dbo.CoachPlan WHERE Id = @planId AND OwnerId = @ownerId;",
-            new { planId, ownerId }, cancellationToken: ct));
-        return removed > 0;
+        // Deleting a saved plan also unpublishes it — pull its sessions off athletes' calendars first
+        // (guarded to the owning coach), then remove the saved plan. Returns whether the plan existed.
+        var deleted = await conn.QuerySingleAsync<int>(new CommandDefinition("""
+            IF EXISTS (SELECT 1 FROM dbo.CoachPlan WHERE Id = @planId AND OwnerId = @ownerId)
+                DELETE FROM dbo.PlannedWorkout WHERE PlanId = @planId;
+            DELETE FROM dbo.CoachPlan WHERE Id = @planId AND OwnerId = @ownerId;
+            SELECT @@ROWCOUNT;
+            """, new { planId, ownerId }, cancellationToken: ct));
+        return deleted > 0;
     }
 }
