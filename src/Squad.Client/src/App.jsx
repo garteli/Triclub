@@ -114,6 +114,9 @@ const HEADER_META = {
   plans: { title: 'Training plans' },
   sensors: { title: 'Connected sensors' },
   upload: { title: 'Upload' },
+  // Coach/group management.
+  manage: { title: 'Manage group' },
+  ledger: { title: 'Ride payments' },
 };
 
 export default function App() {

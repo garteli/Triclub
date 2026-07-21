@@ -47,7 +47,8 @@ export default function CoachLedger({ vm, actions, payments, getToken }) {
 
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
-      <div style={s('display:flex;align-items:center;gap:10px')}><Back onClick={() => actions.go('group')} /><div><div style={s('font-size:20px;font-weight:700')}>Ride payments</div><div style={s('font-size:12px;color:var(--text2)')}>{g.name}</div></div></div>
+      {/* title + back now in the global app header */}
+      {g.name && <div style={s('font-size:12px;color:var(--text2)')}>{g.name}</div>}
 
       {/* totals */}
       {summary && (

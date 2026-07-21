@@ -69,7 +69,6 @@ export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged
   if (!isOwner) {
     return (
       <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
-        <Back onClick={() => actions.go('group')} />
         <div style={s('text-align:center;color:var(--text3);font-size:13px;margin-top:40px')}>You don't manage this group.</div>
       </div>
     );
@@ -151,10 +150,7 @@ export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged
 
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
-      <div style={s('display:flex;align-items:center;gap:12px')}>
-        <Back onClick={() => actions.go('group')} />
-        <div style={s('font-size:17px;font-weight:700')}>Manage group</div>
-      </div>
+      {/* title + back now in the global app header */}
 
       {/* ---- branding: banner + logo ---- */}
       <FieldLabel>Banner</FieldLabel>
