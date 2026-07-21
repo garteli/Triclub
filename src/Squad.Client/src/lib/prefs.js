@@ -8,6 +8,9 @@
 const KEY = 'squad.prefs';
 
 export const defaultPrefs = {
+  theme: 'dark',     // 'dark' | 'light'
+  accent: 'orange',  // accent id — see Settings `accents` (lime/orange/teal/blue)
+  lang: 'en',        // 'en' | 'he' (Hebrew flips the app to RTL)
   units: 'metric',   // 'metric' (km, kg) | 'imperial' (mi, lb)
   temp: 'c',         // 'c' | 'f'
   notif: {
@@ -37,6 +40,9 @@ export const defaultPrefs = {
 function merge(saved) {
   if (!saved || typeof saved !== 'object') return { ...defaultPrefs };
   return {
+    theme: saved.theme ?? defaultPrefs.theme,
+    accent: saved.accent ?? defaultPrefs.accent,
+    lang: saved.lang ?? defaultPrefs.lang,
     units: saved.units ?? defaultPrefs.units,
     temp: saved.temp ?? defaultPrefs.temp,
     notif: { ...defaultPrefs.notif, ...(saved.notif || {}) },
@@ -55,8 +61,8 @@ export function loadPrefs() {
 // Persist just the preference slice of app state.
 export function savePrefs(state) {
   try {
-    const { units, temp, notif, privacy } = state;
-    localStorage.setItem(KEY, JSON.stringify({ units, temp, notif, privacy }));
+    const { theme, accent, lang, units, temp, notif, privacy } = state;
+    localStorage.setItem(KEY, JSON.stringify({ theme, accent, lang, units, temp, notif, privacy }));
   } catch { /* storage unavailable */ }
   return state;
 }

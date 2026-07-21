@@ -272,10 +272,10 @@ export default function App() {
   const actions = useMemo(() => ({
     // navigation: landing on the ride tab always returns to its lobby
     go: (id) => setState((s) => ({ ...s, screen: id, rideState: id === 'ride' ? 'lobby' : s.rideState })),
-    // dock toggles
-    setTheme: (theme) => patch({ theme }),
-    setLang: (lang) => patch({ lang }),
-    setAccent: (accent) => patch({ accent }),
+    // appearance / language — persisted to localStorage via savePrefs (survive reload)
+    setTheme: (theme) => setState((s) => savePrefs({ ...s, theme })),
+    setLang: (lang) => setState((s) => savePrefs({ ...s, lang })),
+    setAccent: (accent) => setState((s) => savePrefs({ ...s, accent })),
     // settings preferences (persisted to localStorage via savePrefs)
     setUnits: (units) => setState((s) => savePrefs({ ...s, units })),
     setTemp: (temp) => setState((s) => savePrefs({ ...s, temp })),
