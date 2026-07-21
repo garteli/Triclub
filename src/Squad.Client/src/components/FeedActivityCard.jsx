@@ -15,14 +15,6 @@ const ROUTE = '#f2622d';
 
 // Monochrome line glyph for the activity's sport, drawn beside the title (the
 // feed's primary "what is this" cue now that the corner sport chip is gone).
-function SportGlyph({ sport, color, size = 26 }) {
-  const p = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: color, strokeWidth: 1.9, strokeLinecap: 'round', strokeLinejoin: 'round' };
-  if (sport === 'Bike') return (<svg {...p}><circle cx="5.5" cy="17" r="3.4" /><circle cx="18.5" cy="17" r="3.4" /><path d="M5.5 17l4.5-8.5h4" /><path d="M14 8.5l4.5 8.5" /><path d="M8 8.5h4l2 4" /></svg>);
-  if (sport === 'Run') return (<svg {...p}><circle cx="16" cy="5" r="1.8" /><path d="M14.5 8l-4 3.5 2.5 2 1 5.5" /><path d="M10.5 11.5l-4 1" /><path d="M13 13.5l3.5 1" /></svg>);
-  if (sport === 'Swim') return (<svg {...p}><circle cx="17.5" cy="6.5" r="1.7" /><path d="M5 12l4-2.5 3.5 2 3-1.5" /><path d="M3 18c1.8-1.4 3.6-1.4 5.4 0s3.6 1.4 5.4 0 3.6-1.4 5.4 0" /></svg>);
-  return (<svg {...p}><path d="M3 9v6M6 7v10M18 7v10M21 9v6M6 12h12" /></svg>);
-}
-
 // Three headline metrics per sport (label above, value below), matching the feed
 // mock: rides show elevation, foot/water sports show pace, the gym shows HR + load.
 function metricsFor(a) {
@@ -143,13 +135,12 @@ export default function FeedActivityCard({ a, onOpen, onAthlete, token, getToken
           <span style={s('font-size:13.5px;font-weight:700;flex:none')}>{a.athleteName}</span>
           {meta && <span style={s('font-size:11px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>· {meta}</span>}
         </div>
+        {/* activity type — right-aligned pill, matching the activity detail header */}
+        <div style={s(`background:color-mix(in srgb,${a.sportColor} 16%,transparent);color:${a.sportColor};font-size:10px;font-weight:700;padding:4px 9px;border-radius:7px;text-transform:uppercase;flex:none`)}>{a.sport}</div>
       </div>
 
-      {/* title with sport glyph */}
-      <div style={s('display:flex;align-items:center;gap:10px;margin-top:12px')}>
-        <SportGlyph sport={a.sport} color={a.sportColor} />
-        <div style={s('font-size:18px;font-weight:700;letter-spacing:-.3px')}>{a.title}</div>
-      </div>
+      {/* title */}
+      <div style={s('font-size:18px;font-weight:700;letter-spacing:-.3px;margin-top:12px')}>{a.title}</div>
 
       {/* headline metrics — label above, value below */}
       <div style={s('display:flex;margin-top:14px')}>
