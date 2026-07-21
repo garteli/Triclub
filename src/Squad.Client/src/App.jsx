@@ -239,7 +239,7 @@ export default function App() {
       now.getDate() - ((now.getDay() + 6) % 7) + state.planWeekOffset * 7);
     return `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`;
   }, [state.planWeekOffset]);
-  const { plan: livePlan, summary: livePlanSummary } = usePlan({ getToken, enabled: authed, weekStart: planWeekStart });
+  const { plan: livePlan, summary: livePlanSummary } = usePlan({ getToken, enabled: authed, weekStart: planWeekStart, refreshSignal });
 
   // The signed-in athlete's persisted profile (drives vm.me + Edit profile).
   const [profile, setProfile] = useState(null);

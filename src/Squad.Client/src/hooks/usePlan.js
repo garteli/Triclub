@@ -28,7 +28,7 @@ const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 // Fetches the athlete's weekly plan (empty until a plan is assigned). `weekStart`
 // (a 'yyyy-MM-dd' in the target week) selects a week other than the current one for
 // week-by-week date navigation; omit it for the current week.
-export function usePlan({ getToken, enabled = true, weekStart } = {}) {
+export function usePlan({ getToken, enabled = true, weekStart, refreshSignal } = {}) {
   const [plan, setPlan] = useState(null);
   const [summary, setSummary] = useState(null);
 
@@ -43,7 +43,9 @@ export function usePlan({ getToken, enabled = true, weekStart } = {}) {
       setPlan((data.week || []).map(mapRow));
       setSummary(data.summary || null);
     } catch { /* offline */ }
-  }, [getToken, enabled, weekStart]);
+    // refreshSignal bumps on publish/unpublish/remove so the week refetches without a manual refresh.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [getToken, enabled, weekStart, refreshSignal]);
 
   useEffect(() => { refetch(); }, [refetch]);
 
