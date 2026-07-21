@@ -533,7 +533,17 @@ export default function App() {
   const rideLive = rideSessionActive || recorder.recording;
   // Saved routes/courses: pick one to follow on the live map (its geometry draws on the map, and it
   // can be attached to a planned ride by a coach). save() turns the just-recorded path into a course.
-  const [selectedCourse, setSelectedCourse] = useState(null); // { id, name, points:[[lat,lon],…] } | null
+  // Restored from localStorage so the course you're following survives a refresh / app restart
+  // (the ride session persists too — the course selection is part of that setup).
+  const [selectedCourse, setSelectedCourse] = useState(() => {
+    try { const raw = localStorage.getItem('squad.selectedCourse'); return raw ? JSON.parse(raw) : null; } catch { return null; }
+  }); // { id, name, points:[[lat,lon],…] } | null
+  useEffect(() => {
+    try {
+      if (selectedCourse?.points?.length) localStorage.setItem('squad.selectedCourse', JSON.stringify(selectedCourse));
+      else localStorage.removeItem('squad.selectedCourse');
+    } catch { /* storage full / unavailable — non-fatal */ }
+  }, [selectedCourse]);
   const courseOps = useMemo(() => ({
     list: () => listCourses(session?.token),
     select: async (id) => { if (!id) { setSelectedCourse(null); return null; } const c = await getCourse(session?.token, id); setSelectedCourse(c); return c; },
