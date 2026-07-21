@@ -514,7 +514,8 @@ export default function App() {
   const rideActive = onRide && state.rideState === 'active';
   const sensors = useSensors();
   const liveRide = useLiveRide(squadId, { getToken, meId: session?.athleteId, enabled: onRide && !!squadId });
-  const recorder = useRideRecorder({ pushTelemetry: liveRide.pushTelemetry, sensors, getToken, onSaved: () => setRefreshSignal((n) => n + 1), enabled: authed });
+  // throttleMs 500 → broadcast position ~2×/s (as fast as GPS delivers) so the peloton moves smoothly.
+  const recorder = useRideRecorder({ pushTelemetry: liveRide.pushTelemetry, sensors, getToken, onSaved: () => setRefreshSignal((n) => n + 1), enabled: authed, throttleMs: 500 });
   // Phone-to-phone BLE ranging (native only): advertise this athlete + scan teammates for
   // pack position while a ride is active. Inert on web — no-op that leaves GPS+heading in charge.
   const peerRanging = usePeerRanging({ athleteId: session?.athleteId, active: rideActive, pushPeerRange: liveRide.pushPeerRange });

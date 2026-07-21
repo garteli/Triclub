@@ -6,8 +6,9 @@ function isNativePlatform() {
 }
 
 // RSSI is noisy and scans fire fast (allowDuplicates); the server only needs a *recent*
-// range per peer, not every packet. Cap the uplink per peer to one push every few seconds.
-const PUSH_THROTTLE_MS = 3000;
+// range per peer, not every packet. One push per peer per second keeps pack spacing fresh
+// without spamming the hub with every BLE packet.
+const PUSH_THROTTLE_MS = 1000;
 
 // Phone-to-phone BLE ranging for live-ride pack position. While a ride is active this
 // device advertises its athlete GUID (native SquadPeerBeacon plugin) and scans for

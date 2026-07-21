@@ -42,16 +42,22 @@ export function useRideTelemetry({ t, active, riders = [], recorder, sensors }) 
   // A sample ≈ one tick ≈ one second, so leadCount/samples is a real "% of time in lead".
   const leadCount = useRef({});
   const leadSamples = useRef(0);
+  // The effect also re-runs when `riders` changes (a peer position arrives) so the map/pack
+  // refresh immediately, not just on the 1s tick. The per-second sampling (history buffers,
+  // elevation + lead accounting) is gated to an actual new tick so those stay 1 sample/sec.
+  const lastTick = useRef(-1);
   const [tel, setTel] = useState(null);
 
   useEffect(() => {
     if (!active) {
       startRef.current = null; hist.current = { spd: [], hr: [], pwr: [], cad: [], elev: [], dist: [] };
       gain.current = 0; drop.current = 0; maxElev.current = null; prevElev.current = null;
-      leadCount.current = {}; leadSamples.current = 0; setTel(null);
+      leadCount.current = {}; leadSamples.current = 0; lastTick.current = -1; setTel(null);
       return;
     }
     if (startRef.current == null) startRef.current = Date.now();
+    const newTick = t !== lastTick.current; // false when this run was triggered by a riders change
+    if (newTick) lastTick.current = t;
 
     const fix = recorder?.lastFix || {};
     const m = sensors?.metrics || {};
@@ -62,18 +68,20 @@ export function useRideTelemetry({ t, active, riders = [], recorder, sensors }) 
     const elev = fix.elevM ?? null;
     const dist = recorder?.distanceKm ?? null;
 
-    if (elev != null) {
-      if (prevElev.current != null) {
-        if (elev > prevElev.current) gain.current += elev - prevElev.current;
-        else if (elev < prevElev.current) drop.current += prevElev.current - elev;
+    // --- once-per-second sampling (only on a real tick, not on a riders-triggered re-run) ---
+    if (newTick) {
+      if (elev != null) {
+        if (prevElev.current != null) {
+          if (elev > prevElev.current) gain.current += elev - prevElev.current;
+          else if (elev < prevElev.current) drop.current += prevElev.current - elev;
+        }
+        prevElev.current = elev;
+        if (maxElev.current == null || elev > maxElev.current) maxElev.current = elev;
       }
-      prevElev.current = elev;
-      if (maxElev.current == null || elev > maxElev.current) maxElev.current = elev;
+      const push = (arr, v) => { arr.push(v); if (arr.length > WINDOW) arr.shift(); };
+      push(hist.current.spd, spd); push(hist.current.hr, hr); push(hist.current.pwr, pwr);
+      push(hist.current.cad, cad); push(hist.current.elev, elev); push(hist.current.dist, dist);
     }
-
-    const push = (arr, v) => { arr.push(v); if (arr.length > WINDOW) arr.shift(); };
-    push(hist.current.spd, spd); push(hist.current.hr, hr); push(hist.current.pwr, pwr);
-    push(hist.current.cad, cad); push(hist.current.elev, elev); push(hist.current.dist, dist);
 
     // Gradient: rise over run across the rolling window (needs a few metres of travel
     // to be stable). Both elevation and distance must be present.
@@ -131,8 +139,11 @@ export function useRideTelemetry({ t, active, riders = [], recorder, sensors }) 
         const d = parseFloat(r.dist) || 0;
         if (d > best) { best = d; leaderId = r.athleteId; }
       }
-      leadSamples.current += 1;
-      if (leaderId != null) leadCount.current[leaderId] = (leadCount.current[leaderId] || 0) + 1;
+      // Accrue lead time once per second (a real tick), not on every position update.
+      if (newTick) {
+        leadSamples.current += 1;
+        if (leaderId != null) leadCount.current[leaderId] = (leadCount.current[leaderId] || 0) + 1;
+      }
     }
     const samples = leadSamples.current;
     const leadPctById = {};
@@ -169,7 +180,7 @@ export function useRideTelemetry({ t, active, riders = [], recorder, sensors }) 
       gap: (localYou ?? hubYou)?.gapM ?? null,
       packFused: allRiders.some((r) => r.fused),
     });
-  }, [t, active]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [t, active, riders]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return tel;
 }
