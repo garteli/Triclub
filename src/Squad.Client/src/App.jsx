@@ -525,6 +525,23 @@ export default function App() {
   const uwb = useUwbRanging({ athleteId: session?.athleteId, active: rideActive, riders: liveRide.riders, pushUwbToken: liveRide.pushUwbToken, onUwbToken: liveRide.onUwbToken });
   const tel = useRideTelemetry({ t, active: rideActive, riders: liveRide.riders, recorder, sensors });
 
+  // Presence heartbeat: while on a ride, announce we're here every 2.5s even with no GPS fix, so
+  // teammates register us as a peer and BLE/UWB ranging can engage regardless of GPS accuracy.
+  // Sends the latest fix when we have one (keeps position fresh), or nulls (the hub keeps our last
+  // known spot). Read the recorder via a ref so a moving fix doesn't reset the interval.
+  const recorderRef = useRef(recorder);
+  recorderRef.current = recorder;
+  useEffect(() => {
+    if (!rideActive || typeof liveRide.pushTelemetry !== 'function') return undefined;
+    const beat = () => {
+      const r = recorderRef.current;
+      liveRide.pushTelemetry({ lat: r?.lastFix?.lat ?? null, lon: r?.lastFix?.lon ?? null, distanceKm: r?.distanceKm ?? null });
+    };
+    beat();
+    const id = setInterval(beat, 2500);
+    return () => clearInterval(id);
+  }, [rideActive, liveRide.pushTelemetry]);
+
   // Garmin Edge–style live-ride pages (configurable fields, auto-rotate, edit).
   const livePages = useLivePages(t, rideActive);
   // Keep the screen awake for the whole live-ride display — recording or just watching.

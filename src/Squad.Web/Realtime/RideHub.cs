@@ -47,7 +47,8 @@ public sealed class RideHub(IAthleteDirectory directory, IRideSessionState state
 
         // Reuse cached identity; only hit the directory the first time we see this rider.
         string name, initials, color;
-        if (state.TryGet(rideId, athleteId.Value, out var existing) && existing is not null)
+        state.TryGet(rideId, athleteId.Value, out var existing);
+        if (existing is not null)
         {
             name = existing.Name; initials = existing.Initials; color = existing.Color;
         }
@@ -57,11 +58,16 @@ public sealed class RideHub(IAthleteDirectory directory, IRideSessionState state
             name = p?.Name ?? ""; initials = p?.Initials ?? ""; color = p?.AvatarColor ?? "#d6ff3f";
         }
 
+        // A presence heartbeat (no GPS yet) carries null Lat/Lon — keep the last known position so
+        // it isn't erased, and just refresh the rider's timestamp/metrics.
+        var lat = t.Lat ?? existing?.Lat;
+        var lon = t.Lon ?? existing?.Lon;
+
         var update = new RiderUpdate
         {
             AthleteId = athleteId.Value,
             Name = name, Initials = initials, Color = color,
-            Lat = t.Lat, Lon = t.Lon,
+            Lat = lat, Lon = lon,
             SpeedKph = t.SpeedKph, HeartRate = t.HeartRate, PowerW = t.PowerW, DistanceKm = t.DistanceKm,
             RadarThreatLevel = t.RadarThreatLevel,
             RadarVehicleCount = t.RadarVehicleCount,
@@ -69,10 +75,14 @@ public sealed class RideHub(IAthleteDirectory directory, IRideSessionState state
             Ts = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
         };
 
-        // Pack-position fusion: sharpen this rider's spot from fresh BLE ranges to teammates.
-        var fused = FuseRider(rideId, athleteId.Value, t.Lat, t.Lon);
-        if (fused.Fused)
-            update = update with { FusedLat = fused.Lat, FusedLon = fused.Lon, NearestGapM = fused.NearestGapM, Fused = true };
+        // Pack-position fusion (needs a real GPS anchor): sharpen this rider's spot from fresh BLE
+        // ranges to teammates. Skipped for presence-only riders that don't have a position yet.
+        if (lat is { } glat && lon is { } glon)
+        {
+            var fused = FuseRider(rideId, athleteId.Value, glat, glon);
+            if (fused.Fused)
+                update = update with { FusedLat = fused.Lat, FusedLon = fused.Lon, NearestGapM = fused.NearestGapM, Fused = true };
+        }
 
         state.Upsert(rideId, update);
         await Clients.Group(RideGroup(rideId)).SendAsync("riderMoved", update);
@@ -109,7 +119,9 @@ public sealed class RideHub(IAthleteDirectory directory, IRideSessionState state
         foreach (var (other, obs) in perPeer)
         {
             if (!state.TryGet(rideId, other, out var u) || u is null) continue;
-            neighbors.Add((u.FusedLat ?? u.Lat, u.FusedLon ?? u.Lon, obs.DistanceM!.Value));
+            // A presence-only teammate (no GPS yet) can't anchor the fusion — skip them.
+            if ((u.FusedLat ?? u.Lat) is { } alat && (u.FusedLon ?? u.Lon) is { } alon)
+                neighbors.Add((alat, alon, obs.DistanceM!.Value));
         }
         if (neighbors.Count == 0) return new FusedPosition(lat, lon, null, false);
 

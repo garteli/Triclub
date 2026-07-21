@@ -74,9 +74,11 @@ public sealed record ClubRankingRow
 
 // ----- Live ride -----
 
-/// <summary>What a rider's own device streams up during a live ride.</summary>
+/// <summary>What a rider's own device streams up during a live ride. Lat/Lon are nullable so a
+/// device with no GPS fix yet can still announce presence (a "I'm on this ride" heartbeat) — that
+/// registers it as a rider so BLE/UWB peer ranging can engage without waiting on GPS.</summary>
 public sealed record RiderTelemetry(
-    double Lat, double Lon, double? ElevM,
+    double? Lat, double? Lon, double? ElevM,
     double? SpeedKph, double? HeartRate, double? Cadence, double? PowerW, double? DistanceKm,
     int? RadarThreatLevel = null, int? RadarVehicleCount = null,
     double? RadarClosestMeters = null, double? RadarClosestClosingKph = null);
@@ -97,8 +99,10 @@ public sealed record RiderUpdate
     public string Name { get; init; } = "";
     public string Initials { get; init; } = "";
     public string Color { get; init; } = "#d6ff3f";
-    public double Lat { get; init; }
-    public double Lon { get; init; }
+    // Nullable: a presence-only rider (on the ride, no GPS fix yet) has no position but is still a
+    // known peer for BLE/UWB ranging. The map simply omits a dot until a position lands.
+    public double? Lat { get; init; }
+    public double? Lon { get; init; }
     public double? SpeedKph { get; init; }
     public double? HeartRate { get; init; }
     public double? PowerW { get; init; }
