@@ -4,6 +4,7 @@ import { useLiveRide } from './hooks/useLiveRide.js';
 import { useSensors } from './hooks/useSensors.js';
 import { useRideRecorder } from './hooks/useRideRecorder.js';
 import { usePeerRanging } from './hooks/usePeerRanging.js';
+import { useUwbRanging } from './hooks/useUwbRanging.js';
 import { useRideTelemetry } from './hooks/useRideTelemetry.js';
 import { useLivePages } from './hooks/useLivePages.js';
 import { useWakeLock } from './hooks/useWakeLock.js';
@@ -519,6 +520,9 @@ export default function App() {
   // Phone-to-phone BLE ranging (native only): advertise this athlete + scan teammates for
   // pack position while a ride is active. Inert on web — no-op that leaves GPS+heading in charge.
   const peerRanging = usePeerRanging({ athleteId: session?.athleteId, active: rideActive, pushPeerRange: liveRide.pushPeerRange });
+  // Ultra-Wideband precise ranging (Apple Nearby Interaction, native + U1 devices only): exact
+  // distance + direction to teammates. Inert on web / non-UWB — falls back to BLE + GPS.
+  const uwb = useUwbRanging({ athleteId: session?.athleteId, active: rideActive, riders: liveRide.riders, pushUwbToken: liveRide.pushUwbToken, onUwbToken: liveRide.onUwbToken });
   const tel = useRideTelemetry({ t, active: rideActive, riders: liveRide.riders, recorder, sensors });
 
   // Garmin Edge–style live-ride pages (configurable fields, auto-rotate, edit).
@@ -526,7 +530,7 @@ export default function App() {
   // Keep the screen awake for the whole live-ride display — recording or just watching.
   useWakeLock(rideActive);
 
-  const live = { riders: liveRide.riders, status: liveRide.status, pushTelemetry: liveRide.pushTelemetry, recorder, sensors, tel, livePages, peerRanging };
+  const live = { riders: liveRide.riders, status: liveRide.status, pushTelemetry: liveRide.pushTelemetry, recorder, sensors, tel, livePages, peerRanging, uwb };
 
   // Unread count for the global header's bell badge.
   const notif = useNotifications({ getToken, enabled: authed });
