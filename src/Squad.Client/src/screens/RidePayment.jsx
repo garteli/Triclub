@@ -64,8 +64,8 @@ export default function RidePayment({ vm, actions, payments }) {
   if (done) {
     return (
       <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
-        <div style={s('display:flex;align-items:center;gap:10px')}><Back onClick={() => actions.go('group')} /><div style={s('font-size:20px;font-weight:700')}>Recorded</div></div>
-        <div style={s('background:color-mix(in srgb,var(--good) 14%,var(--bg2));border:1px solid color-mix(in srgb,var(--good) 35%,transparent);border-radius:16px;padding:18px;margin-top:18px;text-align:center')}>
+        {/* title + back now in the global app header */}
+        <div style={s('background:color-mix(in srgb,var(--good) 14%,var(--bg2));border:1px solid color-mix(in srgb,var(--good) 35%,transparent);border-radius:16px;padding:18px;margin-top:8px;text-align:center')}>
           <div style={s('font-size:34px')}>✅</div>
           <div style={s('font-size:15px;font-weight:700;margin-top:8px')}>{method ? 'Payment logged as paid' : 'Payment logged as owed'}</div>
           <div style={s('font-size:12.5px;color:var(--text2);margin-top:6px;line-height:1.5')}>{preview} to {g.name}. {method ? 'The coach can see it in their ledger.' : 'Settle it out-of-band, then mark it paid.'}</div>
@@ -77,8 +77,8 @@ export default function RidePayment({ vm, actions, payments }) {
 
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
-      <div style={s('display:flex;align-items:center;gap:10px')}><Back onClick={() => actions.go('group')} /><div style={s('font-size:20px;font-weight:700')}>Record a payment</div></div>
-      <div style={s('font-size:12px;color:var(--text3);line-height:1.5;margin-top:8px')}>The app tracks who paid the coach — it doesn't move money. Pay {g.name}'s coach directly, then log it here.</div>
+      {/* title + back now in the global app header */}
+      <div style={s('font-size:12px;color:var(--text3);line-height:1.5;margin-top:2px')}>The app tracks who paid the coach — it doesn't move money. Pay {g.name}'s coach directly, then log it here.</div>
 
       {/* what for */}
       <div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.3px;font-weight:600;margin:18px 0 9px')}>What for</div>
