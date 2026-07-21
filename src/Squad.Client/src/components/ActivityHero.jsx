@@ -15,6 +15,7 @@ export default function ActivityHero({ a, route, frames, hasMap, status, token, 
   const [mapStyle, setMapStyle] = useState('voyager');
   const [is3D, setIs3D] = useState(false);
   const [full, setFull] = useState(false);
+  const [menu, setMenu] = useState(false); // overflow (···) sheet: Save route / Delete
   const [playing, setPlaying] = useState(false);
   const mapRef = useRef(null);
   const glRef = useRef(null);
@@ -55,15 +56,9 @@ export default function ActivityHero({ a, route, frames, hasMap, status, token, 
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round"><path d="M15 6l-6 6 6 6" /></svg>
         </div>
       )}
-      {/* Save Route (→ save this activity's track as a course) + overflow */}
-      <div style={s('position:absolute;top:16px;right:16px;z-index:3;display:flex;gap:8px')}>
-        {onSaveRoute && (
-          <div className="ctl" onClick={onSaveRoute} style={s(`height:38px;padding:0 14px;border-radius:19px;display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;${glass}`)}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" /></svg>
-            Save Route
-          </div>
-        )}
-        <div className="ctl" onClick={a.isMe ? onDelete : undefined} title={a.isMe ? 'Delete training' : undefined} style={s(`width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;letter-spacing:1px;font-size:13px;${glass}`)}>···</div>
+      {/* overflow (···) — opens a menu sheet with Save route + Delete */}
+      <div style={s('position:absolute;top:16px;right:16px;z-index:3')}>
+        <div className="ctl" onClick={() => setMenu(true)} title="More" style={s(`width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;letter-spacing:1px;font-size:13px;${glass}`)}>···</div>
       </div>
       {/* layers (cycle basemap) + 3D (inline terrain tilt) */}
       {hasMap && (
@@ -91,6 +86,31 @@ export default function ActivityHero({ a, route, frames, hasMap, status, token, 
       )}
       {/* bottom fade into the sheet */}
       <div style={s('position:absolute;left:0;right:0;bottom:0;height:56px;background:linear-gradient(0deg,var(--bg),transparent);pointer-events:none;z-index:2')} />
+
+      {/* ··· menu sheet — Save route as course + Delete (own activity only) */}
+      {menu && (
+        <>
+          <div className="ctl" onClick={() => setMenu(false)} style={s('position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:60;animation:floatUp .2s ease')} />
+          <div style={s('position:fixed;left:0;right:0;bottom:0;z-index:61;display:flex;justify-content:center;pointer-events:none')}>
+            <div className="scr" style={s('width:100%;max-width:480px;pointer-events:auto;background:var(--bg);border-radius:24px 24px 0 0;border-top:1px solid var(--line2);padding:12px 16px calc(16px + env(safe-area-inset-bottom));animation:floatUp .3s ease')}>
+              <div style={s('width:40px;height:4px;border-radius:3px;background:var(--line2);margin:2px auto 12px')} />
+              {onSaveRoute && (
+                <div className="ctl" onClick={() => { setMenu(false); onSaveRoute(); }} style={s('display:flex;align-items:center;gap:12px;padding:14px 8px;border-radius:12px;font-size:15px;font-weight:600;color:var(--text)')}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" /></svg>
+                  Save route as course
+                </div>
+              )}
+              {a.isMe && onDelete && (
+                <div className="ctl" onClick={() => { setMenu(false); onDelete(); }} style={s('display:flex;align-items:center;gap:12px;padding:14px 8px;border-radius:12px;font-size:15px;font-weight:600;color:var(--bad)')}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6" /></svg>
+                  Delete activity
+                </div>
+              )}
+              <div className="ctl" onClick={() => setMenu(false)} style={s('text-align:center;padding:13px;margin-top:6px;border-radius:12px;font-size:14px;font-weight:700;background:var(--bg3);border:1px solid var(--line);color:var(--text2)')}>Cancel</div>
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 
