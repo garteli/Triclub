@@ -8,7 +8,8 @@ const ago = (iso) => {
   return `${Math.floor(h / 24)}d ago`;
 };
 
-// kind -> icon key (see Notifications.jsx ICONS) + accent color.
+// kind -> icon key (see Notifications.jsx ICONS) + accent color. `target` navigates to a screen
+// on tap (instead of opening the actor's athlete profile).
 const KIND = {
   follow:   { icon: 'heart', color: '#ff6f61' },
   join:     { icon: 'bike', color: '#37c0ff' },
@@ -17,6 +18,7 @@ const KIND = {
   declined: { icon: 'clipboard', color: '#ff6a2c' },
   message:  { icon: 'chat', color: '#5a86ff' },
   activity: { icon: 'trophy', color: '#ffce4a' },
+  plan:     { icon: 'calendar', color: 'var(--accent)', target: 'plan' },
 };
 
 function mapNote(n) {
@@ -29,7 +31,9 @@ function mapNote(n) {
     time: ago(n.createdUtc),
     icon: k.icon,
     color: k.color,
-    athlete: n.actorId || null, // openAthlete target for follow/join
+    // Kinds with a `target` navigate to that screen; the rest open the actor's athlete profile.
+    target: k.target || null,
+    athlete: k.target ? null : (n.actorId || null),
   };
 }
 

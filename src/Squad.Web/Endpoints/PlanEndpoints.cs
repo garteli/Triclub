@@ -153,7 +153,8 @@ public static class PlanEndpoints
         return ok ? Results.Ok(new { deleted = true }) : Results.NotFound(new { error = "Plan not found." });
     }
 
-    private static async Task<IResult> PublishPlan(HttpContext http, PublishPlanRequest req, IPlanService plans, CancellationToken ct)
+    private static async Task<IResult> PublishPlan(HttpContext http, PublishPlanRequest req, IPlanService plans,
+        INotificationService notes, IAthleteDirectory directory, CancellationToken ct)
     {
         var claim = http.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? http.User.FindFirstValue("sub");
         if (!Guid.TryParse(claim, out var coachId)) return Results.Unauthorized();
@@ -185,9 +186,22 @@ public static class PlanEndpoints
         if (planName.Length == 0) planName = "Training plan";
         if (planName.Length > 120) planName = planName[..120];
 
-        var published = await plans.PublishAsync(coachId, planId, planName, athleteIds, spanStart, spanEnd, workouts, ct);
-        if (published == 0) return Results.BadRequest(new { error = "None of the selected athletes are in a squad you coach." });
-        return Results.Ok(new { published });
+        var recipients = await plans.PublishAsync(coachId, planId, planName, athleteIds, spanStart, spanEnd, workouts, ct);
+        if (recipients.Count == 0) return Results.BadRequest(new { error = "None of the selected athletes are in a squad you coach." });
+
+        // Notify each athlete who got the plan. Best-effort — a notification hiccup must not fail the publish.
+        try
+        {
+            var coachName = (await directory.GetAsync(coachId, ct))?.Name ?? "Your coach";
+            var isWeek = req.Weeks == 1;
+            var text = isWeek ? $"added a week of \"{planName}\" to your calendar"
+                              : $"published \"{planName}\" to your calendar";
+            foreach (var athleteId in recipients)
+                await notes.AddAsync(athleteId, "plan", coachId, coachName, text, ct);
+        }
+        catch (Exception) { /* publish already succeeded; notifications are best-effort */ }
+
+        return Results.Ok(new { published = recipients.Count });
     }
 
     private static async Task<IResult> UnpublishPlan(HttpContext http, Guid id, IPlanService plans, CancellationToken ct)

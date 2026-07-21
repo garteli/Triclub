@@ -219,8 +219,9 @@ public interface IPlanService
     /// replace each assigned athlete's PlannedWorkout rows in [spanStart..spanEnd] with
     /// <paramref name="workouts"/>, stamped with <paramref name="planId"/>/<paramref name="planName"/> so
     /// the plan can later be unpublished or removed. Only athletes who are members of a squad OWNED by
-    /// <paramref name="coachId"/> are written. Returns how many athletes got the plan.</summary>
-    Task<int> PublishAsync(Guid coachId, Guid planId, string planName, IReadOnlyList<Guid> athleteIds,
+    /// <paramref name="coachId"/> are written. Returns the ids of the athletes who got the plan
+    /// (so the caller can notify exactly them).</summary>
+    Task<IReadOnlyList<Guid>> PublishAsync(Guid coachId, Guid planId, string planName, IReadOnlyList<Guid> athleteIds,
         DateTime spanStart, DateTime spanEnd, IReadOnlyList<PlannedWorkoutWrite> workouts, CancellationToken ct);
 
     /// <summary>Unpublish a plan the coach owns: remove every athlete's PlannedWorkout rows stamped with
