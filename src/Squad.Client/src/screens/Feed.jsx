@@ -12,7 +12,7 @@ import { useActivityAnalytics, fmtDur, pace, fmtEffortDur, CURVE_LABEL, DIST_LAB
 import { PWR_ZONE_FRACS, PWR_ZONE_NAMES, HR_ZONE_FRACS, HR_ZONE_NAMES } from '../lib/powerAnalysis.js';
 import ActivityHero from '../components/ActivityHero.jsx';
 import ActivityInteractions from '../components/ActivityInteractions.jsx';
-import { downscaleToJpeg, captureNativePhoto, isNativePlatform, uploadActivityPhoto } from '../lib/photos.js';
+import { downscaleToJpeg, captureNativePhoto, isNativePlatform, isCancelError, uploadActivityPhoto } from '../lib/photos.js';
 
 const label = 'font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.3px;font-weight:600';
 const title = 'font-size:17px;font-weight:700;margin-bottom:12px';
@@ -48,8 +48,15 @@ function ActivityPhotos({ activityId, isMe, token, getToken }) {
   };
   const add = async () => {
     setErr('');
-    if (isNativePlatform()) { try { const d = await captureNativePhoto(); if (d) await doUpload(d); } catch { setErr('Could not capture a photo.'); } }
-    else fileRef.current?.click();
+    if (!isNativePlatform()) { fileRef.current?.click(); return; }
+    try {
+      const d = await captureNativePhoto();
+      if (d) { await doUpload(d); return; }
+    } catch (e) {
+      if (isCancelError(e)) return;          // user backed out — not an error
+      // Camera plugin failed — fall through to the in-WebView file/camera picker.
+    }
+    fileRef.current?.click();
   };
   const onPick = async (e) => {
     const file = e.target.files?.[0]; e.target.value = '';

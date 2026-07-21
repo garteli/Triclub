@@ -26,6 +26,13 @@ export async function downscaleToJpeg(file, maxDim = 1600, quality = 0.82) {
   return canvas.toDataURL('image/jpeg', quality);
 }
 
+// True when a native camera error is really just the user backing out of the camera
+// sheet (Capacitor throws for that) — callers should stay silent rather than flag an error.
+export function isCancelError(err) {
+  const m = (err && (err.message || err.errorMessage)) || String(err || '');
+  return /cancel/i.test(m);
+}
+
 // Native camera capture → a JPEG data URL (already sized/oriented by the plugin).
 export async function captureNativePhoto() {
   const { Camera, CameraResultType, CameraSource } = await import('@capacitor/camera');

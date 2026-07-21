@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { s } from '../lib/style.js';
-import { metricCatalog, metricGroups, liveMetricValues, liveChartsView, liveRadarView, spreadRiders } from '../lib/liveMetrics.js';
+import { metricCatalog, metricGroups, liveMetricValues, liveChartsView, liveRadarView, spreadRiders, pelotonView } from '../lib/liveMetrics.js';
 import TileMap from './TileMap.jsx';
 
 // ---- Group side column: teammates front→back on a rail + rear-radar vehicle blip ----
@@ -30,6 +30,60 @@ function GroupColumn({ tel }) {
       </div>
       <div style={s(`font-size:10px;font-weight:700;line-height:1.2;margin-top:5px;color:${rv.color}`)}>{rv.label}</div>
     </div>
+  );
+}
+
+// ---- Peloton field: 2D pack spread (fore-aft × lateral) + "% time in lead" board ----
+function PelotonField({ v }) {
+  if (!v || v.empty) {
+    return (
+      <div style={s('position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg3);color:var(--text3);font-size:11px;text-align:center;padding:0 18px')}>
+        Waiting for teammates — the pack spread appears once riders are streaming.
+      </div>
+    );
+  }
+  return (
+    <>
+      <div style={s('display:flex;justify-content:space-between;align-items:baseline;flex:none')}>
+        <div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;font-weight:600')}>Peloton</div>
+        <div className="mono" style={s('font-size:10px;color:var(--text2);font-weight:600')}>
+          {v.lengthM != null ? `${v.lengthM}m long` : ''}{v.hasLateral && v.widthM != null ? ` · ${v.widthM}m wide` : ''}
+        </div>
+      </div>
+      {/* the field: front (leader) at top, back at bottom; centre line = travel direction */}
+      <div style={s('position:relative;flex:1;min-height:120px;margin-top:8px;border-radius:11px;background:var(--bg3);border:1px solid var(--line);overflow:hidden')}>
+        <div style={s('position:absolute;left:50%;top:6%;bottom:6%;width:2px;background:var(--line2);transform:translateX(-50%)')} />
+        <div style={s('position:absolute;top:5px;left:0;right:0;text-align:center;font-size:8px;font-weight:700;letter-spacing:1px;color:var(--text3)')}>▲ FRONT</div>
+        <div style={s('position:absolute;bottom:5px;left:0;right:0;text-align:center;font-size:8px;font-weight:700;letter-spacing:1px;color:var(--text3)')}>BACK</div>
+        {!v.hasLateral && (
+          <div style={s('position:absolute;bottom:5px;right:8px;font-size:8px;color:var(--text3)')}>lateral needs GPS</div>
+        )}
+        {v.plot.map((r) => (
+          <div key={r.id} style={s(`position:absolute;left:${(r.x * 100).toFixed(1)}%;top:${(r.y * 100).toFixed(1)}%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:1px;transition:left .9s linear,top .9s linear;z-index:${r.isLeader ? 3 : 2}`)}>
+            <div style={s(`width:24px;height:24px;border-radius:7px;background:${r.color};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#0c0e11;${r.you ? 'box-shadow:0 0 0 2px var(--accent)' : ''}${r.isLeader ? ';outline:2px solid var(--good);outline-offset:1px' : ''};${r.dropped ? 'opacity:.55' : ''}`)}>{r.initials}</div>
+            {r.isLeader
+              ? <span style={s('font-size:8px;font-weight:700;color:var(--good);line-height:1')}>lead</span>
+              : r.dropped && r.gapM > 0 && <span className="mono" style={s('font-size:8px;font-weight:700;color:var(--behind);line-height:1')}>+{r.gapM}m</span>}
+          </div>
+        ))}
+      </div>
+      {/* % time in lead — compact board, highest first */}
+      <div style={s('flex:none;margin-top:8px;display:flex;flex-direction:column;gap:4px')}>
+        <div style={s('font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;font-weight:600')}>% time in lead</div>
+        {v.samples === 0 ? (
+          <div style={s('font-size:10px;color:var(--text3)')}>Tracking begins with two or more riders.</div>
+        ) : (
+          v.board.slice(0, 4).map((r) => (
+            <div key={r.id} style={s('display:flex;align-items:center;gap:7px')}>
+              <span style={s(`width:9px;height:9px;border-radius:3px;background:${r.color};flex:none;${r.you ? 'box-shadow:0 0 0 1.5px var(--accent)' : ''}`)} />
+              <span style={s(`font-size:11px;font-weight:600;flex:none;width:26px;${r.you ? 'color:var(--accent)' : ''}`)}>{r.initials}</span>
+              <div style={s('flex:1;height:6px;border-radius:3px;background:var(--bg4);overflow:hidden')}><div style={s(`height:100%;width:${r.leadPct}%;background:${r.isLeader ? 'var(--good)' : 'var(--accent)'};border-radius:3px`)} /></div>
+              <span className="mono" style={s('font-size:11px;font-weight:700;width:32px;text-align:right')}>{r.leadPct}%</span>
+            </div>
+          ))
+        )}
+      </div>
+    </>
   );
 }
 
@@ -69,6 +123,7 @@ function FieldCell({ f, editing, actions, index }) {
           </svg>
         </>
       )}
+      {f.kind === 'peloton' && <PelotonField v={f.v} />}
       {f.kind === 'map' && (
         <>
           <div style={s('position:absolute;inset:0')}>
@@ -153,6 +208,7 @@ function PickerSheet({ page, slot, actions }) {
   const cur = page.fields[slot];
   const charts = [['chart:spd', 'Speed chart', 'graph'], ['chart:hr', 'HR chart', 'graph'], ['chart:power', 'Power chart', 'graph']];
   const maps = [['map', 'Route map', 'map']];
+  const group = [['peloton', 'Peloton spread', '2D']];
   const section = (title, rows) => (
     <>
       <div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:7px')}>{title}</div>
@@ -168,6 +224,7 @@ function PickerSheet({ page, slot, actions }) {
         <div style={s('width:40px;height:4px;border-radius:3px;background:var(--line2);margin:0 auto 14px')} />
         <div style={s('font-size:17px;font-weight:700;letter-spacing:-.3px;margin-bottom:12px')}>Choose a field</div>
         {section('Charts', charts)}
+        {section('Group', group)}
         {section('Map', maps)}
         {metricGroups.map(([cat, toks]) => section(cat, toks.map((id) => [id, metricCatalog[id].label, metricCatalog[id].unit])))}
       </div>
@@ -211,6 +268,7 @@ export default function LivePages({ tel, lp }) {
       const packGap = tel?.packFused ? (tel?.gap != null ? Math.round(tel.gap) : null) : null;
       return { ...base, kind: 'map', label: 'Route', riders, pts, packFused: !!tel?.packFused, packGap };
     }
+    if (tok === 'peloton') return { ...base, kind: 'peloton', v: pelotonView(tel) };
     if (charts[tok]) { const c = charts[tok]; return { ...base, kind: 'chart', label: c.label, value: c.cur, unit: c.unit, color: c.color, pts: c.pts, area: c.area }; }
     const m = metricCatalog[tok] || { label: tok, unit: '' };
     const val = mv[tok] || { v: '—' };

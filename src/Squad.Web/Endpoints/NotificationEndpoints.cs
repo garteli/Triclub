@@ -12,6 +12,7 @@ public static class NotificationEndpoints
         var g = app.MapGroup("/api/notifications").RequireAuthorization();
         g.MapGet("", List);
         g.MapPost("/read", MarkRead);
+        g.MapPost("/{id:guid}/read", MarkOneRead);
         return app;
     }
 
@@ -25,6 +26,13 @@ public static class NotificationEndpoints
     {
         if (!TryMe(http, out var me)) return Results.Unauthorized();
         await notes.MarkAllReadAsync(me, ct);
+        return Results.Ok(new { ok = true });
+    }
+
+    private static async Task<IResult> MarkOneRead(Guid id, HttpContext http, INotificationService notes, CancellationToken ct)
+    {
+        if (!TryMe(http, out var me)) return Results.Unauthorized();
+        await notes.MarkReadAsync(me, id, ct);
         return Results.Ok(new { ok = true });
     }
 

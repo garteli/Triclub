@@ -55,6 +55,21 @@ export function useNotifications({ getToken, enabled = true } = {}) {
 
   useEffect(() => { refetch(); }, [refetch]);
 
+  // Mark a single notification read (on tap). Optimistic — flips it locally so the bell
+  // badge updates immediately — then persists. A failure reconciles on the next refetch.
+  const markRead = useCallback(async (id) => {
+    let wasUnread = false;
+    setItems((prev) => prev.map((n) => {
+      if (n.id === id && n.unread) { wasUnread = true; return { ...n, unread: false }; }
+      return n;
+    }));
+    if (!wasUnread) return;
+    try {
+      const token = getToken ? await getToken() : null;
+      await fetch(`/api/notifications/${id}/read`, { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : undefined });
+    } catch { /* will reconcile on next refetch */ }
+  }, [getToken]);
+
   const markAllRead = useCallback(async () => {
     setItems((prev) => prev.map((n) => ({ ...n, unread: false }))); // optimistic
     try {
@@ -63,5 +78,5 @@ export function useNotifications({ getToken, enabled = true } = {}) {
     } catch { /* will reconcile on next refetch */ }
   }, [getToken]);
 
-  return { items, ready: ready && enabled, refetch, markAllRead };
+  return { items, ready: ready && enabled, refetch, markRead, markAllRead };
 }

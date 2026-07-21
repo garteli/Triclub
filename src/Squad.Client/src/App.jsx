@@ -6,6 +6,7 @@ import { useRideRecorder } from './hooks/useRideRecorder.js';
 import { usePeerRanging } from './hooks/usePeerRanging.js';
 import { useRideTelemetry } from './hooks/useRideTelemetry.js';
 import { useLivePages } from './hooks/useLivePages.js';
+import { useWakeLock } from './hooks/useWakeLock.js';
 import { useSquadFeed } from './hooks/useSquadFeed.js';
 import { useLeaderboard } from './hooks/useLeaderboard.js';
 import { useClubRanking } from './hooks/useClubRanking.js';
@@ -521,12 +522,14 @@ export default function App() {
 
   // Garmin Edge–style live-ride pages (configurable fields, auto-rotate, edit).
   const livePages = useLivePages(t, rideActive);
+  // Keep the screen awake for the whole live-ride display — recording or just watching.
+  useWakeLock(rideActive);
 
   const live = { riders: liveRide.riders, status: liveRide.status, pushTelemetry: liveRide.pushTelemetry, recorder, sensors, tel, livePages, peerRanging };
 
   // Unread count for the global header's bell badge.
-  const { items: notifItems } = useNotifications({ getToken, enabled: authed });
-  const notifUnread = notifItems.filter((n) => n.unread).length;
+  const notif = useNotifications({ getToken, enabled: authed });
+  const notifUnread = notif.items.filter((n) => n.unread).length;
 
   // Remember the last screen + selections so a refresh returns here (see lib/navState.js).
   // Only while signed in — a logged-out location isn't worth restoring.
@@ -580,6 +583,7 @@ export default function App() {
           onPublishPlan={authed ? onPublishPlan : undefined}
           plans={authed ? planOps : undefined} plan={selectedPlan}
           planMine={authed ? planMineOps : undefined}
+          notif={notif}
           meId={session?.athleteId} />
       </Phone>
     </div>

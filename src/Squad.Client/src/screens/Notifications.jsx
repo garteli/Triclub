@@ -13,15 +13,19 @@ const ICONS = {
   calendar: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/>',
 };
 
-export default function Notifications({ actions, getToken }) {
-  // Live notifications when signed in; the prototype falls back to the seed list.
-  const { items: liveItems, ready, markAllRead } = useNotifications({ getToken, enabled: !!getToken });
+export default function Notifications({ actions, getToken, notif }) {
+  // Share the app-level notifications state (so tapping one updates the header bell too);
+  // fall back to a local instance if rendered without it. The prototype (signed-out) uses
+  // the seed list until the live feed is ready.
+  const own = useNotifications({ getToken, enabled: !!getToken && !notif });
+  const { items: liveItems, ready, markRead, markAllRead } = notif || own;
   const notifications = ready ? liveItems : mockNotifications;
 
   const [read, setRead] = useState(() => new Set());
-  const markAll = () => { setRead(new Set(notifications.map((n) => n.id))); if (ready) markAllRead(); };
+  const markAll = () => { setRead(new Set(notifications.map((n) => n.id))); if (ready) markAllRead?.(); };
   const open = (n) => {
     setRead((r) => new Set(r).add(n.id));
+    if (ready && n.unread) markRead?.(n.id); // persist + clear the bell badge
     if (n.athlete) actions.openAthlete(n.athlete);
     else if (n.target) actions.go(n.target);
   };

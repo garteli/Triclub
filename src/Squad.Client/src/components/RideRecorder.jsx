@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { s } from '../lib/style.js';
-import { downscaleToJpeg, captureNativePhoto, isNativePlatform } from '../lib/photos.js';
+import { downscaleToJpeg, captureNativePhoto, isNativePlatform, isCancelError } from '../lib/photos.js';
 
 const radarLabel = (r) => (!r ? '—' : r.level > 0 ? `${r.closestM ?? '?'}m` : 'clear');
 
@@ -150,14 +150,17 @@ export default function RideRecorder({ recorder, sensors, streaming }) {
 
   const capture = async () => {
     setPhotoErr('');
-    if (isNativePlatform()) {
-      setPhotoBusy(true);
-      try { const d = await captureNativePhoto(); if (d) addPhoto(d); }
-      catch { setPhotoErr('Could not capture a photo.'); }
-      finally { setPhotoBusy(false); }
-    } else {
-      fileRef.current?.click();
-    }
+    if (!isNativePlatform()) { fileRef.current?.click(); return; }
+    setPhotoBusy(true);
+    try {
+      const d = await captureNativePhoto();
+      if (d) { addPhoto(d); return; }
+    } catch (e) {
+      if (isCancelError(e)) return;          // user backed out — not an error
+      // Camera plugin failed (permission/hardware/etc.) — fall back to the in-WebView
+      // file/camera picker so adding a photo still works.
+    } finally { setPhotoBusy(false); }
+    fileRef.current?.click();
   };
   const onPick = async (e) => {
     const file = e.target.files?.[0];
