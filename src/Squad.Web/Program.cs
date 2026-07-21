@@ -119,6 +119,7 @@ app.MapGet("/api/health", () => Results.Ok(new { status = "ok", app = "Domestiqu
 
 app.MapAuth();             // POST /api/auth/{register,login,google,apple}  GET /api/auth/{config,me}
 app.MapProfile();          // GET/PUT /api/profile
+app.MapProfilePage();      // GET /api/profile/page  +  POST/PUT/DELETE /api/profile/goal
 app.MapImages();           // avatars + activity photos (upload + authenticated read proxy)
 app.MapActivityIntake();   // POST /api/activities/upload  +  /api/activities/native/{source}
 app.MapActivityQuery();    // GET  /api/activities

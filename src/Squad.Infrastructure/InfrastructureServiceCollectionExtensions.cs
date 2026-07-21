@@ -66,6 +66,8 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IPlanService>(_ => new SqlPlanService(sqlConnectionString));
         services.AddScoped<IActivityPhotoService>(_ => new SqlActivityPhotoService(sqlConnectionString));
         services.AddScoped<IHealthDailyStore>(_ => new SqlHealthDailyStore(sqlConnectionString));
+        services.AddScoped<IGoalStore>(_ => new SqlGoalStore(sqlConnectionString));
+        services.AddScoped<IProfileStatsService>(_ => new SqlProfileStatsService(sqlConnectionString));
 
         // AI plan import (PDF → CoachPlan doc via Anthropic). Runs in a background worker (not an
         // HTTP request), so the AI call isn't bound by Azure's ~230s front-end cap — a long multi-week
@@ -77,6 +79,14 @@ public static class InfrastructureServiceCollectionExtensions
             sp.GetRequiredService<IHttpClientFactory>().CreateClient("anthropic"),
             aiApiKey, aiModel,
             sp.GetRequiredService<ILogger<AnthropicPlanImportService>>()));
+
+        // AI race-info lookup for the Profile goal card (event URL → name/date/location).
+        // Runs inline in the request; the "anthropic" client's generous timeout also
+        // covers fetching the event page. Same key ⇒ dark (503) when unconfigured.
+        services.AddScoped<IRaceInfoService>(sp => new AnthropicRaceInfoService(
+            sp.GetRequiredService<IHttpClientFactory>().CreateClient("anthropic"),
+            aiApiKey, aiModel,
+            sp.GetRequiredService<ILogger<AnthropicRaceInfoService>>()));
 
         // Async import: an in-memory job queue the endpoint submits to, drained by a hosted worker.
         services.AddSingleton<PlanImportQueue>(_ => new PlanImportQueue(aiConfigured));
