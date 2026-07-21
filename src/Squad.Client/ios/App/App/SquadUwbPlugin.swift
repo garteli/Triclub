@@ -137,9 +137,11 @@ final class NIDelegate: NSObject, NISessionDelegate {
                 case .insufficientVerticalSweep: reasons.append("sweep-up-down")
                 case .insufficientMovement: reasons.append("move-around")
                 case .insufficientLighting: reasons.append("more-light")
-                @unknown default: reasons.append("unknown")
+                default: reasons.append("unknown")
                 }
             }
+        case .unknown:
+            reasons.append("status-unknown")
         @unknown default:
             break
         }
