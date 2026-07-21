@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { s } from '../lib/style.js';
 import RideRecorder from '../components/RideRecorder.jsx';
 import LivePages from '../components/LivePages.jsx';
 import UwbReadout from '../components/UwbReadout.jsx';
+import CoursePicker from '../components/CoursePicker.jsx';
 import { gearComponentsFromSensors } from '../lib/liveMetrics.js';
 
 const Back = ({ onClick }) => (
@@ -19,6 +21,8 @@ const mmss = (sec) => {
 function Lobby({ vm, actions, live }) {
   const riders = live?.riders || [];
   const gear = gearComponentsFromSensors(live?.sensors);
+  const [coursesOpen, setCoursesOpen] = useState(false);
+  const course = live?.course; // selected course { id, name, ... } | null
   return (
     <div style={s('padding:6px 18px 120px')}>
       <div style={s('display:flex;align-items:center;gap:10px;margin-bottom:6px')}>
@@ -82,7 +86,23 @@ function Lobby({ vm, actions, live }) {
         <div className="ctl" onClick={() => actions.go('sensors')} style={s('margin-top:12px;text-align:center;padding:9px;border-radius:11px;font-size:12px;font-weight:700;background:var(--bg3);border:1px dashed var(--line2);color:var(--text2)')}>+ Pair a component</div>
       </div>
 
+      {/* course to follow on the live map */}
+      {live?.courses && (
+        <div className="ctl" onClick={() => setCoursesOpen(true)} style={s('display:flex;align-items:center;gap:11px;background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:13px 14px;margin-top:14px')}>
+          <div style={s('width:36px;height:36px;border-radius:11px;background:var(--accent-dim);flex:none;display:flex;align-items:center;justify-content:center;color:var(--accent)')}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 20l-5.5 2 1-5.5L15 3l4 4L9 20z" /><path d="M13.5 4.5l4 4" /></svg>
+          </div>
+          <div style={s('flex:1;min-width:0')}>
+            <div style={s('font-size:13.5px;font-weight:700')}>{course ? course.name : 'Course'}</div>
+            <div style={s('font-size:11px;color:var(--text2)')}>{course ? 'Following this route on the map — tap to change' : 'Pick a route to follow, save a ride, or import a GPX'}</div>
+          </div>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.4" strokeLinecap="round"><path d="M9 6l6 6-6 6" /></svg>
+        </div>
+      )}
+
       <div className="ctl" onClick={actions.startRide} style={s('background:var(--accent);color:var(--accent-ink);text-align:center;padding:15px;border-radius:15px;font-weight:700;font-size:15px;margin-top:16px;box-shadow:0 8px 22px -8px color-mix(in srgb,var(--accent) 60%,transparent)')}>Open ride display</div>
+
+      {coursesOpen && <CoursePicker courses={live.courses} onClose={() => setCoursesOpen(false)} />}
     </div>
   );
 }
