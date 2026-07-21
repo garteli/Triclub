@@ -29,6 +29,55 @@ const distKm = (pts) => {
   return m / 1000;
 };
 
+// Sample N points evenly ALONG the polyline (interpolating inside segments), each with its
+// cumulative distance (m) — so the elevation profile reflects the whole route, not just vertices.
+function sampleAlong(pts, N) {
+  if (pts.length < 2) return [];
+  const seg = []; let total = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const d = haversineMeters({ lat: pts[i - 1][0], lon: pts[i - 1][1] }, { lat: pts[i][0], lon: pts[i][1] });
+    seg.push({ a: pts[i - 1], b: pts[i], d, start: total }); total += d;
+  }
+  if (total === 0) return [];
+  const out = [];
+  for (let k = 0; k < N; k++) {
+    const target = (total * k) / (N - 1);
+    const sg = seg.find((x) => target <= x.start + x.d) || seg[seg.length - 1];
+    const f = sg.d ? (target - sg.start) / sg.d : 0;
+    out.push({ lat: sg.a[0] + (sg.b[0] - sg.a[0]) * f, lon: sg.a[1] + (sg.b[1] - sg.a[1]) * f, dist: target });
+  }
+  return out;
+}
+
+// Terrain elevations for a set of points (Open-Meteo elevation API — CORS-enabled, no key; same
+// provider the app already uses for weather). Returns metres[] aligned to the samples.
+async function fetchElevations(samples, signal) {
+  const lat = samples.map((s) => s.lat.toFixed(5)).join(',');
+  const lon = samples.map((s) => s.lon.toFixed(5)).join(',');
+  const res = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lat}&longitude=${lon}`, { signal });
+  if (!res.ok) throw new Error('elevation');
+  return (await res.json()).elevation || [];
+}
+
+// Compact elevation profile (elevation vs distance) for the drawn route.
+function ElevChart({ elev }) {
+  const H = 42, W = 300;
+  if (!elev || elev.profile.length < 2) return <div style={s(`height:${H}px;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--text3)`)}>—</div>;
+  const { profile, min, max } = elev;
+  const total = profile[profile.length - 1].dist || 1;
+  const span = Math.max(1, max - min);
+  const px = (d) => (d / total) * W;
+  const py = (e) => H - 2 - ((e - min) / span) * (H - 8);
+  const line = profile.map((p, i) => `${i ? 'L' : 'M'}${px(p.dist).toFixed(1)},${py(p.e).toFixed(1)}`).join(' ');
+  const area = `${line} L${W},${H} L0,${H} Z`;
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: '100%', height: H, display: 'block' }}>
+      <path d={area} fill="var(--accent)" opacity="0.14" />
+      <path d={line} fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export default function CourseDraw({ onCancel, onSave, initialCenter }) {
   const elRef = useRef(null);
   const mapRef = useRef(null);
@@ -40,8 +89,30 @@ export default function CourseDraw({ onCancel, onSave, initialCenter }) {
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [elev, setElev] = useState(null); // { profile:[{dist,e}], ascent, min, max } | null
+  const [elevLoading, setElevLoading] = useState(false);
 
   const km = distKm(pts);
+
+  // Elevation profile from the terrain — debounced so tapping fast doesn't hammer the API, and the
+  // previous request is aborted when the route changes. Cleared when there's nothing to profile.
+  useEffect(() => {
+    if (pts.length < 2) { setElev(null); setElevLoading(false); return undefined; }
+    const ctrl = new AbortController();
+    const timer = setTimeout(async () => {
+      setElevLoading(true);
+      try {
+        const samples = sampleAlong(pts, Math.min(90, Math.max(12, pts.length * 5)));
+        const els = await fetchElevations(samples, ctrl.signal);
+        if (els.length !== samples.length) throw new Error('mismatch');
+        let ascent = 0;
+        for (let i = 1; i < els.length; i++) { const d = els[i] - els[i - 1]; if (d > 0) ascent += d; }
+        setElev({ profile: samples.map((s, i) => ({ dist: s.dist, e: els[i] })), ascent: Math.round(ascent), min: Math.min(...els), max: Math.max(...els) });
+      } catch (e) { if (e.name !== 'AbortError') setElev(null); }
+      finally { setElevLoading(false); }
+    }, 700);
+    return () => { clearTimeout(timer); ctrl.abort(); };
+  }, [pts]);
 
   // Create the map ONCE and drive the drawing imperatively (no re-create on each tap).
   useEffect(() => {
@@ -128,6 +199,17 @@ export default function CourseDraw({ onCancel, onSave, initialCenter }) {
           </div>
         )}
       </div>
+
+      {/* elevation profile (distance + ascent from the terrain) */}
+      {pts.length >= 2 && !naming && (
+        <div style={s('flex:none;padding:8px 14px 2px')}>
+          <div style={s('display:flex;align-items:center;justify-content:space-between;margin-bottom:3px')}>
+            <span style={s('font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.9px;color:var(--text3)')}>Elevation · {km.toFixed(1)} km</span>
+            <span style={s('font-size:11px;font-weight:700;color:var(--text2)')}>{elevLoading ? 'reading terrain…' : elev ? `↑ ${elev.ascent} m` : ''}</span>
+          </div>
+          <ElevChart elev={elev} />
+        </div>
+      )}
 
       {/* footer controls */}
       <div style={s('flex:none;padding:12px 16px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--line2);background:var(--bg)')}>
