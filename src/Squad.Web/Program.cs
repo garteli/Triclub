@@ -12,7 +12,10 @@ var sqlConnection = builder.Configuration.GetConnectionString("Sql") ?? "";
 var storageConnection = builder.Configuration.GetConnectionString("Storage");
 // The club's default cut of each tracked ride payment, in basis points (1000 = 10%).
 var clubFeeBps = builder.Configuration.GetValue<int?>("Payments:ClubFeeBps") ?? 1000;
-builder.Services.AddSquadInfrastructure(sqlConnection, storageConnection, clubFeeBps);
+// AI plan import (PDF → training plan). No key ⇒ the import feature is dark (endpoint 503).
+var aiApiKey = builder.Configuration["Ai:Anthropic:ApiKey"];
+var aiModel = builder.Configuration["Ai:Anthropic:Model"];
+builder.Services.AddSquadInfrastructure(sqlConnection, storageConnection, clubFeeBps, aiApiKey, aiModel);
 
 // ---- realtime (feed + live ride) ----
 builder.Services.AddSignalR();

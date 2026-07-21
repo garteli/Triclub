@@ -1,6 +1,9 @@
+using System;
 using System.IO;
+using System.Net.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Squad.Core;
 
 namespace Squad.Infrastructure;
@@ -16,9 +19,12 @@ public static class InfrastructureServiceCollectionExtensions
     /// When null/empty, images fall back to the local filesystem (dev/no-storage-account).</param>
     /// <param name="paymentsClubFeeBps">The club's default cut of each tracked ride payment, in basis
     /// points (1000 = 10%). Snapshotted onto each ledger row at creation.</param>
+    /// <param name="aiApiKey">Anthropic API key for PDF plan import. Null/empty ⇒ the import feature
+    /// reports "not configured" instead of running.</param>
+    /// <param name="aiModel">Anthropic model id for plan import (default claude-sonnet-5).</param>
     public static IServiceCollection AddSquadInfrastructure(
         this IServiceCollection services, string sqlConnectionString, string? storageConnectionString = null,
-        int paymentsClubFeeBps = 1000)
+        int paymentsClubFeeBps = 1000, string? aiApiKey = null, string? aiModel = null)
     {
         // Collection-surface adapters (resolved by Source in the worker).
         services.AddSingleton<ISourceAdapter, FitUploadAdapter>();
@@ -54,6 +60,15 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IPlanService>(_ => new SqlPlanService(sqlConnectionString));
         services.AddScoped<IActivityPhotoService>(_ => new SqlActivityPhotoService(sqlConnectionString));
         services.AddScoped<IHealthDailyStore>(_ => new SqlHealthDailyStore(sqlConnectionString));
+
+        // AI plan import (PDF → CoachPlan doc via Anthropic). The named client gets a long timeout —
+        // a multi-page-PDF extraction is a slow single call. Unconfigured (no key) ⇒ the service reports
+        // Configured=false and the endpoint returns an honest "not configured", never a fake plan.
+        services.AddHttpClient("anthropic", c => c.Timeout = TimeSpan.FromSeconds(120));
+        services.AddScoped<IPlanImportService>(sp => new AnthropicPlanImportService(
+            sp.GetRequiredService<IHttpClientFactory>().CreateClient("anthropic"),
+            aiApiKey, aiModel,
+            sp.GetRequiredService<ILogger<AnthropicPlanImportService>>()));
 
         // Image blobs: Azure Blob Storage in prod (connection string set), else the
         // local filesystem fallback under {ContentRoot}/App_Data/images for dev.

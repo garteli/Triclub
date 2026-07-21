@@ -73,6 +73,8 @@ body {
    across the animation so the popup doesn't jump to a new position when it settles. */
 @keyframes floatUpCenter { from { opacity: 0; transform: translate(-50%,-50%) translateY(8px); } to { opacity: 1; transform: translate(-50%,-50%); } }
 @keyframes recFlash { 0%, 100% { opacity: 1; } 50% { opacity: .4; } }
+/* Indeterminate progress bar (PDF plan import): a short fill sweeps across the track. */
+@keyframes indet { 0% { transform: translateX(-120%); } 100% { transform: translateX(360%); } }
 
 .nav-btn { cursor: pointer; transition: color .15s; }
 /* Recording: the Live tab flashes so an active recording is visible from any screen. */

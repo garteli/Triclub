@@ -35,7 +35,55 @@ public static class PlanEndpoints
         app.MapGet("/api/plan/plans/{id:guid}", GetPlanDoc).RequireAuthorization();
         app.MapPost("/api/plan/plans", SavePlanDoc).RequireAuthorization();
         app.MapDelete("/api/plan/plans/{id:guid}", DeletePlanDoc).RequireAuthorization();
+        // Import a PDF training plan → AI parses it into a new saved plan (coach's working copy).
+        app.MapPost("/api/plan/import", ImportPlanPdf).DisableAntiforgery().RequireAuthorization();
         return app;
+    }
+
+    private const long MaxPdfBytes = 15 * 1024 * 1024; // 15 MB
+
+    /// <summary>Multipart: file=&lt;pdf&gt;, anchorType=start|target, anchorDate=yyyy-MM-dd (optional).
+    /// The AI turns the PDF into a CoachPlan doc which we save as a new plan owned by the caller.</summary>
+    private static async Task<IResult> ImportPlanPdf(
+        IFormFile? file, HttpContext http, IPlanImportService importer, IPlanService plans, CancellationToken ct)
+    {
+        if (CallerId(http) is not { } ownerId) return Results.Unauthorized();
+        if (!importer.Configured)
+            return Results.Json(new { error = "AI plan import isn't set up on this server yet." },
+                statusCode: StatusCodes.Status503ServiceUnavailable);
+
+        if (file is null || file.Length == 0) return Results.BadRequest(new { error = "Choose a PDF to import." });
+        if (file.Length > MaxPdfBytes) return Results.BadRequest(new { error = "That PDF is larger than 15 MB." });
+        var isPdf = string.Equals(file.ContentType, "application/pdf", StringComparison.OrdinalIgnoreCase)
+            || file.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase);
+        if (!isPdf) return Results.BadRequest(new { error = "Only PDF files can be imported." });
+
+        var form = http.Request.Form;
+        var anchorType = string.Equals(form["anchorType"], "target", StringComparison.OrdinalIgnoreCase) ? "target" : "start";
+        var anchorDate = form["anchorDate"].ToString();
+        if (!DateOnly.TryParse(anchorDate, System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out _))
+            anchorDate = null; // ignore anything not yyyy-MM-dd; the model just leaves it blank
+
+        byte[] bytes;
+        await using (var ms = new MemoryStream())
+        {
+            await file.CopyToAsync(ms, ct);
+            bytes = ms.ToArray();
+        }
+
+        var result = await importer.ImportAsync(bytes, file.FileName, anchorType, anchorDate, ct);
+        if (!result.Ok || result.Doc is null)
+            return Results.BadRequest(new { error = result.Error ?? "Couldn't import that plan." });
+
+        var name = (result.Name ?? "Imported plan").Trim();
+        if (name.Length == 0) name = "Imported plan";
+        if (name.Length > 120) name = name[..120];
+
+        var id = await plans.SavePlanAsync(ownerId, null, name, result.Doc, null, ct);
+        return id is null
+            ? Results.Problem("Couldn't save the imported plan.")
+            : Results.Ok(new { id, name });
     }
 
     private static Guid? CallerId(HttpContext http)
