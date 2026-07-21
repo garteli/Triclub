@@ -64,7 +64,6 @@ export default function AvatarEditor({ img, onCancel, onDone }) {
   return (
     <div
       style={s('position:fixed;inset:0;z-index:50;background:rgba(6,8,11,.82);backdrop-filter:blur(6px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;animation:floatUp .2s ease')}
-      onPointerDown={(e) => { if (e.target === e.currentTarget) onCancel(); }}
     >
       <div style={s('font-size:15px;font-weight:700;color:#eef2f6;margin-bottom:4px')}>Reposition photo</div>
       <div style={s('font-size:12px;color:#98a2ae;margin-bottom:18px')}>Drag to pan · pinch or scroll to zoom</div>

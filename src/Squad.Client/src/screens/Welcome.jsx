@@ -3,6 +3,7 @@ import { s } from '../lib/style.js';
 import { SocialButton, BiometricButton, OrDivider } from '../components/AuthButtons.jsx';
 import Logo from '../components/Logo.jsx';
 import SportIcon from '../components/SportIcon.jsx';
+import { isNativePlatform } from '../lib/platform.js';
 import {
   oauthSignIn, authConfig,
   biometricAvailable, biometricEnrolled, signInWithBiometric,
@@ -38,6 +39,8 @@ export default function Welcome({ actions }) {
   };
 
   const anySocial = providers.google || providers.apple;
+  // Registering a group is an in-app action only — the packaged native app, not the web.
+  const canRegisterGroup = isNativePlatform();
 
   return (
     <div style={s('padding:0 22px calc(20px + env(safe-area-inset-bottom, 0px));min-height:calc(100dvh - env(safe-area-inset-top, 0px) - 12px);display:flex;flex-direction:column;animation:floatUp .35s ease')}>
@@ -77,7 +80,7 @@ export default function Welcome({ actions }) {
         {error && <div style={s('color:var(--bad);font-size:12.5px;margin-bottom:12px;text-align:center')}>{error}</div>}
 
         <div className="ctl" onClick={() => actions.go('register')} style={s('background:var(--accent);color:var(--accent-ink);text-align:center;padding:15px;border-radius:14px;font-weight:700;font-size:15px')}>Create account</div>
-        <div className="ctl" onClick={() => actions.go('newgroup')} style={s('background:var(--bg2);border:1px solid var(--line);color:var(--text);text-align:center;padding:15px;border-radius:14px;font-weight:700;font-size:15px;margin-top:10px')}>Register a group</div>
+        {canRegisterGroup && <div className="ctl" onClick={() => actions.go('newgroup')} style={s('background:var(--bg2);border:1px solid var(--line);color:var(--text);text-align:center;padding:15px;border-radius:14px;font-weight:700;font-size:15px;margin-top:10px')}>Register a group</div>}
         <div style={s('text-align:center;font-size:13px;color:var(--text2);margin-top:16px')}>Already have an account? <span className="ctl" onClick={() => actions.go('login')} style={s('color:var(--accent);font-weight:700')}>Log in</span></div>
         <div style={s('text-align:center;font-size:10.5px;color:var(--text3);margin-top:14px;line-height:1.5')}>By continuing you agree to Domestique Team's Terms &amp; Privacy Policy.</div>
       </div>

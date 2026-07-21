@@ -18,6 +18,7 @@ public static class SquadEndpoints
         g.MapGet("/{id:guid}", Get);
         g.MapPost("", Create);
         g.MapPost("/{id:guid}/join", Join);
+        g.MapPost("/{id:guid}/activate", Activate);
         g.MapPost("/{id:guid}/requests/{athleteId:guid}/approve", Approve);
         g.MapPost("/{id:guid}/requests/{athleteId:guid}/decline", Decline);
         // Owner management: edit details/pricing + roster (add/remove members).
@@ -74,6 +75,14 @@ public static class SquadEndpoints
         }
 
         return Results.Ok(new { outcome = outcome.ToString().ToLowerInvariant(), squad = await squads.GetAsync(id, me, ct) });
+    }
+
+    private static async Task<IResult> Activate(Guid id, HttpContext http, ISquadService squads, CancellationToken ct)
+    {
+        if (Me(http) is not { } me) return Results.Unauthorized();
+        return await squads.SetActiveSquadAsync(id, me, ct)
+            ? Results.Ok(new { status = "active" })
+            : Results.NotFound(new { error = "You're not a member of that club." });
     }
 
     private static async Task<IResult> Requests(HttpContext http, ISquadService squads, CancellationToken ct)
