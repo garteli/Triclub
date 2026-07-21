@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { s } from '../lib/style.js';
 import { Back, Title, Sub, FieldLabel, Field, TextArea, Chips, PrimaryBtn } from './wizard.jsx';
 import AuthedImage from '../components/AuthedImage.jsx';
+import GroupTargets from '../components/GroupTargets.jsx';
 import { downscaleToJpeg } from '../lib/photos.js';
 import { dataUrlToBlob } from '../lib/avatar.js';
 import { bustAuthedImage } from '../lib/authedImage.js';
@@ -239,6 +240,9 @@ export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged
           </div>
         ))}
       </div>
+
+      {/* ---- group targets (coach sets club races from an event link) ---- */}
+      <GroupTargets squadId={g.id} getToken={getToken} mode="manage" />
     </div>
   );
 }
