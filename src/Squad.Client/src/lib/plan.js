@@ -29,9 +29,10 @@ export const getPlan = (token, id) => req(`/api/plan/plans/${id}`, { token });
 export const savePlan = (token, body) => req('/api/plan/plans', { method: 'POST', token, body });
 export const deletePlan = (token, id) => req(`/api/plan/plans/${id}`, { method: 'DELETE', token });
 
-// Import a PDF training plan: the server runs an AI pass to parse it into our plan
-// format and saves it as a new plan. `opts` = { anchorType:'start'|'target', anchorDate?:'yyyy-mm-dd' }.
-// → { id, name }. Multipart body — do NOT set Content-Type; the browser adds the boundary.
+// Import a PDF training plan (async): the server accepts the PDF, runs an AI pass in the
+// background to parse it into our plan format, and saves it as a new plan. This POST returns
+// quickly with a job id; poll getImportStatus until it's done. `opts` = { anchorType, anchorDate }.
+// → { jobId }. Multipart body — do NOT set Content-Type; the browser adds the boundary.
 export async function importPlanPdf(token, file, { anchorType = 'start', anchorDate } = {}) {
   const fd = new FormData();
   fd.append('file', file, file.name);
@@ -45,5 +46,8 @@ export async function importPlanPdf(token, file, { anchorType = 'start', anchorD
   let data = null;
   try { data = await res.json(); } catch { /* empty */ }
   if (!res.ok) throw new Error(data?.error || `Import failed (${res.status})`);
-  return data;
+  return data; // { jobId, status }
 }
+
+// Poll an import job. → { status: 'pending'|'running'|'done'|'error', planId?, name?, error? }.
+export const getImportStatus = (token, jobId) => req(`/api/plan/import/${jobId}`, { token });

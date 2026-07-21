@@ -36,19 +36,22 @@ public static class PlanEndpoints
         app.MapPost("/api/plan/plans", SavePlanDoc).RequireAuthorization();
         app.MapDelete("/api/plan/plans/{id:guid}", DeletePlanDoc).RequireAuthorization();
         // Import a PDF training plan → AI parses it into a new saved plan (coach's working copy).
-        app.MapPost("/api/plan/import", ImportPlanPdf).DisableAntiforgery().RequireAuthorization();
+        // Async: POST submits a background job (202 + jobId); the client polls GET .../import/{jobId}.
+        app.MapPost("/api/plan/import", SubmitPlanImport).DisableAntiforgery().RequireAuthorization();
+        app.MapGet("/api/plan/import/{jobId:guid}", GetPlanImport).RequireAuthorization();
         return app;
     }
 
     private const long MaxPdfBytes = 15 * 1024 * 1024; // 15 MB
 
     /// <summary>Multipart: file=&lt;pdf&gt;, anchorType=start|target, anchorDate=yyyy-MM-dd (optional).
-    /// The AI turns the PDF into a CoachPlan doc which we save as a new plan owned by the caller.</summary>
-    private static async Task<IResult> ImportPlanPdf(
-        IFormFile? file, HttpContext http, IPlanImportService importer, IPlanService plans, CancellationToken ct)
+    /// Validates + hands the PDF to the background import queue and returns 202 with the job id.
+    /// The heavy AI extraction runs off the request thread (see <see cref="IPlanImportQueue"/>).</summary>
+    private static async Task<IResult> SubmitPlanImport(
+        IFormFile? file, HttpContext http, IPlanImportQueue queue, CancellationToken ct)
     {
         if (CallerId(http) is not { } ownerId) return Results.Unauthorized();
-        if (!importer.Configured)
+        if (!queue.Configured)
             return Results.Json(new { error = "AI plan import isn't set up on this server yet." },
                 statusCode: StatusCodes.Status503ServiceUnavailable);
 
@@ -72,18 +75,23 @@ public static class PlanEndpoints
             bytes = ms.ToArray();
         }
 
-        var result = await importer.ImportAsync(bytes, file.FileName, anchorType, anchorDate, ct);
-        if (!result.Ok || result.Doc is null)
-            return Results.BadRequest(new { error = result.Error ?? "Couldn't import that plan." });
+        var job = queue.Submit(ownerId, bytes, file.FileName, anchorType, anchorDate);
+        return Results.Accepted($"/api/plan/import/{job.Id}", new { jobId = job.Id, status = "pending" });
+    }
 
-        var name = (result.Name ?? "Imported plan").Trim();
-        if (name.Length == 0) name = "Imported plan";
-        if (name.Length > 120) name = name[..120];
-
-        var id = await plans.SavePlanAsync(ownerId, null, name, result.Doc, null, ct);
-        return id is null
-            ? Results.Problem("Couldn't save the imported plan.")
-            : Results.Ok(new { id, name });
+    /// <summary>Poll an import job: { status: pending|running|done|error, planId?, name?, error? }.</summary>
+    private static IResult GetPlanImport(HttpContext http, Guid jobId, IPlanImportQueue queue)
+    {
+        if (CallerId(http) is not { } ownerId) return Results.Unauthorized();
+        var job = queue.Get(ownerId, jobId);
+        if (job is null) return Results.NotFound(new { error = "Import job not found." });
+        return Results.Ok(new
+        {
+            status = job.State.ToString().ToLowerInvariant(),
+            planId = job.PlanId,
+            name = job.Name,
+            error = job.Error,
+        });
     }
 
     private static Guid? CallerId(HttpContext http)

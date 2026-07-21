@@ -61,15 +61,21 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IActivityPhotoService>(_ => new SqlActivityPhotoService(sqlConnectionString));
         services.AddScoped<IHealthDailyStore>(_ => new SqlHealthDailyStore(sqlConnectionString));
 
-        // AI plan import (PDF → CoachPlan doc via Anthropic). The named client gets a long timeout —
-        // a multi-page-PDF extraction is a slow single call. 180s stays safely under Azure App
-        // Service's ~230s front-end request cap while giving big plans room. Unconfigured (no key)
-        // ⇒ the service reports Configured=false and the endpoint returns an honest "not configured".
-        services.AddHttpClient("anthropic", c => c.Timeout = TimeSpan.FromSeconds(180));
+        // AI plan import (PDF → CoachPlan doc via Anthropic). Runs in a background worker (not an
+        // HTTP request), so the AI call isn't bound by Azure's ~230s front-end cap — a long multi-week
+        // extraction gets a generous 300s. Unconfigured (no key) ⇒ Configured=false and the endpoint
+        // reports an honest "not set up", never a fake plan.
+        var aiConfigured = !string.IsNullOrWhiteSpace(aiApiKey);
+        services.AddHttpClient("anthropic", c => c.Timeout = TimeSpan.FromSeconds(300));
         services.AddScoped<IPlanImportService>(sp => new AnthropicPlanImportService(
             sp.GetRequiredService<IHttpClientFactory>().CreateClient("anthropic"),
             aiApiKey, aiModel,
             sp.GetRequiredService<ILogger<AnthropicPlanImportService>>()));
+
+        // Async import: an in-memory job queue the endpoint submits to, drained by a hosted worker.
+        services.AddSingleton<PlanImportQueue>(_ => new PlanImportQueue(aiConfigured));
+        services.AddSingleton<IPlanImportQueue>(sp => sp.GetRequiredService<PlanImportQueue>());
+        services.AddHostedService<PlanImportWorker>();
 
         // Image blobs: Azure Blob Storage in prod (connection string set), else the
         // local filesystem fallback under {ContentRoot}/App_Data/images for dev.

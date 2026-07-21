@@ -28,7 +28,7 @@ public sealed class AnthropicPlanImportService : IPlanImportService
 {
     private const string Endpoint = "https://api.anthropic.com/v1/messages";
     private const string ApiVersion = "2023-06-01";
-    private const int MaxTokens = 16000;
+    private const int MaxTokens = 24000; // a detailed 12-week plan can be large; avoid mid-JSON truncation
 
     private static readonly string[] Days = { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" };
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
