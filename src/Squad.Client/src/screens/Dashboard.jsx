@@ -14,17 +14,6 @@ function last7Days(activities) {
     .sort((a, b) => new Date(b.startUtc || 0) - new Date(a.startUtc || 0));
 }
 
-const BikeIcon = ({ size = 26, stroke = 'var(--bike)' }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2" strokeLinecap="round">
-    <circle cx="5.5" cy="17.5" r="3.5" /><circle cx="18.5" cy="17.5" r="3.5" />
-    <path d="M15 17.5l-3-6.5H8.5m6.5 0l-2.5 6.5M9.5 6.5h3l2 4.5" />
-  </svg>
-);
-
-const Chevron = ({ stroke = 'var(--accent)', w = 18 }) => (
-  <svg width={w} height={w} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2.4" strokeLinecap="round"><path d="M9 6l6 6-6 6" /></svg>
-);
-
 function SquadRail({ squad, rtl, onOpen }) {
   if (!squad.length) {
     return (
@@ -53,8 +42,7 @@ function SquadRail({ squad, rtl, onOpen }) {
   );
 }
 
-function DashboardEN({ vm, state, go, openAthlete, openActivity, getToken, notifUnread = 0 }) {
-  const dashB = state.dashVar === 'b';
+function DashboardEN({ vm, go, openAthlete, openActivity, getToken, notifUnread = 0 }) {
   const token = getToken?.() ?? null;
   const recent = last7Days(vm.activities);
   return (
@@ -82,41 +70,8 @@ function DashboardEN({ vm, state, go, openAthlete, openActivity, getToken, notif
         </div>
       </div>
 
-      {/* VARIANT B: squad-first hero */}
-      {dashB && (
-        <div style={s('background:linear-gradient(160deg,var(--bg3),var(--bg2));border:1px solid var(--line);border-radius:22px;padding:18px;margin-bottom:14px')}>
-          <div style={s('display:flex;gap:16px;align-items:center')}>
-            <div style={s('position:relative;width:104px;height:104px;flex:none')}>
-              <svg width="104" height="104" viewBox="0 0 104 104" style={{ transform: 'rotate(-90deg)' }}>
-                <circle cx="52" cy="52" r="44" fill="none" stroke="var(--bg4)" strokeWidth="9" />
-                <circle cx="52" cy="52" r="44" fill="none" stroke="var(--accent)" strokeWidth="9" strokeLinecap="round" strokeDasharray="205 276" />
-              </svg>
-              <div style={s('position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center')}>
-                <div className="mono" style={s('font-size:30px;font-weight:700;line-height:1')}>74<span style={s('font-size:14px')}>%</span></div>
-                <div style={s('font-size:8.5px;color:var(--text3);text-transform:uppercase;letter-spacing:1px')}>squad done</div>
-              </div>
-            </div>
-            <div style={s('flex:1')}>
-              <div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.4px;font-weight:600')}>This week · Base block</div>
-              <div style={s('font-size:19px;font-weight:700;letter-spacing:-.3px;margin-top:2px')}>Domestique Team is on pace</div>
-              <div style={s('display:flex;gap:8px;margin-top:12px')}>
-                <div style={s('flex:1;background:var(--bg);border:1px solid var(--line);border-radius:11px;padding:8px 9px')}><div className="mono" style={s('font-size:17px;font-weight:700;color:var(--good)')}>{vm.squadOnTrack}</div><div style={s('font-size:8.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px')}>On track</div></div>
-                <div style={s('flex:1;background:var(--bg);border:1px solid var(--line);border-radius:11px;padding:8px 9px')}><div className="mono" style={s('font-size:17px;font-weight:700;color:var(--behind)')}>2</div><div style={s('font-size:8.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px')}>Behind</div></div>
-                <div style={s('flex:1;background:var(--bg);border:1px solid var(--line);border-radius:11px;padding:8px 9px')}><div className="mono" style={s('font-size:17px;font-weight:700;color:var(--accent)')}>583</div><div style={s('font-size:8.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px')}>Load</div></div>
-              </div>
-            </div>
-          </div>
-          <div className="ctl" onClick={() => go('ride')} style={s('display:flex;align-items:center;gap:11px;background:var(--bg);border:1px solid color-mix(in srgb,var(--bike) 35%,transparent);border-radius:14px;padding:11px 13px;margin-top:14px')}>
-            <div style={s('width:38px;height:38px;border-radius:11px;background:color-mix(in srgb,var(--bike) 18%,transparent);flex:none;display:flex;align-items:center;justify-content:center')}><BikeIcon size={22} /></div>
-            <div style={s('flex:1')}><div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:600')}>Today · Tue</div><div style={s('font-size:14.5px;font-weight:700')}>Bike · Threshold 3×12′</div></div>
-            <div className="mono" style={s('font-size:12px;color:var(--text2)')}>1:15</div>
-            <Chevron />
-          </div>
-        </div>
-      )}
-
-      {/* VARIANT A: today hero — driven by the real plan (empty state when none) */}
-      {!dashB && (() => {
+      {/* today hero — driven by the real plan (empty state when none) */}
+      {(() => {
         const todayWk = vm.plan.find((p) => p.status === 'today');
         return (
           <>
@@ -271,5 +226,5 @@ export default function Dashboard({ vm, state, actions, getToken }) {
   const notifUnread = notifItems.filter((n) => n.unread).length;
   return state.lang === 'he'
     ? <DashboardHE vm={vm} go={actions.go} openAthlete={actions.openAthlete} openActivity={actions.openActivity} getToken={getToken} notifUnread={notifUnread} />
-    : <DashboardEN vm={vm} state={state} go={actions.go} openAthlete={actions.openAthlete} openActivity={actions.openActivity} getToken={getToken} notifUnread={notifUnread} />;
+    : <DashboardEN vm={vm} go={actions.go} openAthlete={actions.openAthlete} openActivity={actions.openActivity} getToken={getToken} notifUnread={notifUnread} />;
 }
