@@ -286,15 +286,15 @@ export default function PlanEditor({ vm, actions, plan, plans, onPublishPlan }) 
             ))}
           </div>
           <div style={s('display:flex;gap:10px;margin-top:10px')}>
-            <div style={s('flex:1.4')}>
+            <div style={s('flex:1.4;min-width:0')}>
               <div style={s('font-size:9.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;font-weight:600;margin-bottom:5px')}>{anchorType === 'target' ? 'Race / target day' : 'Start date'}</div>
               <input value={anchorDate} onChange={(e) => setAnchorDate(e.target.value)} type="date"
-                style={s('width:100%;background:var(--bg3);border:1px solid var(--line);border-radius:11px;padding:10px 12px;font-size:14px;color:var(--text);outline:none;font-family:inherit')} />
+                style={s('width:100%;box-sizing:border-box;min-width:0;-webkit-appearance:none;appearance:none;background:var(--bg3);border:1px solid var(--line);border-radius:11px;padding:10px 12px;font-size:14px;color:var(--text);outline:none;font-family:inherit')} />
             </div>
-            <div style={s('flex:1')}>
+            <div style={s('flex:1;min-width:0')}>
               <div style={s('font-size:9.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;font-weight:600;margin-bottom:5px')}>Total weeks</div>
               <input value={totalWeeks} onChange={(e) => { setTotalWeeks(e.target.value); setWeek((w) => { const n = (+e.target.value > 0) ? Math.floor(+e.target.value) : null; return Math.max(1, n ? Math.min(n, w) : w); }); }} type="number" min="1" placeholder="—"
-                style={s('width:100%;background:var(--bg3);border:1px solid var(--line);border-radius:11px;padding:10px 12px;font-size:14px;color:var(--text);outline:none;font-family:inherit')} />
+                style={s('width:100%;box-sizing:border-box;min-width:0;-webkit-appearance:none;appearance:none;background:var(--bg3);border:1px solid var(--line);border-radius:11px;padding:10px 12px;font-size:14px;color:var(--text);outline:none;font-family:inherit')} />
             </div>
           </div>
           {startMonday && (
