@@ -1,5 +1,32 @@
 import { useEffect, useState } from 'react';
 
+// Session cache of fetched detail, keyed by activityId, so a card re-mounting (scroll /
+// tab switch) or several views of the same activity don't refetch the heavy /track blob
+// (which also runs the matched-rides query server-side). A failed fetch is evicted so a
+// later view can retry.
+const trackCache = new Map(); // activityId -> Promise<{ track, laps, matched }>
+
+function loadTrack(activityId, token) {
+  const cached = trackCache.get(activityId);
+  if (cached) return cached;
+  const p = (async () => {
+    const res = await fetch(`/api/activities/${activityId}/track`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
+    if (!res.ok) throw new Error(String(res.status));
+    const data = await res.json();
+    // { track, laps, matched } is the current shape; tolerate a bare array from older servers.
+    return {
+      track: Array.isArray(data?.track) ? data.track : (Array.isArray(data) ? data : []),
+      laps: Array.isArray(data?.laps) ? data.laps : [],
+      matched: Array.isArray(data?.matched) ? data.matched : [],
+    };
+  })();
+  trackCache.set(activityId, p);
+  p.catch(() => trackCache.delete(activityId));
+  return p;
+}
+
 // Fetches one activity's recorded detail from GET /api/activities/{id}/track — the route +
 // per-point heart-rate/power/elevation/speed track, device laps (the heavy blob the list
 // omits), and the squad-mates who rode the same place + time. Returns { track, laps, matched, status }:
@@ -23,15 +50,7 @@ export function useActivityTrack(activityId, { getToken, enabled = true } = {}) 
     (async () => {
       try {
         const token = getToken ? await getToken() : null;
-        const res = await fetch(`/api/activities/${activityId}/track`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        });
-        if (!res.ok) throw new Error(String(res.status));
-        const data = await res.json();
-        // { track, laps, matched } is the current shape; tolerate a bare array from older servers.
-        const t = Array.isArray(data?.track) ? data.track : (Array.isArray(data) ? data : []);
-        const l = Array.isArray(data?.laps) ? data.laps : [];
-        const m = Array.isArray(data?.matched) ? data.matched : [];
+        const { track: t, laps: l, matched: m } = await loadTrack(activityId, token);
         if (!cancelled) { setTrack(t); setLaps(l); setMatched(m); setStatus('ready'); }
       } catch {
         if (!cancelled) { setTrack([]); setLaps([]); setMatched([]); setStatus('error'); }

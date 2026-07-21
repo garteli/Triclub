@@ -5,6 +5,7 @@ import AuthedImage from './AuthedImage.jsx';
 import TileMap from './TileMap.jsx';
 import { toPathD } from '../lib/tiles.js';
 import { useActivityTrack } from '../hooks/useActivityTrack.js';
+import { useInView } from '../hooks/useInView.js';
 import { useActivityPhotos } from '../hooks/useActivityPhotos.js';
 import { setKudos } from '../lib/interactions.js';
 
@@ -48,11 +49,19 @@ function routeLatLon(track, max = 300) {
 // data the detail screen maps. Renders nothing when the activity has no GPS (indoor /
 // summary-only import) rather than faking a route.
 function FeedRouteMap({ activityId, getToken }) {
-  const { track, status } = useActivityTrack(activityId, { getToken });
+  // Only fetch the (heavy) track + render tiles once the card scrolls near the viewport,
+  // so an off-screen feed card costs nothing. rootMargin prefetches just before it shows.
+  const [boxRef, inView] = useInView({ rootMargin: '400px 0px' });
+  const { track, status } = useActivityTrack(activityId, { getToken, enabled: inView });
   const pts = useMemo(() => routeLatLon(track), [track]);
-  if (status === 'loading') return <div style={s('margin-top:14px;aspect-ratio:356/150;border-radius:14px;background:var(--bg3);border:1px solid var(--line)')} />;
-  if (pts.length < 2) return null;
+  const waiting = !inView || status === 'loading';
   return (
+    <div ref={boxRef}>
+      {waiting
+        ? <div style={s('margin-top:14px;aspect-ratio:356/150;border-radius:14px;background:var(--bg3);border:1px solid var(--line)')} />
+        : pts.length < 2
+          ? null
+          : (
     <div style={s('margin-top:14px')}>
       <TileMap points={pts} radius={14} pad={22} H={150}>
         {(project) => {
@@ -69,6 +78,8 @@ function FeedRouteMap({ activityId, getToken }) {
           );
         }}
       </TileMap>
+    </div>
+          )}
     </div>
   );
 }
