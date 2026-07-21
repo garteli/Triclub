@@ -259,6 +259,21 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, ena
     }
   }, [pending, getToken, onSaved, photos]);
 
+  // The recorded track so far as a decimated [lat, lon] array (capped for the live map). Read on
+  // the tick by useRideTelemetry, so the breadcrumb grows as you ride. Empty until the first fix.
+  const getPath = useCallback((max = 400) => {
+    const s = samples.current;
+    if (!s.length) return [];
+    const step = Math.max(1, Math.ceil(s.length / max));
+    const out = [];
+    for (let i = 0; i < s.length; i += step) out.push([s[i].lat, s[i].lon]);
+    const last = s[s.length - 1];
+    if (out.length === 0 || out[out.length - 1][0] !== last.lat || out[out.length - 1][1] !== last.lon) {
+      out.push([last.lat, last.lon]);
+    }
+    return out;
+  }, []);
+
   const discardRide = useCallback(() => {
     samples.current = []; agg.current = null; startedAtRef.current = null;
     clearDraft();
@@ -373,5 +388,6 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, ena
     recording, paused, distanceKm, elapsedSec, lastFix, error, mode, start, stop,
     pending, saveState, saveError, saveRide, discardRide,
     photos, addPhoto, removePhoto,
+    getPath,
   };
 }

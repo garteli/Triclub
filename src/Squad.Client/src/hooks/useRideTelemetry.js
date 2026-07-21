@@ -30,7 +30,7 @@ function power3s(arr) {
   return p.length ? Math.round(p.reduce((a, b) => a + b, 0) / p.length) : null;
 }
 
-export function useRideTelemetry({ t, active, riders = [], recorder, sensors, me } = {}) {
+export function useRideTelemetry({ t, active, riders = [], recorder, sensors, me, course } = {}) {
   const startRef = useRef(null);
   const hist = useRef({ spd: [], hr: [], pwr: [], cad: [], elev: [], dist: [] });
   const gain = useRef(0);
@@ -177,6 +177,9 @@ export function useRideTelemetry({ t, active, riders = [], recorder, sensors, me
       radar: groupRadar(allRiders),
       peloton,
       you: localYou ?? hubYou,
+      // Your recorded breadcrumb so far, and the selected course route (each a [lat,lon] array).
+      path: recorder?.getPath?.() ?? [],
+      course: Array.isArray(course) ? course : (course?.points || null),
       // Pack-fusion spacing (from phone-to-phone BLE ranging, when active): your fused gap to
       // the nearest teammate, and whether any rider's position is BLE-refined this tick.
       gap: (localYou ?? hubYou)?.gapM ?? null,
