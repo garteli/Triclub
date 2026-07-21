@@ -19,8 +19,6 @@ export function useUwbRanging({ athleteId, active, riders = [], pushUwbToken, on
   ridersRef.current = riders;
 
   useEffect(() => {
-    console.log('[UWBDIAG] effect: active=', active, 'athleteId=', !!athleteId,
-      'pushTok=', typeof pushUwbToken, 'onTok=', typeof onUwbToken);
     if (!active || !athleteId || typeof pushUwbToken !== 'function' || typeof onUwbToken !== 'function') return undefined;
 
     let cancelled = false;
@@ -40,7 +38,6 @@ export function useUwbRanging({ athleteId, active, riders = [], pushUwbToken, on
 
     (async () => {
       const ok = await src.isSupported();
-      console.log('[UWBDIAG] isSupported =', ok);
       if (cancelled) { src.stop(); return; }
       setSupported(ok);
       if (!ok) return;

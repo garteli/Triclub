@@ -34,16 +34,23 @@ public class SquadUwbPlugin: CAPPlugin, CAPBridgedPlugin {
     private var sessions: [String: NISession] = [:]
     private var delegates: [String: NIDelegate] = [:]
 
-    @objc func isSupported(_ call: CAPPluginCall) {
-        if #available(iOS 14.0, *) {
-            call.resolve(["supported": NISession.isSupported])
-        } else {
-            call.resolve(["supported": false])
+    // NISession.isSupported was deprecated in iOS 16 and can report false on newer OS even on
+    // UWB-capable hardware — iOS 16+ must use deviceCapabilities.supportsPreciseDistanceMeasurement.
+    private static var uwbSupported: Bool {
+        if #available(iOS 16.0, *) {
+            return NISession.deviceCapabilities.supportsPreciseDistanceMeasurement
+        } else if #available(iOS 14.0, *) {
+            return NISession.isSupported
         }
+        return false
+    }
+
+    @objc func isSupported(_ call: CAPPluginCall) {
+        call.resolve(["supported": SquadUwbPlugin.uwbSupported])
     }
 
     @objc func startPeer(_ call: CAPPluginCall) {
-        guard #available(iOS 14.0, *), NISession.isSupported else { call.reject("UWB not supported on this device"); return }
+        guard #available(iOS 14.0, *), SquadUwbPlugin.uwbSupported else { call.reject("UWB not supported on this device"); return }
         guard let athleteId = call.getString("athleteId"), !athleteId.isEmpty else { call.reject("athleteId is required"); return }
         DispatchQueue.main.async {
             self.sessions[athleteId]?.invalidate() // re-create if one already exists for this peer
