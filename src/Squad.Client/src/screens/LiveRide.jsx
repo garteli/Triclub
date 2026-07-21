@@ -52,6 +52,24 @@ function Lobby({ vm, actions, live }) {
         )}
       </div>
 
+      {/* activity type — bike / run outdoors (GPS), trainer / treadmill indoors (sensor speed) */}
+      {live?.rideType && (
+        <div style={s('margin-top:18px')}>
+          <div style={s('font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:1.4px;font-weight:600;margin-bottom:9px')}>Activity type</div>
+          <div style={s('display:flex;gap:6px;background:var(--bg2);border:1px solid var(--line);border-radius:13px;padding:5px')}>
+            {[['bike', 'Bike'], ['run', 'Run'], ['trainer', 'Trainer'], ['treadmill', 'Treadmill']].map(([id, label]) => {
+              const on = live.rideType.value === id;
+              const locked = !!live?.recorder?.recording;
+              return (
+                <div key={id} className={locked ? undefined : 'ctl'} onClick={locked ? undefined : () => live.rideType.set(id)}
+                  style={s('flex:1;text-align:center;padding:9px 4px;border-radius:9px;font-size:11.5px;font-weight:700;' + (on ? 'background:var(--accent);color:var(--accent-ink)' : 'color:var(--text2)') + (locked ? ';opacity:.55' : ''))}>{label}</div>
+              );
+            })}
+          </div>
+          {live.rideType.indoor && <div style={s('font-size:11px;color:var(--text3);margin-top:7px;line-height:1.4')}>Indoor — no GPS. Distance comes from your trainer / footpod speed sensor.</div>}
+        </div>
+      )}
+
       {/* shared recorder — GPS + BLE sensors, streams to the ride hub while active */}
       <RideRecorder recorder={live?.recorder} sensors={live?.sensors} streaming={!!live?.pushTelemetry} />
 
@@ -134,7 +152,7 @@ function Active({ actions, live }) {
       {/* precise UWB distance/direction to teammates (native + U1 devices; hidden otherwise) */}
       <UwbReadout uwb={live?.uwb} riders={live?.riders} />
 
-      <LivePages tel={tel} lp={live?.livePages} uwb={live?.uwb} />
+      <LivePages tel={tel} lp={live?.livePages} uwb={live?.uwb} indoor={!!live?.rideType?.indoor} />
     </div>
   );
 }

@@ -39,7 +39,7 @@ async function uploadFit(bytes, token) {
 // streams through pushTelemetry (live hub) AND is accumulated at full resolution so the
 // finished ride can be encoded as a real Garmin .fit and uploaded through the same
 // ingest path as a Garmin file (see lib/fitEncoder.js).
-export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, enabled = true, sport = FitSport.cycling, throttleMs = 1000 } = {}) {
+export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, enabled = true, sport = FitSport.cycling, indoor = false, throttleMs = 1000 } = {}) {
   const [recording, setRecording] = useState(false);
   const [paused, setPaused] = useState(false);       // web: backgrounded / screen locked
   const [distanceKm, setDistanceKm] = useState(0);
@@ -68,6 +68,7 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, ena
   const startedAtRef = useRef(null); // fallback ride start before the first GPS fix lands
   const wakeLock = useRef(null);
   const prevCoord = useRef(null);
+  const lastSampleTs = useRef(null); // for integrating indoor distance from sensor speed (no GPS)
   const distMeters = useRef(0);
   const lastPush = useRef(0);
 
@@ -76,7 +77,7 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, ena
   const agg = useRef(null);
 
   const resetCapture = () => {
-    distMeters.current = 0; prevCoord.current = null; lastPush.current = 0;
+    distMeters.current = 0; prevCoord.current = null; lastSampleTs.current = null; lastPush.current = 0;
     samples.current = [];
     agg.current = {
       startMs: null, lastTs: null, movingMs: 0,
@@ -101,8 +102,16 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, ena
   }, []);
 
   const onSample = useCallback((s) => {
-    if (prevCoord.current) distMeters.current += haversineMeters(prevCoord.current, s);
-    prevCoord.current = { lat: s.lat, lon: s.lon };
+    // Distance from GPS when we have a fix (haversine between consecutive points); indoors there's
+    // no position, so integrate it from the sensor's instantaneous speed instead (speed × Δt).
+    if (s.lat != null && s.lon != null) {
+      if (prevCoord.current) distMeters.current += haversineMeters(prevCoord.current, s);
+      prevCoord.current = { lat: s.lat, lon: s.lon };
+    } else if (s.speedMps != null && s.speedMps > 0) {
+      const prevTs = lastSampleTs.current;
+      if (prevTs != null) { const dt = ((s.ts ?? Date.now()) - prevTs) / 1000; if (dt > 0 && dt < 10) distMeters.current += s.speedMps * dt; }
+    }
+    lastSampleTs.current = s.ts ?? Date.now();
     const km = distMeters.current / 1000;
     setDistanceKm(km);
 
@@ -159,7 +168,13 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, ena
   // Open the location source (native background source or web watch + Wake Lock) and begin
   // feeding onSample. Shared by a fresh start() and by resuming a recording after a reload.
   const openSource = useCallback(async () => {
-    if (isNativePlatform()) {
+    if (indoor) {
+      // Indoor (trainer / treadmill): no GPS — drive distance from the paired sensors' speed.
+      const { createSensorLocationSource } = await import('../lib/locationSource.sensor.js');
+      source.current = createSensorLocationSource(sensors);
+      setMode('indoor');
+      await acquireWakeLock();
+    } else if (isNativePlatform()) {
       const { createNativeLocationSource } = await import('../lib/locationSource.native.js');
       source.current = await createNativeLocationSource();
       setMode('native');
@@ -169,7 +184,7 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, ena
       await acquireWakeLock(); // keep the screen alive so the foreground watch survives
     }
     source.current.start(onSample, (err) => setError(err?.message || 'Location error'));
-  }, [onSample, acquireWakeLock]);
+  }, [onSample, acquireWakeLock, indoor, sensors]);
 
   const start = useCallback(async () => {
     setError(null);
