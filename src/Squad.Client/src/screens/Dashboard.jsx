@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { s, html } from '../lib/style.js';
 import Avatar from '../components/Avatar.jsx';
 import AuthedImage from '../components/AuthedImage.jsx';
@@ -24,6 +25,49 @@ const BikeIcon = ({ size = 26, stroke = 'var(--bike)' }) => (
 const Chevron = ({ stroke = 'var(--accent)', w = 18 }) => (
   <svg width={w} height={w} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2.4" strokeLinecap="round"><path d="M9 6l6 6-6 6" /></svg>
 );
+
+// The club name/eyebrow in the header, upgraded to an active-club switcher when the
+// athlete belongs to more than one club. Tapping opens a dropdown of their clubs; the
+// active one is marked, and choosing another calls onSwitch (App persists + refreshes).
+function ClubSwitcher({ vm, token, rtl, onSwitch, children }) {
+  const [open, setOpen] = useState(false);
+  const clubs = vm.myClubs || [];
+  const canSwitch = clubs.length > 1 && !!onSwitch;
+  return (
+    <div style={s('position:relative;min-width:0')}>
+      <div
+        className={canSwitch ? 'ctl' : undefined}
+        onClick={canSwitch ? () => setOpen((o) => !o) : undefined}
+        style={s(`display:flex;align-items:center;gap:6px;min-width:0;${rtl ? 'flex-direction:row-reverse' : ''}`)}
+      >
+        {children}
+        {canSwitch && <div style={s(`transition:transform .15s;${open ? 'transform:rotate(90deg)' : ''};display:flex`)}><Chevron stroke="var(--text3)" w={16} /></div>}
+      </div>
+      {open && canSwitch && (
+        <>
+          {/* click-away backdrop */}
+          <div onClick={() => setOpen(false)} style={s('position:fixed;inset:0;z-index:30')} />
+          <div style={s(`position:absolute;top:calc(100% + 8px);${rtl ? 'right:0' : 'left:0'};z-index:31;background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:6px;min-width:210px;max-width:280px;box-shadow:0 14px 34px rgba(0,0,0,.42)`)}>
+            {clubs.map((c) => (
+              <div
+                key={c.id}
+                className="ctl"
+                onClick={() => { setOpen(false); if (!c.active) onSwitch(c.id); }}
+                style={s(`display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;${c.active ? 'background:var(--accent-dim)' : ''};${rtl ? 'flex-direction:row-reverse;text-align:right' : ''}`)}
+              >
+                {c.logoUrl
+                  ? <AuthedImage url={c.logoUrl} token={token} style="width:26px;height:26px;border-radius:8px;flex:none" />
+                  : <div style={s(`width:26px;height:26px;border-radius:8px;flex:none;background:${c.color || 'var(--bg4)'}`)} />}
+                <div style={s('flex:1;min-width:0;font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>{c.name}</div>
+                {c.active && <span style={s('font-size:10px;color:var(--accent);font-weight:700;flex:none')}>{rtl ? 'פעיל' : 'Active'}</span>}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 function SquadRail({ squad, rtl, onOpen }) {
   if (!squad.length) {
@@ -53,7 +97,7 @@ function SquadRail({ squad, rtl, onOpen }) {
   );
 }
 
-function DashboardEN({ vm, state, go, openAthlete, openActivity, getToken, notifUnread = 0 }) {
+function DashboardEN({ vm, state, go, openAthlete, openActivity, getToken, onSwitchSquad, notifUnread = 0 }) {
   const dashB = state.dashVar === 'b';
   const token = getToken?.() ?? null;
   const recent = last7Days(vm.activities);
@@ -65,10 +109,12 @@ function DashboardEN({ vm, state, go, openAthlete, openActivity, getToken, notif
       <div style={s('display:flex;align-items:center;justify-content:space-between;margin-bottom:18px')}>
         <div style={s('display:flex;align-items:center;gap:11px;min-width:0')}>
           {vm.squadLogo && <AuthedImage url={vm.squadLogo} token={token} style="width:40px;height:40px;border-radius:12px;flex:none" />}
-          <div style={s('min-width:0')}>
-            <div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.6px;font-weight:600')}>Domestique Team</div>
-            <div style={s('font-size:23px;font-weight:700;letter-spacing:-.6px;line-height:1.05;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>{vm.squadName || 'Your squad'}</div>
-          </div>
+          <ClubSwitcher vm={vm} token={token} onSwitch={onSwitchSquad}>
+            <div style={s('min-width:0')}>
+              <div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.6px;font-weight:600')}>Domestique Team</div>
+              <div style={s('font-size:23px;font-weight:700;letter-spacing:-.6px;line-height:1.05;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>{vm.squadName || 'Your squad'}</div>
+            </div>
+          </ClubSwitcher>
         </div>
         <div style={s('display:flex;align-items:center;gap:10px')}>
           <div className="ctl" onClick={() => go('discover')} style={s('width:38px;height:38px;border-radius:12px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center')}>
@@ -182,7 +228,7 @@ function DashboardEN({ vm, state, go, openAthlete, openActivity, getToken, notif
   );
 }
 
-function DashboardHE({ vm, go, openAthlete, openActivity, getToken, notifUnread = 0 }) {
+function DashboardHE({ vm, go, openAthlete, openActivity, getToken, onSwitchSquad, notifUnread = 0 }) {
   const token = getToken?.() ?? null;
   const recent = last7Days(vm.activities);
   return (
@@ -191,10 +237,12 @@ function DashboardHE({ vm, go, openAthlete, openActivity, getToken, notifUnread 
       <div style={s('display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-direction:row-reverse')}>
         <div style={s('display:flex;align-items:center;gap:11px;flex-direction:row-reverse;min-width:0')}>
           {vm.squadLogo && <AuthedImage url={vm.squadLogo} token={token} style="width:40px;height:40px;border-radius:12px;flex:none" />}
-          <div style={s('min-width:0')}>
-            <div style={s('font-size:11px;color:var(--text3);letter-spacing:.5px;font-weight:600')}>המועדון</div>
-            <div style={s('font-size:23px;font-weight:700;letter-spacing:-.3px;line-height:1.05;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>{vm.squadName || 'המועדון שלך'}</div>
-          </div>
+          <ClubSwitcher vm={vm} token={token} rtl onSwitch={onSwitchSquad}>
+            <div style={s('min-width:0;text-align:right')}>
+              <div style={s('font-size:11px;color:var(--text3);letter-spacing:.5px;font-weight:600')}>המועדון</div>
+              <div style={s('font-size:23px;font-weight:700;letter-spacing:-.3px;line-height:1.05;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>{vm.squadName || 'המועדון שלך'}</div>
+            </div>
+          </ClubSwitcher>
         </div>
         <div style={s('display:flex;align-items:center;gap:10px;flex-direction:row-reverse')}>
           <div className="ctl" onClick={() => go('notifs')} style={s('width:38px;height:38px;border-radius:12px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;position:relative')}>
@@ -264,12 +312,12 @@ function DashboardHE({ vm, go, openAthlete, openActivity, getToken, notifUnread 
   );
 }
 
-export default function Dashboard({ vm, state, actions, getToken }) {
+export default function Dashboard({ vm, state, actions, getToken, onSwitchSquad }) {
   // Real unread count so the bell badge only shows when there's actually something to
   // read — previously the dot was hard-coded on, hence "badge but no notifications".
   const { items: notifItems } = useNotifications({ getToken, enabled: !!getToken });
   const notifUnread = notifItems.filter((n) => n.unread).length;
   return state.lang === 'he'
-    ? <DashboardHE vm={vm} go={actions.go} openAthlete={actions.openAthlete} openActivity={actions.openActivity} getToken={getToken} notifUnread={notifUnread} />
-    : <DashboardEN vm={vm} state={state} go={actions.go} openAthlete={actions.openAthlete} openActivity={actions.openActivity} getToken={getToken} notifUnread={notifUnread} />;
+    ? <DashboardHE vm={vm} go={actions.go} openAthlete={actions.openAthlete} openActivity={actions.openActivity} getToken={getToken} onSwitchSquad={onSwitchSquad} notifUnread={notifUnread} />
+    : <DashboardEN vm={vm} state={state} go={actions.go} openAthlete={actions.openAthlete} openActivity={actions.openActivity} getToken={getToken} onSwitchSquad={onSwitchSquad} notifUnread={notifUnread} />;
 }

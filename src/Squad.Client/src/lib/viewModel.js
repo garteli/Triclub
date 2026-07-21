@@ -202,6 +202,13 @@ export function buildViewModel(state, t, opts = {}) {
   }));
   const selGroupData = nearbyGroups.find((x) => x.id === selGroup) || nearbyGroups[0];
 
+  // The clubs this athlete belongs to, for the dashboard active-club switcher. Only
+  // meaningful with live squads (each carries a `member` flag); `active` marks the one
+  // currently driving the feed/leaderboard (Athlete.SquadId, passed as activeClubId).
+  const myClubs = (opts.squads || [])
+    .filter((c) => c.member)
+    .map((c) => ({ id: c.id, name: c.name, color: c.color, logoUrl: c.logoUrl || null, active: c.id === opts.activeClubId }));
+
   const joinBtnLock = 'margin-top:5px;background:var(--bg4);color:var(--text3);font-size:11px;font-weight:700;padding:5px 12px;border-radius:8px;opacity:.7';
   const g2 = selGroupData || {};
   const jState = joinState[selGroup];
@@ -301,11 +308,15 @@ export function buildViewModel(state, t, opts = {}) {
     ftp: me.ftp ?? p.ftp ?? '',
     weekly: me.weekly ?? p.weeklyHours ?? '',
     bio: me.bio ?? p.bio ?? '',
+    birthDate: me.birthDate ?? p.birthDate ?? '',
+    gender: me.gender ?? p.gender ?? '',
+    weight: me.weight ?? p.weightKg ?? '',
     initials: p.initials || '', color: p.avatarColor, photo: opts.avatar || null,
   } : {
     name: me.name || '', club: me.club || danaExtra.club || '', ageGroup: me.ageGroup || danaExtra.ageGroup || '',
     sport: me.sport || danaExtra.sport || 'Triathlon', level: me.level || danaExtra.level || '',
     ftp: me.ftp ?? danaExtra.ftp ?? '', weekly: me.weekly || danaExtra.weekly || '', bio: me.bio || danaExtra.bio || '', initials: me.initials || '',
+    birthDate: me.birthDate || '', gender: me.gender || '', weight: me.weight ?? '',
     photo: opts.avatar || null,
   };
   const athlete = (() => {
@@ -385,6 +396,7 @@ export function buildViewModel(state, t, opts = {}) {
     // on the dashboard header so the club's identity carries across the app.
     squadLogo: opts.activeSquad?.logoUrl || null,
     squadBanner: opts.activeSquad?.bannerUrl || null,
+    myClubs, activeClubId: opts.activeClubId ?? null,
     feed: liveFeedRows ?? feedRows,
     activities, myActivities, activityDetail,
     athlete, me: meFull,

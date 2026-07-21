@@ -19,6 +19,8 @@ export const listSquads = (token) => req('/api/squads', { token });
 export const getSquad = (token, id) => req(`/api/squads/${id}`, { token });
 export const createSquad = (token, body) => req('/api/squads', { method: 'POST', token, body });
 export const joinSquad = (token, id) => req(`/api/squads/${id}/join`, { method: 'POST', token });
+// Switch the athlete's active squad to one they already belong to (feed/leaderboard follow).
+export const activateSquad = (token, id) => req(`/api/squads/${id}/activate`, { method: 'POST', token });
 
 // Owner-side join-request management.
 export const listRequests = (token) => req('/api/requests', { token });

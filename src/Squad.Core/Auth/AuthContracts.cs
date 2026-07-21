@@ -51,12 +51,15 @@ public enum ExternalProvider { Google, Apple }
 public sealed record ProfileDetail(
     Guid Id, string Name, string Initials, string AvatarColor, string? Email, Guid SquadId,
     string? Club, string? AgeGroup, string? PrimarySport, string? Level, int? Ftp, string? WeeklyHours, string? Bio,
+    // BirthDate is an ISO 'yyyy-MM-dd' string; AgeGroup is derived from it on the client.
+    string? BirthDate = null, string? Gender = null, decimal? WeightKg = null,
     // Proxy path to the athlete's avatar photo (null when they have none → initials).
     string? AvatarUrl = null);
 
 /// <summary>A profile edit. Null fields are left unchanged; the host recomputes Initials if Name changes.</summary>
 public sealed record ProfileUpdate(
-    string? Name, string? Club, string? AgeGroup, string? PrimarySport, string? Level, int? Ftp, string? WeeklyHours, string? Bio);
+    string? Name, string? Club, string? AgeGroup, string? PrimarySport, string? Level, int? Ftp, string? WeeklyHours, string? Bio,
+    string? BirthDate = null, string? Gender = null, decimal? WeightKg = null);
 
 /// <summary>Read/update the athlete's own profile.</summary>
 public interface IProfileService
@@ -111,6 +114,10 @@ public interface ISquadService
     Task<Guid> CreateAsync(SquadCreate squad, Guid ownerId, CancellationToken ct);
     /// <summary>Join a squad (idempotent) and make it the athlete's active squad.</summary>
     Task JoinAsync(Guid squadId, Guid athleteId, CancellationToken ct);
+
+    /// <summary>Switch the athlete's active squad to one they already belong to (the feed /
+    /// leaderboard / activities follow). Returns false if they're not a member of it.</summary>
+    Task<bool> SetActiveSquadAsync(Guid squadId, Guid athleteId, CancellationToken ct);
 
     /// <summary>Free squad → join immediately; gated squad → create a pending request (idempotent).</summary>
     Task<JoinOutcome> JoinOrRequestAsync(Guid squadId, string kind, Guid athleteId, CancellationToken ct);

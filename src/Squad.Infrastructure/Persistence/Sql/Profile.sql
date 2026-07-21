@@ -13,3 +13,8 @@ IF COL_LENGTH('dbo.Athlete', 'Level')       IS NULL ALTER TABLE dbo.Athlete ADD 
 IF COL_LENGTH('dbo.Athlete', 'Ftp')         IS NULL ALTER TABLE dbo.Athlete ADD Ftp         INT           NULL;
 IF COL_LENGTH('dbo.Athlete', 'WeeklyHours') IS NULL ALTER TABLE dbo.Athlete ADD WeeklyHours NVARCHAR(20)  NULL;
 IF COL_LENGTH('dbo.Athlete', 'Bio')         IS NULL ALTER TABLE dbo.Athlete ADD Bio         NVARCHAR(600) NULL;
+-- BirthDate is stored as an ISO 'yyyy-MM-dd' string (the client owns the date; AgeGroup
+-- above is derived from it client-side). WeightKg allows a half-kg (DECIMAL(5,1)).
+IF COL_LENGTH('dbo.Athlete', 'BirthDate')   IS NULL ALTER TABLE dbo.Athlete ADD BirthDate   NVARCHAR(10)  NULL;
+IF COL_LENGTH('dbo.Athlete', 'Gender')      IS NULL ALTER TABLE dbo.Athlete ADD Gender      NVARCHAR(20)  NULL;
+IF COL_LENGTH('dbo.Athlete', 'WeightKg')    IS NULL ALTER TABLE dbo.Athlete ADD WeightKg    DECIMAL(5,1)  NULL;

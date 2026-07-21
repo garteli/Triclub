@@ -83,6 +83,19 @@ public sealed class SqlSquadService(string connectionString) : ISquadService
         await tx.CommitAsync(ct);
     }
 
+    public async Task<bool> SetActiveSquadAsync(Guid squadId, Guid athleteId, CancellationToken ct)
+    {
+        // Only switch to a squad the athlete is actually a member of — guards against
+        // activating a club you never joined.
+        await using var conn = new SqlConnection(connectionString);
+        var rows = await conn.ExecuteAsync(new CommandDefinition("""
+            UPDATE dbo.Athlete SET SquadId = @squadId
+            WHERE Id = @athleteId
+              AND EXISTS (SELECT 1 FROM dbo.Membership WHERE SquadId = @squadId AND AthleteId = @athleteId);
+            """, new { squadId, athleteId }, cancellationToken: ct));
+        return rows > 0;
+    }
+
     public async Task<JoinOutcome> JoinOrRequestAsync(Guid squadId, string kind, Guid athleteId, CancellationToken ct)
     {
         await using var conn = new SqlConnection(connectionString);
