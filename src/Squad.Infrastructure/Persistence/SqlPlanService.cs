@@ -35,8 +35,8 @@ public sealed class SqlPlanService(string connectionString) : IPlanService
         return rows.ToList();
     }
 
-    public async Task<int> PublishAsync(Guid coachId, IReadOnlyList<Guid> athleteIds, DateTime spanStart, DateTime spanEnd,
-        IReadOnlyList<PlannedWorkoutWrite> workouts, CancellationToken ct)
+    public async Task<int> PublishAsync(Guid coachId, Guid planId, string planName, IReadOnlyList<Guid> athleteIds,
+        DateTime spanStart, DateTime spanEnd, IReadOnlyList<PlannedWorkoutWrite> workouts, CancellationToken ct)
     {
         // Only publish to athletes who belong to a squad this coach OWNS — never trust the
         // caller-supplied id list on its own.
@@ -56,11 +56,12 @@ public sealed class SqlPlanService(string connectionString) : IPlanService
 
         var start = spanStart.Date;
         var end = spanEnd.Date;
+        var name = string.IsNullOrWhiteSpace(planName) ? "Training plan" : planName;
 
         await using var tx = (SqlTransaction)await conn.BeginTransactionAsync(ct);
         foreach (var athleteId in allowed)
         {
-            // Replace the whole plan span for this athlete (idempotent re-publish).
+            // Replace the published span for this athlete (idempotent re-publish of the whole plan or a week).
             await conn.ExecuteAsync(new CommandDefinition("""
                 DELETE FROM dbo.PlannedWorkout
                 WHERE AthleteId = @athleteId AND WorkoutDate BETWEEN @start AND @end;
@@ -69,15 +70,50 @@ public sealed class SqlPlanService(string connectionString) : IPlanService
             foreach (var w in workouts)
             {
                 await conn.ExecuteAsync(new CommandDefinition("""
-                    INSERT INTO dbo.PlannedWorkout (Id, AthleteId, WorkoutDate, Discipline, Title, Sub, DurationMin, Load)
-                    VALUES (NEWID(), @athleteId, @Date, @Discipline, @Title, @Sub, @DurationMin, @Load);
+                    INSERT INTO dbo.PlannedWorkout (Id, AthleteId, WorkoutDate, Discipline, Title, Sub, DurationMin, Load, PlanId, PlanName)
+                    VALUES (NEWID(), @athleteId, @Date, @Discipline, @Title, @Sub, @DurationMin, @Load, @planId, @name);
                     """,
-                    new { athleteId, w.Date, w.Discipline, w.Title, w.Sub, w.DurationMin, w.Load },
+                    new { athleteId, w.Date, w.Discipline, w.Title, w.Sub, w.DurationMin, w.Load, planId, name },
                     tx, cancellationToken: ct));
             }
         }
         await tx.CommitAsync(ct);
         return allowed.Count;
+    }
+
+    public async Task<int> UnpublishAsync(Guid coachId, Guid planId, CancellationToken ct)
+    {
+        await using var conn = new SqlConnection(connectionString);
+        // Only the coach who owns the plan can pull it from athletes' calendars.
+        return await conn.ExecuteAsync(new CommandDefinition("""
+            IF EXISTS (SELECT 1 FROM dbo.CoachPlan WHERE Id = @planId AND OwnerId = @coachId)
+                DELETE FROM dbo.PlannedWorkout WHERE PlanId = @planId;
+            """, new { coachId, planId }, cancellationToken: ct));
+    }
+
+    public async Task<IReadOnlyList<AthletePlanSummary>> ListAthletePlansAsync(Guid athleteId, CancellationToken ct)
+    {
+        await using var conn = new SqlConnection(connectionString);
+        var rows = await conn.QueryAsync<AthletePlanSummary>(new CommandDefinition("""
+            SELECT PlanId,
+                   MAX(PlanName) AS PlanName,
+                   MIN(WorkoutDate) AS FirstDate,
+                   MAX(WorkoutDate) AS LastDate,
+                   COUNT(*) AS Sessions
+            FROM dbo.PlannedWorkout
+            WHERE AthleteId = @athleteId AND PlanId IS NOT NULL
+            GROUP BY PlanId
+            ORDER BY MIN(WorkoutDate);
+            """, new { athleteId }, cancellationToken: ct));
+        return rows.ToList();
+    }
+
+    public async Task<int> RemoveAthletePlanAsync(Guid athleteId, Guid planId, CancellationToken ct)
+    {
+        await using var conn = new SqlConnection(connectionString);
+        return await conn.ExecuteAsync(new CommandDefinition(
+            "DELETE FROM dbo.PlannedWorkout WHERE AthleteId = @athleteId AND PlanId = @planId;",
+            new { athleteId, planId }, cancellationToken: ct));
     }
 
     // ----- a coach's saved plans -----

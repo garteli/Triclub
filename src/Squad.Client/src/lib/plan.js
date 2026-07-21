@@ -20,7 +20,13 @@ async function req(path, { method = 'GET', token, body } = {}) {
   return data;
 }
 
+// body: { athleteIds, planId?, planName?, startDate, weeks, workouts } — publish the whole plan or one week.
 export const publishPlan = (token, body) => req('/api/plan/publish', { method: 'POST', token, body });
+// Coach pulls a published plan back off every athlete's calendar. → { unpublished: <rows> }
+export const unpublishPlan = (token, id) => req(`/api/plan/plans/${id}/unpublish`, { method: 'POST', token });
+// An athlete's own assigned plans, and removing one from their own calendar.
+export const listMyPlans = (token) => req('/api/plan/mine', { token });
+export const removeMyPlan = (token, planId) => req(`/api/plan/mine/${planId}`, { method: 'DELETE', token });
 
 // A coach's saved plans (they can have many).
 export const listPlans = (token) => req('/api/plan/plans', { token });
