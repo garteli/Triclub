@@ -34,15 +34,20 @@ public class SquadUwbPlugin: CAPPlugin, CAPBridgedPlugin {
     private var sessions: [String: NISession] = [:]
     private var delegates: [String: NIDelegate] = [:]
 
-    // NISession.isSupported was deprecated in iOS 16 and can report false on newer OS even on
-    // UWB-capable hardware — iOS 16+ must use deviceCapabilities.supportsPreciseDistanceMeasurement.
+    // Capability reporting is unreliable on U2-chip iPhones (15/16/17 Pro) running iOS 26:
+    // deviceCapabilities.supportsPreciseDistanceMeasurement can report false even though the
+    // hardware ranges fine, and supportsDirection is false there by design (distance-only, no
+    // angle — a documented U2 regression). So DON'T gate the UI on the flag: report supported
+    // on any iOS 14+ device (where NISession exists) and let real distance measurements be the
+    // ground truth. We still log the flags for the record.
     private static var uwbSupported: Bool {
         if #available(iOS 16.0, *) {
             let caps = NISession.deviceCapabilities
-            NSLog("[SquadUwb] supportsPreciseDistanceMeasurement=%@ (deprecated isSupported=%@)",
+            NSLog("[SquadUwb] caps precise=%@ direction=%@ (deprecated isSupported=%@)",
                   caps.supportsPreciseDistanceMeasurement ? "true" : "false",
+                  caps.supportsDirectionMeasurement ? "true" : "false",
                   NISession.isSupported ? "true" : "false")
-            return caps.supportsPreciseDistanceMeasurement
+            return true
         } else if #available(iOS 14.0, *) {
             return NISession.isSupported
         }
