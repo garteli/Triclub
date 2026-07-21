@@ -57,6 +57,25 @@ body {
 .scr::-webkit-scrollbar { width: 0; }
 .hscroll::-webkit-scrollbar { height: 0; }
 
+/* Global form-control hardening. Native controls (esp. iOS <input type=date>) have a large
+   intrinsic min-width; without this a control can grow past its box and, when focused, iOS
+   scrolls the page sideways to reveal the overflow — "the width breaks when the keyboard
+   opens." box-sizing + min-width:0 + max-width:100% keep every input/textarea/select inside
+   its container; appearance:none stops date/number controls from imposing an intrinsic width.
+   Per-screen styles still apply on top. */
+.phone input,
+.phone textarea,
+.phone select {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+}
+.phone input[type="date"],
+.phone input[type="number"] {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
 /* Persistent global header: sticks to the top of the scroll port, carries the safe-area
    top inset, and sits above scrolling content. */
 /* Total header height (safe-area inset + content), exposed so fixed-height screens
