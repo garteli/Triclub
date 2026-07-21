@@ -7,6 +7,7 @@ import { deleteActivity } from '../hooks/useActivities.js';
 import { useActivityPhotos } from '../hooks/useActivityPhotos.js';
 import { useActivityTrack } from '../hooks/useActivityTrack.js';
 import { buildFrames, frameRoute, gpsFrameCount, buildTraces } from '../lib/activityFrames.js';
+import { haversineMeters } from '../lib/geo.js';
 import { describeWeather } from '../lib/weather.js';
 import { useActivityAnalytics, fmtDur, pace, fmtEffortDur, CURVE_LABEL, DIST_LABEL } from '../hooks/useActivityAnalytics.js';
 import { PWR_ZONE_FRACS, PWR_ZONE_NAMES, HR_ZONE_FRACS, HR_ZONE_NAMES } from '../lib/powerAnalysis.js';
@@ -652,7 +653,67 @@ function BestEfforts({ bestPower, bestDist }) {
 // Strava-style page. Everything derived from the real recording where possible; a few
 // cards (Athlete Intelligence, device, weather, fitness/matched, goals) are tagged
 // SAMPLE until a data source exists.
-export default function Feed({ vm, state, actions, getToken, onDataChanged, meId }) {
+// Route length (km) of an activity's [[lat,lon],…] polyline — same haversine sum CoursePicker uses.
+const courseDistKm = (pts) => {
+  let m = 0;
+  for (let i = 1; i < pts.length; i++) m += haversineMeters({ lat: pts[i - 1][0], lon: pts[i - 1][1] }, { lat: pts[i][0], lon: pts[i][1] });
+  return m / 1000;
+};
+
+// Turn this activity's recorded GPS track into a saved course (owner-scoped to the caller), so it
+// can be followed on a live ride or attached to a planned session. Only shows when there's a real
+// map track and a courses API is wired.
+function SaveAsCourse({ route, defaultName, courses }) {
+  const [mode, setMode] = useState('idle'); // idle | naming | saving | saved | error
+  const [name, setName] = useState('');
+  const [msg, setMsg] = useState('');
+  const canSave = !!courses?.save && Array.isArray(route) && route.length >= 2;
+  if (!canSave) return null;
+  const km = courseDistKm(route);
+
+  const open = () => { setName(defaultName || 'Route'); setMsg(''); setMode('naming'); };
+  const doSave = async () => {
+    setMode('saving'); setMsg('');
+    try {
+      await courses.save((name || defaultName || 'Route').trim(), route, km || null);
+      setMode('saved');
+    } catch (e) { setMsg(e?.message || 'Could not save the course.'); setMode('error'); }
+  };
+
+  return (
+    <div style={s('padding:16px 18px 0')}>
+      {mode === 'idle' && (
+        <div className="ctl" onClick={open}
+          style={s('display:flex;align-items:center;justify-content:center;gap:8px;background:var(--bg2);border:1px solid var(--line);color:var(--text);border-radius:14px;padding:13px;font-weight:700;font-size:13.5px')}>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
+          Save route as course
+        </div>
+      )}
+
+      {(mode === 'naming' || mode === 'saving' || mode === 'error') && (
+        <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:14px')}>
+          <div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:8px')}>Save as course · {route.length} pts · {km.toFixed(1)} km</div>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Course name" disabled={mode === 'saving'}
+            style={s('width:100%;box-sizing:border-box;background:var(--bg3);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:14px;color:var(--text);outline:none;font-family:inherit')} />
+          {msg && <div style={s('font-size:12px;color:var(--bad);font-weight:600;margin-top:9px')}>{msg}</div>}
+          <div style={s('display:flex;gap:10px;margin-top:12px')}>
+            <div className="ctl" onClick={mode === 'saving' ? undefined : () => setMode('idle')} style={s('flex:1;text-align:center;padding:11px;border-radius:12px;font-weight:700;font-size:13.5px;background:var(--bg3);border:1px solid var(--line);color:var(--text2)')}>Cancel</div>
+            <div className="ctl" onClick={mode === 'saving' ? undefined : doSave} style={s(`flex:1;text-align:center;padding:11px;border-radius:12px;font-weight:700;font-size:13.5px;background:var(--accent);color:var(--accent-ink);opacity:${mode === 'saving' ? 0.7 : 1}`)}>{mode === 'saving' ? 'Saving…' : 'Save course'}</div>
+          </div>
+        </div>
+      )}
+
+      {mode === 'saved' && (
+        <div style={s('display:flex;align-items:center;gap:8px;background:color-mix(in srgb,var(--good) 12%,var(--bg2));border:1px solid color-mix(in srgb,var(--good) 30%,transparent);border-radius:14px;padding:13px 14px')}>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--good)" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
+          <div style={s('flex:1;font-size:13px;color:var(--text);font-weight:600')}>Saved to your courses — follow it on a live ride.</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function Feed({ vm, state, actions, getToken, onDataChanged, meId, live }) {
   const a = vm.activityDetail;
   const token = getToken?.() ?? null;
   const [confirmDel, setConfirmDel] = useState(false);
@@ -727,6 +788,8 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
     <div style={s('padding:0 0 120px;animation:floatUp .35s ease')}>
       <ActivityHero a={a} route={route} frames={frames} hasMap={hasMap} status={status} token={token}
         onDelete={() => setConfirmDel(true)} />
+
+      {hasMap && <SaveAsCourse route={route} defaultName={a.title} courses={live?.courses} />}
 
       <AthleteTitle a={a} token={token} onAthlete={actions.openAthlete} />
       <MetricHero a={a} load={effLoad} />
