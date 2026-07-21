@@ -28,3 +28,22 @@ export const getPlan = (token, id) => req(`/api/plan/plans/${id}`, { token });
 // body: { id?, name, doc, squadId? } — doc is a JSON string of the editor state.
 export const savePlan = (token, body) => req('/api/plan/plans', { method: 'POST', token, body });
 export const deletePlan = (token, id) => req(`/api/plan/plans/${id}`, { method: 'DELETE', token });
+
+// Import a PDF training plan: the server runs an AI pass to parse it into our plan
+// format and saves it as a new plan. `opts` = { anchorType:'start'|'target', anchorDate?:'yyyy-mm-dd' }.
+// → { id, name }. Multipart body — do NOT set Content-Type; the browser adds the boundary.
+export async function importPlanPdf(token, file, { anchorType = 'start', anchorDate } = {}) {
+  const fd = new FormData();
+  fd.append('file', file, file.name);
+  fd.append('anchorType', anchorType);
+  if (anchorDate) fd.append('anchorDate', anchorDate);
+  const res = await fetch('/api/plan/import', {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: fd,
+  });
+  let data = null;
+  try { data = await res.json(); } catch { /* empty */ }
+  if (!res.ok) throw new Error(data?.error || `Import failed (${res.status})`);
+  return data;
+}

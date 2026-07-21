@@ -14,7 +14,7 @@ import { usePlan } from './hooks/usePlan.js';
 import { useGarminSync } from './hooks/useGarminSync.js';
 import { createSquad, joinSquad, activateSquad } from './lib/squads.js';
 import { recordPayment, markPaymentPaid, waivePayment } from './lib/payments.js';
-import { publishPlan, listPlans, getPlan, savePlan, deletePlan } from './lib/plan.js';
+import { publishPlan, listPlans, getPlan, savePlan, deletePlan, importPlanPdf } from './lib/plan.js';
 // import { useLiveRide } from './hooks/useLiveRide.js'; // swap in for real telemetry
 import { buildViewModel } from './lib/viewModel.js';
 import { loadSession, saveSession, clearSession, enrollBiometric, fetchMe, getProfile } from './lib/auth.js';
@@ -281,6 +281,8 @@ export default function App() {
     create: () => { setSelectedPlan(null); setState((s) => ({ ...s, screen: 'planeditor' })); },
     save: (body) => savePlan(session?.token, body),
     remove: (id) => deletePlan(session?.token, id),
+    // Import a PDF → AI builds a plan → save it, then open it in the editor.
+    importPdf: (file, opts) => importPlanPdf(session?.token, file, opts),
   }), [session?.token]);
 
   // Pull-to-refresh: re-pull every live surface (feed snapshot, leaderboard,

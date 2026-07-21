@@ -228,6 +228,30 @@ public interface IPlanService
     Task<bool> DeletePlanAsync(Guid ownerId, Guid planId, CancellationToken ct);
 }
 
+// ----- AI plan import (PDF → CoachPlan doc) -----
+
+/// <summary>Outcome of importing a PDF training plan. On success <see cref="Doc"/> is a JSON string
+/// in the CoachPlan editor's schema and <see cref="Name"/> is the plan's title; on failure
+/// <see cref="Error"/> explains why (unconfigured, unreadable PDF, model error, …).</summary>
+public sealed record PlanImportResult(bool Ok, string? Doc, string? Name, string? Error)
+{
+    public static PlanImportResult Success(string doc, string name) => new(true, doc, name, null);
+    public static PlanImportResult Fail(string error) => new(false, null, null, error);
+}
+
+/// <summary>Turns an uploaded PDF training plan into a saved-plan JSON doc via an AI model.
+/// <see cref="Configured"/> is false when no provider/API key is set, so the endpoint can
+/// report an honest "not configured" instead of pretending to import.</summary>
+public interface IPlanImportService
+{
+    bool Configured { get; }
+
+    /// <param name="anchorType">"start" (plan begins on anchorDate) or "target" (anchorDate is race day).</param>
+    /// <param name="anchorDate">yyyy-MM-dd the athlete gave, or null to let the model leave it blank.</param>
+    Task<PlanImportResult> ImportAsync(
+        byte[] pdfBytes, string fileName, string anchorType, string? anchorDate, CancellationToken ct);
+}
+
 /// <summary>Result of verifying a provider id_token: the identity, or a diagnostic error reason.</summary>
 public sealed record ExternalVerifyResult(ExternalIdentity? Identity, string? Error);
 
