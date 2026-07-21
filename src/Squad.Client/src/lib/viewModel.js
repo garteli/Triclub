@@ -81,6 +81,11 @@ export function buildViewModel(state, t, opts = {}) {
       barBg: 'color-mix(in srgb,' + wd.color + ' 45%,transparent)',
     })),
     note: wd.note,
+    // The real session opened (state.workoutRow) may carry a coach-attached route to follow —
+    // surfaced here so the sheet can show it and pre-select it when the athlete starts the ride.
+    course: state.workoutRow?.coursePoints?.length
+      ? { name: state.workoutRow.courseName || 'Course', points: state.workoutRow.coursePoints }
+      : null,
   };
 
   // ---- date navigation offsets (week & month are stepped independently) ----

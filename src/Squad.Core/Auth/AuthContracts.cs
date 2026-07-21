@@ -190,14 +190,19 @@ public interface INotificationService
 
 // ----- Training plan -----
 
-/// <summary>One planned workout on a date (a row in the weekly plan).</summary>
+/// <summary>One planned workout on a date (a row in the weekly plan). <see cref="CourseName"/>/
+/// <see cref="CoursePoints"/> (JSON [[lat,lon],…]) are set when a coach attached a route to follow.</summary>
 public sealed record PlannedWorkoutRow(
-    Guid Id, DateTime WorkoutDate, string Discipline, string Title, string? Sub, int DurationMin, int Load);
+    Guid Id, DateTime WorkoutDate, string Discipline, string Title, string? Sub, int DurationMin, int Load,
+    string? CourseName, string? CoursePoints);
 
 /// <summary>A workout a coach is publishing onto an athlete's calendar (no id/athlete yet — the
-/// service fans it out to each assigned athlete on the given date).</summary>
+/// service fans it out to each assigned athlete on the given date). The optional course route is
+/// embedded (<see cref="CoursePoints"/> = JSON [[lat,lon],…]) so athletes need no access to the
+/// coach's owner-scoped Course.</summary>
 public sealed record PlannedWorkoutWrite(
-    DateTime Date, string Discipline, string Title, string? Sub, int DurationMin, int Load);
+    DateTime Date, string Discipline, string Title, string? Sub, int DurationMin, int Load,
+    string? CourseName, string? CoursePoints);
 
 /// <summary>A coach's saved plan in list form (no doc body).</summary>
 public sealed record CoachPlanSummary(Guid Id, string Name, DateTimeOffset UpdatedUtc);

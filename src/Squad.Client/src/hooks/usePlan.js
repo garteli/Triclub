@@ -21,6 +21,9 @@ function mapRow(r) {
     load: String(r.load),
     status: r.status,
     color: COLOR[r.discipline] || 'var(--accent)',
+    // A coach-attached route to follow (embedded [[lat,lon],…]); null on most sessions.
+    courseName: r.courseName || null,
+    coursePoints: Array.isArray(r.coursePoints) ? r.coursePoints : null,
   };
 }
 const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { s, html } from '../lib/style.js';
 
 // Coach's plan editor — build a squad's training week, assign athletes, and
@@ -28,6 +28,19 @@ const sportGlyph = (sp) => html(
 
 const durHours = (dur) => { const p = (dur || '0:00').split(':'); return (+p[0] || 0) + (+p[1] || 0) / 60; };
 
+// A route only needs enough points to draw the line; downsample before embedding it in the plan
+// so a long recorded course doesn't bloat the saved doc / every athlete's published row. The server
+// caps this again on publish. Keeps the first and last point so the route starts/ends correctly.
+const EMBED_MAX_POINTS = 400;
+const downsample = (pts) => {
+  if (!Array.isArray(pts) || pts.length <= EMBED_MAX_POINTS) return pts || [];
+  const step = (pts.length - 1) / (EMBED_MAX_POINTS - 1);
+  return Array.from({ length: EMBED_MAX_POINTS }, (_, i) => pts[Math.round(i * step)]);
+};
+
+// Routes attach to outdoor sessions only.
+const SPORT_HAS_ROUTE = (sp) => sp === 'Bike' || sp === 'Run';
+
 // ── plan-schedule date math (weeks are Monday-anchored) ──
 const MS_DAY = 86400000;
 const addDays = (d, n) => new Date(d.getTime() + n * MS_DAY);
@@ -44,8 +57,9 @@ const BLANK_WEEK = { title: '', targetHrs: '', targetLoad: '', focus: '', sessio
 const initialsOf = (m) => m.initials || (m.name || '?').split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
 
 // ── Session editor bottom sheet ──────────────────────────────────────────────
-function SessionSheet({ editor, onField, onSave, onDelete, onClose }) {
+function SessionSheet({ editor, onField, onSave, onDelete, onClose, courses, courseBusy, onPickCourse }) {
   const canDelete = !!editor.id;
+  const [showCourses, setShowCourses] = useState(false);
   return (
     <>
       <div className="ctl" onClick={onClose} style={s('position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50;animation:floatUp .2s ease')} />
@@ -98,6 +112,49 @@ function SessionSheet({ editor, onField, onSave, onDelete, onClose }) {
         <textarea value={editor.note} onChange={(e) => onField('note', e.target.value)} placeholder="Guidance for the squad…"
           style={s('width:100%;min-height:70px;resize:vertical;background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:14px;color:var(--text);outline:none;line-height:1.5;font-family:inherit')} />
 
+        {/* Route to follow — outdoor sessions only. Attaches one of the coach's saved courses; the
+            athlete's live map draws it, and it's embedded so they need no access to the course itself. */}
+        {SPORT_HAS_ROUTE(editor.sport) && (
+          <>
+            <div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin:16px 0 7px')}>Route to follow <span style={s('text-transform:none;letter-spacing:0;color:var(--text3)')}>· optional</span></div>
+            <div className="ctl" onClick={() => setShowCourses((v) => !v)}
+              style={s('display:flex;align-items:center;gap:10px;background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:12px 14px')}>
+              <div style={s('width:28px;height:28px;border-radius:8px;background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent);flex:none;display:flex;align-items:center;justify-content:center')}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
+              </div>
+              <div style={s('flex:1;min-width:0')}>
+                <div style={s('font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:' + (editor.courseName ? 'var(--text)' : 'var(--text3)'))}>{courseBusy ? 'Loading…' : (editor.courseName || 'No route')}</div>
+                {editor.courseName && !courseBusy && <div style={s('font-size:11px;color:var(--text3);margin-top:1px')}>{(editor.coursePoints?.length || 0)} pts embedded</div>}
+              </div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={s('flex:none;transform:rotate(' + (showCourses ? '180' : '0') + 'deg)')}><path d="M6 9l6 6 6-6" /></svg>
+            </div>
+
+            {showCourses && (
+              <div style={s('display:flex;flex-direction:column;gap:7px;margin-top:8px')}>
+                <div className="ctl" onClick={() => { onPickCourse?.(null); setShowCourses(false); }}
+                  style={s('display:flex;align-items:center;gap:9px;background:var(--bg2);border:1px solid ' + (editor.courseId ? 'var(--line)' : 'var(--accent)') + ';border-radius:11px;padding:11px 13px')}>
+                  <div style={s('flex:1;font-size:13px;font-weight:700;color:' + (editor.courseId ? 'var(--text2)' : 'var(--text)'))}>No route</div>
+                  {!editor.courseId && <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>}
+                </div>
+                {courses === null ? (
+                  <div style={s('text-align:center;font-size:12px;color:var(--text3);padding:8px')}>Loading courses…</div>
+                ) : courses.length === 0 ? (
+                  <div style={s('font-size:12px;color:var(--text3);text-align:center;padding:10px;line-height:1.5')}>No saved courses yet. Record or import a route on a live ride to save one.</div>
+                ) : courses.map((c) => (
+                  <div key={c.id} className="ctl" onClick={courseBusy ? undefined : () => { onPickCourse?.(c); setShowCourses(false); }}
+                    style={s('display:flex;align-items:center;gap:9px;background:var(--bg2);border:1px solid ' + (editor.courseId === c.id ? 'var(--accent)' : 'var(--line)') + ';border-radius:11px;padding:11px 13px')}>
+                    <div style={s('flex:1;min-width:0')}>
+                      <div style={s('font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>{c.name}</div>
+                      <div style={s('font-size:10.5px;color:var(--text3);margin-top:1px')}>{c.distanceKm != null ? `${c.distanceKm.toFixed(1)} km · ` : ''}{c.pointCount} pts</div>
+                    </div>
+                    {editor.courseId === c.id && <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
         <div style={s('display:flex;gap:10px;margin-top:18px')}>
           {canDelete && (
             <div className="ctl" onClick={onDelete} style={s('width:52px;background:color-mix(in srgb,var(--bad) 14%,var(--bg2));border:1px solid color-mix(in srgb,var(--bad) 35%,transparent);color:var(--bad);border-radius:13px;display:flex;align-items:center;justify-content:center')}>
@@ -121,7 +178,7 @@ function parseDoc(plan) {
 // `plan` is the saved plan being edited ({ id, name, doc }) or null for a new one.
 // Mount fresh per plan (App keys the screen by plan id), so seeding state from the
 // doc in the useState initializers is enough — they run once on mount.
-export default function PlanEditor({ vm, actions, plan, plans, onPublishPlan }) {
+export default function PlanEditor({ vm, actions, plan, plans, onPublishPlan, live }) {
   const doc = parseDoc(plan);
   const [planId, setPlanId] = useState(plan?.id ?? null);
   const [planName, setPlanName] = useState(doc?.planName ?? plan?.name ?? '');
@@ -136,6 +193,32 @@ export default function PlanEditor({ vm, actions, plan, plans, onPublishPlan }) 
   const [save, setSave] = useState({ status: 'idle', msg: '' }); // idle | busy | saved | error
   const [unpub, setUnpub] = useState({ status: 'idle', msg: '' }); // idle | busy | done | error
   const [confirmUnpub, setConfirmUnpub] = useState(false);
+
+  // The coach's saved courses (for attaching a route to a session). Loaded once; null = loading.
+  const courseOps = live?.courses;
+  const [courseList, setCourseList] = useState(null);
+  const [courseBusy, setCourseBusy] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    if (!courseOps?.list) { setCourseList([]); return undefined; }
+    courseOps.list().then((cs) => { if (alive) setCourseList(Array.isArray(cs) ? cs : []); })
+      .catch(() => { if (alive) setCourseList([]); });
+    return () => { alive = false; };
+  }, [courseOps]);
+
+  // Attach a saved course to the session being edited: pull its full geometry, downsample, and embed
+  // it (so athletes need no access to the coach's owner-scoped course). Clearing drops the route.
+  const pickCourse = async (summary) => {
+    if (!summary) { setEditor((e) => ({ ...e, courseId: null, courseName: null, coursePoints: null })); return; }
+    if (courseBusy || !courseOps?.load) return;
+    setCourseBusy(true);
+    try {
+      const full = await courseOps.load(summary.id);
+      const pts = downsample(full?.points || []);
+      if (pts.length >= 2) setEditor((e) => ({ ...e, courseId: summary.id, courseName: summary.name, coursePoints: pts }));
+    } catch { /* leave the current selection untouched on a load failure */ }
+    finally { setCourseBusy(false); }
+  };
 
   // The current week's editable slice, and a setter for one of its fields.
   const cur = weeks[week] || BLANK_WEEK;
@@ -244,6 +327,7 @@ export default function PlanEditor({ vm, actions, plan, plans, onPublishPlan }) 
       const wkMon = addDays(startMonday, (wn - 1) * 7);
       DAYS.forEach((day, di) => {
         (wk.sessions?.[day] || []).forEach((x) => {
+          const hasRoute = SPORT_HAS_ROUTE(x.sport) && Array.isArray(x.coursePoints) && x.coursePoints.length >= 2;
           out.push({
             date: toISO(addDays(wkMon, di)),
             discipline: (x.sport || 'rest').toLowerCase(),
@@ -251,6 +335,8 @@ export default function PlanEditor({ vm, actions, plan, plans, onPublishPlan }) 
             sub: (x.z || '').slice(0, 120),
             durationMin: Math.round(durHours(x.dur) * 60),
             load: +x.load || 0,
+            courseName: hasRoute ? (x.courseName || 'Course') : null,
+            coursePoints: hasRoute ? x.coursePoints : null,
           });
         });
       });
@@ -511,7 +597,8 @@ export default function PlanEditor({ vm, actions, plan, plans, onPublishPlan }) 
         {unpub.status === 'error' && <div style={s('text-align:center;font-size:12px;color:var(--bad);font-weight:600;margin-top:2px')}>{unpub.msg}</div>}
       </div>
 
-      {editor && <SessionSheet editor={editor} onField={editField} onSave={saveSession} onDelete={deleteSession} onClose={() => setEditor(null)} />}
+      {editor && <SessionSheet editor={editor} onField={editField} onSave={saveSession} onDelete={deleteSession} onClose={() => setEditor(null)}
+        courses={courseList} courseBusy={courseBusy} onPickCourse={pickCourse} />}
 
       {confirmUnpub && (
         <>
