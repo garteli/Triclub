@@ -399,3 +399,14 @@ UWB devices on the same ride to test. Treat the numbers as unproven until then.
 - Android UWB (`androidx.core.uwb`) is not implemented — very few Android phones have UWB.
 - The iOS TestFlight build blocker (Swift toolchain / FBSDKLoginKit, see the iOS build notes)
   must be resolved before any of this can ship to a device.
+
+### Diagnostics (added for debugging on device)
+- **On-screen:** the UWB strip now shows a per-peer status — `searching` → `ranging` (distance,
+  no angle yet) → `located` (direction available) — plus a coaching hint when direction is stuck
+  (e.g. "move phone around", "sweep left–right", "point top of phone at them & move"). The strip
+  appears whenever the device supports UWB, even before a peer is found ("Searching for a
+  teammate to range…"), so you can confirm the plugin loaded and the chip is supported.
+- **Xcode console:** the plugin logs every step with the tag `[SquadUwb]` — `startPeer`,
+  `receivePeerToken`, each `nearby dist=…m dir=(x,y,z)`, `convergence … reasons=…`, `lost`,
+  `invalidated`. Filter the device console on `SquadUwb` to watch the session live and see whether
+  distance is flowing and why direction hasn't converged.
