@@ -26,7 +26,9 @@ export const Title = ({ children }) => <div style={s('font-size:23px;font-weight
 export const Sub = ({ children }) => <div style={s('font-size:13px;color:var(--text2);line-height:1.5;margin-top:4px')}>{children}</div>;
 export const FieldLabel = ({ children }) => <div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin:16px 2px 7px')}>{children}</div>;
 
-const inputStyle = 'width:100%;background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:14px;color:var(--text);outline:none;font-family:inherit';
+// box-sizing + min-width:0 + appearance:none keep native controls (esp. iOS date inputs)
+// from overflowing their box and overlapping a neighbour in a side-by-side row.
+const inputStyle = 'width:100%;box-sizing:border-box;min-width:0;-webkit-appearance:none;appearance:none;background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:14px;color:var(--text);outline:none;font-family:inherit';
 
 export function Field({ label, value, onChange, placeholder, type = 'text', mono }) {
   return (
