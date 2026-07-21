@@ -120,7 +120,7 @@ function PelotonField({ v }) {
 }
 
 // ---- a single field cell (metric / chart / map) with edit overlays ----
-function FieldCell({ f, editing, actions, index }) {
+function FieldCell({ f, editing, actions, index, indoor }) {
   const stop = (e) => { if (e && e.stopPropagation) e.stopPropagation(); };
   // Long-press-to-edit is armed on every tile EXCEPT the map — holding on the map is a pan/
   // interaction gesture, not an intent to enter edit mode (enter edit from another tile instead).
@@ -165,7 +165,7 @@ function FieldCell({ f, editing, actions, index }) {
             {f.pts.length ? (
               <LiveMapGL pts={f.pts} course={f.course} path={f.path} riders={f.riders} interactive={!editing} />
             ) : (
-              <div style={s('position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg3);color:var(--text3);font-size:11px;text-align:center;padding:0 16px')}>Waiting for GPS…</div>
+              <div style={s('position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg3);color:var(--text3);font-size:11px;text-align:center;padding:0 16px')}>{indoor ? 'Indoor session — no map' : 'Waiting for GPS…'}</div>
             )}
           </div>
           <div style={s('position:absolute;top:10px;left:11px;font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.8px;font-weight:600;background:color-mix(in srgb,var(--bg) 60%,transparent);padding:2px 7px;border-radius:6px;z-index:2')}>Route</div>
@@ -263,7 +263,7 @@ function PickerSheet({ page, slot, actions }) {
 }
 
 // ---- the unified full-screen rotating page system ----
-export default function LivePages({ tel, lp, uwb }) {
+export default function LivePages({ tel, lp, uwb, indoor = false }) {
   const { pages, pageIdx, editFields, picker, autoRotate, actions } = lp;
   const page = pages[pageIdx];
   const side = page.side || 'none';
@@ -346,7 +346,7 @@ export default function LivePages({ tel, lp, uwb }) {
       <div className="live-row" style={s('display:flex;gap:9px;padding:0 12px;touch-action:pan-y')} onPointerDown={onRowPointerDown} onPointerUp={onRowPointerUp}>
         {withSide && <GroupColumn tel={tel} />}
         <div style={s(gridStyle)}>
-          {fields.map((f, i) => <FieldCell key={i} f={f} index={i} editing={editFields} actions={actions} />)}
+          {fields.map((f, i) => <FieldCell key={i} f={f} index={i} editing={editFields} actions={actions} indoor={indoor} />)}
         </div>
       </div>
 

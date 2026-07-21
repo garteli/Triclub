@@ -3,6 +3,7 @@ import { useTick } from './hooks/useTick.js';
 import { useLiveRide } from './hooks/useLiveRide.js';
 import { useSensors } from './hooks/useSensors.js';
 import { useRideRecorder } from './hooks/useRideRecorder.js';
+import { FitSport } from './lib/fitEncoder.js';
 import { usePeerRanging } from './hooks/usePeerRanging.js';
 import { useUwbRanging } from './hooks/useUwbRanging.js';
 import { useRideTelemetry } from './hooks/useRideTelemetry.js';
@@ -83,6 +84,16 @@ const initialState = {
   selMember: 'noa', me: {}, following: {},
   // activities
   selActivity: 'a1',
+};
+
+// Live activity types → the FIT sport recorded + whether it's an indoor (no-GPS) session.
+// Indoor types drive distance from paired sensors' speed instead of GPS. Trainer = indoor bike,
+// treadmill = indoor run (FIT has no finer sub-sport in our encoder, so they map to cycling/running).
+const RIDE_TYPES = {
+  bike: { label: 'Bike', fitSport: FitSport.cycling, indoor: false },
+  run: { label: 'Run', fitSport: FitSport.running, indoor: false },
+  trainer: { label: 'Trainer', fitSport: FitSport.cycling, indoor: true },
+  treadmill: { label: 'Treadmill', fitSport: FitSport.running, indoor: true },
 };
 
 const screens = {
@@ -527,7 +538,19 @@ export default function App() {
   // Keep the ride hub connected while on the ride screen OR while a ride is live anywhere.
   const liveRide = useLiveRide(squadId, { getToken, meId: session?.athleteId, enabled: (onRide || rideSessionActive) && !!squadId });
   // throttleMs 500 → broadcast position ~2×/s (as fast as GPS delivers) so the peloton moves smoothly.
-  const recorder = useRideRecorder({ pushTelemetry: liveRide.pushTelemetry, sensors, getToken, onSaved: () => setRefreshSignal((n) => n + 1), enabled: authed, throttleMs: 500 });
+  // Live activity type (bike / run / trainer / treadmill), persisted so it survives a reload — the
+  // recorder needs the right sport + indoor flag on boot to resume correctly.
+  const [rideSport, setRideSportState] = useState(() => {
+    const v = (() => { try { return localStorage.getItem('squad.rideSport'); } catch { return null; } })();
+    return RIDE_TYPES[v] ? v : 'bike';
+  });
+  const setRideSport = useCallback((v) => {
+    if (!RIDE_TYPES[v]) return;
+    setRideSportState(v);
+    try { localStorage.setItem('squad.rideSport', v); } catch { /* ignore */ }
+  }, []);
+  const rideType = RIDE_TYPES[rideSport] || RIDE_TYPES.bike;
+  const recorder = useRideRecorder({ pushTelemetry: liveRide.pushTelemetry, sensors, getToken, onSaved: () => setRefreshSignal((n) => n + 1), enabled: authed, sport: rideType.fitSport, indoor: rideType.indoor, throttleMs: 500 });
   // A ride is "live" whenever it's active OR still recording — independent of which screen you're on,
   // so sensors, ranging, the hub, telemetry, wake lock and presence all keep running as you navigate.
   const rideLive = rideSessionActive || recorder.recording;
@@ -588,7 +611,7 @@ export default function App() {
   // Keep the screen awake for the whole ride — recording or watching — even on other screens.
   useWakeLock(rideLive);
 
-  const live = { riders: liveRide.riders, status: liveRide.status, pushTelemetry: liveRide.pushTelemetry, recorder, sensors, tel, livePages, peerRanging, uwb, courses: courseOps, course: selectedCourse };
+  const live = { riders: liveRide.riders, status: liveRide.status, pushTelemetry: liveRide.pushTelemetry, recorder, sensors, tel, livePages, peerRanging, uwb, courses: courseOps, course: selectedCourse, rideType: { value: rideSport, indoor: rideType.indoor, label: rideType.label, set: setRideSport } };
 
   // Unread count for the global header's bell badge.
   const notif = useNotifications({ getToken, enabled: authed });
