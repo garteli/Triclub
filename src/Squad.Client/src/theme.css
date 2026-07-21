@@ -138,6 +138,9 @@ body {
   justify-content: center;
   align-items: stretch;
   background: #0c0e11;
+  /* Never let a stray full-bleed/fixed child scroll the whole page sideways. */
+  overflow-x: hidden;
+  max-width: 100vw;
 }
 
 /* Dev-only prototype harness (ControlDock) sits beside the app on wide screens. */
