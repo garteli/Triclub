@@ -14,7 +14,7 @@ const TRIGGER_UI = 60;  // fade the indicator in over the first ~60px of pull (m
 // The app viewport. `.phone` (see theme.css) carries the design tokens and fills
 // the screen (full-width on phones, a centered column on desktop). The real device
 // draws its own status bar, so we only reserve safe-area space at the top.
-export default function Phone({ theme, accent, lang, dir, screen, go, onRefresh, recording, children }) {
+export default function Phone({ theme, accent, lang, dir, screen, go, onRefresh, recording, header, children }) {
   const hideNav = CHROMELESS.has(screen);
   const scrollRef = useRef(null);
   const canPull = typeof onRefresh === 'function' && !NO_PULL.has(screen);
@@ -35,6 +35,9 @@ export default function Phone({ theme, accent, lang, dir, screen, go, onRefresh,
         className="scr"
         style={s('position:absolute;top:0;left:0;right:0;bottom:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior-y:contain')}
       >
+        {/* Persistent global header — sticks to the top of the scroll port so it stays visible
+            on every migrated screen. It carries its own safe-area top padding. */}
+        {header && <div className="appheader">{header}</div>}
         <div style={sx('position:relative', shift, glide)}>
           {canPull && (
             <div style={s('position:absolute;top:-34px;left:0;right:0;display:flex;justify-content:center;pointer-events:none')}>
@@ -50,7 +53,8 @@ export default function Phone({ theme, accent, lang, dir, screen, go, onRefresh,
               />
             </div>
           )}
-          <div style={s('height:max(env(safe-area-inset-top), 12px)')} />
+          {/* When the global header is present it provides the top inset; otherwise reserve it. */}
+          {!header && <div style={s('height:max(env(safe-area-inset-top), 12px)')} />}
           {children}
         </div>
       </div>

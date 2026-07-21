@@ -23,9 +23,11 @@ import { loadNav, saveNav } from './lib/navState.js';
 import { loadDraft, draftMode } from './lib/rideDraft.js';
 import { uploadAvatar, deleteAvatar } from './lib/avatar.js';
 import { fetchAuthedObjectUrl, bustAuthedImage } from './lib/authedImage.js';
+import { useNotifications } from './hooks/useNotifications.js';
 import ControlDock from './components/ControlDock.jsx';
 import Phone from './components/Phone.jsx';
 import BootSplash from './components/BootSplash.jsx';
+import AppHeader from './components/AppHeader.jsx';
 import Dashboard from './screens/Dashboard.jsx';
 import LiveRide from './screens/LiveRide.jsx';
 import Plan from './screens/Plan.jsx';
@@ -83,6 +85,17 @@ const screens = {
   athlete: AthleteProfile, editprofile: EditProfile, notifs: Notifications, activities: Activities,
   upload: UploadActivity, sensors: Sensors,
   units: Units, zones: TrainingZones, notifprefs: NotificationPrefs, privacy: Privacy, help: Help, legal: Legal,
+};
+
+// Screens that render the persistent global header (AppHeader) via the Phone shell.
+// `root: true` → club branding, no Back (the bottom-nav tabs); otherwise the header shows a
+// Back button + `title`. A screen is only listed here once its own in-page header has been
+// removed, so the two never double up. (Migrated screen-by-screen.)
+const HEADER_META = {
+  dash: { root: true },
+  lb: { root: true },
+  coach: { root: true },
+  notifs: { title: 'Notifications' },
 };
 
 export default function App() {
@@ -154,6 +167,16 @@ export default function App() {
   const sessionRef = useRef(session);
   useEffect(() => { sessionRef.current = session; });
   const myAvatarUrl = session?.athleteId ? `/api/images/avatars/${String(session.athleteId).toLowerCase()}` : null;
+
+  // Navigation trail for the global header's Back button. We record each distinct screen
+  // so back() can pop to wherever the athlete came from, rather than every screen hard-coding
+  // a back target. Capped so it can't grow unbounded.
+  const historyRef = useRef([]);
+  useEffect(() => {
+    const h = historyRef.current;
+    if (h[h.length - 1] !== state.screen) h.push(state.screen);
+    if (h.length > 40) h.shift();
+  }, [state.screen]);
 
   const { feed: liveFeed, status: feedStatus } = useSquadFeed({
     getToken,
@@ -296,6 +319,13 @@ export default function App() {
   const actions = useMemo(() => ({
     // navigation: landing on the ride tab always returns to its lobby
     go: (id) => setState((s) => ({ ...s, screen: id, rideState: id === 'ride' ? 'lobby' : s.rideState })),
+    // Global Back: pop the nav trail to the previous distinct screen (dashboard if empty).
+    back: () => setState((s) => {
+      const h = historyRef.current;
+      if (h[h.length - 1] === s.screen) h.pop(); // drop current
+      const prev = h[h.length - 1] || 'dash';
+      return { ...s, screen: prev, rideState: prev === 'ride' ? 'lobby' : s.rideState };
+    }),
     // appearance / language — persisted to localStorage via savePrefs (survive reload)
     setTheme: (theme) => setState((s) => savePrefs({ ...s, theme })),
     setLang: (lang) => setState((s) => savePrefs({ ...s, lang })),
@@ -415,6 +445,10 @@ export default function App() {
 
   const live = { riders: liveRide.riders, status: liveRide.status, pushTelemetry: liveRide.pushTelemetry, recorder, sensors, tel, livePages, peerRanging };
 
+  // Unread count for the global header's bell badge.
+  const { items: notifItems } = useNotifications({ getToken, enabled: authed });
+  const notifUnread = notifItems.filter((n) => n.unread).length;
+
   // Remember the last screen + selections so a refresh returns here (see lib/navState.js).
   // Only while signed in — a logged-out location isn't worth restoring.
   useEffect(() => {
@@ -433,12 +467,25 @@ export default function App() {
   const Screen = screens[state.screen] || Dashboard;
   const dir = state.lang === 'he' ? 'rtl' : 'ltr';
 
+  // Persistent global header for migrated screens (never on the full-screen active ride).
+  // HEADER_META only lists post-login screens, and logged-out users are always on the
+  // chromeless welcome/login flow, so no auth gate is needed here.
+  const headerMeta = HEADER_META[state.screen];
+  const appHeader = headerMeta && !(state.screen === 'ride' && rideActive)
+    ? (
+      <AppHeader vm={vm} actions={actions} getToken={getToken} notifUnread={notifUnread}
+        title={headerMeta.title} showBack={!headerMeta.root} rtl={state.lang === 'he'} onSync={onRefresh}
+        onSwitchSquad={authed ? squadOps.onSwitchSquad : undefined} />
+    )
+    : null;
+
   return (
     <div className="app-shell">
       {booting && <BootSplash hiding={splashHiding} />}
       {/* Dev-only prototype harness (screen switcher / theme toggles); never shipped. */}
       {import.meta.env.DEV && <ControlDock state={state} actions={actions} />}
       <Phone theme={state.theme} accent={state.accent} lang={state.lang} dir={dir} screen={state.screen} go={actions.go}
+        header={appHeader}
         onRefresh={authed ? onRefresh : undefined} recording={recorder.recording}>
         <Screen key={state.screen === 'planeditor' ? `pe-${selectedPlan?.id || 'new'}` : state.screen}
           vm={vm} state={state} actions={actions} live={live} tick={t} livePages={livePages}
