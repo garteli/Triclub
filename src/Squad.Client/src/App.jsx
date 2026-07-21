@@ -19,12 +19,13 @@ import { publishPlan, listPlans, getPlan, savePlan, deletePlan } from './lib/pla
 import { buildViewModel } from './lib/viewModel.js';
 import { loadSession, saveSession, clearSession, enrollBiometric, fetchMe, getProfile } from './lib/auth.js';
 import { loadPrefs, savePrefs } from './lib/prefs.js';
-import { loadNav, saveNav, restorableScreen } from './lib/navState.js';
+import { loadNav, saveNav } from './lib/navState.js';
 import { loadDraft, draftMode } from './lib/rideDraft.js';
 import { uploadAvatar, deleteAvatar } from './lib/avatar.js';
 import { fetchAuthedObjectUrl, bustAuthedImage } from './lib/authedImage.js';
 import ControlDock from './components/ControlDock.jsx';
 import Phone from './components/Phone.jsx';
+import BootSplash from './components/BootSplash.jsx';
 import Dashboard from './screens/Dashboard.jsx';
 import LiveRide from './screens/LiveRide.jsx';
 import Plan from './screens/Plan.jsx';
@@ -95,27 +96,41 @@ export default function App() {
     const base = { ...initialState, ...loadPrefs(), avatar: null, session };
     if (!session) return { ...base, screen: 'welcome' };
 
-    // Restore the last screen + the selections it depends on, so a refresh returns the
-    // athlete to where they were rather than the dashboard.
+    // Always open on the dashboard — unless a live ride is in progress, in which case return
+    // to it. We keep the last selections (group/activity/member) so those screens still open
+    // to the right thing, but we no longer restore the last arbitrary screen on launch.
     const nav = loadNav();
+    const rideLive = nav?.rideState === 'active';
     const merged = {
       ...base,
-      screen: restorableScreen(nav, screens) || 'dash',
-      rideState: nav?.rideState === 'active' ? 'active' : 'lobby',
+      screen: rideLive ? 'ride' : 'dash',
+      rideState: rideLive ? 'active' : 'lobby',
       selGroup: nav?.selGroup ?? base.selGroup,
       selActivity: nav?.selActivity ?? base.selActivity,
       selMember: nav?.selMember ?? base.selMember,
     };
 
-    // If a ride was recording (or finished-but-unsaved) when the page reloaded, land on the
-    // ride screen so the recovered recording / save card is visible (the recorder hook
-    // restores the actual buffers — see useRideRecorder + lib/rideDraft.js).
+    // A recording that was mid-flight (resume) or finished-but-unsaved (recover) when the app
+    // closed also counts as a live activity: land on the ride screen so the recovered buffers /
+    // save card surface (the recorder hook restores them — see useRideRecorder + lib/rideDraft.js).
     const how = draftMode(loadDraft());
     if (how === 'recover') { merged.screen = 'ride'; merged.rideState = 'lobby'; }
-    else if (how === 'resume') { merged.screen = 'ride'; }
+    else if (how === 'resume') { merged.screen = 'ride'; merged.rideState = 'active'; }
     return merged;
   });
   const t = useTick();
+
+  // Launch splash: hold it for at least 2s from page open (window.__bootAt, set in index.html),
+  // then fade out. Seamlessly continues the static #boot-splash that showed while React loaded.
+  const [booting, setBooting] = useState(true);
+  const [splashHiding, setSplashHiding] = useState(false);
+  useEffect(() => {
+    const bootAt = window.__bootAt || Date.now();
+    const remaining = Math.max(0, 2000 - (Date.now() - bootAt));
+    const hideAt = setTimeout(() => setSplashHiding(true), remaining);
+    const doneAt = setTimeout(() => setBooting(false), remaining + 340); // after the .32s fade
+    return () => { clearTimeout(hideAt); clearTimeout(doneAt); };
+  }, []);
 
   // ---- live backend data (feed + leaderboard) ----
   const session = state.session;
@@ -420,6 +435,7 @@ export default function App() {
 
   return (
     <div className="app-shell">
+      {booting && <BootSplash hiding={splashHiding} />}
       {/* Dev-only prototype harness (screen switcher / theme toggles); never shipped. */}
       {import.meta.env.DEV && <ControlDock state={state} actions={actions} />}
       <Phone theme={state.theme} accent={state.accent} lang={state.lang} dir={dir} screen={state.screen} go={actions.go}
