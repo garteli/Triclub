@@ -58,35 +58,69 @@ public sealed class AnthropicPlanImportService : IPlanImportService
             return PlanImportResult.Fail("The PDF was empty.");
 
         var anchor = anchorType == "target" ? "target" : "start";
-        var b64 = Convert.ToBase64String(pdfBytes);
+        var content = new object[]
+        {
+            new { type = "document", source = new { type = "base64", media_type = "application/pdf", data = Convert.ToBase64String(pdfBytes) } },
+            new { type = "text", text = ImportUserPrompt(anchor, anchorDate) },
+        };
 
+        var (text, fail) = await CompleteAsync(SchemaSystemPrompt, content, "import", ct);
+        if (fail is not null) return PlanImportResult.Fail(fail);
+        if (!TryExtractJson(text!, out var modelJson))
+            return PlanImportResult.Fail("Couldn't read a plan out of that PDF. Is it a training plan?");
+
+        return BuildResult(modelJson, anchor, anchorDate, SanitizeName(System.IO.Path.GetFileNameWithoutExtension(fileName)), "import");
+    }
+
+    public async Task<PlanImportResult> GeneratePlanAsync(PlanSpec spec, CancellationToken ct)
+    {
+        if (_apiKey is null)
+            return PlanImportResult.Fail("AI plan generation isn't configured on the server.");
+
+        var content = new object[] { new { type = "text", text = GenerateUserPrompt(spec) } };
+        var (text, fail) = await CompleteAsync(SchemaSystemPrompt, content, $"generate {spec.Key}", ct);
+        if (fail is not null) return PlanImportResult.Fail(fail);
+        if (!TryExtractJson(text!, out var modelJson))
+            return PlanImportResult.Fail("The AI didn't return a plan.");
+
+        // Templates carry no athlete date; the adopter sets start/target when they take the plan.
+        return BuildResult(modelJson, "start", null, spec.Title, $"generate {spec.Key}");
+    }
+
+    // Shared: parse the model's JSON into our editor doc shape.
+    private PlanImportResult BuildResult(string modelJson, string anchor, string? anchorDate, string fallbackName, string op)
+    {
+        try
+        {
+            using var parsed = JsonDocument.Parse(modelJson);
+            var (doc, name) = Normalize(parsed.RootElement, anchor, anchorDate, fallbackName);
+            return PlanImportResult.Success(doc, name);
+        }
+        catch (JsonException ex)
+        {
+            _log.LogWarning(ex, "Anthropic {Op} produced invalid JSON", op);
+            return PlanImportResult.Fail("The AI response wasn't valid. Try again.");
+        }
+    }
+
+    // Shared: one Messages API call. Returns (text, null) on success or (null, friendlyError) on any
+    // failure — HTTP error, timeout, or a 200 with no text (logged with stop_reason + raw for diagnosis).
+    private async Task<(string? text, string? fail)> CompleteAsync(
+        string systemPrompt, object[] userContent, string op, CancellationToken ct)
+    {
         var body = new
         {
             model = _model,
             max_tokens = MaxTokens,
-            system = SystemPrompt,
-            messages = new object[]
-            {
-                new
-                {
-                    role = "user",
-                    content = new object[]
-                    {
-                        new { type = "document", source = new { type = "base64", media_type = "application/pdf", data = b64 } },
-                        new { type = "text", text = UserPrompt(anchor, anchorDate) },
-                    },
-                },
-            },
+            system = systemPrompt,
+            messages = new object[] { new { role = "user", content = userContent } },
         };
 
         AnthropicResponse? resp;
         string rawJson = "";
         try
         {
-            using var req = new HttpRequestMessage(HttpMethod.Post, Endpoint)
-            {
-                Content = JsonContent.Create(body),
-            };
+            using var req = new HttpRequestMessage(HttpMethod.Post, Endpoint) { Content = JsonContent.Create(body) };
             req.Headers.TryAddWithoutValidation("x-api-key", _apiKey);
             req.Headers.TryAddWithoutValidation("anthropic-version", ApiVersion);
             req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
@@ -95,8 +129,8 @@ public sealed class AnthropicPlanImportService : IPlanImportService
             if (!res.IsSuccessStatusCode)
             {
                 var raw = await res.Content.ReadAsStringAsync(ct);
-                _log.LogWarning("Anthropic plan import failed: {Status} {Body}", (int)res.StatusCode, Truncate(raw, 500));
-                return PlanImportResult.Fail(FriendlyError((int)res.StatusCode, raw));
+                _log.LogWarning("Anthropic {Op} failed: {Status} {Body}", op, (int)res.StatusCode, Truncate(raw, 500));
+                return (null, FriendlyError((int)res.StatusCode, raw));
             }
 
             rawJson = await res.Content.ReadAsStringAsync(ct);
@@ -104,57 +138,41 @@ public sealed class AnthropicPlanImportService : IPlanImportService
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
-            throw; // the caller/client actually aborted the request — let it propagate
+            throw; // caller/host actually aborted — let it propagate
         }
         catch (OperationCanceledException)
         {
-            // HttpClient.Timeout elapsed (thrown as a TaskCanceledException while ct is NOT
-            // cancelled) — a slow/large PDF, not a client abort. Report it, don't 500.
-            _log.LogWarning("Anthropic plan import timed out after {Seconds}s", _http.Timeout.TotalSeconds);
-            return PlanImportResult.Fail("The AI took too long to read that PDF. Try again, or split a very long plan into smaller parts.");
+            _log.LogWarning("Anthropic {Op} timed out after {Seconds}s", op, _http.Timeout.TotalSeconds);
+            return (null, "The AI took too long. Try again.");
         }
         catch (Exception ex)
         {
-            _log.LogWarning(ex, "Anthropic plan import request errored");
-            return PlanImportResult.Fail("Couldn't reach the AI service. Try again.");
+            _log.LogWarning(ex, "Anthropic {Op} request errored", op);
+            return (null, "Couldn't reach the AI service. Try again.");
         }
 
         var text = resp?.Text();
         if (string.IsNullOrWhiteSpace(text))
         {
-            // 200 OK but no text block — capture what actually came back to diagnose (stop_reason,
-            // content block types, first chunk of the raw body).
-            _log.LogWarning("Anthropic plan import returned no text. stop_reason={Stop} types=[{Types}] raw={Raw}",
+            // 200 OK but no text block — capture stop_reason, content block types, and the first chunk
+            // of the raw body so the actual cause is visible in the logs.
+            _log.LogWarning("Anthropic {Op} returned no text. stop_reason={Stop} types=[{Types}] raw={Raw}", op,
                 resp?.StopReason ?? "(none)",
                 resp?.Content is null ? "(null content)" : string.Join(",", resp.Content.Select(b => b.Type ?? "?")),
                 Truncate(rawJson, 1200));
-            return PlanImportResult.Fail("The AI returned an empty response. Try again.");
+            return (null, "The AI returned an empty response. Try again.");
         }
-
-        if (!TryExtractJson(text, out var modelJson))
-            return PlanImportResult.Fail("Couldn't read a plan out of that PDF. Is it a training plan?");
-
-        try
-        {
-            using var parsed = JsonDocument.Parse(modelJson);
-            var fallbackName = SanitizeName(System.IO.Path.GetFileNameWithoutExtension(fileName));
-            var (doc, name) = Normalize(parsed.RootElement, anchor, anchorDate, fallbackName);
-            return PlanImportResult.Success(doc, name);
-        }
-        catch (JsonException ex)
-        {
-            _log.LogWarning(ex, "Anthropic plan import produced invalid JSON");
-            return PlanImportResult.Fail("The AI response wasn't valid. Try again.");
-        }
+        return (text, null);
     }
 
     // ── prompts ──────────────────────────────────────────────────────────────
 
-    private const string SystemPrompt = """
-        You convert an uploaded endurance/triathlon TRAINING PLAN (a PDF) into a strict JSON object for a
-        coaching app. Preserve every session EXACTLY as written — same weeks, days, sports, durations,
-        intensities and notes. Do not invent, summarise, merge, reorder or drop sessions. If a detail is in
-        the plan, it must survive into the JSON. Output ONLY the JSON object — no prose, no markdown fences.
+    private const string SchemaSystemPrompt = """
+        You produce a strict JSON training plan for an endurance/triathlon coaching app. Whether you are
+        transcribing an uploaded plan or building a new one, the output must be a single JSON object in the
+        schema below and NOTHING else — no prose, no markdown fences. When transcribing, preserve every
+        session exactly (same weeks, days, sports, durations, intensities, notes) — never invent, summarise,
+        merge, reorder or drop sessions. When building a new plan, make it realistic and coach-credible.
 
         Schema:
         {
@@ -187,7 +205,7 @@ public sealed class AnthropicPlanImportService : IPlanImportService
           consecutive 7-day weeks in order and map each day onto Mon..Sun within its week.
         """;
 
-    private static string UserPrompt(string anchor, string? anchorDate)
+    private static string ImportUserPrompt(string anchor, string? anchorDate)
     {
         var when = string.IsNullOrWhiteSpace(anchorDate)
             ? "The athlete gave no anchor date."
@@ -196,6 +214,26 @@ public sealed class AnthropicPlanImportService : IPlanImportService
                 : $"The athlete set the plan's week 1 to begin on {anchorDate}.";
         return $"Import this training plan into the JSON schema. {when} Return only the JSON object now.";
     }
+
+    private static string GenerateUserPrompt(PlanSpec spec) => $"""
+        Build a complete, realistic {spec.Weeks}-week {spec.Distance} training plan for an athlete targeting
+        {spec.GoalLabel}. Focus: {spec.Focus}.
+
+        Requirements:
+        - Exactly {spec.Weeks} weeks, keyed "1".."{spec.Weeks}", progressing sensibly: build phase(s) with
+          rising load, a peak, then a taper in the final 1-2 weeks. Include recovery/down weeks (roughly every
+          3rd-4th week). The last week ends on race day.
+        - Each week: set title (e.g. "Base 2", "Peak", "Taper", "Race week"), a realistic weekly targetHrs,
+          a focus line, and daily sessions. Include at least one rest day per week.
+        - Make sessions specific and coach-credible for the {spec.GoalLabel} goal: real workout structure in
+          the title/z/note (e.g. intervals with paces/zones, tempo, long endurance, bricks for triathlon).
+          Put pace/power/HR/zone targets in "z" and extra guidance in "note".
+        - For triathlon distances (70.3, 140.6) balance Swim, Bike and Run across the week and include brick
+          sessions; for run distances (5K/10K/Half/Marathon) centre on Run with optional Gym for strength.
+        - Set planName to "{spec.Distance} — {spec.GoalLabel} ({spec.Weeks} weeks)".
+
+        Return only the JSON object now.
+        """;
 
     // ── normalisation: rebuild the editor doc from whatever the model returned ──
 
