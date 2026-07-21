@@ -59,10 +59,15 @@ body {
 
 /* Persistent global header: sticks to the top of the scroll port, carries the safe-area
    top inset, and sits above scrolling content. */
+/* Total header height (safe-area inset + content), exposed so fixed-height screens
+   (e.g. the chat pane) can size themselves to the remaining space below the header. */
+.phone { --app-header-h: calc(max(env(safe-area-inset-top), 10px) + 55px); }
 .appheader {
   position: sticky;
   top: 0;
   z-index: 20;
+  min-height: var(--app-header-h);
+  box-sizing: border-box;
   padding: max(env(safe-area-inset-top), 10px) 16px 9px;
   background: color-mix(in srgb, var(--bg) 88%, transparent);
   backdrop-filter: blur(12px);

@@ -21,7 +21,6 @@ export default function GroupProfile({ vm, actions, onJoinSquad, payments, meId,
   if (!g) {
     return (
       <div style={s('padding:6px 0 120px;animation:floatUp .35s ease')}>
-        <div style={s('padding:2px 18px 0')}><Back onClick={() => actions.go('discover')} /></div>
         <div style={s('text-align:center;color:var(--text3);font-size:13px;margin-top:64px')}>Loading group…</div>
       </div>
     );
@@ -47,7 +46,7 @@ export default function GroupProfile({ vm, actions, onJoinSquad, payments, meId,
   };
   return (
     <div style={s('padding:6px 0 120px;animation:floatUp .35s ease')}>
-      <div style={s('padding:2px 18px 0')}><Back onClick={() => actions.go('discover')} /></div>
+      {/* back now in the global app header */}
 
       {/* banner — uploaded image when set, else the discipline-tinted gradient */}
       <div style={s(`margin:12px 18px 0;height:96px;border-radius:18px;background:linear-gradient(135deg,${g.color},color-mix(in srgb,${g.color} 40%, var(--bg3)));position:relative;overflow:hidden`)}>

@@ -117,6 +117,15 @@ const HEADER_META = {
   // Coach/group management.
   manage: { title: 'Manage group' },
   ledger: { title: 'Ride payments' },
+  // Tab root + contextual screens (dynamic titles from the view model).
+  plan: { root: true },
+  athlete: { title: (vm) => vm.athlete?.name || 'Athlete' },
+  group: { title: (vm) => vm.selGroupData?.name || 'Group' },
+  recordpay: { title: 'Record a payment' },
+  chat: { title: 'Squad chat' },
+  // Intentionally NOT global-header screens (they have immersive layouts or semantic in-screen
+  // backs the global Back can't replace): feed (hero + overlay back), requests (closeApplicant),
+  // planeditor, checkout (cancelPay), and the full-screen active ride.
 };
 
 export default function App() {
@@ -492,10 +501,11 @@ export default function App() {
   // HEADER_META only lists post-login screens, and logged-out users are always on the
   // chromeless welcome/login flow, so no auth gate is needed here.
   const headerMeta = HEADER_META[state.screen];
+  const headerTitle = typeof headerMeta?.title === 'function' ? headerMeta.title(vm, state) : headerMeta?.title;
   const appHeader = headerMeta && !(state.screen === 'ride' && rideActive)
     ? (
       <AppHeader vm={vm} actions={actions} getToken={getToken} notifUnread={notifUnread}
-        title={headerMeta.title} showBack={!headerMeta.root} rtl={state.lang === 'he'} onSync={onRefresh}
+        title={headerTitle} showBack={!headerMeta.root} rtl={state.lang === 'he'} onSync={onRefresh}
         onSwitchSquad={authed ? squadOps.onSwitchSquad : undefined} />
     )
     : null;

@@ -30,17 +30,11 @@ export default function Messages({ vm, actions, getToken, meId }) {
     : 'background:var(--bg2);border:1px solid var(--line);color:var(--text);border-radius:15px 15px 15px 4px;padding:10px 13px;font-size:13px;line-height:1.4';
 
   return (
-    <div style={s('padding:6px 0 0;animation:floatUp .35s ease;display:flex;flex-direction:column;height:calc(100dvh - max(env(safe-area-inset-top),12px) - 108px)')}>
-      {/* header */}
-      <div style={s('display:flex;align-items:center;gap:11px;padding:2px 18px 12px;border-bottom:1px solid var(--line)')}>
-        <div className="ctl" onClick={() => actions.go('dash')} style={s('width:32px;height:32px;border-radius:9px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center')}>
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round"><path d="M15 6l-6 6 6 6" /></svg>
-        </div>
-        <div style={s('width:36px;height:36px;border-radius:10px;background:var(--accent);flex:none;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:var(--accent-ink)')}>#</div>
-        <div style={s('flex:1')}>
-          <div style={s('font-size:14px;font-weight:700')}>Squad chat</div>
-          <div style={s('font-size:11px;color:' + (status === 'live' ? 'var(--good)' : 'var(--text3)'))}>{live ? (status === 'live' ? '● live' : status) : 'preview'}</div>
-        </div>
+    <div style={s('padding:0;animation:floatUp .35s ease;display:flex;flex-direction:column;height:calc(100dvh - var(--app-header-h) - 108px)')}>
+      {/* title + back now in the global app header; keep a slim connection-status row */}
+      <div style={s('display:flex;align-items:center;gap:9px;padding:6px 18px 10px;border-bottom:1px solid var(--line)')}>
+        <div style={s('width:30px;height:30px;border-radius:9px;background:var(--accent);flex:none;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:var(--accent-ink)')}>#</div>
+        <div style={s('flex:1;font-size:11px;color:' + (status === 'live' ? 'var(--good)' : 'var(--text3)'))}>{live ? (status === 'live' ? '● live' : status) : 'preview'}</div>
       </div>
 
       {/* thread */}

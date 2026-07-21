@@ -16,9 +16,7 @@ export default function AthleteProfile({ vm, state, actions, getToken }) {
   if (!a) {
     return (
       <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
-        <div className="ctl" onClick={() => actions.go(state.profileBack || 'dash')} style={s('width:34px;height:34px;border-radius:10px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center')}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round"><path d="M15 6l-6 6 6 6" /></svg>
-        </div>
+        {/* back now in the global app header */}
         <EmptyState icon="👤" title="Athlete not found" sub="This profile isn't available." />
       </div>
     );
@@ -28,15 +26,7 @@ export default function AthleteProfile({ vm, state, actions, getToken }) {
     : () => actions.toggleFollow(a.id);
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
-      {/* header */}
-      <div style={s('display:flex;align-items:center;justify-content:space-between')}>
-        <div className="ctl" onClick={() => actions.go(state.profileBack || 'dash')} style={s('width:34px;height:34px;border-radius:10px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center')}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round"><path d="M15 6l-6 6 6 6" /></svg>
-        </div>
-        <div style={s('font-size:12px;color:var(--text3);font-weight:600')}>{a.isMe ? 'Your public profile' : 'Athlete'}</div>
-        <div style={s('width:34px')} />
-      </div>
-
+      {/* name + back now in the global app header */}
       {/* identity */}
       <div style={s('display:flex;align-items:center;gap:14px;margin-top:14px')}>
         <Avatar photo={a.photo} initials={a.initials} color={a.color} size={64} radius={20} fontSize={22} />
