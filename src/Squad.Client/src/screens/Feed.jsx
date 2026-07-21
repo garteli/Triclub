@@ -103,7 +103,7 @@ function AthleteTitle({ a, token, onAthlete }) {
         </div>
         <div style={s(`background:color-mix(in srgb,${a.sportColor} 16%,transparent);color:${a.sportColor};font-size:10px;font-weight:700;padding:4px 9px;border-radius:7px;text-transform:uppercase;flex:none`)}>{a.sport}</div>
       </div>
-      <div style={s('font-size:27px;font-weight:700;letter-spacing:-.7px;margin-top:14px')}>{a.title}</div>
+      <div style={s('font-size:27px;font-weight:700;letter-spacing:-.7px;margin-top:14px;text-align:right')}>{a.title}</div>
     </div>
   );
 }
