@@ -8,7 +8,7 @@ const DEFAULT_PAGES = [
   // rows of two — no ragged half-empty last row. See balanceHero().
   { name: 'Overview', side: 'none', layout: 'hero', heroIndex: 0, fields: ['spd', 'time', 'dist', 'hr', 'pwr', 'cad', 'grad'] },
   { name: 'Climb', side: 'group', layout: 'grid', fields: ['grad', 'elev', 'spd', 'hr'] },
-  { name: 'Group', side: 'group', layout: 'grid', fields: ['spd', 'avgspd', 'hr', 'dist'] },
+  { name: 'Group', side: 'group', layout: 'grid', fields: ['leader', 'packpos', 'gap', 'spd'] },
   // Peloton spread — a single full tile: 2D pack layout + "% time in lead" board.
   { name: 'Peloton', side: 'none', layout: 'grid', fields: ['peloton'] },
   { name: 'Gear', side: 'none', layout: 'grid', fields: ['gear', 'gearratio', 'di2', 'cad'] },

@@ -78,6 +78,9 @@ export const metricCatalog = {
   kcal: { label: 'Calories', unit: 'kcal', cat: 'Other' },
   temp: { label: 'Temperature', unit: '°C', cat: 'Other' },
   gap: { label: 'Pack gap', unit: 'm', cat: 'Other' },
+  leader: { label: 'Leader', unit: '', cat: 'Other' },
+  leadgap: { label: 'Gap to Leader', unit: 'm', cat: 'Other' },
+  packpos: { label: 'Pack Position', unit: '', cat: 'Other' },
   leadpct: { label: 'Time in Lead', unit: '%', cat: 'Other' },
   resp: { label: 'Respiration', unit: 'brpm', cat: 'Other' },
   battery: { label: 'Battery', unit: '%', cat: 'Other' },
@@ -86,6 +89,25 @@ export const metricCatalog = {
 // Category order for the field picker (mirrors the Garmin data-field grouping).
 export const metricGroups = ['Timers', 'Distance', 'Speed', 'Cadence', 'Heart Rate', 'Power', 'Elevation', 'Navigation', 'Gears', 'Other']
   .map((cat) => [cat, Object.keys(metricCatalog).filter((tok) => metricCatalog[tok].cat === cat)]);
+
+// Who's on the front, your gap to them, and your place in the pack. Order is by along-route
+// progress (distance-covered) — the reliable signal that needs no BLE/UWB direction, only that
+// riders are streaming. Prefers the server-designated leaderId, falling back to the furthest rider.
+function packVals(tel) {
+  const riders = (tel?.riders || []).map((r) => ({ ...r, d: parseFloat(r.dist) || 0 }));
+  if (riders.length < 1) return { leader: { v: DASH }, leadgap: { v: DASH }, packpos: { v: DASH } };
+  const byDist = riders.slice().sort((a, b) => b.d - a.d);
+  const lid = tel?.peloton?.leaderId;
+  const leader = (lid && byDist.find((r) => String(r.athleteId).toLowerCase() === String(lid).toLowerCase())) || byDist[0];
+  const you = riders.find((r) => r.you);
+  const gapM = you && leader ? Math.max(0, Math.round((leader.d - you.d) * 1000)) : null;
+  const rank = you ? byDist.findIndex((r) => r.you) + 1 : null;
+  return {
+    leader: { v: leader?.you ? 'You' : (leader?.initials || '··'), color: leader?.you ? 'var(--accent)' : undefined },
+    leadgap: { v: gapM == null ? DASH : String(gapM), color: gapM === 0 ? 'var(--good)' : undefined },
+    packpos: { v: rank ? `${rank}/${riders.length}` : DASH, color: rank === 1 ? 'var(--accent)' : undefined },
+  };
+}
 
 // Instant metric values keyed by token — { v, color? }. Fields backed by a real
 // telemetry source resolve to a live number; everything else stays "—".
@@ -121,6 +143,8 @@ export function liveMetricValues(tel) {
     kcal: { v: r0(tel?.kcal) }, temp: { v: DASH },
     // Fused metres to the nearest teammate (phone-to-phone BLE ranging). "—" until ranged.
     gap: { v: r0(tel?.gap), color: tel?.gap == null ? 'var(--behind)' : 'var(--good)' },
+    // Who leads, your gap to them, and your place in the pack (from along-route order).
+    ...packVals(tel),
     // Share of ride time you've spent on the front of the pack (needs ≥2 riders streaming).
     leadpct: { v: tel?.peloton?.youLeadPct == null ? DASH : String(Math.round(tel.peloton.youLeadPct * 100)) },
     resp: { v: DASH }, battery: { v: DASH },
