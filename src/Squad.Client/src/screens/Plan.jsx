@@ -1,7 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { s, html } from '../lib/style.js';
 import EmptyState from '../components/EmptyState.jsx';
-import SquadEvents from '../components/SquadEvents.jsx';
+import SportIcon from '../components/SportIcon.jsx';
+import AuthedImage from '../components/AuthedImage.jsx';
+import { listSquadEvents, joinEvent, leaveEvent } from '../lib/events.js';
+
+const glyphForSport = (sport, family) =>
+  family === 'motorsport' ? 'moto' : ({ 1: 'swim', 2: 'bike', 3: 'run' }[sport] || 'bike');
 
 const fmtRange = (a, b) => {
   const f = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
@@ -171,6 +176,63 @@ export default function Plan({ vm, state, actions, planMine, live, meId, getToke
     ? 'background:var(--accent);color:var(--accent-ink)'
     : 'background:var(--bg3);color:var(--text2);border:1px solid var(--line)';
 
+  // Group sessions the coach scheduled are shown as sessions in the plan — unified with the
+  // workouts, so a week with only a group ride no longer reads as "No sessions planned".
+  const [events, setEvents] = useState([]);
+  const [evBusyId, setEvBusyId] = useState(null);
+  const loadEvents = useCallback(async () => {
+    if (!vm.activeClubId || !getToken) { setEvents([]); return; }
+    try { setEvents((await listSquadEvents(await getToken(), vm.activeClubId)) || []); } catch { setEvents([]); }
+  }, [vm.activeClubId, getToken]);
+  useEffect(() => { loadEvents(); }, [loadEvents]);
+
+  // Monday of the displayed week (mirrors App's planWeekStart) → that week's events.
+  const weekStart = useMemo(() => {
+    const n = new Date();
+    const d = new Date(n.getFullYear(), n.getMonth(), n.getDate() - ((n.getDay() + 6) % 7) + state.planWeekOffset * 7);
+    d.setHours(0, 0, 0, 0); return d;
+  }, [state.planWeekOffset]);
+  const byStart = (a, b) => new Date(a.start) - new Date(b.start);
+  const weekEvents = useMemo(() => {
+    const end = new Date(weekStart); end.setDate(end.getDate() + 7);
+    return (events || []).filter((e) => { const t = new Date(e.start); return t >= weekStart && t < end; }).sort(byStart);
+  }, [events, weekStart]);
+  const upcomingEvents = useMemo(() => (events || []).slice().sort(byStart), [events]);
+  const evToken = getToken?.();
+
+  const toggleJoin = async (ev) => {
+    setEvBusyId(ev.id);
+    try { const t = await getToken?.(); if (ev.joined) await leaveEvent(t, ev.id); else await joinEvent(t, ev.id); await loadEvents(); }
+    catch { /* ignore */ } finally { setEvBusyId(null); }
+  };
+  const renderEvent = (ev) => {
+    const d = new Date(ev.start);
+    const busy = evBusyId === ev.id;
+    return (
+      <div key={`ev-${ev.id}`} className="ctl" onClick={() => actions.openEvent(ev)}
+        style={s('background:var(--bg2);border:1px solid color-mix(in srgb,var(--accent) 28%,var(--line));border-radius:16px;padding:12px 13px;display:flex;gap:12px;align-items:center')}>
+        <div style={s('flex:none;width:38px;text-align:center')}>
+          <div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600')}>{d.toLocaleDateString('en-US', { weekday: 'short' })}</div>
+          <div className="mono" style={s('font-size:17px;font-weight:700')}>{Number.isNaN(d.getTime()) ? '—' : d.getDate()}</div>
+        </div>
+        <div style={s('width:1px;height:34px;background:var(--line)')} />
+        <div style={s('width:36px;height:36px;border-radius:11px;background:var(--accent-dim);color:var(--accent);flex:none;display:flex;align-items:center;justify-content:center;overflow:hidden')}>
+          {ev.logoUrl ? <AuthedImage url={ev.logoUrl} token={evToken} style="width:100%;height:100%;object-fit:cover" /> : <SportIcon name={glyphForSport(ev.sport, vm.family)} size={18} />}
+        </div>
+        <div style={s('flex:1;min-width:0')}>
+          <div style={s('font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>{ev.title}</div>
+          <div style={s('font-size:11.5px;color:var(--text2)')}>{d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}{ev.courseName ? ` · ${ev.courseName}` : ''} · {ev.joinCount || 0} going</div>
+        </div>
+        <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : (e) => { e.stopPropagation(); toggleJoin(ev); }}
+          style={s(ev.joined
+            ? 'flex:none;font-size:11px;font-weight:700;color:var(--text3);padding:7px 11px;border-radius:9px;border:1px solid var(--line)'
+            : 'flex:none;font-size:11px;font-weight:700;color:var(--accent-ink);background:var(--accent);padding:7px 13px;border-radius:9px')}>
+          {busy ? '…' : ev.joined ? 'Going' : 'Join'}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <>
       <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
@@ -232,8 +294,8 @@ export default function Plan({ vm, state, actions, planMine, live, meId, getToke
               <div style={s('flex:1;text-align:center')}><div className="mono" style={s('font-size:18px;font-weight:700')}>{sm.done}<span style={s('font-size:11px;color:var(--text2)')}>/{sm.total}</span></div><div style={s('font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.7px')}>Done</div></div>
             </div>
             ); })()}
-            {vm.plan.length === 0 && (
-              <EmptyState icon="📅" title="No sessions planned" sub="Your coach's weekly plan will appear here once it's set." />
+            {vm.plan.length === 0 && weekEvents.length === 0 && (
+              <EmptyState icon="📅" title="No sessions planned" sub="Your coach's workouts and group rides for this week show up here." />
             )}
             <div style={s('display:flex;flex-direction:column;gap:9px')}>
               {vm.plan.map((p) => (
@@ -245,6 +307,8 @@ export default function Plan({ vm, state, actions, planMine, live, meId, getToke
                   <div style={s('text-align:right;flex:none')}><span style={s(`font-size:9.5px;font-weight:700;padding:3px 7px;border-radius:6px;color:${p.badgeC};background:${p.badgeBg}`)}>{p.badgeT}</span><div className="mono" style={s('font-size:11px;color:var(--text3);margin-top:5px')}>{p.dur} · {p.load}</div></div>
                 </div>
               ))}
+              {/* group rides sit in the same session list — with a Join action */}
+              {weekEvents.map(renderEvent)}
             </div>
           </>
         ) : (
@@ -265,15 +329,13 @@ export default function Plan({ vm, state, actions, planMine, live, meId, getToke
                 <div key={lbl} style={s('display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)')}><span style={s(`width:8px;height:8px;border-radius:50%;background:${col}`)} />{lbl}</div>
               ))}
             </div>
+            {upcomingEvents.length > 0 && (
+              <>
+                <div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.4px;font-weight:600;margin:22px 2px 10px')}>Group sessions</div>
+                <div style={s('display:flex;flex-direction:column;gap:9px')}>{upcomingEvents.map(renderEvent)}</div>
+              </>
+            )}
           </>
-        )}
-
-        {/* club group sessions the coach scheduled — members join here and check in on the day
-            from the Live page. Collapses when there's nothing upcoming. */}
-        {vm.activeClubId && (
-          <div style={s('margin-top:20px')}>
-            <SquadEvents squadId={vm.activeClubId} getToken={getToken} mode="browse" disc={vm.activeSquad?.disc} onOpen={(ev) => actions.openEvent(ev)} />
-          </div>
         )}
       </div>
 
