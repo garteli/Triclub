@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { s } from '../lib/style.js';
 import { BASEMAP_LABEL, baseSource, applyBasemap, nextBasemap, inIsrael } from '../lib/basemaps.js';
 import { getRouteStyle, setRouteStyle as persistRouteStyle, ROUTE_COLORS, ROUTE_WIDTHS } from '../lib/routeStyle.js';
+import { addRouteArrows } from '../lib/mapArrows.js';
 import AuthedAvatar from './AuthedAvatar.jsx';
 
 // Full-screen 3D route map (MapLibre GL): our CARTO basemap draped over free AWS terrain
@@ -11,20 +12,6 @@ import AuthedAvatar from './AuthedAvatar.jsx';
 // bundle. Portaled to <body> so it's a true viewport overlay (and reliably exitable).
 const glass = 'background:rgba(20,23,29,.82);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.14);color:#fff';
 const validPts = (route) => (route || []).filter((p) => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]));
-
-// A white, dark-haloed chevron drawn to a canvas — placed repeatedly ALONG the route (symbol-
-// placement:line), so each one auto-rotates to the travel direction (start→end). Returns ImageData
-// for map.addImage.
-function makeArrowImage() {
-  const S = 30, cv = document.createElement('canvas');
-  cv.width = S; cv.height = S;
-  const x = cv.getContext('2d');
-  x.lineCap = 'round'; x.lineJoin = 'round';
-  const chevron = () => { x.beginPath(); x.moveTo(S * 0.36, S * 0.24); x.lineTo(S * 0.64, S * 0.5); x.lineTo(S * 0.36, S * 0.76); x.stroke(); };
-  x.strokeStyle = 'rgba(0,0,0,.5)'; x.lineWidth = S * 0.2; chevron();  // halo for contrast on any basemap
-  x.strokeStyle = '#fff'; x.lineWidth = S * 0.12; chevron();          // white chevron
-  return x.getImageData(0, 0, S, S);
-}
 
 const buildStyle = (style) => ({
   version: 8,
@@ -83,12 +70,7 @@ export default function FullMap({ route, style: initialStyle = 'voyager', a, tok
             map.addSource('route', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: pts.map(([la, lo]) => [lo, la]) } } });
             map.addLayer({ id: 'route', type: 'line', source: 'route', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': rs.color, 'line-width': rs.width } });
             // Direction chevrons repeated along the route (auto-rotated to travel direction).
-            let arrowsOk = false;
-            try { if (!map.hasImage('route-arrow')) map.addImage('route-arrow', makeArrowImage(), { pixelRatio: 2 }); arrowsOk = true; } catch { arrowsOk = false; }
-            if (arrowsOk) map.addLayer({ id: 'route-arrows', type: 'symbol', source: 'route', layout: {
-              'symbol-placement': 'line', 'symbol-spacing': 85, 'icon-image': 'route-arrow', 'icon-size': 0.62,
-              'icon-rotation-alignment': 'map', 'icon-allow-overlap': true, 'icon-ignore-placement': true,
-            } });
+            addRouteArrows(map, 'route', 'route-arrows');
             // Start/end as circle layers (canvas-rendered, same reliable path as the line).
             map.addSource('ends', { type: 'geojson', data: { type: 'FeatureCollection', features: [
               { type: 'Feature', properties: { c: '#4fe08b' }, geometry: { type: 'Point', coordinates: [pts[0][1], pts[0][0]] } },
