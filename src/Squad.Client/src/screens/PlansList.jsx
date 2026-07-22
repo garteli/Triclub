@@ -11,7 +11,10 @@ const fmtWhen = (iso) => {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 };
 
-export default function PlansList({ plans, actions }) {
+export default function PlansList({ plans, actions, vm }) {
+  // Motorsport clubs don't run structured training plans, so the ready-made plan library
+  // (endurance race plans) is hidden for them.
+  const isMotor = vm?.family === 'motorsport';
   const [items, setItems] = useState(null); // null = loading
   const [error, setError] = useState('');
   const [busyId, setBusyId] = useState(null);
@@ -54,15 +57,17 @@ export default function PlansList({ plans, actions }) {
     <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
       {/* title + back now in the global app header */}
 
-      {/* browse the library (primary) — a ready-made plan for your race + goal */}
-      <div className="ctl" onClick={() => actions.go('planlibrary')} style={s('display:flex;align-items:center;gap:12px;background:var(--accent);color:var(--accent-ink);border-radius:16px;padding:15px 16px;font-weight:700;font-size:14.5px;margin-top:16px')}>
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
-        <div style={s('flex:1;min-width:0')}>
-          <div>Browse the plan library</div>
-          <div style={s('font-size:11.5px;font-weight:600;opacity:.75;margin-top:1px')}>Ready-made plans for your race & goal time</div>
+      {/* browse the library (primary) — a ready-made plan for your race + goal (endurance only) */}
+      {!isMotor && (
+        <div className="ctl" onClick={() => actions.go('planlibrary')} style={s('display:flex;align-items:center;gap:12px;background:var(--accent);color:var(--accent-ink);border-radius:16px;padding:15px 16px;font-weight:700;font-size:14.5px;margin-top:16px')}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
+          <div style={s('flex:1;min-width:0')}>
+            <div>Browse the plan library</div>
+            <div style={s('font-size:11.5px;font-weight:600;opacity:.75;margin-top:1px')}>Ready-made plans for your race & goal time</div>
+          </div>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
         </div>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
-      </div>
+      )}
 
       {/* new (blank) plan */}
       <div className="ctl" onClick={() => plans?.create?.()} style={s('display:flex;align-items:center;justify-content:center;gap:8px;background:var(--bg2);border:1px solid var(--line);color:var(--text);border-radius:14px;padding:12px 14px;font-weight:700;font-size:13.5px;margin-top:10px')}>
