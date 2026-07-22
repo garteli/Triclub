@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { s } from '../lib/style.js';
-import { BASEMAP_LABEL, baseSource, applyBasemap, nextBasemap } from '../lib/basemaps.js';
+import { BASEMAP_LABEL, baseSource, applyBasemap, nextBasemap, setTrailsOverlay } from '../lib/basemaps.js';
 
 // Interactive live-ride map tile: a real MapLibre basemap you can pinch-zoom, pan and rotate,
 // with the course route + your breadcrumb, and each rider as a coloured dot with their initials.
@@ -79,6 +79,7 @@ export default function LiveMapGL({ pts, course, path, riders, mySport, interact
   const [failed, setFailed] = useState(false);
   const [basemap, setBasemap] = useState('voyager'); // cycle Voyager → Light → Dark → Off-road
   const basemapRef = useRef('voyager');
+  const [trailsOn, setTrailsOn] = useState(false); // marked-trails overlay
 
   // Create the map once.
   useEffect(() => {
@@ -250,8 +251,14 @@ export default function LiveMapGL({ pts, course, path, riders, mySport, interact
   useEffect(() => {
     basemapRef.current = basemap;
     const map = mapRef.current;
-    if (map && readyRef.current) applyBasemap(map, basemap, 'course');
+    if (map && readyRef.current) applyBasemap(map, basemap);
   }, [basemap]);
+
+  // Toggle the marked-trails overlay (kept beneath the course line, above the basemap).
+  useEffect(() => {
+    const map = mapRef.current;
+    if (map && readyRef.current) setTrailsOverlay(map, trailsOn, 'course');
+  }, [trailsOn]);
 
   // Enable/disable gesture handlers (off during tile drag-reorder so the tile can be dragged).
   useEffect(() => {
@@ -280,6 +287,13 @@ export default function LiveMapGL({ pts, course, path, riders, mySport, interact
           // compass N
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7l2.5 6L12 12l-2.5 1z" fill="currentColor" stroke="none" /><text x="12" y="6" fontSize="4.5" textAnchor="middle" fill="currentColor" stroke="none">N</text></svg>
         )}
+      </div>
+      {/* Marked-trails overlay toggle (stacked above the basemap button) */}
+      <div
+        className="ctl" onPointerDown={stop} onClick={(e) => { stop(e); setTrailsOn((v) => !v); }}
+        title={trailsOn ? 'Hide marked trails' : 'Show marked trails'}
+        style={s(`position:absolute;bottom:50px;right:8px;z-index:3;width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--bg) 78%,transparent);border:1px solid ${trailsOn ? 'color-mix(in srgb,var(--accent) 55%,transparent)' : 'var(--line2)'};color:${trailsOn ? 'var(--accent)' : 'var(--text)'}`)}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3v13a3 3 0 0 0 6 0V8a3 3 0 0 1 6 0v13" /><path d="M4 3h4M16 21h4" /></svg>
       </div>
       {/* Basemap cycle (Voyager → Light → Dark → Off-road) */}
       <div
