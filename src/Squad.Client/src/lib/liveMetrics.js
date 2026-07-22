@@ -90,6 +90,12 @@ export const metricCatalog = {
 export const metricGroups = ['Timers', 'Distance', 'Speed', 'Cadence', 'Heart Rate', 'Power', 'Elevation', 'Navigation', 'Gears', 'Other']
   .map((cat) => [cat, Object.keys(metricCatalog).filter((tok) => metricCatalog[tok].cat === cat)]);
 
+// The field picker filtered to a discipline family. Motorsport rides have no power meter,
+// pedalling cadence, or drivetrain gears — hide those whole categories from the picker.
+const MOTOR_HIDE_CATS = new Set(['Cadence', 'Power', 'Gears']);
+export const metricGroupsFor = (family) =>
+  family === 'motorsport' ? metricGroups.filter(([cat]) => !MOTOR_HIDE_CATS.has(cat)) : metricGroups;
+
 // Who's on the front, your gap to them, and your place in the pack. Order is by along-route
 // progress (distance-covered) — the reliable signal that needs no BLE/UWB direction, only that
 // riders are streaming. Prefers the server-designated leaderId, falling back to the furthest rider.
