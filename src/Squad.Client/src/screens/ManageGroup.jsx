@@ -302,7 +302,7 @@ export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged
       {inviteMsg && <div style={s('color:var(--good);font-size:12px;margin-top:8px;text-align:center')}>{inviteMsg}</div>}
 
       {/* ---- group sessions (coach schedules an ad-hoc ride/run/swim for the squad) ---- */}
-      <div style={s('margin-top:22px')}><SquadEvents squadId={g.id} getToken={getToken} mode="manage" /></div>
+      <div style={s('margin-top:22px')}><SquadEvents squadId={g.id} getToken={getToken} mode="manage" disc={g.disc} /></div>
 
       {/* ---- group targets (coach sets club races from an event link) ---- */}
       <div style={s('margin-top:22px')}><GroupTargets squadId={g.id} getToken={getToken} mode="manage" /></div>
