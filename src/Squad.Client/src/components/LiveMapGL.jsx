@@ -144,7 +144,8 @@ export default function LiveMapGL({ pts, course, path, riders, mySport, interact
     if (!list.some((r) => r.you)) {
       const yp = youPos(riders, path);
       const yr = (riders || []).find((r) => r.you);
-      if (yp) list.push({ lat: yp[0], lon: yp[1], initials: yr?.initials || 'You', color: resolveColor(yr?.color || 'var(--accent)'), you: true });
+      // Carry the driver flag through so a positionless driver still shows the car (not a plain dot).
+      if (yp) list.push({ lat: yp[0], lon: yp[1], initials: yr?.initials || 'You', color: resolveColor(yr?.color || 'var(--accent)'), you: true, driver: yr?.driver || mySport === 'driver' });
     }
 
     // Greedy cluster by on-screen pixel distance.
