@@ -71,6 +71,9 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, onE
   // sent with the FIT upload so the saved activity is attributed to the event. Survives reload
   // via the draft. Null for an ad-hoc ride.
   const eventIdRef = useRef(null);
+  // Reactive mirror of "which event is being recorded right now" (null for an ad-hoc ride) — the
+  // lobby uses it to swap an event's Start/Join buttons for a live progress row. Cleared on stop.
+  const [activeEventId, setActiveEventId] = useState(null);
   const [paused, setPaused] = useState(false);       // web: backgrounded / screen locked
   const [distanceKm, setDistanceKm] = useState(0);
   const [elapsedSec, setElapsedSec] = useState(0);   // wall-clock since the ride started, ticks live
@@ -257,6 +260,7 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, onE
     setPending(null); setSaveState('idle'); setSaveError(null); setPhotos([]);
     resetCapture(); setDistanceKm(0); setElapsedSec(0);
     eventIdRef.current = opts?.eventId ?? null; // attribute this ride to a group event, if started from one
+    setActiveEventId(opts?.eventId ?? null);
     startedAtRef.current = Date.now();
     clearDraft(); // a fresh ride supersedes any recovered draft
     try {
@@ -287,6 +291,7 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, onE
   // Stop the location source and hand the ride to the save/discard summary card.
   const stop = useCallback(async () => {
     recordingRef.current = false; // close the onSample gate FIRST — ignore any in-flight fixes
+    setActiveEventId(null);       // recording ended — the event card returns to its normal state
     try { await source.current?.stop?.(); } catch { /* ignore */ }
     source.current = null;
     await releaseWakeLock();
@@ -506,6 +511,6 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, onE
     recording, paused, autoPaused, distanceKm, elapsedSec, lastFix, error, mode, start, stop,
     pending, saveState, saveError, saveRide, discardRide,
     photos, addPhoto, removePhoto,
-    getPath,
+    getPath, activeEventId,
   };
 }

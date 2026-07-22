@@ -137,7 +137,9 @@ function RideSummary({ pending, saveState, saveError, saveRide, discardRide, pho
 // Presentational: the shared recorder + sensors are owned by App (so recording and the
 // hub connection persist across lobby→active). `streaming` reflects whether fixes are
 // going to the ride hub.
-export default function RideRecorder({ recorder, sensors, streaming }) {
+export default function RideRecorder({ recorder, sensors, streaming, sport }) {
+  // Off-road motorcycle rides only surface heart rate — no power meter or (rear) radar.
+  const hrOnly = sport === 'offroad';
   const { recording, paused, autoPaused, distanceKm, elapsedSec, lastFix, error, mode, start, stop,
           pending, saveState, saveError, saveRide, discardRide,
           photos, addPhoto, removePhoto } = recorder;
@@ -208,11 +210,11 @@ export default function RideRecorder({ recorder, sensors, streaming }) {
         {!streaming && <span style={s('font-size:10px;color:var(--text3)')}>local · not streaming</span>}
       </div>
 
-      {/* BLE sensors — tap to pair / unpair */}
+      {/* BLE sensors — tap to pair / unpair. Off-road rides show HR only. */}
       <div style={s('display:flex;gap:8px;margin-top:12px')}>
         <SensorChip label="HR" kind="hr" status={sensors.status.hr} value={sensors.metrics.heartRate ?? '—'} connect={sensors.connect} disconnect={sensors.disconnect} />
-        <SensorChip label="Power" kind="power" status={sensors.status.power} value={sensors.metrics.powerW != null ? `${sensors.metrics.powerW}W` : '—'} connect={sensors.connect} disconnect={sensors.disconnect} />
-        <SensorChip label="Radar" kind="radar" status={sensors.status.radar} value={radarLabel(radar)} connect={sensors.connect} disconnect={sensors.disconnect} />
+        {!hrOnly && <SensorChip label="Power" kind="power" status={sensors.status.power} value={sensors.metrics.powerW != null ? `${sensors.metrics.powerW}W` : '—'} connect={sensors.connect} disconnect={sensors.disconnect} />}
+        {!hrOnly && <SensorChip label="Radar" kind="radar" status={sensors.status.radar} value={radarLabel(radar)} connect={sensors.connect} disconnect={sensors.disconnect} />}
       </div>
 
       {/* radar threat banner */}

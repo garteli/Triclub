@@ -82,6 +82,9 @@ function TodayRides({ live, actions }) {
         {items.map((ev) => {
           const busy = busyId === ev.id;
           const sub = [fmtEventTime(ev.start), ev.courseName, ev.courseKm ? `${ev.courseKm.toFixed(1)} km` : null].filter(Boolean).join(' · ');
+          // Recording THIS event right now → swap the join/check-in/start controls for a live row.
+          const rec = live?.recorder;
+          const recordingThis = !!rec?.recording && rec?.activeEventId === ev.id;
           return (
             <div key={ev.id} style={s('background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:12px 13px')}>
               <div style={s('display:flex;align-items:flex-start;gap:10px')}>
@@ -90,20 +93,32 @@ function TodayRides({ live, actions }) {
                   {sub && <div style={s('font-size:11.5px;color:var(--text2);margin-top:1px')}>{sub}</div>}
                   <div style={s('font-size:10.5px;color:var(--text3);margin-top:2px')}>{ev.joinCount || 0} going{ev.checkedInCount ? ` · ${ev.checkedInCount} checked in` : ''} · Details ›</div>
                 </div>
-                {ev.joined
+                {!recordingThis && (ev.joined
                   ? <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : () => run(ev.id, () => live.events.leave(ev.id))} style={s('flex:none;font-size:11.5px;font-weight:700;color:var(--text3);padding:7px 11px;border-radius:9px;border:1px solid var(--line)')}>Leave</div>
-                  : <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : () => run(ev.id, () => live.events.join(ev.id))} style={s('flex:none;font-size:11.5px;font-weight:700;color:var(--accent-ink);background:var(--accent);padding:7px 13px;border-radius:9px')}>Join</div>}
+                  : <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : () => run(ev.id, () => live.events.join(ev.id))} style={s('flex:none;font-size:11.5px;font-weight:700;color:var(--accent-ink);background:var(--accent);padding:7px 13px;border-radius:9px')}>Join</div>)}
               </div>
-              <div style={s('display:flex;gap:8px;margin-top:11px')}>
-                {ev.myActivityId
-                  ? <div className="ctl" onClick={() => actions.openActivity?.(ev.myActivityId)} style={s('flex:1;text-align:center;font-size:12px;font-weight:700;padding:10px;border-radius:11px;background:color-mix(in srgb,var(--good) 14%,var(--bg2));border:1px solid color-mix(in srgb,var(--good) 30%,transparent);color:var(--good)')}>✓ Rode this · View</div>
-                  : ev.checkedIn
-                    ? <div style={s('flex:1;text-align:center;font-size:12px;font-weight:700;padding:10px;border-radius:11px;background:color-mix(in srgb,var(--good) 14%,var(--bg2));border:1px solid color-mix(in srgb,var(--good) 30%,transparent);color:var(--good)')}>✓ Checked in</div>
-                    : ev.joined
-                      ? <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : () => run(ev.id, () => live.events.checkIn(ev.id))} style={s('flex:1;text-align:center;font-size:12.5px;font-weight:700;padding:10px;border-radius:11px;background:var(--bg3);border:1px solid var(--line);color:var(--text)')}>Check in</div>
-                      : null}
-                <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : () => startEvent(ev)} style={s('flex:1.2;text-align:center;font-size:12.5px;font-weight:700;padding:10px;border-radius:11px;background:var(--accent);color:var(--accent-ink)')}>{busy ? '…' : 'Start ride'}</div>
-              </div>
+              {recordingThis ? (
+                // Checked in + recording this ride — show live progress instead of the actions.
+                <div className="ctl" onClick={() => actions.startRide()}
+                  style={s('display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:11px;padding:10px 13px;border-radius:11px;background:color-mix(in srgb,var(--bad) 12%,var(--bg2));border:1px solid color-mix(in srgb,var(--bad) 30%,transparent)')}>
+                  <div style={s('display:flex;align-items:center;gap:8px')}>
+                    <span style={s('width:8px;height:8px;border-radius:50%;background:var(--bad);animation:pulseDot 1.2s infinite;flex:none')} />
+                    <span style={s('font-size:12.5px;font-weight:700;color:var(--bad)')}>Recording</span>
+                  </div>
+                  <span className="mono" style={s('font-size:13px;font-weight:700;color:var(--text)')}>{mmss(rec.elapsedSec)} · {(rec.distanceKm || 0).toFixed(2)} km ›</span>
+                </div>
+              ) : (
+                <div style={s('display:flex;gap:8px;margin-top:11px')}>
+                  {ev.myActivityId
+                    ? <div className="ctl" onClick={() => actions.openActivity?.(ev.myActivityId)} style={s('flex:1;text-align:center;font-size:12px;font-weight:700;padding:10px;border-radius:11px;background:color-mix(in srgb,var(--good) 14%,var(--bg2));border:1px solid color-mix(in srgb,var(--good) 30%,transparent);color:var(--good)')}>✓ Rode this · View</div>
+                    : ev.checkedIn
+                      ? <div style={s('flex:1;text-align:center;font-size:12px;font-weight:700;padding:10px;border-radius:11px;background:color-mix(in srgb,var(--good) 14%,var(--bg2));border:1px solid color-mix(in srgb,var(--good) 30%,transparent);color:var(--good)')}>✓ Checked in</div>
+                      : ev.joined
+                        ? <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : () => run(ev.id, () => live.events.checkIn(ev.id))} style={s('flex:1;text-align:center;font-size:12.5px;font-weight:700;padding:10px;border-radius:11px;background:var(--bg3);border:1px solid var(--line);color:var(--text)')}>Check in</div>
+                        : null}
+                  <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : () => startEvent(ev)} style={s('flex:1.2;text-align:center;font-size:12.5px;font-weight:700;padding:10px;border-radius:11px;background:var(--accent);color:var(--accent-ink)')}>{busy ? '…' : 'Start ride'}</div>
+                </div>
+              )}
             </div>
           );
         })}
@@ -175,7 +190,7 @@ function Lobby({ vm, actions, live }) {
       )}
 
       {/* shared recorder — GPS + BLE sensors, streams to the ride hub while active */}
-      <RideRecorder recorder={live?.recorder} sensors={live?.sensors} streaming={!!live?.pushTelemetry} />
+      <RideRecorder recorder={live?.recorder} sensors={live?.sensors} streaming={!!live?.pushTelemetry} sport={live?.rideType?.value} />
 
       {/* Bike & gear — connected BLE components (battery from the sensors, when they report it) */}
       <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:14px;margin-top:14px')}>
@@ -208,8 +223,9 @@ function Lobby({ vm, actions, live }) {
         <div className="ctl" onClick={() => actions.go('sensors')} style={s('margin-top:12px;text-align:center;padding:9px;border-radius:11px;font-size:12px;font-weight:700;background:var(--bg3);border:1px dashed var(--line2);color:var(--text2)')}>+ Pair a component</div>
       </div>
 
-      {/* course to follow on the live map */}
-      {live?.courses && (
+      {/* course to follow on the live map — hidden once a ride is recording (the route is locked;
+          an event ride already follows the event's course) */}
+      {live?.courses && !live?.recorder?.recording && (
         <div className="ctl" onClick={() => setCoursesOpen(true)} style={s('display:flex;align-items:center;gap:11px;background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:13px 14px;margin-top:14px')}>
           <div style={s('width:36px;height:36px;border-radius:11px;background:var(--accent-dim);flex:none;display:flex;align-items:center;justify-content:center;color:var(--accent)')}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 20l-5.5 2 1-5.5L15 3l4 4L9 20z" /><path d="M13.5 4.5l4 4" /></svg>
