@@ -1,22 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { s } from '../lib/style.js';
+import { BASEMAP_ORDER, BASEMAP_LABEL, baseSource, applyBasemap } from '../lib/basemaps.js';
 import AuthedAvatar from './AuthedAvatar.jsx';
 
 // Full-screen 3D route map (MapLibre GL): our CARTO basemap draped over free AWS terrain
 // DEM tiles, with a 2D/3D pitch toggle, compass, basemap layers, replay, and an athlete
 // sheet — the Strava-style full page. MapLibre is lazy-loaded so it never touches the main
 // bundle. Portaled to <body> so it's a true viewport overlay (and reliably exitable).
-const TILE_SEG = { voyager: 'voyager', light: 'light_all', dark: 'dark_all' };
-const MAP_STYLES = ['voyager', 'light', 'dark'];
 const glass = 'background:rgba(20,23,29,.82);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.14);color:#fff';
 const validPts = (route) => (route || []).filter((p) => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]));
-const baseTiles = (style) => ['a', 'b', 'c', 'd'].map((sd) => `https://${sd}.basemaps.cartocdn.com/rastertiles/${TILE_SEG[style] || 'voyager'}/{z}/{x}/{y}.png`);
 
 const buildStyle = (style) => ({
   version: 8,
   sources: {
-    base: { type: 'raster', tiles: baseTiles(style), tileSize: 256, attribution: '© OpenStreetMap · © CARTO' },
+    base: baseSource(style),
     dem: { type: 'raster-dem', tiles: ['https://elevation-tiles-prod.s3.amazonaws.com/terrarium/{z}/{x}/{y}.png'], tileSize: 256, encoding: 'terrarium', maxzoom: 14 },
   },
   layers: [{ id: 'base', type: 'raster', source: 'base' }],
@@ -80,9 +78,10 @@ export default function FullMap({ route, style: initialStyle = 'voyager', a, tok
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route]);
 
-  useEffect(() => { const src = mapRef.current?.getSource('base'); if (src) src.setTiles(baseTiles(mapStyle)); }, [mapStyle]);
+  // Swap the basemap on style change — kept beneath the route line so the track stays on top.
+  useEffect(() => { const m = mapRef.current; if (m && m.getSource('base')) applyBasemap(m, mapStyle, 'route'); }, [mapStyle]);
 
-  const cycleStyle = () => setMapStyle((st) => MAP_STYLES[(MAP_STYLES.indexOf(st) + 1) % MAP_STYLES.length]);
+  const cycleStyle = () => setMapStyle((st) => BASEMAP_ORDER[(BASEMAP_ORDER.indexOf(st) + 1) % BASEMAP_ORDER.length]);
   const toggle3D = () => { const m = mapRef.current; if (!m) return; const next = !is3D; setIs3D(next); m.easeTo({ pitch: next ? 62 : 0, duration: 600 }); };
   const resetNorth = () => mapRef.current?.easeTo({ bearing: 0, duration: 400 });
 
@@ -130,7 +129,7 @@ export default function FullMap({ route, style: initialStyle = 'voyager', a, tok
         </div>
         {/* layers · 2D/3D · compass */}
         <div style={{ ...s('position:absolute;right:16px;z-index:1200;display:flex;flex-direction:column;gap:8px'), top: safeTop(64) }}>
-          <div className="ctl" onClick={cycleStyle} title={`Map: ${mapStyle}`} style={s(`width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;${glass}`)}>
+          <div className="ctl" onClick={cycleStyle} title={`Map: ${BASEMAP_LABEL[mapStyle] || mapStyle}`} style={s(`width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;${glass}`)}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"><path d="M12 2l9 5-9 5-9-5z" /><path d="M3 12l9 5 9-5M3 17l9 5 9-5" /></svg>
           </div>
           <div className="ctl" onClick={toggle3D} title={is3D ? 'Switch to 2D' : 'Switch to 3D'} style={s(`width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;${glass}`)}>{is3D ? '2D' : '3D'}</div>
