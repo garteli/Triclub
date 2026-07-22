@@ -223,7 +223,12 @@ export function buildViewModel(state, t, opts = {}) {
   // currently driving the feed/leaderboard (Athlete.SquadId, passed as activeClubId).
   const myClubs = (opts.squads || [])
     .filter((c) => c.member)
-    .map((c) => ({ id: c.id, name: c.name, color: c.color, logoUrl: c.logoUrl || null, active: c.id === opts.activeClubId }));
+    .map((c) => ({
+      id: c.id, name: c.name, color: c.color, logoUrl: c.logoUrl || null,
+      active: c.id === opts.activeClubId,
+      // Owner of this club? Drives the header's "Manage group" shortcut.
+      owned: !!opts.meId && !!c.owner && String(c.owner).toLowerCase() === String(opts.meId).toLowerCase(),
+    }));
 
   const joinBtnLock = 'margin-top:5px;background:var(--bg4);color:var(--text3);font-size:11px;font-weight:700;padding:5px 12px;border-radius:8px;opacity:.7';
   const g2 = selGroupData || {};
