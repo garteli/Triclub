@@ -123,13 +123,20 @@ export default function LiveMapGL({ pts, course, path, riders, mySport, interact
           drawAll();          // seed the route + breadcrumb
           rebuildRef.current(); // seed the rider markers
         });
-        setTimeout(() => map && map.resize(), 60);
-        const ro = new ResizeObserver(() => map && map.resize());
+        // Tiles never load if the map is created while its pager page is off-screen / zero-size (the
+        // pages stay mounted). So nudge a resize on any size change (ResizeObserver), when it scrolls
+        // into view (IntersectionObserver), and a few times just after creation — so it always paints.
+        const nudge = () => { if (map) map.resize(); };
+        [60, 250, 600].forEach((t) => setTimeout(nudge, t));
+        const ro = new ResizeObserver(nudge);
         ro.observe(elRef.current);
         map._ro = ro;
+        const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) nudge(); }, { threshold: 0.01 });
+        io.observe(elRef.current);
+        map._io = io;
       } catch { if (!cancelled) setFailed(true); }
     })();
-    return () => { cancelled = true; markersRef.current.forEach((m) => m.remove()); markersRef.current = []; if (map?._ro) map._ro.disconnect(); if (map) map.remove(); mapRef.current = null; readyRef.current = false; framedRef.current = false; };
+    return () => { cancelled = true; markersRef.current.forEach((m) => m.remove()); markersRef.current = []; if (map?._ro) map._ro.disconnect(); if (map?._io) map._io.disconnect(); if (map) map.remove(); mapRef.current = null; readyRef.current = false; framedRef.current = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
