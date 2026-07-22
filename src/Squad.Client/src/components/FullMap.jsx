@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { s } from '../lib/style.js';
-import { BASEMAP_ORDER, BASEMAP_LABEL, baseSource, applyBasemap, setTrailsOverlay } from '../lib/basemaps.js';
+import { BASEMAP_ORDER, BASEMAP_LABEL, baseSource, applyBasemap } from '../lib/basemaps.js';
 import AuthedAvatar from './AuthedAvatar.jsx';
 
 // Full-screen 3D route map (MapLibre GL): our CARTO basemap draped over free AWS terrain
@@ -37,7 +37,6 @@ export default function FullMap({ route, style: initialStyle = 'voyager', a, tok
   const [bearing, setBearing] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [error, setError] = useState(false);
-  const [trailsOn, setTrailsOn] = useState(false);
 
   useEffect(() => {
     let map, cancelled = false;
@@ -81,9 +80,6 @@ export default function FullMap({ route, style: initialStyle = 'voyager', a, tok
 
   // Swap the basemap on style change — kept beneath the route line so the track stays on top.
   useEffect(() => { const m = mapRef.current; if (m && m.getSource('base')) applyBasemap(m, mapStyle); }, [mapStyle]);
-
-  // Toggle the marked-trails overlay (kept beneath the route line).
-  useEffect(() => { const m = mapRef.current; if (m && m.getSource('base')) setTrailsOverlay(m, trailsOn, 'route'); }, [trailsOn]);
 
   const cycleStyle = () => setMapStyle((st) => BASEMAP_ORDER[(BASEMAP_ORDER.indexOf(st) + 1) % BASEMAP_ORDER.length]);
   const toggle3D = () => { const m = mapRef.current; if (!m) return; const next = !is3D; setIs3D(next); m.easeTo({ pitch: next ? 62 : 0, duration: 600 }); };
@@ -135,10 +131,6 @@ export default function FullMap({ route, style: initialStyle = 'voyager', a, tok
         <div style={{ ...s('position:absolute;right:16px;z-index:1200;display:flex;flex-direction:column;gap:8px'), top: safeTop(64) }}>
           <div className="ctl" onClick={cycleStyle} title={`Map: ${BASEMAP_LABEL[mapStyle] || mapStyle}`} style={s(`width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;${glass}`)}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"><path d="M12 2l9 5-9 5-9-5z" /><path d="M3 12l9 5 9-5M3 17l9 5 9-5" /></svg>
-          </div>
-          {/* Marked-trails overlay toggle */}
-          <div className="ctl" onClick={() => setTrailsOn((v) => !v)} title={trailsOn ? 'Hide marked trails' : 'Show marked trails'} style={s(`width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;${glass}${trailsOn ? ';color:var(--accent);border-color:color-mix(in srgb,var(--accent) 55%,transparent)' : ''}`)}>
-            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3v13a3 3 0 0 0 6 0V8a3 3 0 0 1 6 0v13" /><path d="M4 3h4M16 21h4" /></svg>
           </div>
           <div className="ctl" onClick={toggle3D} title={is3D ? 'Switch to 2D' : 'Switch to 3D'} style={s(`width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;${glass}`)}>{is3D ? '2D' : '3D'}</div>
           <div className="ctl" onClick={resetNorth} title="Reset north" style={s(`width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;${glass}`)}>
