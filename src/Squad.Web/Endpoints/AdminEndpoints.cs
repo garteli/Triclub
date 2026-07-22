@@ -37,6 +37,12 @@ public static class AdminEndpoints
         g.MapGet("/squads/{id:guid}/members", async (Guid id, ISysAdminService admin, CancellationToken ct)
             => await admin.GetMembersAsync(id, ct) is { } members ? Results.Ok(members) : Results.NotFound());
 
+        g.MapGet("/users/{id:guid}", async (Guid id, ISysAdminService admin, CancellationToken ct)
+            => await admin.GetUserAsync(id, ct) is { } user ? Results.Ok(user) : Results.NotFound());
+
+        g.MapGet("/squads/{id:guid}", async (Guid id, ISysAdminService admin, CancellationToken ct)
+            => await admin.GetSquadAsync(id, ct) is { } squad ? Results.Ok(squad) : Results.NotFound());
+
         g.MapDelete("/squads/{id:guid}", async (Guid id, ISysAdminService admin, CancellationToken ct)
             => ToResult(await admin.DeleteSquadAsync(id, ct)));
 

@@ -18,6 +18,8 @@ export const adminListUsers = (token, search) =>
   req(`/api/admin/users${search ? `?search=${encodeURIComponent(search)}` : ''}`, { token });
 export const adminListSquads = (token) => req('/api/admin/squads', { token });
 export const adminSquadMembers = (token, id) => req(`/api/admin/squads/${id}/members`, { token });
+export const adminGetUser = (token, id) => req(`/api/admin/users/${id}`, { token });
+export const adminGetSquad = (token, id) => req(`/api/admin/squads/${id}`, { token });
 
 export const adminDeleteSquad = (token, id) => req(`/api/admin/squads/${id}`, { method: 'DELETE', token });
 export const adminRemoveMember = (token, id, athleteId) =>

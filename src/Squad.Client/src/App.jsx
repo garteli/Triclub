@@ -74,6 +74,8 @@ import Privacy from './screens/Privacy.jsx';
 import Help from './screens/Help.jsx';
 import Legal from './screens/Legal.jsx';
 import Admin from './screens/Admin.jsx';
+import AdminUserDetail from './screens/AdminUserDetail.jsx';
+import AdminGroupDetail from './screens/AdminGroupDetail.jsx';
 
 // Initial prototype state (matches the handoff's Component.state).
 const initialState = {
@@ -124,7 +126,7 @@ const screens = {
   athlete: AthleteProfile, editprofile: EditProfile, notifs: Notifications, activities: Activities,
   upload: UploadActivity, sensors: Sensors,
   units: Units, zones: TrainingZones, notifprefs: NotificationPrefs, privacy: Privacy, help: Help, legal: Legal,
-  admin: Admin,
+  admin: Admin, adminuser: AdminUserDetail, admingroup: AdminGroupDetail,
 };
 
 // Screens that render the persistent global header (AppHeader) via the Phone shell.
@@ -160,6 +162,8 @@ const HEADER_META = {
   manage: { title: 'Manage group' },
   ledger: { title: 'Ride payments' },
   admin: { title: 'System admin' },
+  adminuser: { title: 'User details' },
+  admingroup: { title: 'Group details' },
   // Tab root + contextual screens (dynamic titles from the view model).
   plan: { root: true },
   athlete: { title: (vm) => vm.athlete?.name || 'Athlete' },
@@ -526,6 +530,9 @@ export default function App() {
     setLbTab: (lbTab) => patch({ lbTab }),
     // discover / groups
     openGroup: (id) => patch({ selGroup: id, screen: 'group' }),
+    // sysadmin console detail pages
+    openAdminUser: (id) => patch({ adminUserId: id, screen: 'adminuser' }),
+    openAdminGroup: (id) => patch({ adminGroupId: id, screen: 'admingroup' }),
     // events — open the editor to add (ev = null) or edit an existing session
     editEvent: (ev) => patch({ selEvent: ev ?? null, screen: 'eventeditor' }),
     // ride-payment nav — selGroup is already the viewed squad
