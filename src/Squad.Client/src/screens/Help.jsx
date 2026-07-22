@@ -51,9 +51,9 @@ export default function Help({ actions }) {
 
       <SectionLabel>Get in touch</SectionLabel>
       <Card>
-        <LinkRow external onClick={() => actions.openLink?.('mailto:support@domestique.team')}>Email support</LinkRow>
-        <LinkRow external onClick={() => actions.openLink?.('https://domestique.team/help')}>Help centre</LinkRow>
-        <LinkRow external last onClick={() => actions.openLink?.('https://domestique.team/feedback')}>Send feedback</LinkRow>
+        <LinkRow external onClick={() => actions.openLink?.('mailto:support@domestiquehub.com')}>Email support</LinkRow>
+        <LinkRow external onClick={() => actions.openLink?.('https://www.domestiquehub.com/help')}>Help centre</LinkRow>
+        <LinkRow external last onClick={() => actions.openLink?.('https://www.domestiquehub.com/feedback')}>Send feedback</LinkRow>
       </Card>
 
       <SectionLabel>Diagnostics</SectionLabel>
