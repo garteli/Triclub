@@ -45,13 +45,21 @@ export function clearDraft() {
   try { localStorage.removeItem(KEY); } catch { /* ignore */ }
 }
 
+// Did a draft actually capture anything? A ride that never got a GPS fix (permission denied /
+// no signal) has no samples and no distance — resuming it just re-arms a dead GPS and keeps
+// "recording" forever, and since the flush re-stamps savedAt every 8s it never ages out.
+const draftHasProgress = (draft) => (draft?.samples?.length || 0) > 0 || (draft?.distMeters || 0) > 0;
+
 // How a saved draft should come back on boot:
-//   'resume'  — a fresh in-progress ride: restore buffers and keep recording (re-arm GPS).
-//   'recover' — a finished or stale ride: restore buffers as a pending save/discard card.
-//   null      — nothing to restore.
+//   'resume'  — a fresh in-progress ride WITH captured data: restore buffers, keep recording.
+//   'recover' — a finished/stale ride with data: restore buffers as a pending save/discard card.
+//   null      — nothing worth restoring (incl. an empty zombie ride — the caller should purge it).
 export function draftMode(draft, now = Date.now()) {
   if (!draft) return null;
-  if (draft.recording) return now - (draft.savedAt || 0) <= STALE_RESUME_MS ? 'resume' : 'recover';
-  if (draft.pending) return 'recover';
+  if (draft.recording) {
+    if (!draftHasProgress(draft)) return null; // empty zombie — don't auto-resume, don't recover
+    return now - (draft.savedAt || 0) <= STALE_RESUME_MS ? 'resume' : 'recover';
+  }
+  if (draft.pending && draftHasProgress(draft)) return 'recover';
   return null;
 }

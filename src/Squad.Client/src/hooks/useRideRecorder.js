@@ -398,7 +398,9 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, onE
     const how = draftMode(draft);
     console.log('[RIDEDIAG] restore: hasDraft=', !!draft, 'recording=', draft?.recording,
       'pending=', !!draft?.pending, 'ageMs=', draft ? Date.now() - (draft.savedAt || 0) : null, 'how=', how);
-    if (!how) return;
+    // Nothing worth restoring: purge the draft so an empty/zombie ride (e.g. GPS never fixed)
+    // can't sit in storage and re-trigger on the next load.
+    if (!how) { if (draft) clearDraft(); return; }
     samples.current = draft.samples || [];
     agg.current = draft.agg || null;
     distMeters.current = draft.distMeters || 0;
