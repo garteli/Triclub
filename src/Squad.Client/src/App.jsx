@@ -56,7 +56,6 @@ import Profile from './screens/Profile.jsx';
 import Discover from './screens/Discover.jsx';
 import GroupProfile from './screens/GroupProfile.jsx';
 import ManageGroup from './screens/ManageGroup.jsx';
-import Checkout from './screens/Checkout.jsx';
 import RidePayment from './screens/RidePayment.jsx';
 import CoachLedger from './screens/CoachLedger.jsx';
 import JoinRequests from './screens/JoinRequests.jsx';
@@ -88,7 +87,7 @@ const initialState = {
   dashVar: 'a', rideVar: 'a', rideState: 'lobby',
   planView: 'week', planWeekOffset: 0, planMonthOffset: 0, lbTab: 'load', showWorkout: false, workoutKey: 'bike', coachView: false,
   // discover / group / join-request / chat flow
-  selGroup: 'galilee', selApplicant: null, payPlan: null, joinState: {}, reqStatus: {},
+  selGroup: 'galilee', selApplicant: null, joinState: {}, reqStatus: {},
   // profiles
   selMember: 'noa', me: {}, following: {},
   // activities
@@ -126,7 +125,7 @@ captureInviteFromUrl();
 const screens = {
   dash: Dashboard, ride: LiveRide, plan: Plan, events: Events, eventeditor: EventEditor, eventdetail: EventDetail, plans: PlansList, planeditor: PlanEditor, planlibrary: PlanLibrary, lb: Leaderboard, clubrank: ClubRanking,
   feed: Feed, seg: Segments, coach: Coach, profile: Profile,
-  discover: Discover, group: GroupProfile, manage: ManageGroup, pay: Checkout, recordpay: RidePayment, ledger: CoachLedger, requests: JoinRequests, chat: Messages,
+  discover: Discover, group: GroupProfile, manage: ManageGroup, recordpay: RidePayment, ledger: CoachLedger, requests: JoinRequests, chat: Messages,
   settings: Settings, welcome: Welcome, register: Register, login: Login, newgroup: CreateGroup,
   athlete: AthleteProfile, editprofile: EditProfile, notifs: Notifications, activities: Activities,
   upload: UploadActivity, sensors: Sensors,
@@ -176,7 +175,6 @@ const HEADER_META = {
   recordpay: { title: 'Record a payment' },
   chat: { title: 'Squad chat' },
   feed: { title: 'Activity' },
-  pay: { title: 'Checkout' },
   requests: { title: 'Join requests' },
   planeditor: { title: 'Plan editor' },
   // The full-screen active ride is intentionally NOT here — it's a chrome-free immersive page.
@@ -484,15 +482,12 @@ export default function App() {
     go: (id) => setState((s) => ({ ...s, screen: id, rideState: (id === 'ride' && s.rideState !== 'active') ? 'lobby' : s.rideState })),
     // Global Back: handle in-screen "back" first (an open applicant detail closes to the
     // list), then pop the nav trail to the previous distinct screen (dashboard if empty).
-    // Leaving checkout also clears the pending pay plan (its old back was a cancel).
     back: () => setState((s) => {
       if (s.screen === 'requests' && s.selApplicant) return { ...s, selApplicant: null };
       const h = historyRef.current;
       if (h[h.length - 1] === s.screen) h.pop(); // drop current
       const prev = h[h.length - 1] || 'dash';
-      const next = { ...s, screen: prev, rideState: (prev === 'ride' && s.rideState !== 'active') ? 'lobby' : s.rideState };
-      if (s.screen === 'pay') next.payPlan = null;
-      return next;
+      return { ...s, screen: prev, rideState: (prev === 'ride' && s.rideState !== 'active') ? 'lobby' : s.rideState };
     }),
     // appearance / language — persisted to localStorage via savePrefs (survive reload)
     setTheme: (theme) => setState((s) => savePrefs({ ...s, theme })),
@@ -579,11 +574,6 @@ export default function App() {
     applyJoin: () => setState((s) => ({ ...s, joinState: { ...s.joinState, [s.selGroup]: 'applied' } })),
     simulateApprove: () => setState((s) => ({ ...s, joinState: { ...s.joinState, [s.selGroup]: 'approved' } })),
     freeJoin: () => setState((s) => ({ ...s, joinState: { ...s.joinState, [s.selGroup]: 'paid' } })),
-    payMember: () => setState((s) => (s.joinState[s.selGroup] === 'approved' ? { ...s, payPlan: 'member', screen: 'pay' } : s)),
-    payDropin: () => setState((s) => (s.joinState[s.selGroup] === 'approved' ? { ...s, payPlan: 'dropin', screen: 'pay' } : s)),
-    payCoach: () => setState((s) => (s.joinState[s.selGroup] === 'approved' ? { ...s, payPlan: 'coach', screen: 'pay' } : s)),
-    confirmPay: () => setState((s) => ({ ...s, joinState: { ...s.joinState, [s.selGroup]: 'paid' }, screen: 'group', payPlan: null })),
-    cancelPay: () => patch({ screen: 'group', payPlan: null }),
     // join requests (coach)
     openApplicant: (id) => patch({ selApplicant: id, screen: 'requests' }),
     closeApplicant: () => patch({ selApplicant: null }),
