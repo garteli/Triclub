@@ -1,10 +1,52 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { s, html } from '../lib/style.js';
 import Avatar from '../components/Avatar.jsx';
 import AuthedAvatar from '../components/AuthedAvatar.jsx';
 import AuthedImage from '../components/AuthedImage.jsx';
+import SportIcon from '../components/SportIcon.jsx';
 import FeedActivityCard from '../components/FeedActivityCard.jsx';
 import { useNotifications } from '../hooks/useNotifications.js';
+import { listSquadEvents } from '../lib/events.js';
+
+// Is an event's start on the local calendar-today?
+function eventIsToday(iso) {
+  const d = new Date(iso); const n = new Date();
+  return !Number.isNaN(d.getTime())
+    && d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
+}
+
+// The "today" hero for a motorsport club: a group ride scheduled for today (from the club's
+// events), mirroring the endurance plan card so a coach's just-added ride actually shows here.
+function TodayEventCard({ ev, go, rtl = false }) {
+  const d = new Date(ev.start);
+  const time = Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString(rtl ? 'he-IL' : 'en-US', { hour: 'numeric', minute: '2-digit' });
+  const sub = [time, ev.courseName, ev.courseKm ? `${ev.courseKm.toFixed(1)} km` : null].filter(Boolean).join(' · ');
+  const going = ev.joinCount || 0;
+  return (
+    <div className="ctl" onClick={() => go('events')} style={s('background:linear-gradient(160deg,var(--bg3),var(--bg2));border:1px solid var(--line);border-radius:22px;overflow:hidden')}>
+      <div style={s('height:4px;background:var(--accent)')} />
+      <div style={s(`padding:17px 18px 18px;${rtl ? 'text-align:right' : ''}`)}>
+        <div style={s(`display:flex;justify-content:space-between;align-items:flex-start;${rtl ? 'flex-direction:row-reverse' : ''}`)}>
+          <div style={s(`display:flex;gap:12px;align-items:center;${rtl ? 'flex-direction:row-reverse' : ''}`)}>
+            <div style={s('width:46px;height:46px;border-radius:14px;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;flex:none')}>
+              <SportIcon name="moto" size={24} color="var(--accent)" />
+            </div>
+            <div>
+              <div style={s('font-size:19px;font-weight:700;letter-spacing:-.4px')}>{ev.title}</div>
+              {sub && <div style={s('font-size:13px;color:var(--text2)')}>{sub}</div>}
+            </div>
+          </div>
+          <div style={s('background:var(--accent);color:var(--accent-ink);font-size:10px;font-weight:700;padding:4px 8px;border-radius:7px;text-transform:uppercase;letter-spacing:.5px;flex:none')}>{rtl ? 'היום' : 'Today'}</div>
+        </div>
+        <div style={s('display:flex;margin-top:14px')}>
+          <div className="ctl" style={s('flex:1;background:var(--accent);color:var(--accent-ink);text-align:center;padding:13px;border-radius:13px;font-weight:700;font-size:14px')}>
+            {rtl ? (going ? `${going} רשומים · צפה` : 'צפה באירוע') : (going ? `${going} going · View` : 'View ride')}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // Last 7 days of squad activities for the main-page feed. Live rows carry a real
 // startUtc (kept when a row can't be dated, e.g. seed data), newest first.
@@ -93,7 +135,7 @@ function SquadRail({ squad, rtl, onOpen, token }) {
   );
 }
 
-function DashboardEN({ vm, go, openAthlete, openActivity, getToken, onSwitchSquad, notifUnread = 0 }) {
+function DashboardEN({ vm, go, openAthlete, openActivity, getToken, onSwitchSquad, notifUnread = 0, todayEvent = null }) {
   const token = getToken?.() ?? null;
   const recent = last7Days(vm.activities);
   return (
@@ -131,10 +173,14 @@ function DashboardEN({ vm, go, openAthlete, openActivity, getToken, onSwitchSqua
                 </div>
               </div>
             ) : vm.family === 'motorsport' ? (
-              <div className="ctl" onClick={() => go('events')} style={s('background:var(--bg2);border:1px dashed var(--line2);border-radius:20px;padding:22px 18px;text-align:center')}>
-                <div style={s('font-size:15px;font-weight:600')}>No ride scheduled for today</div>
-                <div style={s('font-size:12.5px;color:var(--text3);margin-top:5px;line-height:1.5')}>Your club's group rides show up here. Tap to see upcoming events.</div>
-              </div>
+              todayEvent ? (
+                <TodayEventCard ev={todayEvent} go={go} />
+              ) : (
+                <div className="ctl" onClick={() => go('events')} style={s('background:var(--bg2);border:1px dashed var(--line2);border-radius:20px;padding:22px 18px;text-align:center')}>
+                  <div style={s('font-size:15px;font-weight:600')}>No ride scheduled for today</div>
+                  <div style={s('font-size:12.5px;color:var(--text3);margin-top:5px;line-height:1.5')}>Your club's group rides show up here. Tap to see upcoming events.</div>
+                </div>
+              )
             ) : (
               <div className="ctl" onClick={() => go('plan')} style={s('background:var(--bg2);border:1px dashed var(--line2);border-radius:20px;padding:22px 18px;text-align:center')}>
                 <div style={s('font-size:15px;font-weight:600')}>No session planned for today</div>
@@ -170,7 +216,7 @@ function DashboardEN({ vm, go, openAthlete, openActivity, getToken, onSwitchSqua
   );
 }
 
-function DashboardHE({ vm, go, openAthlete, openActivity, getToken, onSwitchSquad, notifUnread = 0 }) {
+function DashboardHE({ vm, go, openAthlete, openActivity, getToken, onSwitchSquad, notifUnread = 0, todayEvent = null }) {
   const token = getToken?.() ?? null;
   const recent = last7Days(vm.activities);
   return (
@@ -202,10 +248,14 @@ function DashboardHE({ vm, go, openAthlete, openActivity, getToken, onSwitchSqua
                 </div>
               </div>
             ) : vm.family === 'motorsport' ? (
-              <div className="ctl" onClick={() => go('events')} style={s('background:var(--bg2);border:1px dashed var(--line2);border-radius:20px;padding:22px 18px;text-align:center')}>
-                <div style={s('font-size:15px;font-weight:600')}>אין רכיבה מתוזמנת להיום</div>
-                <div style={s('font-size:12.5px;color:var(--text3);margin-top:5px;line-height:1.5')}>הרכיבות הקבוצתיות של המועדון יופיעו כאן. הקש לצפייה באירועים.</div>
-              </div>
+              todayEvent ? (
+                <TodayEventCard ev={todayEvent} go={go} rtl />
+              ) : (
+                <div className="ctl" onClick={() => go('events')} style={s('background:var(--bg2);border:1px dashed var(--line2);border-radius:20px;padding:22px 18px;text-align:center')}>
+                  <div style={s('font-size:15px;font-weight:600')}>אין רכיבה מתוזמנת להיום</div>
+                  <div style={s('font-size:12.5px;color:var(--text3);margin-top:5px;line-height:1.5')}>הרכיבות הקבוצתיות של המועדון יופיעו כאן. הקש לצפייה באירועים.</div>
+                </div>
+              )
             ) : (
               <div className="ctl" onClick={() => go('plan')} style={s('background:var(--bg2);border:1px dashed var(--line2);border-radius:20px;padding:22px 18px;text-align:center')}>
                 <div style={s('font-size:15px;font-weight:600')}>אין אימון מתוכנן להיום</div>
@@ -244,7 +294,26 @@ export default function Dashboard({ vm, state, actions, getToken, onSwitchSquad 
   // read — previously the dot was hard-coded on, hence "badge but no notifications".
   const { items: notifItems } = useNotifications({ getToken, enabled: !!getToken });
   const notifUnread = notifItems.filter((n) => n.unread).length;
+
+  // Motorsport clubs run on group rides (events), not a training plan — so the "today" hero must
+  // read the club's events. Fetch the active club's events and surface one scheduled for today.
+  const [todayEvent, setTodayEvent] = useState(null);
+  useEffect(() => {
+    let ok = true;
+    const squadId = vm.activeClubId;
+    if (vm.family !== 'motorsport' || !squadId || !getToken) { setTodayEvent(null); return undefined; }
+    (async () => {
+      try {
+        const t = await getToken();
+        const evs = await listSquadEvents(t, squadId);
+        const today = (evs || []).find((e) => eventIsToday(e.start));
+        if (ok) setTodayEvent(today || null);
+      } catch { if (ok) setTodayEvent(null); }
+    })();
+    return () => { ok = false; };
+  }, [vm.activeClubId, vm.family, getToken]);
+
   return state.lang === 'he'
-    ? <DashboardHE vm={vm} go={actions.go} openAthlete={actions.openAthlete} openActivity={actions.openActivity} getToken={getToken} onSwitchSquad={onSwitchSquad} notifUnread={notifUnread} />
-    : <DashboardEN vm={vm} go={actions.go} openAthlete={actions.openAthlete} openActivity={actions.openActivity} getToken={getToken} onSwitchSquad={onSwitchSquad} notifUnread={notifUnread} />;
+    ? <DashboardHE vm={vm} go={actions.go} openAthlete={actions.openAthlete} openActivity={actions.openActivity} getToken={getToken} onSwitchSquad={onSwitchSquad} notifUnread={notifUnread} todayEvent={todayEvent} />
+    : <DashboardEN vm={vm} go={actions.go} openAthlete={actions.openAthlete} openActivity={actions.openActivity} getToken={getToken} onSwitchSquad={onSwitchSquad} notifUnread={notifUnread} todayEvent={todayEvent} />;
 }
