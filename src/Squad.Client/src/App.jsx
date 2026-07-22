@@ -307,8 +307,9 @@ export default function App() {
       squadName: authed ? liveSquads.find((sq) => sq.id === squadId)?.name : undefined,
       activeSquad: authed ? liveSquads.find((sq) => sq.id === squadId) : null,
       activeClubId: authed ? squadId : null,
+      meId: session?.athleteId ?? null,
     }),
-    [state, t, liveFeed, liveLeaderboard, liveActivities, profile, liveSquads, livePlan, livePlanSummary, authed, squadId],
+    [state, t, liveFeed, liveLeaderboard, liveActivities, profile, liveSquads, livePlan, livePlanSummary, authed, squadId, session?.athleteId],
   );
 
   // After joining/creating a squad the athlete's active SquadId changes server-side;
@@ -532,6 +533,8 @@ export default function App() {
     openRecordPay: () => patch({ screen: 'recordpay' }),
     openLedger: () => patch({ screen: 'ledger' }),
     openManage: () => patch({ screen: 'manage' }),
+    // Manage a specific club (from the header switcher): point selGroup at it, then open manage.
+    manageClub: (id) => patch({ selGroup: id, screen: 'manage' }),
     applyJoin: () => setState((s) => ({ ...s, joinState: { ...s.joinState, [s.selGroup]: 'applied' } })),
     simulateApprove: () => setState((s) => ({ ...s, joinState: { ...s.joinState, [s.selGroup]: 'approved' } })),
     freeJoin: () => setState((s) => ({ ...s, joinState: { ...s.joinState, [s.selGroup]: 'paid' } })),

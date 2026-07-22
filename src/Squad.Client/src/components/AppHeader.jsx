@@ -11,9 +11,11 @@ export default function AppHeader({ vm, actions, getToken, notifUnread = 0, titl
   const [syncing, setSyncing] = useState(false);
   const [switchOpen, setSwitchOpen] = useState(false);
   const clubs = vm.myClubs || [];
-  // The club name is a switcher when the athlete belongs to more than one club and we're
-  // showing club branding (root screens, not a sub-page title).
-  const canSwitch = !showBack && !title && clubs.length > 1 && !!onSwitchSquad;
+  // The club name opens a dropdown when we're showing club branding (root screens, not a
+  // sub-page title) AND there's something to do there: switch between multiple clubs, or
+  // manage the active club you own.
+  const activeOwned = !!clubs.find((c) => c.active)?.owned;
+  const canSwitch = !showBack && !title && ((clubs.length > 1 && !!onSwitchSquad) || activeOwned);
   const doSync = async () => {
     if (syncing || !onSync) return;
     setSyncing(true);
@@ -63,6 +65,16 @@ export default function AppHeader({ vm, actions, getToken, notifUnread = 0, titl
                     {c.active && <span style={s('font-size:10px;color:var(--accent);font-weight:700;flex:none')}>{rtl ? 'פעיל' : 'Active'}</span>}
                   </div>
                 ))}
+                {/* Owner shortcut: manage the active club you own (branding, details, pricing, members). */}
+                {clubs.find((c) => c.active)?.owned && (
+                  <div className="ctl" onClick={(e) => { e.stopPropagation(); setSwitchOpen(false); actions.manageClub?.(clubs.find((c) => c.active).id); }}
+                    style={s(`display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;margin-top:4px;border-top:1px solid var(--line);${rtl ? 'flex-direction:row-reverse;text-align:right' : ''}`)}>
+                    <div style={s('width:26px;height:26px;border-radius:8px;flex:none;background:var(--accent-dim);display:flex;align-items:center;justify-content:center')}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
+                    </div>
+                    <div style={s('flex:1;min-width:0;font-size:13.5px;font-weight:600;color:var(--accent)')}>{rtl ? 'נהל קבוצה' : 'Manage group'}</div>
+                  </div>
+                )}
               </div>
             </>
           )}
