@@ -110,20 +110,24 @@ export function buildViewModel(state, t, opts = {}) {
   // by full 'yyyy-MM-dd' keeps dots on their real days when navigating between months.
   const DISC_DOT = { bike: 'var(--bike)', swim: 'var(--swim)', run: 'var(--run)', gym: 'var(--gym)' };
   const isoOf = (y, m, d) => `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  // Month dots come from the whole viewed month (opts.planMonth) so the plan shows on the
+  // weeks ahead, not just the current week; fall back to the loaded week (seed/offline).
   const planByIso = {};
-  planSource.forEach((p) => { if (p.iso) planByIso[p.iso] = p.disc; });
+  const dotSource = opts.planMonth?.length ? opts.planMonth : planSource;
+  dotSource.forEach((p) => { if (p.iso && p.disc && p.disc !== 'rest') planByIso[p.iso] = p.disc; });
   const monthCells = [];
   const totalCells = Math.ceil((firstDow + daysInMonth) / 7) * 7;
   for (let i = 0; i < totalCells; i++) {
     const dn = i - firstDow + 1;
     const inMonth = dn >= 1 && dn <= daysInMonth;
-    const disc = inMonth ? (planByIso[isoOf(mYear, mMonth, dn)] || '') : '';
+    const iso = inMonth ? isoOf(mYear, mMonth, dn) : '';
+    const disc = inMonth ? (planByIso[iso] || '') : '';
     const dotColor = DISC_DOT[disc] || 'transparent';
     const cellMs = inMonth ? new Date(mYear, mMonth, dn).getTime() : 0;
     const today = inMonth && cellMs === todayMs;
     const done = inMonth && !!disc && cellMs < todayMs;
     const cellStyle = today ? 'background:var(--accent);color:var(--accent-ink)' : inMonth ? 'background:var(--bg2);border:1px solid var(--line)' : 'background:transparent';
-    monthCells.push({ day: inMonth ? dn : '', inMonth, disc, dotColor, done, today, cellStyle, dayOpacity: inMonth ? '1' : '0', dotOpacity: done ? '1' : '.5' });
+    monthCells.push({ day: inMonth ? dn : '', iso, inMonth, disc, dotColor, done, today, cellStyle, dayOpacity: inMonth ? '1' : '0', dotOpacity: done ? '1' : '.5' });
   }
 
   // ---- plan date-nav labels (header eyebrow + the prev/next range/month strip) ----

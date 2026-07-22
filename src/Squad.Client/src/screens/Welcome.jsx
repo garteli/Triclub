@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { s } from '../lib/style.js';
-import { SocialButton, BiometricButton } from '../components/AuthButtons.jsx';
+import { SocialButton, BiometricButton, OrDivider } from '../components/AuthButtons.jsx';
 import Logo from '../components/Logo.jsx';
 import SportIcon from '../components/SportIcon.jsx';
 import InviteBanner from '../components/InviteBanner.jsx';
@@ -95,24 +95,22 @@ export default function Welcome({ actions, inviteInfo }) {
             <BiometricButton onClick={bioSignIn} label="Unlock with Face ID" />
           </div>
         )}
-        {/* Google / Apple are the ONLY way in — the same buttons create a new account or sign a
-            returning athlete straight in (the server's External endpoint creates-or-signs-in). */}
-        {anySocial ? (
+        {/* Google / Apple create-or-sign-in with one tap; email/password is offered below for
+            those who prefer it (and so App Review always has a demo account to sign in with). */}
+        {anySocial && (
           <div style={s('display:flex;flex-direction:column;gap:10px')}>
             {providers.google && (isNativePlatform()
               ? <SocialButton provider="google" onClick={() => social('google')} />
               : <GoogleButton clientId={providers.google.clientId} onCredential={onGoogleCredential} onError={setError} />)}
             {providers.apple && <SocialButton provider="apple" onClick={() => social('apple')} />}
           </div>
-        ) : (
-          <div style={s('text-align:center;font-size:13px;color:var(--text2);padding:10px 0')}>
-            Sign-in is temporarily unavailable. Please try again shortly.
-          </div>
         )}
 
         {error && <div style={s('color:var(--bad);font-size:12.5px;margin-top:12px;text-align:center')}>{error}</div>}
 
-        <div style={s('text-align:center;font-size:12.5px;color:var(--text2);margin-top:16px')}>New or returning — continue with Google or Apple.</div>
+        <OrDivider>{anySocial ? 'or with email' : 'sign in with email'}</OrDivider>
+        <div className="ctl" onClick={() => actions.go('register')} style={s('background:var(--accent);color:var(--accent-ink);text-align:center;padding:15px;border-radius:14px;font-weight:700;font-size:15px;margin-top:4px')}>Create account</div>
+        <div style={s('text-align:center;font-size:13px;color:var(--text2);margin-top:16px')}>Already have an account? <span className="ctl" onClick={() => actions.go('login')} style={s('color:var(--accent);font-weight:700')}>Log in</span></div>
         <div style={s('text-align:center;font-size:10.5px;color:var(--text3);margin-top:14px;line-height:1.5')}>By continuing you agree to Domestique Team's Terms &amp; Privacy Policy.</div>
       </div>
     </div>

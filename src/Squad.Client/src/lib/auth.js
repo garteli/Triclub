@@ -74,8 +74,14 @@ export function sessionToken() {
 }
 
 // --- credential exchange ----------------------------------------------------
-// Email/password auth was removed — Google and Apple are the only sign-in methods
-// (see oauthSignIn below). The server's /api/auth/register + /login endpoints are gone.
+
+export async function registerWithEmail({ name, email, password }) {
+  return api('/api/auth/register', { method: 'POST', body: { name, email, password } });
+}
+
+export async function loginWithEmail({ email, password }) {
+  return api('/api/auth/login', { method: 'POST', body: { email, password } });
+}
 
 // Verify the current session's token server-side (and refresh profile fields).
 export async function fetchMe(token) {
