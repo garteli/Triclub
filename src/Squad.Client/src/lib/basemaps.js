@@ -27,15 +27,17 @@ export const baseSource = (key) => {
 // Swap a live map's 'base' raster source+layer to a different basemap. Rebuilds the source (not just
 // setTiles) so maxzoom + attribution follow the layer — off-road stops at z15 vs CARTO's z20. Always
 // re-inserts the base at the very bottom, so the route line AND the trails overlay stay above it.
+//
+// Runs synchronously: callers only invoke this once the map is ready (they guard on getSource('base')
+// / a ready flag), and add/removeLayer only needs the style parsed — NOT isStyleLoaded(), which is
+// false whenever any source is mid-tile-load and would wrongly defer the swap to a styledata event
+// that may never fire on a static map (the "button reacts, map doesn't" bug).
 export const applyBasemap = (map, key) => {
-  const swap = () => {
-    if (map.getLayer('base')) map.removeLayer('base');
-    if (map.getSource('base')) map.removeSource('base');
-    map.addSource('base', baseSource(key));
-    const layers = map.getStyle().layers || [];
-    map.addLayer({ id: 'base', type: 'raster', source: 'base' }, layers.length ? layers[0].id : undefined);
-  };
-  if (map.isStyleLoaded()) swap(); else map.once('styledata', swap);
+  if (map.getLayer('base')) map.removeLayer('base');
+  if (map.getSource('base')) map.removeSource('base');
+  map.addSource('base', baseSource(key));
+  const layers = map.getStyle().layers || [];
+  map.addLayer({ id: 'base', type: 'raster', source: 'base' }, layers.length ? layers[0].id : undefined);
 };
 
 // Marked-trails overlay: Waymarked Trails hiking tiles (OSM-based, global, open + CORS). A transparent
@@ -49,17 +51,15 @@ export const TRAILS = {
 
 // Toggle the trails overlay on a live map. Kept beneath `beneathId` (the route/course line) so our
 // track + rider markers stay on top of the trail lines, but above the basemap (which applyBasemap
-// pins to the bottom).
+// pins to the bottom). Runs synchronously — see the applyBasemap note on why the isStyleLoaded()
+// gate is wrong (it defers the toggle indefinitely on a static map).
 export const setTrailsOverlay = (map, on, beneathId) => {
-  const apply = () => {
-    const has = !!map.getLayer('trails');
-    if (on && !has) {
-      if (!map.getSource('trails')) map.addSource('trails', { type: 'raster', tiles: TRAILS.tiles, tileSize: 256, maxzoom: TRAILS.maxzoom, attribution: TRAILS.attribution });
-      map.addLayer({ id: 'trails', type: 'raster', source: 'trails' }, beneathId && map.getLayer(beneathId) ? beneathId : undefined);
-    } else if (!on && has) {
-      map.removeLayer('trails');
-      if (map.getSource('trails')) map.removeSource('trails');
-    }
-  };
-  if (map.isStyleLoaded()) apply(); else map.once('styledata', apply);
+  const has = !!map.getLayer('trails');
+  if (on && !has) {
+    if (!map.getSource('trails')) map.addSource('trails', { type: 'raster', tiles: TRAILS.tiles, tileSize: 256, maxzoom: TRAILS.maxzoom, attribution: TRAILS.attribution });
+    map.addLayer({ id: 'trails', type: 'raster', source: 'trails' }, beneathId && map.getLayer(beneathId) ? beneathId : undefined);
+  } else if (!on && has) {
+    map.removeLayer('trails');
+    if (map.getSource('trails')) map.removeSource('trails');
+  }
 };
