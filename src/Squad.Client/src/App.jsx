@@ -110,7 +110,7 @@ const RIDE_TYPES = {
 // Which activity types each discipline family offers on the live ride, in display order.
 const RIDE_TYPES_BY_FAMILY = {
   endurance: ['bike', 'run', 'trainer', 'treadmill', 'driver'],
-  motorsport: ['road', 'offroad', 'touring', 'driver'],
+  motorsport: ['road', 'offroad', 'touring'],
 };
 
 // Stash any ?invite=TOKEN from the launch URL before the app renders, so it survives the

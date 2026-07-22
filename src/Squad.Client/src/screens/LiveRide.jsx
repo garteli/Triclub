@@ -158,7 +158,7 @@ function Lobby({ vm, actions, live }) {
           <div style={s('font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:1.4px;font-weight:600;margin-bottom:9px')}>Activity type</div>
           <div style={s('display:flex;gap:6px;background:var(--bg2);border:1px solid var(--line);border-radius:13px;padding:5px')}>
             {(vm.family === 'motorsport'
-              ? [['road', 'Road'], ['offroad', 'Off-road'], ['touring', 'Touring'], ['driver', 'Driver']]
+              ? [['road', 'Road'], ['offroad', 'Off-road'], ['touring', 'Touring']]
               : [['bike', 'Bike'], ['run', 'Run'], ['trainer', 'Trainer'], ['treadmill', 'Treadmill'], ['driver', 'Driver']]
             ).map(([id, label]) => {
               const on = live.rideType.value === id;
