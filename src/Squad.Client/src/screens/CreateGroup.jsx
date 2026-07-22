@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { s } from '../lib/style.js';
 import { StepHeader, Title, Sub, FieldLabel, Field, TextArea, Chips, Switch, PrimaryBtn } from './wizard.jsx';
-import { DISCIPLINES, DISC_COLOR } from '../lib/disciplines.js';
+import { DISC_COLOR, familyOf, disciplinesInFamily } from '../lib/disciplines.js';
 
 const LEVELS = ['All levels', 'Intermediate+', 'Advanced', 'Race focus'];
 
@@ -21,14 +21,18 @@ export default function CreateGroup({ actions, onCreateSquad }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [form, setForm] = useState({
-    name: '', city: '', disc: ['Cycling'], level: 'All levels', desc: '',
+    name: '', city: '', disc: 'Cycling', level: 'All levels', desc: '',
     price: '', dropin: '35', coaching: false, coachPrice: '450',
   });
   const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
 
+  // A group is one discipline family — endurance OR motor sports, never both.
+  const family = familyOf(form.disc);
+  const setFamily = (fam) => { if (fam !== family) setForm((f) => ({ ...f, disc: disciplinesInFamily(fam)[0] })); };
+
   const back = () => (step === 0 ? actions.go('welcome') : setStep((n) => n - 1));
-  const color = DISC_COLOR[form.disc[0]] || '#ff6a2c';
-  const basicsValid = form.name.trim() && form.city.trim() && form.disc.length;
+  const color = DISC_COLOR[form.disc] || '#ff6a2c';
+  const basicsValid = form.name.trim() && form.city.trim() && form.disc;
 
   // Publish: create a real squad when signed in (onCreateSquad wired), else the
   // logged-out prototype just shows the success screen.
@@ -38,7 +42,7 @@ export default function CreateGroup({ actions, onCreateSquad }) {
       if (onCreateSquad) {
         await onCreateSquad({
           name: form.name.trim(),
-          discipline: form.disc[0],
+          discipline: form.disc,
           location: form.city.trim(),
           level: form.level,
           kind: form.coaching ? 'coach' : (form.price ? 'member' : 'free'),
@@ -84,8 +88,17 @@ export default function CreateGroup({ actions, onCreateSquad }) {
           <Sub>Set up your club so athletes can find and join it.</Sub>
           <Field label="Group name" value={form.name} onChange={set('name')} placeholder="Your club name" />
           <Field label="City / base" value={form.city} onChange={set('city')} placeholder="Tiberias" />
-          <FieldLabel>Disciplines</FieldLabel>
-          <Chips options={DISCIPLINES} value={form.disc} onChange={set('disc')} multi />
+          <FieldLabel>Discipline type</FieldLabel>
+          <div style={s('display:flex;gap:8px')}>
+            {[['endurance', 'Endurance'], ['motorsport', 'Motor sports']].map(([id, label]) => (
+              <div key={id} className="ctl" onClick={() => setFamily(id)}
+                style={s(`flex:1;text-align:center;padding:11px;border-radius:12px;font-size:13px;font-weight:700;border:1px solid ${family === id ? 'var(--accent)' : 'var(--line)'};background:${family === id ? 'var(--accent-dim)' : 'var(--bg2)'};color:${family === id ? 'var(--accent)' : 'var(--text2)'}`)}>
+                {label}
+              </div>
+            ))}
+          </div>
+          <FieldLabel>Discipline</FieldLabel>
+          <Chips options={disciplinesInFamily(family)} value={form.disc} onChange={set('disc')} />
           <FieldLabel>Level</FieldLabel>
           <Chips options={LEVELS} value={form.level} onChange={set('level')} />
           <TextArea label="About the group" value={form.desc} onChange={set('desc')} placeholder="Weekly threshold and long endurance rides, coach-led plans, live group rides…" />
@@ -118,7 +131,7 @@ export default function CreateGroup({ actions, onCreateSquad }) {
             <div style={s('flex:1;min-width:0')}>
               <div style={s('font-size:14.5px;font-weight:700')}>{form.name || 'Your group'}</div>
               <div style={s('font-size:11.5px;color:var(--text2);margin-top:1px')}>{form.city || 'City'} · new</div>
-              <div style={s('display:flex;gap:9px;margin-top:6px;font-size:10.5px;color:var(--text3)')}><span>★ —</span><span>· 1 rider</span><span>· {form.disc.join(', ')}</span></div>
+              <div style={s('display:flex;gap:9px;margin-top:6px;font-size:10.5px;color:var(--text3)')}><span>★ —</span><span>· 1 rider</span><span>· {form.disc}</span></div>
             </div>
             <div style={s('text-align:right;flex:none')}>
               <div style={s('font-size:9.5px;font-weight:700;padding:3px 8px;border-radius:7px;color:var(--accent);background:var(--accent-dim)')}><span className="mono">{form.price ? '₪' + form.price : 'Free'}</span>{form.price ? '/mo' : ''}</div>

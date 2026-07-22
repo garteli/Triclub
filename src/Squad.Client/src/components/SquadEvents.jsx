@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { s, html } from '../lib/style.js';
+import { s } from '../lib/style.js';
 import { listCourses } from '../lib/courses.js';
+import { familyOf } from '../lib/disciplines.js';
+import SportIcon from './SportIcon.jsx';
 import {
   listSquadEvents, createSquadEvent, deleteSquadEvent,
   joinEvent, leaveEvent, checkInEvent, toOffsetIso,
@@ -11,13 +13,16 @@ import {
 //   mode="browse"  — members join upcoming sessions and, on the day of the event, check in.
 // Shared so the Manage screen and the Group page render the same list consistently.
 
-const SPORTS = {
-  1: { label: 'Swim', icon: '<path d="M2 16c1.5 0 1.5 1.5 3 1.5S8.5 16 10 16s1.5 1.5 3 1.5 1.5-1.5 3-1.5 1.5 1.5 3 1.5"/><path d="M2 20c1.5 0 1.5 1.5 3 1.5S8.5 20 10 20s1.5 1.5 3 1.5 1.5-1.5 3-1.5 1.5 1.5 3 1.5"/><circle cx="15" cy="6" r="2"/><path d="M6 13l5-4 3 2 3-3"/>' },
-  2: { label: 'Bike', icon: '<circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 17.5l-3-6.5H8.5m6.5 0l-2.5 6.5M9.5 6.5h3l2 4.5"/>' },
-  3: { label: 'Run', icon: '<circle cx="14" cy="5" r="2"/><path d="M11 21l1.5-5-2.5-2 1-5 3 2 2 1M8 12l1-4 3-1"/>' },
-  0: { label: 'Session', icon: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>' },
+// The sport choices offered when scheduling, keyed by the club's discipline family.
+// Values are the ActivitySport byte stored on the event (0..3); motorsport clubs schedule
+// a single "Ride" (stored as the generic bike=2, rendered with the motorcycle glyph).
+const SPORT_OPTIONS = {
+  endurance: [{ v: 1, label: 'Swim', glyph: 'swim' }, { v: 2, label: 'Bike', glyph: 'bike' }, { v: 3, label: 'Run', glyph: 'run' }],
+  motorsport: [{ v: 2, label: 'Ride', glyph: 'moto' }],
 };
-const sportMeta = (n) => SPORTS[n] || SPORTS[0];
+// The glyph for an event's stored sport, adapted to the club's family (moto clubs always ride).
+const glyphForSport = (sport, family) =>
+  family === 'motorsport' ? 'moto' : ({ 1: 'swim', 2: 'bike', 3: 'run' }[sport] || 'bike');
 
 const fmtWhen = (iso) => {
   const d = new Date(iso);
@@ -38,15 +43,13 @@ const defaultWhen = () => {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 };
 
-const SportIcon = ({ sport, size = 18 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-    strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={html(sportMeta(sport).icon)} />
-);
-
 // standalone=true — rendered as its own screen (the motorsport Events tab): keep the
 // empty state visible instead of collapsing the section, and drop the section heading.
-export default function SquadEvents({ squadId, getToken, mode = 'browse', standalone = false }) {
+// `disc` is the club's discipline; it drives the family-aware sport choices + glyphs.
+export default function SquadEvents({ squadId, getToken, mode = 'browse', standalone = false, disc }) {
   const manage = mode === 'manage';
+  const family = familyOf(disc);
+  const sportOptions = SPORT_OPTIONS[family] || SPORT_OPTIONS.endurance;
   const [items, setItems] = useState(null); // null = loading
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState('');
@@ -54,7 +57,7 @@ export default function SquadEvents({ squadId, getToken, mode = 'browse', standa
   // create form (manage only)
   const [courses, setCourses] = useState(null);
   const [title, setTitle] = useState('');
-  const [sport, setSport] = useState(2);
+  const [sport, setSport] = useState(() => sportOptions[0].v);
   const [when, setWhen] = useState(defaultWhen);
   const [courseId, setCourseId] = useState('');
   const [notes, setNotes] = useState('');
@@ -141,12 +144,12 @@ export default function SquadEvents({ squadId, getToken, mode = 'browse', standa
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Session title — e.g. Saturday hills"
             style={s('background:var(--bg3);border:1px solid var(--line);border-radius:11px;padding:11px 12px;font-size:13px;color:var(--text);outline:none;font-family:inherit')} />
 
-          {/* sport toggle */}
+          {/* sport toggle — adapts to the club's discipline family (endurance vs motorsport) */}
           <div style={s('display:flex;gap:7px')}>
-            {[1, 2, 3].map((n) => (
-              <div key={n} className="ctl" onClick={() => setSport(n)}
-                style={s(`flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;border-radius:10px;font-size:12.5px;font-weight:700;border:1px solid ${sport === n ? 'var(--accent)' : 'var(--line)'};background:${sport === n ? 'var(--accent-dim)' : 'var(--bg3)'};color:${sport === n ? 'var(--accent)' : 'var(--text2)'}`)}>
-                <SportIcon sport={n} size={16} />{sportMeta(n).label}
+            {sportOptions.map((o) => (
+              <div key={o.v} className="ctl" onClick={() => setSport(o.v)}
+                style={s(`flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;border-radius:10px;font-size:12.5px;font-weight:700;border:1px solid ${sport === o.v ? 'var(--accent)' : 'var(--line)'};background:${sport === o.v ? 'var(--accent-dim)' : 'var(--bg3)'};color:${sport === o.v ? 'var(--accent)' : 'var(--text2)'}`)}>
+                <SportIcon name={o.glyph} size={16} />{o.label}
               </div>
             ))}
           </div>
@@ -186,7 +189,7 @@ export default function SquadEvents({ squadId, getToken, mode = 'browse', standa
             return (
               <div key={ev.id} style={s('background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:13px 14px;display:flex;align-items:center;gap:11px')}>
                 <div style={s('width:38px;height:38px;border-radius:11px;flex:none;display:flex;align-items:center;justify-content:center;background:var(--accent-dim);color:var(--accent)')}>
-                  <SportIcon sport={ev.sport} />
+                  <SportIcon name={glyphForSport(ev.sport, family)} size={18} />
                 </div>
                 <div style={s('flex:1;min-width:0')}>
                   <div style={s('font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>{ev.title}</div>

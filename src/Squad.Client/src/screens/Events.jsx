@@ -63,7 +63,7 @@ export default function Events({ vm, actions, getToken, meId, onDataChanged }) {
         ? <EmptyState icon="🏁" title="No club yet" sub="Join a club to see its scheduled rides and sessions here." />
         : isOwner
           ? <CoachEventList squadId={squadId} getToken={getToken} actions={actions} onDataChanged={onDataChanged} />
-          : <SquadEvents squadId={squadId} getToken={getToken} mode="browse" standalone />}
+          : <SquadEvents squadId={squadId} getToken={getToken} mode="browse" standalone disc={vm.activeSquad?.disc} />}
     </div>
   );
 }

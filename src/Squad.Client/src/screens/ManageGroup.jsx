@@ -3,7 +3,6 @@ import { s } from '../lib/style.js';
 import { Back, Title, Sub, FieldLabel, Field, TextArea, Chips, PrimaryBtn } from './wizard.jsx';
 import AuthedImage from '../components/AuthedImage.jsx';
 import GroupTargets from '../components/GroupTargets.jsx';
-import SquadEvents from '../components/SquadEvents.jsx';
 import { downscaleToJpeg } from '../lib/photos.js';
 import { dataUrlToBlob } from '../lib/avatar.js';
 import { bustAuthedImage } from '../lib/authedImage.js';
@@ -11,6 +10,7 @@ import {
   updateSquad, listMembers, addMember, removeMember, uploadSquadImage, deleteSquadImage, createInvite,
 } from '../lib/squads.js';
 import { API_BASE } from '../lib/apiBase.js';
+import { DISCIPLINES, familyOf, disciplinesInFamily } from '../lib/disciplines.js';
 
 const LEVELS = ['All levels', 'Intermediate+', 'Advanced', 'Race focus'];
 const KINDS = [
@@ -42,6 +42,12 @@ export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged
   // details/pricing form, seeded from the current squad
   const [name, setName] = useState(g.name || '');
   const [loc, setLoc] = useState(g.loc || '');
+  // A group belongs to ONE discipline family — endurance OR motor sports, never both.
+  // `disc` is the single stored discipline; the family (segmented toggle) is derived from it.
+  const [disc, setDisc] = useState(DISCIPLINES.includes(g.disc) ? g.disc : 'Cycling');
+  const family = familyOf(disc);
+  // Switching family swaps the discipline to that family's first option (so the two can't mix).
+  const setFamily = (fam) => { if (fam !== family) setDisc(disciplinesInFamily(fam)[0]); };
   const [level, setLevel] = useState(LEVELS.includes(g.level) ? g.level : 'All levels');
   const [desc, setDesc] = useState(g.desc || '');
   const [kind, setKind] = useState(g.kind || 'member');
@@ -115,6 +121,7 @@ export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged
       const digits = String(priceNum).replace(/[^\d]/g, '');
       await updateSquad(t, g.id, {
         name: name.trim() || null,
+        discipline: disc,
         location: loc.trim(),
         level,
         kind,
@@ -147,7 +154,16 @@ export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged
   // (which also serves the web SPA) on native — never the capacitor:// app origin.
   const inviteLinkFor = (token) => `${API_BASE || window.location.origin}/?invite=${token}`;
 
-  // Create (or rotate, when reset) the group's invite link, then copy / share it.
+  // A friendly, ready-to-send invite (for chat / WhatsApp / email). The link is on its own
+  // line so it stays tappable. Kept short so it reads well in a message bubble.
+  const inviteMessageFor = (url) => {
+    const club = g.name || 'our group';
+    return `You're invited to join ${club} on Domestique Team 🚴‍♀️\n`
+      + `Train, ride and race together — sign up with my link and you're in the group automatically:\n`
+      + `${url}`;
+  };
+
+  // Create (or rotate, when reset) the group's invite link, then share / copy a nice message.
   const makeInvite = async (reset = false) => {
     setInviteBusy(true); setInviteMsg('');
     try {
@@ -155,12 +171,16 @@ export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged
       const r = await createInvite(t, g.id, reset);
       const url = inviteLinkFor(r.token);
       setInviteUrl(url);
-      // Native share sheet if available; otherwise copy to the clipboard.
+      const message = inviteMessageFor(url);
+      // Native share sheet if available; otherwise copy the full message to the clipboard.
       if (navigator.share) {
-        try { await navigator.share({ title: `Join ${g.name || 'our group'} on Domestique Team`, url }); setInviteMsg(reset ? 'New link ready — shared.' : 'Link shared.'); return; }
-        catch { /* user dismissed the sheet — fall through to clipboard */ }
+        try {
+          await navigator.share({ title: `Join ${g.name || 'our group'} on Domestique Team`, text: message });
+          setInviteMsg(reset ? 'New link ready — shared.' : 'Invite shared.');
+          return;
+        } catch { /* user dismissed the sheet — fall through to clipboard */ }
       }
-      try { await navigator.clipboard?.writeText(url); setInviteMsg(reset ? 'New link copied to clipboard.' : 'Invite link copied to clipboard.'); }
+      try { await navigator.clipboard?.writeText(message); setInviteMsg(reset ? 'New invite copied — paste it to a friend.' : 'Invite copied — paste it to a friend.'); }
       catch { setInviteMsg('Invite link ready — copy it below.'); }
     } catch (ex) { setInviteMsg(ex.message || 'Could not create an invite link.'); }
     finally { setInviteBusy(false); }
@@ -168,7 +188,7 @@ export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged
 
   const copyInvite = async () => {
     if (!inviteUrl) return;
-    try { await navigator.clipboard?.writeText(inviteUrl); setInviteMsg('Invite link copied to clipboard.'); }
+    try { await navigator.clipboard?.writeText(inviteMessageFor(inviteUrl)); setInviteMsg('Invite copied — paste it to a friend.'); }
     catch { setInviteMsg('Select the link above to copy it.'); }
   };
 
@@ -219,6 +239,20 @@ export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged
       {/* ---- details ---- */}
       <Field label="Group name" value={name} onChange={setName} placeholder="Your club name" />
       <Field label="City / base" value={loc} onChange={setLoc} placeholder="Tiberias" />
+
+      <FieldLabel>Discipline type</FieldLabel>
+      <div style={s('font-size:12px;color:var(--text2);line-height:1.5;margin:-4px 0 8px')}>A group is either endurance or motor sports — not both.</div>
+      <div style={s('display:flex;gap:8px')}>
+        {[['endurance', 'Endurance'], ['motorsport', 'Motor sports']].map(([id, label]) => (
+          <div key={id} className="ctl" onClick={() => setFamily(id)}
+            style={s(`flex:1;text-align:center;padding:11px;border-radius:12px;font-size:13px;font-weight:700;border:1px solid ${family === id ? 'var(--accent)' : 'var(--line)'};background:${family === id ? 'var(--accent-dim)' : 'var(--bg2)'};color:${family === id ? 'var(--accent)' : 'var(--text2)'}`)}>
+            {label}
+          </div>
+        ))}
+      </div>
+      <FieldLabel>Discipline</FieldLabel>
+      <Chips options={disciplinesInFamily(family)} value={disc} onChange={setDisc} />
+
       <FieldLabel>Level</FieldLabel>
       <Chips options={LEVELS} value={level} onChange={setLevel} />
       <TextArea label="About the group" value={desc} onChange={setDesc} placeholder="Weekly threshold and long endurance rides…" />
@@ -300,9 +334,6 @@ export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged
         </>
       )}
       {inviteMsg && <div style={s('color:var(--good);font-size:12px;margin-top:8px;text-align:center')}>{inviteMsg}</div>}
-
-      {/* ---- group sessions (coach schedules an ad-hoc ride/run/swim for the squad) ---- */}
-      <div style={s('margin-top:22px')}><SquadEvents squadId={g.id} getToken={getToken} mode="manage" /></div>
 
       {/* ---- group targets (coach sets club races from an event link) ---- */}
       <div style={s('margin-top:22px')}><GroupTargets squadId={g.id} getToken={getToken} mode="manage" /></div>

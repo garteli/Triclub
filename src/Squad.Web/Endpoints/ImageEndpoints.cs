@@ -184,7 +184,7 @@ public static class ImageEndpoints
 
     // ---- helpers -------------------------------------------------------------
 
-    private static async Task<IResult> StreamBlob(IImageStore images, string blobName, CancellationToken ct)
+    internal static async Task<IResult> StreamBlob(IImageStore images, string blobName, CancellationToken ct)
     {
         var blob = await images.OpenReadAsync(blobName, ct);
         if (blob is null) return Results.NotFound();
