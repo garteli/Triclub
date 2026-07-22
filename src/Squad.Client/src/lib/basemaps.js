@@ -28,7 +28,7 @@ export const baseSource = (key) => {
 
 // Swap a live map's 'base' raster source+layer to a different basemap. Rebuilds the source (not just
 // setTiles) so maxzoom + attribution follow the layer — off-road stops at z15 vs CARTO's z20. Always
-// re-inserts the base at the very bottom, so the route line AND the trails overlay stay above it.
+// re-inserts the base at the very bottom, so the route/course line and markers stay above it.
 //
 // Runs synchronously: callers only invoke this once the map is ready (they guard on getSource('base')
 // / a ready flag), and add/removeLayer only needs the style parsed — NOT isStyleLoaded(), which is
@@ -40,28 +40,4 @@ export const applyBasemap = (map, key) => {
   map.addSource('base', baseSource(key));
   const layers = map.getStyle().layers || [];
   map.addLayer({ id: 'base', type: 'raster', source: 'base' }, layers.length ? layers[0].id : undefined);
-};
-
-// Marked-trails overlay: Waymarked Trails hiking tiles (OSM-based, global, open + CORS). A transparent
-// raster — coloured marked-route lines you drape over ANY basemap, anywhere. OSM data is CC-BY-SA, so
-// the attribution must ride along.
-export const TRAILS = {
-  tiles: ['https://tile.waymarkedtrails.org/hiking/{z}/{x}/{y}.png'],
-  maxzoom: 18,
-  attribution: '© <a href="https://hiking.waymarkedtrails.org">Waymarked Trails</a> · © OpenStreetMap (CC-BY-SA)',
-};
-
-// Toggle the trails overlay on a live map. Kept beneath `beneathId` (the route/course line) so our
-// track + rider markers stay on top of the trail lines, but above the basemap (which applyBasemap
-// pins to the bottom). Runs synchronously — see the applyBasemap note on why the isStyleLoaded()
-// gate is wrong (it defers the toggle indefinitely on a static map).
-export const setTrailsOverlay = (map, on, beneathId) => {
-  const has = !!map.getLayer('trails');
-  if (on && !has) {
-    if (!map.getSource('trails')) map.addSource('trails', { type: 'raster', tiles: TRAILS.tiles, tileSize: 256, maxzoom: TRAILS.maxzoom, attribution: TRAILS.attribution });
-    map.addLayer({ id: 'trails', type: 'raster', source: 'trails' }, beneathId && map.getLayer(beneathId) ? beneathId : undefined);
-  } else if (!on && has) {
-    map.removeLayer('trails');
-    if (map.getSource('trails')) map.removeSource('trails');
-  }
 };
