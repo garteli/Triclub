@@ -19,14 +19,23 @@ npx cap sync
 ```
 
 `capacitor.config.json` is already in this folder (appId `com.triclub.app`, appName
-`Domestique Team`, `webDir` points at the Vite output). The SPA is **bundled into the
-native shell** (no `server.url`), so it loads from `capacitor://localhost` and works
-offline-first. Because the app origin is then local, root-relative `/api` and `/hubs`
-requests are pointed at the deployed backend by `src/lib/apiBase.js` (`API_BASE`) — a
-fetch shim rewrites `fetch('/api/…')`, and the SignalR hooks + the XHR upload use
-`API_BASE`/`apiUrl(…)` explicitly. On web, `API_BASE` is empty and everything stays
-same-origin. Front-end changes now require a new native build (`npm run build` →
-`npx cap sync` → TestFlight); update `API_BASE` in `apiBase.js` if the backend moves.
+`Domestique Team`). The native shell loads the live web app via **`server.url`
+(`https://www.domestiquehub.com`)** — the same host that serves the API — so the app
+origin is that domain and root-relative `/api` and `/hubs` requests are same-origin.
+The Capacitor bridge and all native plugins (background geolocation, BLE, HealthKit,
+UWB, camera, keep-awake) are still injected into the remotely-loaded page and work
+normally. `src/lib/apiBase.js` (`API_BASE`) also points at that domain, so the fetch
+shim / `apiUrl(…)` prefixing is a harmless no-op (already same-origin).
+
+**Front-end changes now ship by deploying the web app** (`npm run build` → deploy) —
+no new native build or TestFlight is needed unless you change native code, plugins,
+permissions, icons, or this config. `webDir` still points at the Vite output so
+`npx cap sync` keeps a bundled copy in the app, but it isn't used for loading while
+`server.url` is set. Trade-offs of this mode: the app needs network to launch (not
+offline-first), and because the whole UI is remotely loaded, be ready to speak to
+App Store review guideline 4.2 — the app clears it easily thanks to substantial native
+functionality (background GPS, BLE sensors, HealthKit, UWB). To go back to a fully
+bundled/offline build, remove `server.url` and re-archive.
 
 ## 2. iOS — `ios/App/App/Info.plist`
 

@@ -3,6 +3,7 @@
   "appName": "Domestique Team",
   "webDir": "../Squad.Web/wwwroot",
   "server": {
+    "url": "https://www.domestiquehub.com",
     "androidScheme": "https"
   },
   "plugins": {
