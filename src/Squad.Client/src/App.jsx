@@ -696,7 +696,7 @@ export default function App() {
   }, [rideLive, liveRide.pushTelemetry]);
 
   // Garmin Edge–style live-ride pages (configurable fields, auto-rotate, edit).
-  const livePages = useLivePages(t, rideActive);
+  const livePages = useLivePages(t, rideActive, vm.family);
   // Keep the screen awake for the whole ride — recording or watching — even on other screens.
   useWakeLock(rideLive);
 

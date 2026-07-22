@@ -16,6 +16,32 @@ const DEFAULT_PAGES = [
   { name: 'Map', side: 'none', layout: 'grid', fields: ['map'] },
 ];
 
+// Motorsport rides: no power/cadence/drivetrain — seed pages of speed / distance / time /
+// elevation / group / map only. The rider can still edit these and add their own pages.
+const DEFAULT_PAGES_MOTOR = [
+  { name: 'Overview', side: 'none', layout: 'hero', heroIndex: 0, fields: ['spd', 'time', 'dist', 'avgspd', 'grad'] },
+  { name: 'Ride', side: 'none', layout: 'grid', fields: ['spd', 'dist', 'time', 'maxspd', 'elev', 'grad'] },
+  { name: 'Group', side: 'group', layout: 'grid', fields: ['leader', 'packpos', 'gap', 'spd'] },
+  { name: 'Charts', side: 'none', layout: 'grid', fields: ['chart:spd', 'chart:hr'] },
+  { name: 'Map', side: 'none', layout: 'grid', fields: ['map'] },
+];
+
+const defaultPagesFor = (family) => (family === 'motorsport' ? DEFAULT_PAGES_MOTOR : DEFAULT_PAGES);
+
+// Persist each family's page layout + current page so a refresh / next ride resumes them.
+const PKEY = 'squad.livepages.v1';
+const famKey = (family) => (family === 'motorsport' ? 'motorsport' : 'endurance');
+const loadState = (family) => {
+  try { return (JSON.parse(localStorage.getItem(PKEY) || '{}')[famKey(family)]) || {}; } catch { return {}; }
+};
+const saveState = (family, st) => {
+  try {
+    const all = JSON.parse(localStorage.getItem(PKEY) || '{}');
+    all[famKey(family)] = st;
+    localStorage.setItem(PKEY, JSON.stringify(all));
+  } catch { /* storage unavailable — non-fatal */ }
+};
+
 const COUNT_POOL = ['spd', 'hr', 'pwr', 'dist', 'time', 'cad', 'avgspd', 'grad'];
 
 // A hero tile spans the full width, so the remaining tiles should complete rows of two.
@@ -32,10 +58,23 @@ function balanceHero(c) {
 // Owns the live-ride page state (pages, current page, edit/picker/pager/drag) plus
 // the two timers the design calls for: 4s pager auto-hide and 500ms long-press to
 // edit. Auto-rotate (7s) is driven off the shared tick `t` while the ride is active.
-export function useLivePages(t, active) {
-  const [pages, setPages] = useState(DEFAULT_PAGES);
-  const [dataPage, setDataPage] = useState(0);
+export function useLivePages(t, active, family) {
+  const [pages, setPages] = useState(() => loadState(family).pages || defaultPagesFor(family));
+  const [dataPage, setDataPage] = useState(() => loadState(family).page || 0);
   const [editFields, setEditFields] = useState(false);
+  // Which family the current pages belong to — persist under it, and reload when it changes
+  // (e.g. the active club finishes loading, or the athlete switches clubs).
+  const curFamily = useRef(famKey(family));
+  useEffect(() => {
+    if (curFamily.current === famKey(family)) return;
+    curFamily.current = famKey(family);
+    const st = loadState(family);
+    setPages(st.pages || defaultPagesFor(family));
+    setDataPage(st.page || 0);
+  }, [family]);
+  // Persist layout + current page under the current family (keyed off the ref so a family
+  // switch doesn't clobber the new family's slot with the old pages).
+  useEffect(() => { saveState(curFamily.current === 'motorsport' ? 'motorsport' : 'endurance', { pages, page: dataPage }); }, [pages, dataPage]);
   const [picker, setPicker] = useState({ open: false, slot: 0 });
   const [autoRotate, setAutoRotate] = useState(false);
   const [pagerVisible, setPagerVisible] = useState(true);
@@ -143,7 +182,7 @@ export function useLivePages(t, active) {
   useEffect(() => () => { clearTimeout(pressTimer.current); clearTimeout(pagerTimer.current); }, []);
 
   return {
-    pages, pageIdx, editFields, picker, autoRotate, pagerVisible, dragFrom,
+    pages, pageIdx, editFields, picker, autoRotate, pagerVisible, dragFrom, family,
     actions: {
       goPage, nextPage, prevPage, toggleEdit, toggleAutoRotate,
       setPageLayout, setPageSide, setPageCount,

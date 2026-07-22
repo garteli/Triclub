@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { s } from '../lib/style.js';
-import { metricCatalog, metricGroups, liveMetricValues, liveChartsView, liveRadarView, spreadRiders, pelotonView } from '../lib/liveMetrics.js';
+import { metricCatalog, metricGroupsFor, liveMetricValues, liveChartsView, liveRadarView, spreadRiders, pelotonView } from '../lib/liveMetrics.js';
 import LiveMapGL from './LiveMapGL.jsx';
 import { mergePeerRanges } from '../lib/ranging.js';
 
@@ -232,9 +232,11 @@ function PickerRow({ label, unit, active, onPick }) {
   );
 }
 
-function PickerSheet({ page, slot, actions }) {
+function PickerSheet({ page, slot, actions, family }) {
   const cur = page.fields[slot];
-  const charts = [['chart:spd', 'Speed chart', 'graph'], ['chart:hr', 'HR chart', 'graph'], ['chart:power', 'Power chart', 'graph']];
+  const motor = family === 'motorsport';
+  // Motorsport has no power meter — drop the power chart (metricGroupsFor hides the rest).
+  const charts = [['chart:spd', 'Speed chart', 'graph'], ['chart:hr', 'HR chart', 'graph'], ...(motor ? [] : [['chart:power', 'Power chart', 'graph']])];
   const maps = [['map', 'Route map', 'map']];
   const group = [['peloton', 'Peloton spread', '2D']];
   const section = (title, rows) => (
@@ -254,7 +256,7 @@ function PickerSheet({ page, slot, actions }) {
         {section('Charts', charts)}
         {section('Group', group)}
         {section('Map', maps)}
-        {metricGroups.map(([cat, toks]) => section(cat, toks.map((id) => [id, metricCatalog[id].label, metricCatalog[id].unit])))}
+        {metricGroupsFor(family).map(([cat, toks]) => section(cat, toks.map((id) => [id, metricCatalog[id].label, metricCatalog[id].unit])))}
       </div>
     </>
   );
@@ -262,7 +264,7 @@ function PickerSheet({ page, slot, actions }) {
 
 // ---- the unified full-screen rotating page system ----
 export default function LivePages({ tel, lp, uwb, blePeers, indoor = false, mySport }) {
-  const { pages, pageIdx, editFields, picker, autoRotate, actions } = lp;
+  const { pages, pageIdx, editFields, picker, autoRotate, actions, family } = lp;
   const page = pages[pageIdx];
   const side = page.side || 'none';
   const withSide = side !== 'none';
@@ -388,7 +390,7 @@ export default function LivePages({ tel, lp, uwb, blePeers, indoor = false, mySp
       </div>
       )}
 
-      {picker.open && <PickerSheet page={page} slot={picker.slot} actions={actions} />}
+      {picker.open && <PickerSheet page={page} slot={picker.slot} actions={actions} family={family} />}
     </>
   );
 }
