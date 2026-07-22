@@ -4,6 +4,7 @@ import { s } from '../lib/style.js';
 import { BASEMAP_LABEL, baseSource, applyBasemap, nextBasemap, inIsrael } from '../lib/basemaps.js';
 import { getRouteStyle, setRouteStyle as persistRouteStyle, ROUTE_COLORS, ROUTE_WIDTHS } from '../lib/routeStyle.js';
 import { addRouteArrows, styleArrows } from '../lib/mapArrows.js';
+import { setMapView } from '../lib/mapView.js';
 import AuthedAvatar from './AuthedAvatar.jsx';
 
 // Full-screen 3D route map (MapLibre GL): our CARTO basemap draped over free AWS terrain
@@ -22,7 +23,7 @@ const buildStyle = (style) => ({
   layers: [{ id: 'base', type: 'raster', source: 'base' }],
 });
 
-export default function FullMap({ route, style: initialStyle = 'voyager', a, token, onClose }) {
+export default function FullMap({ route, style: initialStyle = 'voyager', is3D: initial3D, a, token, onClose, onView }) {
   const elRef = useRef(null);
   const mapRef = useRef(null);
   const headRef = useRef(null);
@@ -35,7 +36,7 @@ export default function FullMap({ route, style: initialStyle = 'voyager', a, tok
   const inPhone = targetRef.current && targetRef.current !== document.body;
   const safeTop = (px) => `calc(env(safe-area-inset-top, 0px) + ${px}px)`;
   const [mapStyle, setMapStyle] = useState(initialStyle);
-  const [is3D, setIs3D] = useState(true);
+  const [is3D, setIs3D] = useState(initial3D ?? true);
   const [bearing, setBearing] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [error, setError] = useState(false);
@@ -103,6 +104,9 @@ export default function FullMap({ route, style: initialStyle = 'voyager', a, tok
 
   // If we opened on Off-road but the route isn't in Israel, fall back to a global basemap.
   useEffect(() => { if (!israel && mapStyle === 'offroad') setMapStyle('voyager'); }, [israel, mapStyle]);
+
+  // Persist the last-selected layer + view, and sync the inline hero behind us (onView).
+  useEffect(() => { setMapView({ style: mapStyle, is3D }); onView?.(mapStyle, is3D); }, [mapStyle, is3D]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const applyRstyle = (next) => { setRstyle(next); persistRouteStyle(next); };
   const cycleStyle = () => setMapStyle((st) => nextBasemap(st, israel));
