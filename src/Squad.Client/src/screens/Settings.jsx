@@ -115,6 +115,16 @@ export default function Settings({ vm, state, actions }) {
         </div>
       </div>
 
+      {/* administration — sysadmin accounts only */}
+      {state.session?.isAdmin && (
+        <>
+          <div style={s(label)}>Administration</div>
+          <div style={s(card)}>
+            <NavRow last onClick={() => actions.go('admin')}>System admin · users &amp; groups</NavRow>
+          </div>
+        </>
+      )}
+
       {/* sign out */}
       <div style={s(card + ';margin-top:14px')}>
         <NavRow danger last onClick={() => actions.signOut()}>Sign out</NavRow>

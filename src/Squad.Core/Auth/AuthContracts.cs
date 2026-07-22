@@ -337,4 +337,6 @@ public sealed record AuthResult(
     string AvatarColor,
     string? Email,
     Guid SquadId,
-    string Provider);
+    string Provider,
+    // True for sysadmin accounts — the client shows the System-admin console entry.
+    bool IsAdmin = false);

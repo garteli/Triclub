@@ -52,10 +52,10 @@ public static class AuthEndpoints
         });
 
         // Email/password auth has been removed — Google and Apple are the only sign-in methods.
-        g.MapPost("/google", (ExternalLoginRequest req, HttpContext http, IAthleteAccounts accounts, ITokenIssuer issuer, IEnumerable<IExternalTokenVerifier> verifiers, CancellationToken ct)
-            => External(ExternalProvider.Google, req, accounts, issuer, verifiers, ct));
-        g.MapPost("/apple", (ExternalLoginRequest req, HttpContext http, IAthleteAccounts accounts, ITokenIssuer issuer, IEnumerable<IExternalTokenVerifier> verifiers, CancellationToken ct)
-            => External(ExternalProvider.Apple, req, accounts, issuer, verifiers, ct));
+        g.MapPost("/google", (ExternalLoginRequest req, HttpContext http, IAthleteAccounts accounts, ITokenIssuer issuer, AdminRegistry admins, IEnumerable<IExternalTokenVerifier> verifiers, CancellationToken ct)
+            => External(ExternalProvider.Google, req, accounts, issuer, admins, verifiers, ct));
+        g.MapPost("/apple", (ExternalLoginRequest req, HttpContext http, IAthleteAccounts accounts, ITokenIssuer issuer, AdminRegistry admins, IEnumerable<IExternalTokenVerifier> verifiers, CancellationToken ct)
+            => External(ExternalProvider.Apple, req, accounts, issuer, admins, verifiers, ct));
 
         g.MapGet("/me", Me).RequireAuthorization();
 
@@ -66,7 +66,7 @@ public static class AuthEndpoints
 
     private static async Task<IResult> External(
         ExternalProvider provider, ExternalLoginRequest req,
-        IAthleteAccounts accounts, ITokenIssuer issuer,
+        IAthleteAccounts accounts, ITokenIssuer issuer, AdminRegistry admins,
         IEnumerable<IExternalTokenVerifier> verifiers, CancellationToken ct)
     {
         var verifier = verifiers.FirstOrDefault(v => v.Provider == provider);
@@ -107,12 +107,12 @@ public static class AuthEndpoints
             account = ToAccount(created);
         }
 
-        return Ok(account, issuer, provider.ToString().ToLowerInvariant());
+        return Ok(account, issuer, admins, provider.ToString().ToLowerInvariant());
     }
 
     // --- current athlete ---
 
-    private static async Task<IResult> Me(HttpContext http, IAthleteAccounts accounts, CancellationToken ct)
+    private static async Task<IResult> Me(HttpContext http, IAthleteAccounts accounts, AdminRegistry admins, CancellationToken ct)
     {
         var id = http.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? http.User.FindFirstValue("sub");
         if (!Guid.TryParse(id, out var athleteId)) return Results.Unauthorized();
@@ -128,16 +128,18 @@ public static class AuthEndpoints
             avatarColor = account.AvatarColor,
             email = account.Email,
             squadId = account.SquadId,
+            isAdmin = admins.IsAdmin(account.Email),
         });
     }
 
     // --- helpers ---
 
-    private static IResult Ok(AthleteAccount a, ITokenIssuer issuer, string provider)
+    private static IResult Ok(AthleteAccount a, ITokenIssuer issuer, AdminRegistry admins, string provider)
     {
         var (token, expires) = issuer.Issue(a);
         return Results.Ok(new AuthResult(
-            token, expires, a.Id, a.DisplayName, a.Initials, a.AvatarColor, a.Email, a.SquadId, provider));
+            token, expires, a.Id, a.DisplayName, a.Initials, a.AvatarColor, a.Email, a.SquadId, provider,
+            IsAdmin: admins.IsAdmin(a.Email)));
     }
 
     private static NewAthleteAccount NewAccount(
