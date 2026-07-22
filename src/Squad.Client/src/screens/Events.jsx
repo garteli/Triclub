@@ -17,7 +17,7 @@ export default function Events({ vm, getToken }) {
       </div>
 
       {squadId
-        ? <SquadEvents squadId={squadId} getToken={getToken} mode="browse" standalone />
+        ? <SquadEvents squadId={squadId} getToken={getToken} mode="browse" standalone disc={vm.activeSquad?.disc} />
         : <EmptyState icon="🏁" title="No club yet" sub="Join a club to see its scheduled rides and sessions here." />}
     </div>
   );
