@@ -106,11 +106,15 @@ public sealed class SqlLeaderboardService(string connectionString) : ILeaderboar
         return (from, from.AddDays(7));
     }
 
+    // The leaderboard roster is the club's actual MEMBERS (dbo.Membership) — not everyone whose
+    // *active* squad happens to be this club. Otherwise a non-member who recorded a ride while the
+    // club was their active squad would show up on the board.
     private const string RosterSql = """
-        SELECT Id, DisplayName AS Name, Initials, AvatarColor AS Color,
-               CASE WHEN AvatarBlob IS NOT NULL
-                    THEN '/api/images/avatars/' + LOWER(CONVERT(varchar(36), Id)) END AS AvatarUrl
-        FROM dbo.Athlete WHERE SquadId = @squadId;
+        SELECT a.Id, a.DisplayName AS Name, a.Initials, a.AvatarColor AS Color,
+               CASE WHEN a.AvatarBlob IS NOT NULL
+                    THEN '/api/images/avatars/' + LOWER(CONVERT(varchar(36), a.Id)) END AS AvatarUrl
+        FROM dbo.Athlete a
+        JOIN dbo.Membership m ON m.AthleteId = a.Id AND m.SquadId = @squadId;
         """;
 
     // Every numeric column is CAST to float so it maps to the double-typed Agg
