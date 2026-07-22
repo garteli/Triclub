@@ -153,9 +153,15 @@ function WorkoutSheet({ wkDetail, actions, live }) {
 const dowLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 const legend = [['Bike', 'var(--bike)'], ['Swim', 'var(--swim)'], ['Run', 'var(--run)'], ['Gym', 'var(--gym)']];
 
-export default function Plan({ vm, state, actions, planMine, live }) {
+export default function Plan({ vm, state, actions, planMine, live, meId }) {
   const week = state.planView === 'week';
   const [showMine, setShowMine] = useState(false);
+  // Coach mode is only for the coach of the active club — i.e. its owner (the app gates every
+  // coach action on owner == caller). Hide the Coach toggle otherwise.
+  const owner = vm.activeSquad?.owner;
+  const isClubCoach = !!meId && !!owner && String(owner).toLowerCase() === String(meId).toLowerCase();
+  // If the active club changed to one this athlete doesn't coach, leave any stale coach view.
+  useEffect(() => { if (!isClubCoach && state.coachView) actions.toggleCoach(); }, [isClubCoach, state.coachView, actions]);
   const coachToggleStyle = state.coachView
     ? 'background:var(--accent);color:var(--accent-ink)'
     : 'background:var(--bg3);color:var(--text2);border:1px solid var(--line)';
@@ -171,9 +177,11 @@ export default function Plan({ vm, state, actions, planMine, live }) {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" /></svg>My plans
               </div>
             )}
-            <div className="ctl" onClick={actions.toggleCoach} style={s(`${coachToggleStyle};border-radius:11px;padding:8px 11px;font-size:11.5px;font-weight:700;display:flex;align-items:center;gap:6px`)}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>Coach
-            </div>
+            {isClubCoach && (
+              <div className="ctl" onClick={actions.toggleCoach} style={s(`${coachToggleStyle};border-radius:11px;padding:8px 11px;font-size:11.5px;font-weight:700;display:flex;align-items:center;gap:6px`)}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>Coach
+              </div>
+            )}
           </div>
         </div>
 

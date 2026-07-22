@@ -401,6 +401,7 @@ export function buildViewModel(state, t, opts = {}) {
     // on the dashboard header so the club's identity carries across the app.
     squadLogo: opts.activeSquad?.logoUrl || null,
     squadBanner: opts.activeSquad?.bannerUrl || null,
+    activeSquad: opts.activeSquad || null,
     myClubs, activeClubId: opts.activeClubId ?? null,
     feed: liveFeedRows ?? feedRows,
     activities, myActivities, activityDetail,
