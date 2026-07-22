@@ -125,10 +125,10 @@ export default function EventDetail({ vm, state, actions, getToken }) {
       ) : (
         <div style={s('display:flex;flex-direction:column;gap:9px')}>
           {people.map((p) => (
-            <div key={p.athleteId} className="ctl" onClick={() => actions.openAthlete?.(p.athleteId)}
+            <div key={p.athleteId} className={p.you ? undefined : 'ctl'} onClick={p.you ? undefined : () => actions.openAthlete?.(p.athleteId)}
               style={s('display:flex;align-items:center;gap:11px;background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:9px 11px')}>
               <AuthedAvatar avatarUrl={p.avatarUrl} token={token} initials={p.initials} color={p.avatarColor} size={34} radius={11} fontSize={13} />
-              <div style={s('flex:1;min-width:0;font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>{p.name}</div>
+              <div style={s('flex:1;min-width:0;font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>{p.name}{p.you ? ' (you)' : ''}</div>
               {p.checkedIn && <span style={s('font-size:10.5px;font-weight:700;color:var(--good);flex:none')}>✓ Checked in</span>}
             </div>
           ))}
