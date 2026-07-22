@@ -55,11 +55,16 @@ function TodayRides({ live, actions }) {
     finally { setBusyId(null); }
   };
 
-  // Start recording this event: follow its route on the map (if it has one), then begin recording
-  // and open the ride display.
+  // Start recording this event: record attendance (join + check in — starting the ride IS doing
+  // it), follow its route on the map (if it has one), then begin recording and open the display.
   const startEvent = async (ev) => {
     setBusyId(ev.id); setErr('');
     try {
+      // Attendance is best-effort — never block the ride if it fails.
+      try {
+        if (!ev.joined) await live.events.join(ev.id);
+        if (!ev.checkedIn) await live.events.checkIn(ev.id);
+      } catch { /* ignore — the ride still starts */ }
       if (ev.courseId && live?.courses?.load) {
         try { const c = await live.courses.load(ev.courseId); live.courses.setCourse?.(c); } catch { /* route is optional */ }
       }
