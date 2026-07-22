@@ -19,6 +19,28 @@ public sealed record AdminSquadRow(
     Guid Id, string Name, string Discipline, string Kind, string Color, string? Location,
     int MemberCount, Guid? OwnerId, string? OwnerName, DateTimeOffset CreatedUtc, string? LogoUrl);
 
+/// <summary>A club row in a user's ownership / membership lists (group detail cross-links).</summary>
+public sealed record AdminUserClub(Guid Id, string Name, string Kind, string Role, int MemberCount);
+
+/// <summary>Full detail for one athlete: identity/contact + the groups they own and belong to.</summary>
+public sealed record AdminUserDetail(
+    Guid Id, string Name, string? Email, string Initials, string AvatarColor, string? AvatarUrl,
+    bool HasGoogle, bool HasApple,
+    Guid ActiveSquadId, string? ActiveSquadName,
+    string? PrimarySport, string? Level, string? Club, int Activities,
+    IReadOnlyList<AdminUserClub> OwnedClubs, IReadOnlyList<AdminUserClub> Memberships);
+
+/// <summary>A club's owner as shown on the group detail page.</summary>
+public sealed record AdminOwner(
+    Guid Id, string Name, string? Email, string Initials, string AvatarColor, string? AvatarUrl);
+
+/// <summary>Full detail for one club: info + owner + roster.</summary>
+public sealed record AdminSquadDetail(
+    Guid Id, string Name, string Discipline, string Kind, string Color, string? Location, string? Level,
+    string? Price, string? PerLabel, string? Description, DateTimeOffset CreatedUtc,
+    string? LogoUrl, string? BannerUrl,
+    AdminOwner? Owner, int MemberCount, IReadOnlyList<SquadMember> Members);
+
 /// <summary>Outcome of a destructive sysadmin action.</summary>
 public enum AdminOutcome
 {
@@ -41,6 +63,12 @@ public interface ISysAdminService
 
     /// <summary>A squad's roster. Null when the squad doesn't exist.</summary>
     Task<IReadOnlyList<SquadMember>?> GetMembersAsync(Guid squadId, CancellationToken ct);
+
+    /// <summary>Full detail for one user (contact + owned/member groups). Null if not found.</summary>
+    Task<AdminUserDetail?> GetUserAsync(Guid athleteId, CancellationToken ct);
+
+    /// <summary>Full detail for one club (info + owner + roster). Null if not found.</summary>
+    Task<AdminSquadDetail?> GetSquadAsync(Guid squadId, CancellationToken ct);
 
     /// <summary>Delete a club and its dependent rows, moving any member whose active squad was this
     /// one back to their own private squad. Personal squads and the landing club are protected.</summary>

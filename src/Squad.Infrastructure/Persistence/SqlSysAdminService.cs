@@ -90,6 +90,78 @@ public sealed class SqlSysAdminService(string connectionString) : ISysAdminServi
         return rows.ToList();
     }
 
+    public async Task<AdminUserDetail?> GetUserAsync(Guid athleteId, CancellationToken ct)
+    {
+        // Head row + owned clubs + memberships in one round-trip.
+        const string sql = """
+            SELECT a.Id, a.DisplayName AS Name, a.Email, a.Initials, a.AvatarColor,
+                   CASE WHEN a.AvatarBlob IS NOT NULL THEN '/api/images/avatars/' + LOWER(CONVERT(varchar(36), a.Id)) END AS AvatarUrl,
+                   CAST(CASE WHEN a.GoogleSub IS NOT NULL THEN 1 ELSE 0 END AS bit) AS HasGoogle,
+                   CAST(CASE WHEN a.AppleSub  IS NOT NULL THEN 1 ELSE 0 END AS bit) AS HasApple,
+                   a.SquadId AS ActiveSquadId, sq.Name AS ActiveSquadName,
+                   a.PrimarySport, a.Level, a.Club,
+                   (SELECT COUNT(*) FROM dbo.Activity ac WHERE ac.AthleteId = a.Id) AS Activities
+            FROM dbo.Athlete a LEFT JOIN dbo.Squad sq ON sq.Id = a.SquadId
+            WHERE a.Id = @athleteId;
+
+            SELECT s.Id, s.Name, s.Kind, 'owner' AS Role,
+                   (SELECT COUNT(*) FROM dbo.Membership mm WHERE mm.SquadId = s.Id) AS MemberCount
+            FROM dbo.Squad s WHERE s.OwnerId = @athleteId AND s.Kind <> 'personal' ORDER BY s.Name;
+
+            SELECT s.Id, s.Name, s.Kind, m.Role,
+                   (SELECT COUNT(*) FROM dbo.Membership mm WHERE mm.SquadId = s.Id) AS MemberCount
+            FROM dbo.Membership m JOIN dbo.Squad s ON s.Id = m.SquadId
+            WHERE m.AthleteId = @athleteId
+            ORDER BY CASE WHEN s.Kind = 'personal' THEN 1 ELSE 0 END, s.Name;
+            """;
+        await using var conn = new SqlConnection(connectionString);
+        await using var multi = await conn.QueryMultipleAsync(new CommandDefinition(sql, new { athleteId }, cancellationToken: ct));
+        var head = await multi.ReadSingleOrDefaultAsync<UserHead>();
+        if (head is null) return null;
+        var owned = (await multi.ReadAsync<AdminUserClub>()).ToList();
+        var memberships = (await multi.ReadAsync<AdminUserClub>()).ToList();
+        return new AdminUserDetail(head.Id, head.Name, head.Email, head.Initials, head.AvatarColor, head.AvatarUrl,
+            head.HasGoogle, head.HasApple, head.ActiveSquadId, head.ActiveSquadName,
+            head.PrimarySport, head.Level, head.Club, head.Activities, owned, memberships);
+    }
+
+    public async Task<AdminSquadDetail?> GetSquadAsync(Guid squadId, CancellationToken ct)
+    {
+        // Club info + owner + roster in one round-trip.
+        const string sql = """
+            SELECT s.Id, s.Name, s.Discipline, s.Kind, s.Color, s.Location, s.Level, s.Price, s.PerLabel, s.Description, s.CreatedUtc,
+                   CASE WHEN s.LogoBlob   IS NOT NULL THEN '/api/images/squads/' + LOWER(CONVERT(varchar(36), s.Id)) + '/logo'   END AS LogoUrl,
+                   CASE WHEN s.BannerBlob IS NOT NULL THEN '/api/images/squads/' + LOWER(CONVERT(varchar(36), s.Id)) + '/banner' END AS BannerUrl,
+                   (SELECT COUNT(*) FROM dbo.Membership m WHERE m.SquadId = s.Id) AS MemberCount
+            FROM dbo.Squad s WHERE s.Id = @squadId;
+
+            SELECT o.Id, o.DisplayName AS Name, o.Email, o.Initials, o.AvatarColor,
+                   CASE WHEN o.AvatarBlob IS NOT NULL THEN '/api/images/avatars/' + LOWER(CONVERT(varchar(36), o.Id)) END AS AvatarUrl
+            FROM dbo.Squad s JOIN dbo.Athlete o ON o.Id = s.OwnerId WHERE s.Id = @squadId;
+
+            SELECT m.AthleteId, a.DisplayName AS Name, a.Initials, a.AvatarColor, m.Role, m.JoinedUtc,
+                   CASE WHEN a.AvatarBlob IS NOT NULL THEN '/api/images/avatars/' + LOWER(CONVERT(varchar(36), a.Id)) END AS AvatarUrl
+            FROM dbo.Membership m JOIN dbo.Athlete a ON a.Id = m.AthleteId
+            WHERE m.SquadId = @squadId
+            ORDER BY CASE m.Role WHEN 'owner' THEN 0 WHEN 'coach' THEN 1 ELSE 2 END, a.DisplayName;
+            """;
+        await using var conn = new SqlConnection(connectionString);
+        await using var multi = await conn.QueryMultipleAsync(new CommandDefinition(sql, new { squadId }, cancellationToken: ct));
+        var head = await multi.ReadSingleOrDefaultAsync<SquadHead>();
+        if (head is null) return null;
+        var owner = await multi.ReadSingleOrDefaultAsync<AdminOwner>();
+        var members = (await multi.ReadAsync<SquadMember>()).ToList();
+        return new AdminSquadDetail(head.Id, head.Name, head.Discipline, head.Kind, head.Color, head.Location, head.Level,
+            head.Price, head.PerLabel, head.Description, head.CreatedUtc, head.LogoUrl, head.BannerUrl, owner, head.MemberCount, members);
+    }
+
+    private sealed record UserHead(Guid Id, string Name, string? Email, string Initials, string AvatarColor, string? AvatarUrl,
+        bool HasGoogle, bool HasApple, Guid ActiveSquadId, string? ActiveSquadName,
+        string? PrimarySport, string? Level, string? Club, int Activities);
+
+    private sealed record SquadHead(Guid Id, string Name, string Discipline, string Kind, string Color, string? Location, string? Level,
+        string? Price, string? PerLabel, string? Description, DateTimeOffset CreatedUtc, string? LogoUrl, string? BannerUrl, int MemberCount);
+
     public async Task<AdminActionResult> DeleteSquadAsync(Guid squadId, CancellationToken ct)
     {
         if (squadId == Squads.Landing)
