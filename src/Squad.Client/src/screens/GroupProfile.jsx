@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { s } from '../lib/style.js';
 import AuthedImage from '../components/AuthedImage.jsx';
 import GroupTargets from '../components/GroupTargets.jsx';
+import SportIcon from '../components/SportIcon.jsx';
+import { familyMeta } from '../lib/disciplines.js';
 
 const Back = ({ onClick }) => (
   <div className="ctl" onClick={onClick} style={s('width:34px;height:34px;border-radius:10px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center')}>
@@ -55,7 +57,7 @@ export default function GroupProfile({ vm, actions, onJoinSquad, payments, meId,
           ? <AuthedImage url={g.bannerUrl} token={token} style="position:absolute;inset:0;width:100%;height:100%" />
           : (
             <div style={s('position:absolute;right:-10px;bottom:-16px;opacity:.25')}>
-              <svg width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="#0c0e11" strokeWidth="1.6"><circle cx="5.5" cy="17.5" r="3.5" /><circle cx="18.5" cy="17.5" r="3.5" /><path d="M15 17.5l-3-6.5H8.5m6.5 0l-2.5 6.5M9.5 6.5h3l2 4.5" /></svg>
+              <SportIcon name={familyMeta(g.disc).glyph} size={120} color="#0c0e11" strokeWidth={1.6} />
             </div>
           )}
         {g.logoUrl && (
@@ -64,7 +66,10 @@ export default function GroupProfile({ vm, actions, onJoinSquad, payments, meId,
       </div>
 
       <div style={s('padding:14px 18px 0')}>
-        <div style={s('font-size:22px;font-weight:700;letter-spacing:-.4px')}>{g.name}</div>
+        <div style={s('display:flex;align-items:center;gap:8px;flex-wrap:wrap')}>
+          <div style={s('font-size:22px;font-weight:700;letter-spacing:-.4px')}>{g.name}</div>
+          <span style={s(`font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;padding:3px 8px;border-radius:7px;color:#0c0e11;background:${familyMeta(g.disc).accent}`)}>{familyMeta(g.disc).label}</span>
+        </div>
         <div style={s('font-size:12.5px;color:var(--text2);margin-top:2px')}>{g.loc} · {g.disc} · {g.level}</div>
         <div style={s('display:flex;gap:16px;margin-top:12px')}>
           {g.rating && <div><div className="mono" style={s('font-size:18px;font-weight:700')}>★ {g.rating}</div><div style={s('font-size:9.5px;color:var(--text3);text-transform:uppercase')}>Rating</div></div>}

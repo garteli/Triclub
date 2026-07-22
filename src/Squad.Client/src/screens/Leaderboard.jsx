@@ -10,7 +10,7 @@ export default function Leaderboard({ vm, state, actions, getToken }) {
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
       <div style={s('display:flex;align-items:center;justify-content:space-between;margin-bottom:6px')}>
-        <div><div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.6px;font-weight:600')}>This week</div><div style={s('font-size:23px;font-weight:700;letter-spacing:-.5px')}>Domestique Team Ranks</div></div>
+        <div><div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.6px;font-weight:600')}>This week</div><div style={s('font-size:23px;font-weight:700;letter-spacing:-.5px')}>{vm.fam.ranksTitle}</div></div>
         <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:11px;padding:7px 10px;text-align:center')}><div className="mono" style={s('font-size:13px;font-weight:700;color:var(--accent)')}>{daysToReset}d</div><div style={s('font-size:9px;color:var(--text3);text-transform:uppercase')}>resets</div></div>
       </div>
 
