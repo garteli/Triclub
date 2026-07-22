@@ -63,6 +63,8 @@ public sealed record ClubRankingRow
     public string Name { get; init; } = "";
     public string Initials { get; init; } = "";
     public string Color { get; init; } = "#ff6a2c";
+    /// <summary>The club's discipline (e.g. Cycling, Triathlon, Moto Road) — lets the board rank clubs against same-discipline peers.</summary>
+    public string Discipline { get; init; } = "";
     public string Emblem { get; init; } = "peak";
     public bool You { get; init; }
     public double Load { get; init; }
