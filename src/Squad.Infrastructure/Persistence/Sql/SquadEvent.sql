@@ -24,6 +24,13 @@ BEGIN
     );
 END;
 
+-- Draft / published state. A coach can schedule an event as a draft (members don't see it,
+-- no notifications) and publish it later; unpublishing hides it again. Additive + idempotent;
+-- existing rows default to published (they were already live under the create-and-fan-out model).
+IF COL_LENGTH('dbo.SquadEvent', 'Published') IS NULL
+    ALTER TABLE dbo.SquadEvent ADD Published BIT NOT NULL CONSTRAINT DF_SquadEvent_Published DEFAULT 1;
+GO
+
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_SquadEvent_Squad' AND object_id = OBJECT_ID('dbo.SquadEvent'))
     CREATE INDEX IX_SquadEvent_Squad ON dbo.SquadEvent (SquadId, StartUtc);
 

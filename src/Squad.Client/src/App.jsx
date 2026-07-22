@@ -40,6 +40,7 @@ import Dashboard from './screens/Dashboard.jsx';
 import LiveRide from './screens/LiveRide.jsx';
 import Plan from './screens/Plan.jsx';
 import Events from './screens/Events.jsx';
+import EventEditor from './screens/EventEditor.jsx';
 import PlanEditor from './screens/PlanEditor.jsx';
 import PlansList from './screens/PlansList.jsx';
 import PlanLibrary from './screens/PlanLibrary.jsx';
@@ -106,7 +107,7 @@ const RIDE_TYPES = {
 captureInviteFromUrl();
 
 const screens = {
-  dash: Dashboard, ride: LiveRide, plan: Plan, events: Events, plans: PlansList, planeditor: PlanEditor, planlibrary: PlanLibrary, lb: Leaderboard, clubrank: ClubRanking,
+  dash: Dashboard, ride: LiveRide, plan: Plan, events: Events, eventeditor: EventEditor, plans: PlansList, planeditor: PlanEditor, planlibrary: PlanLibrary, lb: Leaderboard, clubrank: ClubRanking,
   feed: Feed, seg: Segments, coach: Coach, profile: Profile,
   discover: Discover, group: GroupProfile, manage: ManageGroup, pay: Checkout, recordpay: RidePayment, ledger: CoachLedger, requests: JoinRequests, chat: Messages,
   settings: Settings, welcome: Welcome, register: Register, login: Login, newgroup: CreateGroup,
@@ -513,6 +514,8 @@ export default function App() {
     setLbTab: (lbTab) => patch({ lbTab }),
     // discover / groups
     openGroup: (id) => patch({ selGroup: id, screen: 'group' }),
+    // events — open the editor to add (ev = null) or edit an existing session
+    editEvent: (ev) => patch({ selEvent: ev ?? null, screen: 'eventeditor' }),
     // ride-payment nav — selGroup is already the viewed squad
     openRecordPay: () => patch({ screen: 'recordpay' }),
     openLedger: () => patch({ screen: 'ledger' }),
