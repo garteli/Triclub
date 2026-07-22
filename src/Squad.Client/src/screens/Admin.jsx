@@ -36,6 +36,33 @@ const KindTag = ({ kind }) => {
   return <span style={s(`font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:${c};border:1px solid ${c};border-radius:6px;padding:1px 6px`)}>{kind}</span>;
 };
 
+// Confirmation modal for destructive actions. When `requireText` is set (e.g. a group name),
+// the confirm button stays disabled until the admin types it exactly — a deliberate speed-bump
+// for irreversible deletes.
+const ConfirmModal = ({ title, body, requireText, confirmLabel, input, setInput, busy, onCancel, onConfirm }) => {
+  const ready = !requireText || input.trim() === requireText;
+  return (
+    <div onClick={onCancel} style={s('position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:24px')}>
+      <div onClick={(e) => e.stopPropagation()} style={s('width:100%;max-width:340px;background:var(--bg2);border:1px solid var(--line);border-radius:18px;padding:18px;animation:floatUp .2s ease')}>
+        <div style={s('font-size:15.5px;font-weight:800;letter-spacing:-.3px')}>{title}</div>
+        <div style={s('font-size:12.5px;color:var(--text2);line-height:1.55;margin-top:9px')}>{body}</div>
+        {requireText && (
+          <>
+            <div style={s('font-size:11px;color:var(--text3);margin:14px 0 6px')}>Type <b style={s('color:var(--text)')}>{requireText}</b> to confirm</div>
+            <input value={input} onChange={(e) => setInput(e.target.value)} autoFocus placeholder={requireText}
+              style={s('width:100%;padding:10px 12px;border-radius:10px;background:var(--bg3);border:1px solid var(--line);color:var(--text);font-size:13px;outline:none;box-sizing:border-box')} />
+          </>
+        )}
+        <div style={s('display:flex;gap:9px;margin-top:16px')}>
+          <div className="ctl" onClick={busy ? undefined : onCancel} style={s('flex:1;text-align:center;padding:11px;border-radius:11px;font-size:13px;font-weight:700;background:var(--bg3);border:1px solid var(--line);color:var(--text2)')}>Cancel</div>
+          <div className="ctl" onClick={ready && !busy ? onConfirm : undefined}
+            style={s(`flex:1;text-align:center;padding:11px;border-radius:11px;font-size:13px;font-weight:700;color:#fff;background:var(--bad);${ready && !busy ? '' : 'opacity:.45;pointer-events:none'}`)}>{busy ? 'Working…' : confirmLabel}</div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function Admin({ getToken }) {
   const [tab, setTab] = useState('groups');
   const [overview, setOverview] = useState(null);
@@ -47,6 +74,8 @@ export default function Admin({ getToken }) {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
+  const [modal, setModal] = useState(null);        // { title, body, requireText, confirmLabel, run }
+  const [modalInput, setModalInput] = useState('');
 
   const token = getToken?.();
 
@@ -83,38 +112,75 @@ export default function Admin({ getToken }) {
     }
   };
 
-  const deleteSquad = async (sq) => {
-    if (!window.confirm(`Delete the group "${sq.name}"? Its ${sq.memberCount} member(s) will be moved to their own private squad. This can't be undone.`)) return;
+  const openModal = (m) => { setModalInput(''); setError(''); setModal(m); };
+  const closeModal = () => { setModal(null); setModalInput(''); };
+  const runModal = async () => {
+    if (!modal) return;
     setBusy(true); setError('');
     try {
-      await adminDeleteSquad(token, sq.id);
-      flash(`Deleted "${sq.name}".`);
-      setExpanded(null);
-      loadSquads(); loadOverview(); loadUsers(search);
-    } catch (e) { setError(e.message); } finally { setBusy(false); }
+      await modal.run();
+      closeModal();
+    } catch (e) { setError(e.message); closeModal(); } finally { setBusy(false); }
   };
 
-  const removeMember = async (sq, m) => {
-    if (!window.confirm(`Remove ${m.name} from "${sq.name}"?`)) return;
-    setBusy(true); setError('');
-    try {
+  // The real club(s) a user owns (from the loaded groups list) — deleting the user deletes these too.
+  const ownedClubsOf = (u) => squads.filter((sq) => sq.ownerId === u.id && sq.kind !== 'personal');
+
+  const deleteSquad = (sq) => openModal({
+    title: 'Delete group',
+    body: `This permanently deletes “${sq.name}” and moves its ${sq.memberCount} member(s) to their own private squad. This can't be undone.`,
+    requireText: sq.name,
+    confirmLabel: 'Delete group',
+    run: async () => {
+      await adminDeleteSquad(token, sq.id);
+      flash(`Deleted “${sq.name}”.`);
+      setExpanded(null);
+      loadSquads(); loadOverview(); loadUsers(search);
+    },
+  });
+
+  const removeMember = (sq, m) => openModal({
+    title: 'Remove member',
+    body: `Remove ${m.name} from “${sq.name}”? They keep their account and move back to their own private squad.`,
+    requireText: null,
+    confirmLabel: 'Remove',
+    run: async () => {
       await adminRemoveMember(token, sq.id, m.athleteId);
       const roster = await adminSquadMembers(token, sq.id);
       setMembers((mm) => ({ ...mm, [sq.id]: roster }));
-      flash(`Removed ${m.name} from "${sq.name}".`);
+      flash(`Removed ${m.name} from “${sq.name}”.`);
       loadSquads();
-    } catch (e) { setError(e.message); } finally { setBusy(false); }
-  };
+    },
+  });
 
-  const deleteUser = async (u) => {
-    if (u.ownsClub) { setError(`${u.name} owns a club — delete or reassign that club first.`); return; }
-    if (!window.confirm(`Permanently delete ${u.name}${u.email ? ` (${u.email})` : ''} and all their data (activities, memberships, private squad)? This can't be undone.`)) return;
-    setBusy(true); setError('');
-    try {
-      await adminDeleteUser(token, u.id);
-      flash(`Deleted ${u.name}.`);
-      loadUsers(search); loadOverview(); loadSquads();
-    } catch (e) { setError(e.message); } finally { setBusy(false); }
+  const deleteUser = (u) => {
+    const owned = ownedClubsOf(u);
+    if (owned.length) {
+      const names = owned.map((c) => c.name).join(', ');
+      openModal({
+        title: 'Delete user & their group(s)',
+        body: `${u.name} owns ${owned.length === 1 ? 'the group' : 'the groups'} “${names}”. Deleting the user also permanently deletes ${owned.length === 1 ? 'that group' : 'those groups'} and moves all members to their own private squad. This can't be undone.`,
+        requireText: names,
+        confirmLabel: 'Delete user & group',
+        run: async () => {
+          await adminDeleteUser(token, u.id, { deleteOwnedClubs: true });
+          flash(`Deleted ${u.name} and their group(s).`);
+          loadUsers(search); loadOverview(); loadSquads();
+        },
+      });
+    } else {
+      openModal({
+        title: 'Delete user',
+        body: `Permanently delete ${u.name}${u.email ? ` (${u.email})` : ''} and all their data — activities, memberships, and their private squad? This can't be undone.`,
+        requireText: null,
+        confirmLabel: 'Delete user',
+        run: async () => {
+          await adminDeleteUser(token, u.id);
+          flash(`Deleted ${u.name}.`);
+          loadUsers(search); loadOverview(); loadSquads();
+        },
+      });
+    }
   };
 
   return (
@@ -197,12 +263,20 @@ export default function Admin({ getToken }) {
                     {[u.email, u.activeSquadName, `${u.activities} act`].filter(Boolean).join(' · ')}
                   </div>
                 </div>
-                {!u.ownsClub && <DeleteBtn onClick={() => deleteUser(u)} />}
+                <DeleteBtn onClick={() => deleteUser(u)} />
               </div>
             ))}
           </div>
-          <div style={s('font-size:11px;color:var(--text3);margin:12px 4px 0;line-height:1.5')}>Users who own a club can't be deleted here — delete or reassign the club first.</div>
+          <div style={s('font-size:11px;color:var(--text3);margin:12px 4px 0;line-height:1.5')}>Deleting a user who owns a club also deletes that club — you'll confirm by typing the group name.</div>
         </>
+      )}
+
+      {modal && (
+        <ConfirmModal
+          title={modal.title} body={modal.body} requireText={modal.requireText} confirmLabel={modal.confirmLabel}
+          input={modalInput} setInput={setModalInput} busy={busy}
+          onCancel={closeModal} onConfirm={runModal}
+        />
       )}
     </div>
   );

@@ -161,7 +161,7 @@ public sealed class SqlSysAdminService(string connectionString) : ISysAdminServi
         return new AdminActionResult(AdminOutcome.Ok);
     }
 
-    public async Task<AdminActionResult> DeleteUserAsync(Guid athleteId, CancellationToken ct)
+    public async Task<AdminActionResult> DeleteUserAsync(Guid athleteId, bool deleteOwnedClubs, CancellationToken ct)
     {
         await using var conn = new SqlConnection(connectionString);
         await conn.OpenAsync(ct);
@@ -169,15 +169,43 @@ public sealed class SqlSysAdminService(string connectionString) : ISysAdminServi
         if (!await Exists(conn, null, "dbo.Athlete", "Id", athleteId, ct))
             return new AdminActionResult(AdminOutcome.NotFound);
 
-        // A user who owns a real club must have it handled first — deleting them would
-        // orphan the club's members. Their own private squad is fine (deleted below).
+        // A user who owns a real club can only be deleted if the caller opted to delete the club(s)
+        // too — otherwise deleting them would orphan the club's members. Their own private squad is
+        // always fine (deleted below).
         var ownsClub = await conn.ExecuteScalarAsync<int>(new CommandDefinition(
             "SELECT CASE WHEN EXISTS (SELECT 1 FROM dbo.Squad WHERE OwnerId = @athleteId AND Kind <> 'personal') THEN 1 ELSE 0 END;",
             new { athleteId }, cancellationToken: ct));
-        if (ownsClub == 1)
-            return new AdminActionResult(AdminOutcome.OwnsClub, "This user owns a club. Delete or reassign that club first.");
+        if (ownsClub == 1 && !deleteOwnedClubs)
+            return new AdminActionResult(AdminOutcome.OwnsClub, "This user owns a club. Confirm to delete the user together with their club(s).");
 
         await using var tx = (SqlTransaction)await conn.BeginTransactionAsync(ct);
+
+        if (deleteOwnedClubs && ownsClub == 1)
+        {
+            // Delete every real club this user owns (moving each club's other members back to their
+            // own private squad). The seeded landing club is orphaned (OwnerId→NULL), never deleted,
+            // so the shared club survives even if its owner is removed. Deleting SquadEvent cascades RSVPs.
+            await conn.ExecuteAsync(new CommandDefinition("""
+                UPDATE dbo.Squad SET OwnerId = NULL WHERE OwnerId = @id AND Id = @landing;
+
+                DECLARE @owned TABLE (Id UNIQUEIDENTIFIER PRIMARY KEY);
+                INSERT INTO @owned SELECT Id FROM dbo.Squad WHERE OwnerId = @id AND Kind <> 'personal' AND Id <> @landing;
+
+                UPDATE a SET a.SquadId = COALESCE(
+                        (SELECT TOP 1 Id FROM dbo.Squad p WHERE p.OwnerId = a.Id AND p.Kind = 'personal'),
+                        @landing)
+                FROM dbo.Athlete a
+                WHERE a.SquadId IN (SELECT Id FROM @owned);
+
+                DELETE FROM dbo.SquadTarget WHERE SquadId IN (SELECT Id FROM @owned);
+                DELETE FROM dbo.JoinRequest WHERE SquadId IN (SELECT Id FROM @owned);
+                DELETE FROM dbo.RidePayment WHERE SquadId IN (SELECT Id FROM @owned);
+                DELETE FROM dbo.SquadEvent  WHERE SquadId IN (SELECT Id FROM @owned);
+                DELETE FROM dbo.SquadInvite WHERE SquadId IN (SELECT Id FROM @owned);
+                DELETE FROM dbo.Membership  WHERE SquadId IN (SELECT Id FROM @owned);
+                DELETE FROM dbo.Squad       WHERE Id      IN (SELECT Id FROM @owned);
+                """, new { id = athleteId, landing = Squads.Landing }, tx, cancellationToken: ct));
+        }
 
         // Everything that references the athlete, children before parents. Deleting the
         // athlete's own Activities cascades the kudos/comments *on* them; their kudos/comments
