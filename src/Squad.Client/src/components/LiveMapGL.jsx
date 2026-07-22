@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { s } from '../lib/style.js';
 import { BASEMAP_LABEL, baseSource, applyBasemap, nextBasemap, inIsrael } from '../lib/basemaps.js';
-import { getRouteStyle } from '../lib/routeStyle.js';
-import { addRouteArrows } from '../lib/mapArrows.js';
+import { getRouteStyle, setRouteStyle as persistRouteStyle, ROUTE_COLORS, ROUTE_WIDTHS } from '../lib/routeStyle.js';
+import { addRouteArrows, styleArrows } from '../lib/mapArrows.js';
 
 // Interactive live-ride map tile: a real MapLibre basemap you can pinch-zoom, pan and rotate,
 // with the course route + your breadcrumb, and each rider as a coloured dot with their initials.
@@ -79,8 +79,12 @@ export default function LiveMapGL({ pts, course, path, riders, mySport, interact
   const markerSigRef = useRef('');     // last rider signature, so we only rebuild on real change
   const [follow, setFollow] = useState(false); // false = north-up (free pan), true = follow heading
   const [failed, setFailed] = useState(false);
-  const [basemap, setBasemap] = useState('voyager'); // cycle Voyager → Light → Dark → Satellite → Off-road
+  const [basemap, setBasemap] = useState('voyager'); // cycle Voyager → Light → Satellite → Terrain → Off-road
   const basemapRef = useRef('voyager');
+  const [rstyle, setRstyle] = useState(getRouteStyle); // per-user route colour + width (path + arrows)
+  const [styleOpen, setStyleOpen] = useState(false);
+  const rstyleRef = useRef(rstyle);
+  rstyleRef.current = rstyle;
   // Off-road basemap only offered when the ride is in Israel (its tiles are blank elsewhere).
   const firstPt = (Array.isArray(pts) && pts[0]) || (Array.isArray(course) && course[0]) || (Array.isArray(path) && path[0]);
   const israel = firstPt ? inIsrael(firstPt[0], firstPt[1]) : true;
@@ -105,12 +109,12 @@ export default function LiveMapGL({ pts, course, path, riders, mySport, interact
           const accent = resolveColor('var(--accent)');
           map.addSource('course', { type: 'geojson', data: lineFC(course) });
           map.addLayer({ id: 'course', type: 'line', source: 'course', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#7c8794', 'line-width': 3, 'line-opacity': 0.7, 'line-dasharray': [2, 2] } });
-          const rs = getRouteStyle(); // per-user route colour/width (shared with the full map)
+          const rs = rstyleRef.current; // per-user route colour/width (shared with the full map)
           map.addSource('path', { type: 'geojson', data: lineFC(path) });
           map.addLayer({ id: 'path', type: 'line', source: 'path', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': rs.color || accent, 'line-width': rs.width || 4 } });
-          // Direction chevrons along the course (route to follow) + your breadcrumb.
-          addRouteArrows(map, 'course', 'course-arrows');
-          addRouteArrows(map, 'path', 'path-arrows');
+          // Direction chevrons (in the route colour) along the course (route to follow) + your breadcrumb.
+          addRouteArrows(map, 'course', 'course-arrows', { color: rs.color, width: rs.width });
+          addRouteArrows(map, 'path', 'path-arrows', { color: rs.color, width: rs.width });
           // Riders are DOM markers (initials dots + clusters), not a circle layer — see rebuildMarkers.
           readyRef.current = true;
           setFailed(false);
@@ -262,6 +266,15 @@ export default function LiveMapGL({ pts, course, path, riders, mySport, interact
     if (map && readyRef.current) applyBasemap(map, basemap);
   }, [basemap]);
 
+  // Apply the per-user route colour/width live to the breadcrumb line AND the direction arrows.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !readyRef.current) return;
+    if (map.getLayer('path')) { map.setPaintProperty('path', 'line-color', rstyle.color); map.setPaintProperty('path', 'line-width', rstyle.width); }
+    styleArrows(map, ['course-arrows', 'path-arrows'], rstyle);
+  }, [rstyle]);
+  const applyRstyle = (next) => { setRstyle(next); persistRouteStyle(next); };
+
   // Enable/disable gesture handlers (off during tile drag-reorder so the tile can be dragged).
   useEffect(() => {
     const map = mapRef.current;
@@ -290,7 +303,34 @@ export default function LiveMapGL({ pts, course, path, riders, mySport, interact
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7l2.5 6L12 12l-2.5 1z" fill="currentColor" stroke="none" /><text x="12" y="6" fontSize="4.5" textAnchor="middle" fill="currentColor" stroke="none">N</text></svg>
         )}
       </div>
-      {/* Basemap cycle (Voyager → Light → Dark → Satellite → Off-road) */}
+      {/* Route colour + width (path + arrows), stacked above the basemap button */}
+      <div
+        className="ctl" onPointerDown={stop} onClick={(e) => { stop(e); setStyleOpen((o) => !o); }}
+        title="Route colour & width"
+        style={s(`position:absolute;bottom:50px;right:8px;z-index:3;width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--bg) 78%,transparent);border:1px solid ${styleOpen ? 'var(--accent)' : 'var(--line2)'};color:var(--text)`)}>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 18l7-7" /><circle cx="15.5" cy="8.5" r="1.5" fill="currentColor" stroke="none" /><path d="M12 3l3 3-8 8-3 1 1-3z" /><path d="M17 5l2-2 2 2-2 2z" /></svg>
+      </div>
+      {styleOpen && (
+        <div onPointerDown={stop} style={s('position:absolute;bottom:50px;right:50px;z-index:4;width:172px;border-radius:13px;padding:11px;background:color-mix(in srgb,var(--bg) 92%,transparent);border:1px solid var(--line2);box-shadow:0 8px 24px -8px rgba(0,0,0,.5)')}>
+          <div style={s('font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text3);margin-bottom:7px')}>Route colour</div>
+          <div style={s('display:flex;flex-wrap:wrap;gap:7px')}>
+            {ROUTE_COLORS.map((c) => (
+              <div key={c} className="ctl" onClick={(e) => { stop(e); applyRstyle({ ...rstyle, color: c }); }}
+                style={s(`width:24px;height:24px;border-radius:50%;background:${c};cursor:pointer;box-shadow:0 0 0 ${rstyle.color === c ? '2.5px var(--text)' : '1px var(--line2)'}`)} />
+            ))}
+          </div>
+          <div style={s('font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text3);margin:11px 0 7px')}>Width</div>
+          <div style={s('display:flex;gap:7px')}>
+            {ROUTE_WIDTHS.map(({ label, w }) => (
+              <div key={w} className="ctl" onClick={(e) => { stop(e); applyRstyle({ ...rstyle, width: w }); }}
+                style={s(`flex:1;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:11.5px;font-weight:700;cursor:pointer;background:${rstyle.width === w ? 'color-mix(in srgb,var(--accent) 18%,transparent)' : 'var(--bg3)'};border:1px solid ${rstyle.width === w ? 'var(--accent)' : 'var(--line)'};color:var(--text)`)}>
+                <span style={s(`width:18px;height:${w}px;border-radius:${w}px;background:${rstyle.color}`)} />{label}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {/* Basemap cycle (Voyager → Light → Satellite → Terrain → Off-road) */}
       <div
         className="ctl" onPointerDown={stop} onClick={(e) => { stop(e); setBasemap((b) => nextBasemap(b, israel)); }}
         title={`Map: ${BASEMAP_LABEL[basemap] || basemap} — tap to change`}
