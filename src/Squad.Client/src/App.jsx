@@ -39,6 +39,7 @@ import SyncToast from './components/SyncToast.jsx';
 import Dashboard from './screens/Dashboard.jsx';
 import LiveRide from './screens/LiveRide.jsx';
 import Plan from './screens/Plan.jsx';
+import Events from './screens/Events.jsx';
 import PlanEditor from './screens/PlanEditor.jsx';
 import PlansList from './screens/PlansList.jsx';
 import PlanLibrary from './screens/PlanLibrary.jsx';
@@ -105,7 +106,7 @@ const RIDE_TYPES = {
 captureInviteFromUrl();
 
 const screens = {
-  dash: Dashboard, ride: LiveRide, plan: Plan, plans: PlansList, planeditor: PlanEditor, planlibrary: PlanLibrary, lb: Leaderboard, clubrank: ClubRanking,
+  dash: Dashboard, ride: LiveRide, plan: Plan, events: Events, plans: PlansList, planeditor: PlanEditor, planlibrary: PlanLibrary, lb: Leaderboard, clubrank: ClubRanking,
   feed: Feed, seg: Segments, coach: Coach, profile: Profile,
   discover: Discover, group: GroupProfile, manage: ManageGroup, pay: Checkout, recordpay: RidePayment, ledger: CoachLedger, requests: JoinRequests, chat: Messages,
   settings: Settings, welcome: Welcome, register: Register, login: Login, newgroup: CreateGroup,
@@ -701,7 +702,7 @@ export default function App() {
       {/* Dev-only prototype harness (screen switcher / theme toggles); never shipped. */}
       {import.meta.env.DEV && <ControlDock state={state} actions={actions} />}
       <Phone theme={state.theme} accent={state.accent} lang={state.lang} dir={dir} screen={state.screen} go={actions.go}
-        header={appHeader}
+        header={appHeader} family={vm.family}
         onRefresh={authed ? onRefresh : undefined} recording={recorder.recording}>
         <Screen key={state.screen === 'planeditor' ? `pe-${selectedPlan?.id || 'new'}` : state.screen}
           vm={vm} state={state} actions={actions} live={live} tick={t} livePages={livePages}
