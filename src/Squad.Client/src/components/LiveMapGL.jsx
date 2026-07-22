@@ -105,6 +105,9 @@ export default function LiveMapGL({ pts, course, path, riders, mySport, interact
         mapRef.current = map;
         mlRef.current = maplibregl;
         map.on('error', (e) => { const m = e?.error?.message || String(e?.error || e); if (!/tile|404|Failed to fetch|AbortError/i.test(m)) console.error('MAPLIBRE', m); });
+        // If the map is created while its pager page is off-screen, basemap tiles load with no frame
+        // scheduled → a blank basemap until you pan. Repaint whenever the base finishes loading tiles.
+        map.on('sourcedata', (e) => { if (mapRef.current && e.sourceId === 'base' && e.isSourceLoaded) map.triggerRepaint(); });
         map.on('load', () => {
           const accent = resolveColor('var(--accent)');
           const rs = rstyleRef.current; // per-user route colour/width (shared with the full map)
@@ -128,8 +131,8 @@ export default function LiveMapGL({ pts, course, path, riders, mySport, interact
         // Tiles never load if the map is created while its pager page is off-screen / zero-size (the
         // pages stay mounted). So nudge a resize on any size change (ResizeObserver), when it scrolls
         // into view (IntersectionObserver), and a few times just after creation — so it always paints.
-        const nudge = () => { if (map) map.resize(); };
-        [60, 250, 600].forEach((t) => setTimeout(nudge, t));
+        const nudge = () => { if (map) { map.resize(); map.triggerRepaint(); } };
+        [60, 250, 600, 1200].forEach((t) => setTimeout(nudge, t));
         const ro = new ResizeObserver(nudge);
         ro.observe(elRef.current);
         map._ro = ro;
