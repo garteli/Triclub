@@ -16,6 +16,11 @@ export default function AppHeader({ vm, actions, getToken, notifUnread = 0, titl
   // manage the active club you own.
   const activeOwned = !!clubs.find((c) => c.active)?.owned;
   const canSwitch = !showBack && !title && ((clubs.length > 1 && !!onSwitchSquad) || activeOwned);
+  // Tapping the logo / name: a single club opens straight to its group page; with more than one
+  // (or an owned club) it opens the switch/manage dropdown, which also has an "Open group page" row.
+  const canOpenGroup = !showBack && !title && !!vm.activeClubId && !!actions?.openGroup;
+  const brandTappable = canSwitch || canOpenGroup;
+  const onBrandTap = () => { if (canSwitch) setSwitchOpen((o) => !o); else if (canOpenGroup) actions.openGroup(vm.activeClubId); };
   const doSync = async () => {
     if (syncing || !onSync) return;
     setSyncing(true);
@@ -38,10 +43,14 @@ export default function AppHeader({ vm, actions, getToken, notifUnread = 0, titl
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round"><path d={rtl ? 'M9 6l6 6-6 6' : 'M15 6l-6 6 6 6'} /></svg>
           </div>
         )}
-        {vm.squadLogo && <AuthedImage url={vm.squadLogo} token={token} style="width:34px;height:34px;border-radius:10px;flex:none" />}
+        {vm.squadLogo && (
+          <div className={brandTappable ? 'ctl' : undefined} onClick={brandTappable ? onBrandTap : undefined} style={s('flex:none')} aria-label="Group page">
+            <AuthedImage url={vm.squadLogo} token={token} style="width:34px;height:34px;border-radius:10px" />
+          </div>
+        )}
         <div
-          className={canSwitch ? 'ctl' : undefined}
-          onClick={canSwitch ? () => setSwitchOpen((o) => !o) : undefined}
+          className={brandTappable ? 'ctl' : undefined}
+          onClick={brandTappable ? onBrandTap : undefined}
           style={s(`position:relative;min-width:0;display:flex;align-items:center;gap:5px;${rtl ? 'flex-direction:row-reverse' : ''}`)}
         >
           <div style={s(`min-width:0;${rtl ? 'text-align:right' : ''}`)}>
@@ -55,6 +64,15 @@ export default function AppHeader({ vm, actions, getToken, notifUnread = 0, titl
             <>
               <div onClick={(e) => { e.stopPropagation(); setSwitchOpen(false); }} style={s('position:fixed;inset:0;z-index:30')} />
               <div style={s(`position:absolute;top:calc(100% + 10px);${rtl ? 'right:0' : 'left:0'};z-index:31;background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:6px;min-width:210px;max-width:280px;box-shadow:0 14px 34px rgba(0,0,0,.42)`)}>
+                {/* Open the active club's group page. */}
+                <div className="ctl" onClick={(e) => { e.stopPropagation(); setSwitchOpen(false); actions.openGroup?.(vm.activeClubId); }}
+                  style={s(`display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;margin-bottom:4px;border-bottom:1px solid var(--line);${rtl ? 'flex-direction:row-reverse;text-align:right' : ''}`)}>
+                  <div style={s('width:26px;height:26px;border-radius:8px;flex:none;background:var(--bg4);display:flex;align-items:center;justify-content:center;color:var(--text2)')}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21h18M5 21V8l7-5 7 5v13M9 21v-6h6v6" /></svg>
+                  </div>
+                  <div style={s('flex:1;min-width:0;font-size:13.5px;font-weight:600')}>{rtl ? 'עמוד הקבוצה' : 'Open group page'}</div>
+                </div>
+                {clubs.length > 1 && <div style={s(`font-size:9.5px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:600;padding:2px 10px 5px;${rtl ? 'text-align:right' : ''}`)}>{rtl ? 'החלף קבוצה' : 'Switch club'}</div>}
                 {clubs.map((c) => (
                   <div key={c.id} className="ctl" onClick={(e) => { e.stopPropagation(); setSwitchOpen(false); if (!c.active) onSwitchSquad(c.id); }}
                     style={s(`display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;${c.active ? 'background:var(--accent-dim)' : ''};${rtl ? 'flex-direction:row-reverse;text-align:right' : ''}`)}>
