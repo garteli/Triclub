@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { s } from '../lib/style.js';
 import AuthedImage from '../components/AuthedImage.jsx';
 import GroupTargets from '../components/GroupTargets.jsx';
+import SquadEvents from '../components/SquadEvents.jsx';
 import SportIcon from '../components/SportIcon.jsx';
 import { familyMeta } from '../lib/disciplines.js';
 
@@ -156,6 +157,9 @@ export default function GroupProfile({ vm, actions, onJoinSquad, payments, meId,
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.4" strokeLinecap="round"><path d="M9 6l6 6-6 6" /></svg>
           </div>
         )}
+
+        {/* group sessions — members join upcoming rides and check in on the day */}
+        {live && <SquadEvents squadId={g.id} getToken={getToken} mode="browse" />}
 
         {/* group target races — members can add one to their own goals */}
         {live && <GroupTargets squadId={g.id} getToken={getToken} mode="adopt" />}

@@ -19,6 +19,7 @@ const KIND = {
   message:  { icon: 'chat', color: '#5a86ff' },
   activity: { icon: 'trophy', color: '#ffce4a' },
   plan:     { icon: 'calendar', color: 'var(--accent)', target: 'plan' },
+  event:    { icon: 'calendar', color: '#37c0ff', target: 'group' },
 };
 
 function mapNote(n) {

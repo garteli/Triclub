@@ -127,6 +127,7 @@ app.MapInteractions();     // kudos + comments on /api/activities/{id}
 app.MapHealthDaily();      // POST/GET /api/health/daily (Apple Health wellness)
 app.MapSquads();           // GET/POST /api/squads (+ /{id}, /{id}/join)
 app.MapSquadTargets();      // group target races: /api/squads/{id}/targets (owner add/remove, members view)
+app.MapSquadEvents();       // ad-hoc group sessions: /api/squads/{id}/events + /api/events/{id}/{join,leave,checkin}
 app.MapCourses();           // saved routes/courses: /api/courses (list/get/create/delete)
 app.MapPayments();         // ride-payment ledger: /api/payments (+ /mine, /squad/{id}, /{id}/paid, /{id}/waive)
 app.MapLeaderboard();      // GET  /api/squads/{squadId}/leaderboard

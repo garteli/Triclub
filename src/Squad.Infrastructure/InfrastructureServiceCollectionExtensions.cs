@@ -58,6 +58,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IProfileService>(_ => new SqlProfileService(sqlConnectionString));
         services.AddScoped<ISquadService>(_ => new SqlSquadService(sqlConnectionString));
         services.AddScoped<ISquadTargetStore>(_ => new SqlSquadTargetStore(sqlConnectionString));
+        services.AddScoped<ISquadEventStore>(_ => new SqlSquadEventStore(sqlConnectionString));
         services.AddScoped<ICourseStore>(_ => new SqlCourseStore(sqlConnectionString));
         services.AddScoped<IPaymentService>(_ => new SqlPaymentService(sqlConnectionString, paymentsClubFeeBps));
         services.AddScoped<IChatService>(_ => new SqlChatService(sqlConnectionString));
