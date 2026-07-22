@@ -39,9 +39,17 @@ async function uploadFit(bytes, token) {
 // streams through pushTelemetry (live hub) AND is accumulated at full resolution so the
 // finished ride can be encoded as a real Garmin .fit and uploaded through the same
 // ingest path as a Garmin file (see lib/fitEncoder.js).
-export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, enabled = true, sport = FitSport.cycling, indoor = false, driver = false, throttleMs = 1000 } = {}) {
+export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, enabled = true, sport = FitSport.cycling, indoor = false, driver = false, autoPause = { enabled: false, pauseKph: 2, resumeKph: 4 }, throttleMs = 1000 } = {}) {
   const driverRef = useRef(driver);
   driverRef.current = driver;
+  // Auto-pause: freeze distance + the elapsed clock when you stop, resume after sustained movement.
+  const apCfgRef = useRef(autoPause);
+  apCfgRef.current = autoPause;
+  const [autoPaused, setAutoPaused] = useState(false);
+  const autoPausedRef = useRef(false);
+  const pausedMsRef = useRef(0);      // total time spent auto-paused (excluded from elapsed)
+  const pauseStartRef = useRef(null); // when the current pause began
+  const resumeStartRef = useRef(null); // when speed first crossed the resume threshold (5s sustain)
   const [recording, setRecording] = useState(false);
   const [paused, setPaused] = useState(false);       // web: backgrounded / screen locked
   const [distanceKm, setDistanceKm] = useState(0);
@@ -80,6 +88,7 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, ena
 
   const resetCapture = () => {
     distMeters.current = 0; prevCoord.current = null; lastSampleTs.current = null; lastPush.current = 0;
+    autoPausedRef.current = false; pausedMsRef.current = 0; pauseStartRef.current = null; resumeStartRef.current = null; setAutoPaused(false);
     samples.current = [];
     agg.current = {
       startMs: null, lastTs: null, movingMs: 0,
@@ -104,20 +113,40 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, ena
   }, []);
 
   const onSample = useCallback((s) => {
-    // Distance from GPS when we have a fix (haversine between consecutive points); indoors there's
-    // no position, so integrate it from the sensor's instantaneous speed instead (speed × Δt).
-    if (s.lat != null && s.lon != null) {
-      if (prevCoord.current) distMeters.current += haversineMeters(prevCoord.current, s);
-      prevCoord.current = { lat: s.lat, lon: s.lon };
-    } else if (s.speedMps != null && s.speedMps > 0) {
-      const prevTs = lastSampleTs.current;
-      if (prevTs != null) { const dt = ((s.ts ?? Date.now()) - prevTs) / 1000; if (dt > 0 && dt < 10) distMeters.current += s.speedMps * dt; }
+    const nowTs = s.ts ?? Date.now();
+    const speedKph = s.speedMps != null ? mpsToKph(s.speedMps) : null;
+
+    // Auto-pause: when moving speed drops near zero, pause (freeze distance + the elapsed clock);
+    // resume only after speed holds above the resume threshold for a sustained 5 s.
+    const ap = apCfgRef.current;
+    if (ap?.enabled) {
+      const kph = speedKph ?? 0;
+      if (!autoPausedRef.current) {
+        if (kph < (ap.pauseKph ?? 2)) { autoPausedRef.current = true; pauseStartRef.current = nowTs; resumeStartRef.current = null; setAutoPaused(true); }
+      } else if (kph > (ap.resumeKph ?? 4)) {
+        if (resumeStartRef.current == null) resumeStartRef.current = nowTs;
+        else if (nowTs - resumeStartRef.current >= 5000) {
+          pausedMsRef.current += Math.max(0, nowTs - (pauseStartRef.current ?? nowTs)); // bank the paused span
+          autoPausedRef.current = false; pauseStartRef.current = null; resumeStartRef.current = null; setAutoPaused(false);
+        }
+      } else {
+        resumeStartRef.current = null; // dropped back below resume — restart the 5 s sustain
+      }
     }
-    lastSampleTs.current = s.ts ?? Date.now();
+
+    // Distance from GPS when we have a fix (haversine between consecutive points); indoors there's
+    // no position, so integrate it from the sensor's instantaneous speed instead (speed × Δt). While
+    // auto-paused we still track position (so the map dot stays put) but stop counting distance.
+    if (s.lat != null && s.lon != null) {
+      if (prevCoord.current && !autoPausedRef.current) distMeters.current += haversineMeters(prevCoord.current, s);
+      prevCoord.current = { lat: s.lat, lon: s.lon };
+    } else if (s.speedMps != null && s.speedMps > 0 && !autoPausedRef.current) {
+      const prevTs = lastSampleTs.current;
+      if (prevTs != null) { const dt = (nowTs - prevTs) / 1000; if (dt > 0 && dt < 10) distMeters.current += s.speedMps * dt; }
+    }
+    lastSampleTs.current = nowTs;
     const km = distMeters.current / 1000;
     setDistanceKm(km);
-
-    const speedKph = s.speedMps != null ? mpsToKph(s.speedMps) : null;
 
     // Fold in the latest BLE sensor readings (HR / power / radar), if paired.
     const m = sensors?.current?.() || {};
@@ -313,7 +342,9 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, ena
     if (!recording) return undefined;
     const tick = () => {
       const base = agg.current?.startMs ?? startedAtRef.current;
-      setElapsedSec(base ? Math.max(0, Math.round((Date.now() - base) / 1000)) : 0);
+      // Exclude auto-paused time (banked + any in-progress pause) so the clock freezes when stopped.
+      const pausedMs = pausedMsRef.current + (autoPausedRef.current && pauseStartRef.current ? Date.now() - pauseStartRef.current : 0);
+      setElapsedSec(base ? Math.max(0, Math.round((Date.now() - base - pausedMs) / 1000)) : 0);
     };
     tick();
     const id = setInterval(tick, 1000);
@@ -413,7 +444,7 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, ena
   useEffect(() => () => { source.current?.stop?.(); releaseWakeLock(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return {
-    recording, paused, distanceKm, elapsedSec, lastFix, error, mode, start, stop,
+    recording, paused, autoPaused, distanceKm, elapsedSec, lastFix, error, mode, start, stop,
     pending, saveState, saveError, saveRide, discardRide,
     photos, addPhoto, removePhoto,
     getPath,

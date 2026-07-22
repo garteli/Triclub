@@ -138,9 +138,10 @@ function RideSummary({ pending, saveState, saveError, saveRide, discardRide, pho
 // hub connection persist across lobby→active). `streaming` reflects whether fixes are
 // going to the ride hub.
 export default function RideRecorder({ recorder, sensors, streaming }) {
-  const { recording, paused, distanceKm, elapsedSec, lastFix, error, mode, start, stop,
+  const { recording, paused, autoPaused, distanceKm, elapsedSec, lastFix, error, mode, start, stop,
           pending, saveState, saveError, saveRide, discardRide,
           photos, addPhoto, removePhoto } = recorder;
+  const stopped = paused || autoPaused; // any pause — dim the status dot and freeze the label
   const radar = sensors.metrics.radar;
 
   // Photo capture: native uses the camera plugin; web opens the file/camera input.
@@ -199,9 +200,9 @@ export default function RideRecorder({ recorder, sensors, streaming }) {
       {input}
       <div style={s('display:flex;align-items:center;justify-content:space-between')}>
         <div style={s('display:flex;align-items:center;gap:8px')}>
-          <Dot color={recording ? (paused ? 'var(--warn)' : 'var(--bad)') : 'var(--text3)'} pulse={recording && !paused} />
+          <Dot color={recording ? (stopped ? 'var(--warn)' : 'var(--bad)') : 'var(--text3)'} pulse={recording && !stopped} />
           <span style={s('font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--text2)')}>
-            {recording ? (paused ? 'Paused' : 'Recording') : 'Record ride'}
+            {recording ? (autoPaused ? 'Auto-paused' : paused ? 'Paused' : 'Recording') : 'Record ride'}
           </span>
         </div>
         {!streaming && <span style={s('font-size:10px;color:var(--text3)')}>local · not streaming</span>}

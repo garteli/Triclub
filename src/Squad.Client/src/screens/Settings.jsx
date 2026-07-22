@@ -23,8 +23,26 @@ const NavRow = ({ children, danger, last, onClick }) => (
   </div>
 );
 
+const Toggle = ({ on, onClick }) => (
+  <div className="ctl" onClick={onClick} style={s(`width:44px;height:26px;border-radius:14px;flex:none;position:relative;transition:background .15s;${on ? 'background:var(--accent)' : 'background:var(--bg4)'}`)}>
+    <div style={s(`position:absolute;top:3px;${on ? 'right:3px' : 'left:3px'};width:20px;height:20px;border-radius:50%;background:#fff;transition:all .15s`)} />
+  </div>
+);
+
+const Stepper = ({ label, value, unit, min, max, onChange }) => (
+  <div style={s('display:flex;align-items:center')}>
+    <span style={s('flex:1;font-size:13px;color:var(--text2);font-weight:600')}>{label}</span>
+    <div style={s('display:flex;align-items:center;gap:10px')}>
+      <div className="ctl" onClick={() => onChange(Math.max(min, value - 1))} style={s('width:30px;height:30px;border-radius:9px;background:var(--bg3);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700;color:var(--text)')}>−</div>
+      <span className="mono" style={s('font-size:13.5px;font-weight:700;min-width:58px;text-align:center')}>{value} {unit}</span>
+      <div className="ctl" onClick={() => onChange(Math.min(max, value + 1))} style={s('width:30px;height:30px;border-radius:9px;background:var(--bg3);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700;color:var(--text)')}>+</div>
+    </div>
+  </div>
+);
+
 export default function Settings({ vm, state, actions }) {
   const { theme, accent, lang, units } = state;
+  const ap = state.autoPause || { enabled: true, pauseKph: 2, resumeKph: 4 };
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
       {/* title + back now in the global app header */}
@@ -54,6 +72,26 @@ export default function Settings({ vm, state, actions }) {
           <Seg active={lang === 'he'} onClick={() => actions.setLang('he')}>עברית</Seg>
         </div>
         <div style={s('font-size:11px;color:var(--text3);margin-top:9px;line-height:1.4')}>Hebrew flips the whole app to right-to-left.</div>
+      </div>
+
+      {/* recording */}
+      <div style={s(label)}>Recording</div>
+      <div style={s(card + ';padding:14px 15px')}>
+        <div style={s('display:flex;align-items:center')}>
+          <div style={s('flex:1;min-width:0')}>
+            <div style={s('font-size:13.5px;font-weight:600;color:var(--text)')}>Auto-pause</div>
+            <div style={s('font-size:11px;color:var(--text3);margin-top:2px;line-height:1.4')}>Pause when you stop; resume after moving for 5s.</div>
+          </div>
+          <Toggle on={ap.enabled} onClick={() => actions.setAutoPause('enabled', !ap.enabled)} />
+        </div>
+        {ap.enabled && (
+          <>
+            <div style={s('height:1px;background:var(--line);margin:14px 0')} />
+            <Stepper label="Pause below" value={ap.pauseKph} unit="km/h" min={1} max={10} onChange={(v) => actions.setAutoPause('pauseKph', v)} />
+            <div style={s('height:12px')} />
+            <Stepper label="Resume above" value={ap.resumeKph} unit="km/h" min={2} max={20} onChange={(v) => actions.setAutoPause('resumeKph', v)} />
+          </>
+        )}
       </div>
 
       {/* general */}

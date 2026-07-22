@@ -431,6 +431,8 @@ export default function App() {
     setUnits: (units) => setState((s) => savePrefs({ ...s, units })),
     setTemp: (temp) => setState((s) => savePrefs({ ...s, temp })),
     setNotif: (key, value) => setState((s) => savePrefs({ ...s, notif: { ...s.notif, [key]: value } })),
+    // Auto-pause preferences (enabled + km/h thresholds), persisted to localStorage.
+    setAutoPause: (key, value) => setState((s) => savePrefs({ ...s, autoPause: { ...s.autoPause, [key]: value } })),
     setPrivacy: (key, value) => setState((s) => savePrefs({ ...s, privacy: { ...s.privacy, [key]: value } })),
     // profile photo — optimistic local update, then persist to blob storage. The
     // cropped JPEG data URL renders immediately; the upload syncs it across devices
@@ -553,7 +555,7 @@ export default function App() {
     try { localStorage.setItem('squad.rideSport', v); } catch { /* ignore */ }
   }, []);
   const rideType = RIDE_TYPES[rideSport] || RIDE_TYPES.bike;
-  const recorder = useRideRecorder({ pushTelemetry: liveRide.pushTelemetry, sensors, getToken, onSaved: () => setRefreshSignal((n) => n + 1), enabled: authed, sport: rideType.fitSport, indoor: rideType.indoor, driver: !!rideType.driver, throttleMs: 500 });
+  const recorder = useRideRecorder({ pushTelemetry: liveRide.pushTelemetry, sensors, getToken, onSaved: () => setRefreshSignal((n) => n + 1), enabled: authed, sport: rideType.fitSport, indoor: rideType.indoor, driver: !!rideType.driver, autoPause: state.autoPause, throttleMs: 500 });
   // A ride is "live" whenever it's active OR still recording — independent of which screen you're on,
   // so sensors, ranging, the hub, telemetry, wake lock and presence all keep running as you navigate.
   const rideLive = rideSessionActive || recorder.recording;
