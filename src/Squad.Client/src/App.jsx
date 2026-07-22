@@ -25,7 +25,7 @@ import { recordPayment, markPaymentPaid, waivePayment } from './lib/payments.js'
 import { publishPlan, unpublishPlan, listMyPlans, removeMyPlan, listPlans, getPlan, savePlan, deletePlan, listLibrary, getLibraryTemplate, adoptTemplate } from './lib/plan.js';
 // import { useLiveRide } from './hooks/useLiveRide.js'; // swap in for real telemetry
 import { buildViewModel } from './lib/viewModel.js';
-import { loadSession, saveSession, clearSession, enrollBiometric, fetchMe, getProfile } from './lib/auth.js';
+import { loadSession, saveSession, clearSession, enrollBiometric, fetchMe, getProfile, deleteAccount as apiDeleteAccount, clearBiometric } from './lib/auth.js';
 import { loadPrefs, savePrefs } from './lib/prefs.js';
 import { loadNav, saveNav } from './lib/navState.js';
 import { loadDraft, draftMode } from './lib/rideDraft.js';
@@ -509,7 +509,14 @@ export default function App() {
     openLink: (url) => { try { window.open(url, '_blank', 'noopener'); } catch { /* ignore */ } },
     copyDiagnostics: () => { try { navigator.clipboard?.writeText('Domestique Team 1.0.0 (build 100)'); } catch { /* ignore */ } },
     exportData: () => { try { window.open('https://domestique.team/account/export', '_blank', 'noopener'); } catch { /* ignore */ } },
-    deleteAccount: () => { try { window.open('https://domestique.team/account/delete', '_blank', 'noopener'); } catch { /* ignore */ } },
+    // In-app account deletion (App Store 5.1.1(v)): permanently delete the account server-side,
+    // then drop the local biometric enrolment and sign out to the Welcome screen. Errors
+    // propagate so the confirm modal can surface them (and keep the session intact).
+    deleteAccount: async () => {
+      await apiDeleteAccount(sessionRef.current?.token);
+      clearBiometric();
+      actions.signOut();
+    },
     setDashVar: (dashVar) => patch({ dashVar }),
     setRideVar: (rideVar) => patch({ rideVar }),
     // ride

@@ -87,6 +87,13 @@ export async function getProfile(token) {
   return api('/api/profile', { token });
 }
 
+// Permanently delete the signed-in athlete's own account and all associated data
+// (activities, memberships, messages, photos, owned squads). Required by Apple App Store
+// Guideline 5.1.1(v) — deletion must be doable from inside the app. Returns on 204.
+export async function deleteAccount(token) {
+  return api('/api/auth/me', { method: 'DELETE', token });
+}
+
 // Partial update; returns the updated ProfileDetail. Null/undefined fields are left unchanged.
 export async function updateProfile(token, fields) {
   return api('/api/profile', { method: 'PUT', token, body: fields });

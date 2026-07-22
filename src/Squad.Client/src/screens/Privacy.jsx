@@ -1,5 +1,6 @@
 import { s } from '../lib/style.js';
 import { Header, SectionLabel, Card, ChoiceRow, ToggleRow, LinkRow } from '../components/SettingsUI.jsx';
+import { useConfirm } from '../components/ConfirmModal.jsx';
 
 const VISIBILITY = [
   { id: 'public', label: 'Everyone' },
@@ -9,6 +10,7 @@ const VISIBILITY = [
 
 export default function Privacy({ state, actions }) {
   const p = state.privacy || {};
+  const confirm = useConfirm();
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
       <Header title="Privacy" onBack={() => actions.go('settings')}
@@ -44,12 +46,20 @@ export default function Privacy({ state, actions }) {
       <SectionLabel>Your data</SectionLabel>
       <Card>
         <LinkRow onClick={() => actions.exportData?.()}>Download my data</LinkRow>
-        <LinkRow danger last onClick={() => actions.deleteAccount?.()}>Delete account</LinkRow>
+        <LinkRow danger last onClick={() => confirm.open({
+          title: 'Delete account',
+          body: 'This permanently deletes your account and all your data — activities, memberships, messages, photos and any squads you own. This cannot be undone.',
+          requireText: 'DELETE',
+          confirmLabel: 'Delete account',
+          run: () => actions.deleteAccount(),
+        })}>Delete account</LinkRow>
       </Card>
 
       <div style={s('font-size:11px;color:var(--text3);margin-top:14px;line-height:1.5;padding:0 2px')}>
         Deleting your account permanently removes your activities, memberships and messages. This can't be undone.
       </div>
+
+      {confirm.node}
     </div>
   );
 }

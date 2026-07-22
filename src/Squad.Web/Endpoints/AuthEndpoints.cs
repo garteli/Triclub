@@ -59,6 +59,11 @@ public static class AuthEndpoints
 
         g.MapGet("/me", Me).RequireAuthorization();
 
+        // Self-service account deletion — required by Apple App Store Guideline 5.1.1(v):
+        // an app that creates accounts must let the account owner delete theirs from inside
+        // the app (not only via a website).
+        g.MapDelete("/me", DeleteMe).RequireAuthorization();
+
         return app;
     }
 
@@ -130,6 +135,25 @@ public static class AuthEndpoints
             squadId = account.SquadId,
             isAdmin = admins.IsAdmin(account.Email),
         });
+    }
+
+    // Permanently delete the signed-in athlete and everything they own. Reuses the same
+    // teardown as the sysadmin path (SqlSysAdminService.DeleteUserAsync). deleteOwnedClubs:true
+    // so a user who owns club(s) can always complete deletion — their clubs are deleted too and
+    // remaining members are moved back to their own private squads (the seeded landing club is
+    // orphaned, never deleted). With that flag set, OwnsClub is never returned.
+    private static async Task<IResult> DeleteMe(HttpContext http, ISysAdminService admin, CancellationToken ct)
+    {
+        var id = http.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? http.User.FindFirstValue("sub");
+        if (!Guid.TryParse(id, out var athleteId)) return Results.Unauthorized();
+
+        var result = await admin.DeleteUserAsync(athleteId, deleteOwnedClubs: true, ct);
+        return result.Outcome switch
+        {
+            AdminOutcome.Ok => Results.NoContent(),
+            AdminOutcome.NotFound => Results.NotFound(),
+            _ => Results.Problem(result.Message ?? "Account could not be deleted.", statusCode: 409),
+        };
     }
 
     // --- helpers ---
