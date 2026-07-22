@@ -3,6 +3,7 @@ import { s } from '../lib/style.js';
 import { Back } from './wizard.jsx';
 import RouteMapGL from '../components/RouteMapGL.jsx';
 import AuthedAvatar from '../components/AuthedAvatar.jsx';
+import AuthedImage from '../components/AuthedImage.jsx';
 import SportIcon from '../components/SportIcon.jsx';
 import { getCourse } from '../lib/courses.js';
 import { listEventParticipants, joinEvent, leaveEvent } from '../lib/events.js';
@@ -78,10 +79,19 @@ export default function EventDetail({ vm, state, actions, getToken }) {
         <div style={s('font-size:20px;font-weight:700;letter-spacing:-.4px')}>Event</div>
       </div>
 
-      {/* header — sport glyph, title, when */}
+      {/* banner hero (if set) */}
+      {ev.bannerUrl && (
+        <div style={s('margin-top:12px;border-radius:18px;overflow:hidden;border:1px solid var(--line);height:150px')}>
+          <AuthedImage url={ev.bannerUrl} token={token} style="width:100%;height:100%;object-fit:cover" />
+        </div>
+      )}
+
+      {/* header — logo or sport glyph, title, when */}
       <div style={s('display:flex;align-items:center;gap:12px;margin-top:14px')}>
-        <div style={s('width:48px;height:48px;border-radius:14px;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;flex:none')}>
-          <SportIcon name={glyphForSport(ev.sport, vm.family)} size={26} color="var(--accent)" />
+        <div style={s('width:48px;height:48px;border-radius:14px;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;flex:none;overflow:hidden')}>
+          {ev.logoUrl
+            ? <AuthedImage url={ev.logoUrl} token={token} style="width:100%;height:100%;object-fit:cover" />
+            : <SportIcon name={glyphForSport(ev.sport, vm.family)} size={26} color="var(--accent)" />}
         </div>
         <div style={s('min-width:0')}>
           <div style={s('font-size:20px;font-weight:700;letter-spacing:-.4px;overflow:hidden;text-overflow:ellipsis')}>{ev.title}</div>

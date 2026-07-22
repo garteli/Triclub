@@ -44,7 +44,70 @@ public static class ImageEndpoints
                     => GetSquadImage(squadId, k, http, images, squads, ct))
                 .RequireAuthorization();
         }
+
+        // Per-event logo + banner (owner-managed branding on a group session)
+        foreach (var kind in new[] { "logo", "banner" })
+        {
+            var k = kind;
+            app.MapPost($"/api/squads/{{squadId:guid}}/events/{{eventId:guid}}/{k}",
+                (Guid squadId, Guid eventId, IFormFile file, HttpContext http, IImageStore images, ISquadEventStore events, CancellationToken ct)
+                    => UploadEventImage(squadId, eventId, k, file, http, images, events, ct))
+                .DisableAntiforgery().RequireAuthorization();
+            app.MapDelete($"/api/squads/{{squadId:guid}}/events/{{eventId:guid}}/{k}",
+                (Guid squadId, Guid eventId, HttpContext http, IImageStore images, ISquadEventStore events, CancellationToken ct)
+                    => DeleteEventImage(squadId, eventId, k, http, images, events, ct))
+                .RequireAuthorization();
+            app.MapGet($"/api/images/squads/{{squadId:guid}}/events/{{eventId:guid}}/{k}",
+                (Guid squadId, Guid eventId, HttpContext http, IImageStore images, ISquadEventStore events, CancellationToken ct)
+                    => GetEventImage(squadId, eventId, k, http, images, events, ct))
+                .RequireAuthorization();
+        }
         return app;
+    }
+
+    // ---- event logo / banner -------------------------------------------------
+
+    private static async Task<IResult> UploadEventImage(
+        Guid squadId, Guid eventId, string kind, IFormFile file, HttpContext http, IImageStore images, ISquadEventStore events, CancellationToken ct)
+    {
+        var me = ActivityIntakeEndpoints.ResolveAthleteId(http.User);
+        if (me is null) return Results.Unauthorized();
+        if (!TryValidate(file, out var err)) return Results.BadRequest(err);
+
+        var previous = await events.GetImageBlobAsync(squadId, eventId, kind, ct);
+        string blobName;
+        await using (var stream = file.OpenReadStream())
+            blobName = await images.SaveAsync($"event-{kind}", stream, file.ContentType, ct);
+
+        if (!await events.SetImageBlobAsync(squadId, eventId, kind, blobName, me.Value, ct))
+        {
+            await images.DeleteAsync(blobName, ct);
+            return Results.NotFound(new { error = "Event not found, or you don't manage it." });
+        }
+        if (!string.IsNullOrEmpty(previous)) await images.DeleteAsync(previous, ct);
+        return Results.Ok(new { url = $"/api/images/squads/{squadId:D}/events/{eventId:D}/{kind}".ToLowerInvariant() });
+    }
+
+    private static async Task<IResult> DeleteEventImage(
+        Guid squadId, Guid eventId, string kind, HttpContext http, IImageStore images, ISquadEventStore events, CancellationToken ct)
+    {
+        var me = ActivityIntakeEndpoints.ResolveAthleteId(http.User);
+        if (me is null) return Results.Unauthorized();
+
+        var previous = await events.GetImageBlobAsync(squadId, eventId, kind, ct);
+        if (!await events.SetImageBlobAsync(squadId, eventId, kind, null, me.Value, ct))
+            return Results.NotFound(new { error = "Event not found, or you don't manage it." });
+        if (!string.IsNullOrEmpty(previous)) await images.DeleteAsync(previous, ct);
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> GetEventImage(
+        Guid squadId, Guid eventId, string kind, HttpContext http, IImageStore images, ISquadEventStore events, CancellationToken ct)
+    {
+        if (ActivityIntakeEndpoints.ResolveAthleteId(http.User) is null) return Results.Unauthorized();
+        var blobName = await events.GetImageBlobAsync(squadId, eventId, kind, ct);
+        if (string.IsNullOrEmpty(blobName)) return Results.NotFound();
+        return await StreamBlob(images, blobName, ct);
     }
 
     // ---- squad logo / banner -------------------------------------------------

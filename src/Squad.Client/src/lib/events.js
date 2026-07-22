@@ -52,8 +52,20 @@ export const publishEvent = (token, squadId, eventId) => req(`/api/squads/${squa
 export const unpublishEvent = (token, squadId, eventId) => req(`/api/squads/${squadId}/events/${eventId}/unpublish`, { method: 'POST', token });
 // Owner-only join/check-in roster → [{ athleteId, name, initials, avatarColor, avatarUrl, joinedUtc, checkedIn, checkedInUtc }]
 export const listEventAttendees = (token, squadId, eventId) => req(`/api/squads/${squadId}/events/${eventId}/attendees`, { token });
-// Member-facing participant roster (the event page) → [{ athleteId, name, initials, avatarColor, avatarUrl, checkedIn }]
+// Member-facing participant roster (the event page) → [{ athleteId, name, initials, avatarColor, avatarUrl, checkedIn, you }]
 export const listEventParticipants = (token, squadId, eventId) => req(`/api/squads/${squadId}/events/${eventId}/participants`, { token });
+
+// Per-event branding (owner-only). kind is 'logo' | 'banner'; blob is a downscaled JPEG. Returns { url }.
+export async function uploadEventImage(token, squadId, eventId, kind, blob) {
+  const fd = new FormData();
+  fd.append('file', blob, `${kind}.jpg`);
+  const res = await fetch(`/api/squads/${squadId}/events/${eventId}/${kind}`, {
+    method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : undefined, body: fd,
+  });
+  if (!res.ok) throw new Error(`Upload failed (${res.status})`);
+  return res.json().catch(() => ({}));
+}
+export const deleteEventImage = (token, squadId, eventId, kind) => req(`/api/squads/${squadId}/events/${eventId}/${kind}`, { method: 'DELETE', token });
 export const deleteSquadEvent = (token, squadId, eventId) => req(`/api/squads/${squadId}/events/${eventId}`, { method: 'DELETE', token });
 
 export const joinEvent = (token, eventId) => req(`/api/events/${eventId}/join`, { method: 'POST', token });
