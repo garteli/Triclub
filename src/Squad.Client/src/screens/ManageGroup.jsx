@@ -11,6 +11,7 @@ import {
   updateSquad, listMembers, addMember, removeMember, uploadSquadImage, deleteSquadImage, createInvite,
 } from '../lib/squads.js';
 import { API_BASE } from '../lib/apiBase.js';
+import { DISCIPLINES, familyOf, disciplinesInFamily } from '../lib/disciplines.js';
 
 const LEVELS = ['All levels', 'Intermediate+', 'Advanced', 'Race focus'];
 const KINDS = [
@@ -42,6 +43,12 @@ export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged
   // details/pricing form, seeded from the current squad
   const [name, setName] = useState(g.name || '');
   const [loc, setLoc] = useState(g.loc || '');
+  // A group belongs to ONE discipline family — endurance OR motor sports, never both.
+  // `disc` is the single stored discipline; the family (segmented toggle) is derived from it.
+  const [disc, setDisc] = useState(DISCIPLINES.includes(g.disc) ? g.disc : 'Cycling');
+  const family = familyOf(disc);
+  // Switching family swaps the discipline to that family's first option (so the two can't mix).
+  const setFamily = (fam) => { if (fam !== family) setDisc(disciplinesInFamily(fam)[0]); };
   const [level, setLevel] = useState(LEVELS.includes(g.level) ? g.level : 'All levels');
   const [desc, setDesc] = useState(g.desc || '');
   const [kind, setKind] = useState(g.kind || 'member');
@@ -115,6 +122,7 @@ export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged
       const digits = String(priceNum).replace(/[^\d]/g, '');
       await updateSquad(t, g.id, {
         name: name.trim() || null,
+        discipline: disc,
         location: loc.trim(),
         level,
         kind,
@@ -232,6 +240,20 @@ export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged
       {/* ---- details ---- */}
       <Field label="Group name" value={name} onChange={setName} placeholder="Your club name" />
       <Field label="City / base" value={loc} onChange={setLoc} placeholder="Tiberias" />
+
+      <FieldLabel>Discipline type</FieldLabel>
+      <div style={s('font-size:12px;color:var(--text2);line-height:1.5;margin:-4px 0 8px')}>A group is either endurance or motor sports — not both.</div>
+      <div style={s('display:flex;gap:8px')}>
+        {[['endurance', 'Endurance'], ['motorsport', 'Motor sports']].map(([id, label]) => (
+          <div key={id} className="ctl" onClick={() => setFamily(id)}
+            style={s(`flex:1;text-align:center;padding:11px;border-radius:12px;font-size:13px;font-weight:700;border:1px solid ${family === id ? 'var(--accent)' : 'var(--line)'};background:${family === id ? 'var(--accent-dim)' : 'var(--bg2)'};color:${family === id ? 'var(--accent)' : 'var(--text2)'}`)}>
+            {label}
+          </div>
+        ))}
+      </div>
+      <FieldLabel>Discipline</FieldLabel>
+      <Chips options={disciplinesInFamily(family)} value={disc} onChange={setDisc} />
+
       <FieldLabel>Level</FieldLabel>
       <Chips options={LEVELS} value={level} onChange={setLevel} />
       <TextArea label="About the group" value={desc} onChange={setDesc} placeholder="Weekly threshold and long endurance rides…" />
