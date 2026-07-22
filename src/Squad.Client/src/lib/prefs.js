@@ -48,7 +48,9 @@ function merge(saved) {
   return {
     theme: saved.theme ?? defaultPrefs.theme,
     accent: saved.accent ?? defaultPrefs.accent,
-    lang: saved.lang ?? defaultPrefs.lang,
+    // The app is English-only for now; coerce any previously-saved 'he' back to 'en'
+    // so no one is stranded in RTL after the Hebrew option was removed.
+    lang: saved.lang === 'he' ? 'en' : (saved.lang ?? defaultPrefs.lang),
     units: saved.units ?? defaultPrefs.units,
     temp: saved.temp ?? defaultPrefs.temp,
     notif: { ...defaultPrefs.notif, ...(saved.notif || {}) },

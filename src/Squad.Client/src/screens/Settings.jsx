@@ -41,7 +41,7 @@ const Stepper = ({ label, value, unit, min, max, onChange }) => (
 );
 
 export default function Settings({ vm, state, actions }) {
-  const { theme, accent, lang, units } = state;
+  const { theme, accent, units } = state;
   const ap = state.autoPause || { enabled: true, pauseKph: 2, resumeKph: 4 };
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
@@ -62,16 +62,6 @@ export default function Settings({ vm, state, actions }) {
               style={s(`width:36px;height:36px;border-radius:11px;background:${a.color};border:2px solid ${accent === a.id ? 'var(--text)' : 'transparent'}`)} />
           ))}
         </div>
-      </div>
-
-      {/* language */}
-      <div style={s(label)}>Language</div>
-      <div style={s(card + ';padding:14px 15px')}>
-        <div style={s('display:flex;gap:7px')}>
-          <Seg active={lang === 'en'} onClick={() => actions.setLang('en')}>English</Seg>
-          <Seg active={lang === 'he'} onClick={() => actions.setLang('he')}>עברית</Seg>
-        </div>
-        <div style={s('font-size:11px;color:var(--text3);margin-top:9px;line-height:1.4')}>Hebrew flips the whole app to right-to-left.</div>
       </div>
 
       {/* recording */}
