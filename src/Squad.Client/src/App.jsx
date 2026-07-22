@@ -519,7 +519,7 @@ export default function App() {
     },
     openLink: (url) => { try { window.open(url, '_blank', 'noopener'); } catch { /* ignore */ } },
     copyDiagnostics: () => { try { navigator.clipboard?.writeText('Domestique Team 1.0.0 (build 100)'); } catch { /* ignore */ } },
-    exportData: () => { try { window.open('https://domestique.team/account/export', '_blank', 'noopener'); } catch { /* ignore */ } },
+    exportData: () => { try { window.open('https://www.domestiquehub.com/account/export', '_blank', 'noopener'); } catch { /* ignore */ } },
     // In-app account deletion (App Store 5.1.1(v)): permanently delete the account server-side,
     // then drop the local biometric enrolment and sign out to the Welcome screen. Errors
     // propagate so the confirm modal can surface them (and keep the session intact).

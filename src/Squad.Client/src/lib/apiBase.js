@@ -10,7 +10,7 @@ import { Capacitor } from '@capacitor/core';
 const isNative = () => { try { return Capacitor.isNativePlatform(); } catch { return false; } };
 
 export const API_BASE = isNative()
-  ? 'https://triclub-epcjf6hxaaaed6b3.canadacentral-01.azurewebsites.net'
+  ? 'https://www.domestiquehub.com'
   : '';
 
 // Prefix a root-relative path with the backend origin when native (used for SignalR
