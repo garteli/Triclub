@@ -46,11 +46,12 @@ export default function Welcome({ actions, inviteInfo }) {
       <div style={s('flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center')}>
         <Logo size={78} />
         <div style={s('font-size:30px;font-weight:700;letter-spacing:-.6px;margin-top:22px')}>Domestique<span style={s('color:var(--accent)')}> Team</span></div>
-        <div style={s('font-size:14px;color:var(--text2);line-height:1.5;margin-top:8px;max-width:250px')}>Train together. Ride together. Your team's triathlon season, in one app.</div>
+        <div style={s('font-size:14px;color:var(--text2);line-height:1.5;margin-top:8px;max-width:270px')}>Train together. Ride together. Your team's multi-sport &amp; motorsport season, in one app.</div>
 
-        <div style={s('display:flex;gap:22px;margin-top:26px')}>
-          {[['swim', 'Swim', 'var(--swim)'], ['bike', 'Bike', 'var(--bike)'], ['run', 'Run', 'var(--run)']].map(([key, l, c]) => (
-            <div key={l} style={s('text-align:center')}>
+        <div style={s('display:flex;gap:15px;margin-top:26px;flex-wrap:wrap;justify-content:center;max-width:320px')}>
+          {[['swim', 'Swim', 'var(--swim)'], ['bike', 'Bike', 'var(--bike)'], ['run', 'Run', 'var(--run)'],
+            ['mx', 'MX', '#c68bff'], ['moto', 'Moto', '#5a86ff'], ['enduro', 'Enduro', '#4ade80']].map(([key, l, c]) => (
+            <div key={l} style={s('text-align:center;width:44px')}>
               <div style={s('display:flex;justify-content:center;height:28px;align-items:center')}><SportIcon name={key} size={26} color={c} /></div>
               <div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-top:6px')}>{l}</div>
             </div>

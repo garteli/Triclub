@@ -50,6 +50,21 @@ const GLYPHS = {
       <path d="M8.2 16h4.3l-2.5-4H6.3M12.5 16l3-4h3.2M15.5 12l-1.2-2h-2.6M16.5 8.8h2.6" />
     </>
   ),
+  // motocross — a full-face helmet with visor + chin bar
+  mx: (
+    <>
+      <path d="M3.2 13.5a8.8 8.8 0 0 1 17.6 0v2.3a2 2 0 0 1-2 2h-4l-1.4-2.3H8a4.8 4.8 0 0 1-4.8-4.8z" />
+      <path d="M3.6 13h6.6M13.5 9.2l7.2-1" />
+    </>
+  ),
+  // enduro / off-road — twin mountain peaks
+  enduro: (
+    <>
+      <path d="M2.5 18.5h19" />
+      <path d="M4 18.5l4.6-7.5 3.2 4.6" />
+      <path d="M10.5 18.5l4.2-6.4 5 6.4" />
+    </>
+  ),
 };
 
 export default function SportIcon({ name, size = 24, color = 'currentColor', strokeWidth = 2, style }) {
