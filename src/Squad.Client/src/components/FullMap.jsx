@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { s } from '../lib/style.js';
 import { BASEMAP_LABEL, baseSource, applyBasemap, nextBasemap, inIsrael } from '../lib/basemaps.js';
 import { getRouteStyle, setRouteStyle as persistRouteStyle, ROUTE_COLORS, ROUTE_WIDTHS } from '../lib/routeStyle.js';
-import { addRouteArrows } from '../lib/mapArrows.js';
+import { addRouteArrows, styleArrows } from '../lib/mapArrows.js';
 import AuthedAvatar from './AuthedAvatar.jsx';
 
 // Full-screen 3D route map (MapLibre GL): our CARTO basemap draped over free AWS terrain
@@ -70,7 +70,7 @@ export default function FullMap({ route, style: initialStyle = 'voyager', a, tok
             map.addSource('route', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: pts.map(([la, lo]) => [lo, la]) } } });
             map.addLayer({ id: 'route', type: 'line', source: 'route', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': rs.color, 'line-width': rs.width } });
             // Direction chevrons repeated along the route (auto-rotated to travel direction).
-            addRouteArrows(map, 'route', 'route-arrows');
+            addRouteArrows(map, 'route', 'route-arrows', { color: rs.color, width: rs.width });
             // Start/end as circle layers (canvas-rendered, same reliable path as the line).
             map.addSource('ends', { type: 'geojson', data: { type: 'FeatureCollection', features: [
               { type: 'Feature', properties: { c: '#4fe08b' }, geometry: { type: 'Point', coordinates: [pts[0][1], pts[0][0]] } },
@@ -92,12 +92,13 @@ export default function FullMap({ route, style: initialStyle = 'voyager', a, tok
   // Swap the basemap on style change — kept beneath the route line so the track stays on top.
   useEffect(() => { const m = mapRef.current; if (m && m.getSource('base')) applyBasemap(m, mapStyle); }, [mapStyle]);
 
-  // Apply the per-user route colour/width live (and on first paint after the layer exists).
+  // Apply the per-user route colour/width live to the line AND the direction arrows.
   useEffect(() => {
     const m = mapRef.current;
     if (!m || !m.getLayer || !m.getLayer('route')) return;
     m.setPaintProperty('route', 'line-color', rstyle.color);
     m.setPaintProperty('route', 'line-width', rstyle.width);
+    styleArrows(m, ['route-arrows'], rstyle);
   }, [rstyle]);
 
   // If we opened on Off-road but the route isn't in Israel, fall back to a global basemap.

@@ -11,15 +11,14 @@ const cartoTiles = (seg) => ['a', 'b', 'c', 'd'].map((sd) => `https://${sd}.base
 export const BASEMAPS = {
   voyager: { tiles: cartoTiles('voyager'), maxzoom: 20, attribution: '© OpenStreetMap · © CARTO' },
   light: { tiles: cartoTiles('light_all'), maxzoom: 20, attribution: '© OpenStreetMap · © CARTO' },
-  dark: { tiles: cartoTiles('dark_all'), maxzoom: 20, attribution: '© OpenStreetMap · © CARTO' },
   // Esri World Imagery — global aerial/satellite (JPEG, open CORS). ArcGIS tile scheme is z/y/x.
   satellite: { tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], maxzoom: 19, attribution: '© Esri · Maxar · Earthstar Geographics' },
   // OpenTopoMap — topographic map with contour lines + elevation marks/spot heights (open CORS).
   terrain: { tiles: ['a', 'b', 'c'].map((sd) => `https://${sd}.tile.opentopomap.org/{z}/{x}/{y}.png`), maxzoom: 17, attribution: '© OpenTopoMap (CC-BY-SA) · © OpenStreetMap' },
   offroad: { tiles: ['https://hiking.off-road.io/hiking_map/{z}/{x}/{y}.png'], maxzoom: 15, attribution: '© off-road.io · © OpenStreetMap' },
 };
-export const BASEMAP_ORDER = ['voyager', 'light', 'dark', 'satellite', 'terrain', 'offroad'];
-export const BASEMAP_LABEL = { voyager: 'Voyager', light: 'Light', dark: 'Dark', satellite: 'Satellite', terrain: 'Terrain', offroad: 'Off-road' };
+export const BASEMAP_ORDER = ['voyager', 'light', 'satellite', 'terrain', 'offroad'];
+export const BASEMAP_LABEL = { voyager: 'Voyager', light: 'Light', satellite: 'Satellite', terrain: 'Terrain', offroad: 'Off-road' };
 
 // off-road.io's tiles only cover Israel (+ immediate surroundings), so the Off-road option is only
 // offered when the view is in that region. Generous bbox around Israel/PS.
