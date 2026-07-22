@@ -763,7 +763,7 @@ export default function App() {
           onJoinSquad={authed ? squadOps.onJoinSquad : undefined}
           onCreateSquad={authed ? squadOps.onCreateSquad : undefined}
           onSwitchSquad={authed ? squadOps.onSwitchSquad : undefined}
-          payments={authed ? paymentOps : undefined}
+          payments={undefined /* ride payments hidden for now — re-enable with `authed ? paymentOps : undefined` */}
           onPublishPlan={authed ? onPublishPlan : undefined}
           plans={authed ? planOps : undefined} plan={selectedPlan}
           planMine={authed ? planMineOps : undefined}
