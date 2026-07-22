@@ -54,7 +54,7 @@ export default function Legal({ actions }) {
       <Article sections={tab === 'terms' ? TERMS : PRIVACY} />
 
       <div style={s('font-size:11px;color:var(--text3);margin-top:14px;line-height:1.5;padding:0 2px')}>
-        Questions about these policies? Email <span style={s('color:var(--text2)')}>privacy@domestiquehub.com</span>.
+        Questions about these policies? Email <span style={s('color:var(--text2)')}>support@domestiquehub.com</span>.
       </div>
     </div>
   );
