@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { s } from '../lib/style.js';
 import EmptyState from '../components/EmptyState.jsx';
+import { FAMILY, familyOf } from '../lib/disciplines.js';
 
 // Decorative club glyphs — the shapes the design draws for each club logo. The server
 // picks one deterministically per club (ClubRankingRow.Emblem); we just render it.
@@ -26,22 +27,28 @@ const TAB_DEFS = [['load', 'Load'], ['vol', 'Volume'], ['members', 'Athletes'], 
 
 export default function ClubRanking({ clubRanking }) {
   const [tab, setTab] = useState('load');
+  const [fam, setFam] = useState(null);   // null = auto (the caller's own family)
   const [disc, setDisc] = useState('All');
   const rows = clubRanking?.rows ?? [];
 
-  // Default the board to the caller's own discipline once rows arrive (so it opens on
-  // "clubs like mine"), unless they've already picked one. 'All' cancels the auto-pick.
+  // Open the board on the caller's own family once rows arrive (so it lands on "clubs
+  // like mine"), unless they've already switched. Picking a family cancels the auto-pick.
   const [autoPicked, setAutoPicked] = useState(false);
   useEffect(() => {
     if (autoPicked) return;
     const mine = rows.find((r) => r.you)?.disc;
-    if (mine) { setDisc(mine); setAutoPicked(true); }
+    if (mine) { setFam(familyOf(mine)); setAutoPicked(true); }
   }, [rows, autoPicked]);
 
-  // Discipline chips: only disciplines that actually field a club, plus 'All'.
-  const discList = ['All', ...Array.from(new Set(rows.map((r) => r.disc).filter(Boolean)))];
-  // Compare clubs against same-discipline peers: everything below ranks the scoped set.
-  const scoped = disc === 'All' ? rows : rows.filter((r) => r.disc === disc);
+  // Endurance and motorsport clubs rank apart. Families present on the board → the
+  // top-level switch; the active one falls back to the first present.
+  const famList = Array.from(new Set(rows.map((r) => familyOf(r.disc))));
+  const activeFam = fam ?? famList[0] ?? 'endurance';
+
+  // Within the active family: discipline chips for the disciplines that field a club.
+  const discList = ['All', ...Array.from(new Set(rows.filter((r) => familyOf(r.disc) === activeFam).map((r) => r.disc)))];
+  // Rank same-family (and, when a discipline chip is picked, same-discipline) peers.
+  const scoped = rows.filter((r) => familyOf(r.disc) === activeFam && (disc === 'All' || r.disc === disc));
 
   // Real days until the weekly board resets (next Monday). Mon=0..Sun=6.
   const dayIdx = (new Date().getDay() + 6) % 7;
@@ -89,7 +96,20 @@ export default function ClubRanking({ clubRanking }) {
         </div>
       </div>
 
-      {/* discipline scope — rank clubs against same-discipline peers */}
+      {/* family switch — endurance and motorsport clubs are ranked apart */}
+      {famList.length > 1 && (
+        <div style={s('display:flex;gap:6px;margin-top:14px;background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:4px')}>
+          {famList.map((f) => {
+            const on = activeFam === f;
+            return (
+              <div key={f} className="ctl" onClick={() => { setFam(f); setDisc('All'); setAutoPicked(true); }}
+                style={s('flex:1;text-align:center;padding:8px 10px;border-radius:9px;font-size:12.5px;font-weight:700;' + (on ? `background:${FAMILY[f].accent};color:#0c0e11` : 'color:var(--text2)'))}>{FAMILY[f].label}</div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* discipline scope — rank clubs against same-discipline peers within the family */}
       {discList.length > 2 && (
         <div className="hscroll" style={s('display:flex;gap:7px;overflow-x:auto;margin:14px -18px 0;padding:0 18px 4px')}>
           {discList.map((d) => (

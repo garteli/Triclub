@@ -42,6 +42,14 @@ const GLYPHS = {
       <path d="M11.5 12.5h1M4.4 12.5H2.4M19.6 12.5h2M5.2 9.6 3.8 8.3M18.8 9.6l1.4-1.3" />
     </>
   ),
+  // motorcycle — two wheels + tank/handlebar, the motorsport family mark
+  moto: (
+    <>
+      <circle cx="5" cy="16" r="3.2" />
+      <circle cx="19" cy="16" r="3.2" />
+      <path d="M8.2 16h4.3l-2.5-4H6.3M12.5 16l3-4h3.2M15.5 12l-1.2-2h-2.6M16.5 8.8h2.6" />
+    </>
+  ),
 };
 
 export default function SportIcon({ name, size = 24, color = 'currentColor', strokeWidth = 2, style }) {
