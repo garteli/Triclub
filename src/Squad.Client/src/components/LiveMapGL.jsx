@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { s } from '../lib/style.js';
-import { BASEMAP_LABEL, baseSource, applyBasemap, nextBasemap } from '../lib/basemaps.js';
+import { BASEMAP_LABEL, baseSource, applyBasemap, nextBasemap, inIsrael } from '../lib/basemaps.js';
+import { getRouteStyle } from '../lib/routeStyle.js';
 
 // Interactive live-ride map tile: a real MapLibre basemap you can pinch-zoom, pan and rotate,
 // with the course route + your breadcrumb, and each rider as a coloured dot with their initials.
@@ -79,6 +80,9 @@ export default function LiveMapGL({ pts, course, path, riders, mySport, interact
   const [failed, setFailed] = useState(false);
   const [basemap, setBasemap] = useState('voyager'); // cycle Voyager → Light → Dark → Satellite → Off-road
   const basemapRef = useRef('voyager');
+  // Off-road basemap only offered when the ride is in Israel (its tiles are blank elsewhere).
+  const firstPt = (Array.isArray(pts) && pts[0]) || (Array.isArray(course) && course[0]) || (Array.isArray(path) && path[0]);
+  const israel = firstPt ? inIsrael(firstPt[0], firstPt[1]) : true;
 
   // Create the map once.
   useEffect(() => {
@@ -100,8 +104,9 @@ export default function LiveMapGL({ pts, course, path, riders, mySport, interact
           const accent = resolveColor('var(--accent)');
           map.addSource('course', { type: 'geojson', data: lineFC(course) });
           map.addLayer({ id: 'course', type: 'line', source: 'course', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#7c8794', 'line-width': 3, 'line-opacity': 0.7, 'line-dasharray': [2, 2] } });
+          const rs = getRouteStyle(); // per-user route colour/width (shared with the full map)
           map.addSource('path', { type: 'geojson', data: lineFC(path) });
-          map.addLayer({ id: 'path', type: 'line', source: 'path', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': accent, 'line-width': 4 } });
+          map.addLayer({ id: 'path', type: 'line', source: 'path', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': rs.color || accent, 'line-width': rs.width || 4 } });
           // Riders are DOM markers (initials dots + clusters), not a circle layer — see rebuildMarkers.
           readyRef.current = true;
           setFailed(false);
@@ -283,7 +288,7 @@ export default function LiveMapGL({ pts, course, path, riders, mySport, interact
       </div>
       {/* Basemap cycle (Voyager → Light → Dark → Satellite → Off-road) */}
       <div
-        className="ctl" onPointerDown={stop} onClick={(e) => { stop(e); setBasemap((b) => nextBasemap(b)); }}
+        className="ctl" onPointerDown={stop} onClick={(e) => { stop(e); setBasemap((b) => nextBasemap(b, israel)); }}
         title={`Map: ${BASEMAP_LABEL[basemap] || basemap} — tap to change`}
         style={s(`position:absolute;bottom:8px;right:8px;z-index:3;width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--bg) 78%,transparent);border:1px solid var(--line2);color:${basemap === 'offroad' ? 'var(--accent)' : 'var(--text)'}`)}>
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"><path d="M12 2l9 5-9 5-9-5z" /><path d="M3 12l9 5 9-5M3 17l9 5 9-5" /></svg>

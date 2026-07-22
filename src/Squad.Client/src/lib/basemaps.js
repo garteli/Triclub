@@ -18,7 +18,19 @@ export const BASEMAPS = {
 };
 export const BASEMAP_ORDER = ['voyager', 'light', 'dark', 'satellite', 'offroad'];
 export const BASEMAP_LABEL = { voyager: 'Voyager', light: 'Light', dark: 'Dark', satellite: 'Satellite', offroad: 'Off-road' };
-export const nextBasemap = (key) => BASEMAP_ORDER[(BASEMAP_ORDER.indexOf(key) + 1) % BASEMAP_ORDER.length];
+
+// off-road.io's tiles only cover Israel (+ immediate surroundings), so the Off-road option is only
+// offered when the view is in that region. Generous bbox around Israel/PS.
+export const inIsrael = (lat, lon) =>
+  Number.isFinite(lat) && Number.isFinite(lon) && lat >= 29.0 && lat <= 33.5 && lon >= 34.0 && lon <= 36.2;
+
+// Basemap keys available for the locale — drops Off-road outside Israel.
+export const basemapOrder = (allowOffroad) => BASEMAP_ORDER.filter((k) => k !== 'offroad' || allowOffroad);
+export const nextBasemap = (key, allowOffroad = true) => {
+  const order = basemapOrder(allowOffroad);
+  const i = order.indexOf(key);
+  return order[(i + 1) % order.length];
+};
 
 // A MapLibre raster-source spec for the given basemap key (falls back to voyager).
 export const baseSource = (key) => {
