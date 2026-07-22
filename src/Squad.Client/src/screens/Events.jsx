@@ -221,9 +221,10 @@ export default function Events({ vm, actions, getToken, meId, onDataChanged }) {
                 <div style={s('display:flex;flex-direction:column;gap:10px')}>
                   {weekItems.map((ev) => (isOwner ? (
                     <CoachCard key={ev.id} ev={ev} busy={busyId === ev.id} open={openId === ev.id} roster={rosters[ev.id]}
+                      onOpen={() => actions.openEvent(ev)}
                       onEdit={() => actions.editEvent(ev)} onPublish={() => togglePublish(ev)} onDelete={() => setConfirmId(ev.id)} onRoster={() => toggleRoster(ev)} />
                   ) : (
-                    <MemberCard key={ev.id} ev={ev} busy={busyId === ev.id}
+                    <MemberCard key={ev.id} ev={ev} busy={busyId === ev.id} onOpen={() => actions.openEvent(ev)}
                       onJoin={() => join(ev)} onLeave={() => leave(ev)} onCheckIn={() => checkin(ev)} onUndoCheckIn={() => undoCheckin(ev)} />
                   )))}
                 </div>
@@ -288,19 +289,19 @@ function MonthGrid({ cells, legend, onOpenWeek }) {
 }
 
 // ── member browse card (join / check in / undo) ─────────────────────────────────────
-function MemberCard({ ev, busy, onJoin, onLeave, onCheckIn, onUndoCheckIn }) {
+function MemberCard({ ev, busy, onOpen, onJoin, onLeave, onCheckIn, onUndoCheckIn }) {
   const today = isTodayIso(ev.start);
   return (
     <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:13px 14px;display:flex;align-items:center;gap:11px')}>
       <div style={s('width:38px;height:38px;border-radius:11px;flex:none;display:flex;align-items:center;justify-content:center;background:var(--accent-dim);color:var(--accent)')}>
         <SportIcon sport={ev.sport} />
       </div>
-      <div style={s('flex:1;min-width:0')}>
+      <div className={onOpen ? 'ctl' : undefined} onClick={onOpen ? () => onOpen(ev) : undefined} style={s('flex:1;min-width:0')}>
         <div style={s('font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>{ev.title}</div>
         <div style={s('font-size:11.5px;color:var(--text3);margin-top:2px')}>
           {fmtWhen(ev.start)}{ev.courseName ? ` · ${ev.courseName}` : ''}{today ? <span style={s('color:var(--accent);font-weight:700')}>{'  ·  Today'}</span> : null}
         </div>
-        <div style={s('font-size:10.5px;color:var(--text3);margin-top:3px')}>{ev.joinCount || 0} going</div>
+        <div style={s('font-size:10.5px;color:var(--text3);margin-top:3px')}>{ev.joinCount || 0} going{onOpen ? ' · Details ›' : ''}</div>
       </div>
 
       {ev.checkedIn ? (
@@ -329,14 +330,14 @@ function MemberCard({ ev, busy, onJoin, onLeave, onCheckIn, onUndoCheckIn }) {
 }
 
 // ── coach manager card (edit / publish / delete + roster) ───────────────────────────
-function CoachCard({ ev, busy, open, roster, onEdit, onPublish, onDelete, onRoster }) {
+function CoachCard({ ev, busy, open, roster, onOpen, onEdit, onPublish, onDelete, onRoster }) {
   return (
     <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:13px 14px')}>
       <div style={s('display:flex;align-items:center;gap:11px')}>
         <div style={s('width:38px;height:38px;border-radius:11px;flex:none;display:flex;align-items:center;justify-content:center;background:var(--accent-dim);color:var(--accent)')}>
           <SportIcon sport={ev.sport} />
         </div>
-        <div style={s('flex:1;min-width:0')}>
+        <div className={onOpen ? 'ctl' : undefined} onClick={onOpen ? () => onOpen(ev) : undefined} style={s('flex:1;min-width:0')}>
           <div style={s('display:flex;align-items:center;gap:7px')}>
             <span style={s('font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>{ev.title}</span>
             <span style={s(ev.published

@@ -17,13 +17,13 @@ function eventIsToday(iso) {
 
 // The "today" hero for a motorsport club: a group ride scheduled for today (from the club's
 // events), mirroring the endurance plan card so a coach's just-added ride actually shows here.
-function TodayEventCard({ ev, go, rtl = false }) {
+function TodayEventCard({ ev, onOpen, rtl = false }) {
   const d = new Date(ev.start);
   const time = Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString(rtl ? 'he-IL' : 'en-US', { hour: 'numeric', minute: '2-digit' });
   const sub = [time, ev.courseName, ev.courseKm ? `${ev.courseKm.toFixed(1)} km` : null].filter(Boolean).join(' · ');
   const going = ev.joinCount || 0;
   return (
-    <div className="ctl" onClick={() => go('events')} style={s('background:linear-gradient(160deg,var(--bg3),var(--bg2));border:1px solid var(--line);border-radius:22px;overflow:hidden')}>
+    <div className="ctl" onClick={() => onOpen?.(ev)} style={s('background:linear-gradient(160deg,var(--bg3),var(--bg2));border:1px solid var(--line);border-radius:22px;overflow:hidden')}>
       <div style={s('height:4px;background:var(--accent)')} />
       <div style={s(`padding:17px 18px 18px;${rtl ? 'text-align:right' : ''}`)}>
         <div style={s(`display:flex;justify-content:space-between;align-items:flex-start;${rtl ? 'flex-direction:row-reverse' : ''}`)}>
@@ -135,7 +135,7 @@ function SquadRail({ squad, rtl, onOpen, token }) {
   );
 }
 
-function DashboardEN({ vm, go, openAthlete, openActivity, getToken, onSwitchSquad, notifUnread = 0, todayEvent = null }) {
+function DashboardEN({ vm, go, openAthlete, openActivity, openEvent, getToken, onSwitchSquad, notifUnread = 0, todayEvent = null }) {
   const token = getToken?.() ?? null;
   const recent = last7Days(vm.activities);
   return (
@@ -174,7 +174,7 @@ function DashboardEN({ vm, go, openAthlete, openActivity, getToken, onSwitchSqua
               </div>
             ) : vm.family === 'motorsport' ? (
               todayEvent ? (
-                <TodayEventCard ev={todayEvent} go={go} />
+                <TodayEventCard ev={todayEvent} onOpen={openEvent} />
               ) : (
                 <div className="ctl" onClick={() => go('events')} style={s('background:var(--bg2);border:1px dashed var(--line2);border-radius:20px;padding:22px 18px;text-align:center')}>
                   <div style={s('font-size:15px;font-weight:600')}>No ride scheduled for today</div>
@@ -216,7 +216,7 @@ function DashboardEN({ vm, go, openAthlete, openActivity, getToken, onSwitchSqua
   );
 }
 
-function DashboardHE({ vm, go, openAthlete, openActivity, getToken, onSwitchSquad, notifUnread = 0, todayEvent = null }) {
+function DashboardHE({ vm, go, openAthlete, openActivity, openEvent, getToken, onSwitchSquad, notifUnread = 0, todayEvent = null }) {
   const token = getToken?.() ?? null;
   const recent = last7Days(vm.activities);
   return (
@@ -249,7 +249,7 @@ function DashboardHE({ vm, go, openAthlete, openActivity, getToken, onSwitchSqua
               </div>
             ) : vm.family === 'motorsport' ? (
               todayEvent ? (
-                <TodayEventCard ev={todayEvent} go={go} rtl />
+                <TodayEventCard ev={todayEvent} onOpen={openEvent} rtl />
               ) : (
                 <div className="ctl" onClick={() => go('events')} style={s('background:var(--bg2);border:1px dashed var(--line2);border-radius:20px;padding:22px 18px;text-align:center')}>
                   <div style={s('font-size:15px;font-weight:600')}>אין רכיבה מתוזמנת להיום</div>
@@ -314,6 +314,6 @@ export default function Dashboard({ vm, state, actions, getToken, onSwitchSquad 
   }, [vm.activeClubId, vm.family, getToken]);
 
   return state.lang === 'he'
-    ? <DashboardHE vm={vm} go={actions.go} openAthlete={actions.openAthlete} openActivity={actions.openActivity} getToken={getToken} onSwitchSquad={onSwitchSquad} notifUnread={notifUnread} todayEvent={todayEvent} />
-    : <DashboardEN vm={vm} go={actions.go} openAthlete={actions.openAthlete} openActivity={actions.openActivity} getToken={getToken} onSwitchSquad={onSwitchSquad} notifUnread={notifUnread} todayEvent={todayEvent} />;
+    ? <DashboardHE vm={vm} go={actions.go} openAthlete={actions.openAthlete} openActivity={actions.openActivity} openEvent={actions.openEvent} getToken={getToken} onSwitchSquad={onSwitchSquad} notifUnread={notifUnread} todayEvent={todayEvent} />
+    : <DashboardEN vm={vm} go={actions.go} openAthlete={actions.openAthlete} openActivity={actions.openActivity} openEvent={actions.openEvent} getToken={getToken} onSwitchSquad={onSwitchSquad} notifUnread={notifUnread} todayEvent={todayEvent} />;
 }

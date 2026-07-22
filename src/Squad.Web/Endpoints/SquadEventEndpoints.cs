@@ -155,6 +155,7 @@ public static class SquadEventEndpoints
                 avatarColor = a.AvatarColor,
                 avatarUrl = a.AvatarUrl,
                 checkedIn = a.CheckedInUtc != null,
+                you = a.AthleteId == me,   // the caller's own row — not tappable on the client
             }));
     }
 
