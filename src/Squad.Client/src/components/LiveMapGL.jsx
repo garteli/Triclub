@@ -54,9 +54,12 @@ function headingFromPath(path) {
 const SPORT_ICON = {
   bike: '<circle cx="5.5" cy="17" r="3.4"/><circle cx="18.5" cy="17" r="3.4"/><path d="M5.5 17l4.5-8.5h4"/><path d="M14 8.5l4.5 8.5"/><path d="M8 8.5h4l2 4"/>',
   run: '<circle cx="16" cy="5" r="1.8"/><path d="M14.5 8l-4 3.5 2.5 2 1 5.5"/><path d="M10.5 11.5l-4 1"/><path d="M13 13.5l3.5 1"/>',
+  moto: '<circle cx="5" cy="16" r="3.2"/><circle cx="19" cy="16" r="3.2"/><path d="M8.2 16h4.3l-2.5-4H6.3M12.5 16l3-4h3.2M15.5 12l-1.2-2h-2.6M16.5 8.8h2.6"/>',
 };
+const MOTO_SPORTS = new Set(['road', 'offroad', 'touring']);
 const sportGlyph = (sport) => {
-  const p = sport === 'trainer' ? SPORT_ICON.bike : sport === 'treadmill' ? SPORT_ICON.run : SPORT_ICON[sport];
+  const key = sport === 'trainer' ? 'bike' : sport === 'treadmill' ? 'run' : MOTO_SPORTS.has(sport) ? 'moto' : sport;
+  const p = SPORT_ICON[key];
   return p ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${p}</svg>` : null;
 };
 

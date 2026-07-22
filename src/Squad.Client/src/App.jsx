@@ -95,9 +95,20 @@ const RIDE_TYPES = {
   run: { label: 'Run', fitSport: FitSport.running, indoor: false },
   trainer: { label: 'Trainer', fitSport: FitSport.cycling, indoor: true },
   treadmill: { label: 'Treadmill', fitSport: FitSport.running, indoor: true },
+  // Motorsport clubs record a motorcycle ride — road / off-road / touring (all outdoor GPS;
+  // FIT has no motorcycling sport in our encoder, so they record as cycling).
+  road: { label: 'Road', fitSport: FitSport.cycling, indoor: false },
+  offroad: { label: 'Off-road', fitSport: FitSport.cycling, indoor: false },
+  touring: { label: 'Touring', fitSport: FitSport.cycling, indoor: false },
   // Escort vehicle — GPS, but shown as a car on the map, kept out of the peloton/leader stats,
-  // and NOT saved as an activity (escorting isn't a workout).
+  // and NOT saved as an activity (escorting isn't a workout). Offered in both families.
   driver: { label: 'Driver', fitSport: FitSport.cycling, indoor: false, driver: true },
+};
+
+// Which activity types each discipline family offers on the live ride, in display order.
+const RIDE_TYPES_BY_FAMILY = {
+  endurance: ['bike', 'run', 'trainer', 'treadmill', 'driver'],
+  motorsport: ['road', 'offroad', 'touring', 'driver'],
 };
 
 // Stash any ?invite=TOKEN from the launch URL before the app renders, so it survives the
@@ -595,6 +606,12 @@ export default function App() {
     setRideSportState(v);
     try { localStorage.setItem('squad.rideSport', v); } catch { /* ignore */ }
   }, []);
+  // Keep the selected activity type valid for the active club's discipline family — an endurance
+  // type on a motorsport club (or vice-versa) coerces to that family's first option (Driver is shared).
+  useEffect(() => {
+    const list = RIDE_TYPES_BY_FAMILY[vm.family] || RIDE_TYPES_BY_FAMILY.endurance;
+    if (!list.includes(rideSport)) setRideSport(list[0]);
+  }, [vm.family, rideSport, setRideSport]);
   const rideType = RIDE_TYPES[rideSport] || RIDE_TYPES.bike;
   const recorder = useRideRecorder({ pushTelemetry: liveRide.pushTelemetry, sensors, getToken, onSaved: () => setRefreshSignal((n) => n + 1), enabled: authed, sport: rideType.fitSport, indoor: rideType.indoor, driver: !!rideType.driver, autoPause: state.autoPause, throttleMs: 500 });
   // A ride is "live" whenever it's active OR still recording — independent of which screen you're on,
