@@ -43,9 +43,8 @@ export default function GroupProfile({ vm, actions, onJoinSquad, payments, meId,
     setError(''); setBusy(true);
     try {
       await onJoinSquad(g.id);
-      // Free squads land you in the app; gated squads stay put to show "pending".
-      if (g.kind === 'free') actions.go('dash');
-    } catch (e) { setError(e.message || 'Could not join.'); }
+      // Every club is gated now — joining creates a request; stay put to show "pending".
+    } catch (e) { setError(e.message || 'Could not send your request.'); }
     finally { setBusy(false); }
   };
   return (
@@ -110,7 +109,7 @@ export default function GroupProfile({ vm, actions, onJoinSquad, payments, meId,
 
         {/* live join / request / membership status */}
         {live && (() => {
-          const gated = g.kind !== 'free';
+          const gated = true; // every club is approval/invitation-gated — no instant join
           if (g.member) return (
             <div style={s('background:color-mix(in srgb,var(--good) 14%,var(--bg2));border:1px solid color-mix(in srgb,var(--good) 35%,transparent);border-radius:13px;padding:12px 14px;margin-top:16px;font-size:12.5px;color:var(--text2)')}><span style={s('color:var(--good);font-weight:700')}>You're a member.</span> This is your active squad — its feed &amp; leaderboard are on your dashboard.</div>
           );

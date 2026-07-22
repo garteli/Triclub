@@ -45,7 +45,9 @@ export default function CreateGroup({ actions, onCreateSquad }) {
           discipline: form.disc,
           location: form.city.trim(),
           level: form.level,
-          kind: form.coaching ? 'coach' : (form.price ? 'member' : 'free'),
+          // Every club is approval-gated (no instant-join "free/open" kind). Coaching → coach,
+          // otherwise a membership club; a blank price just means it's free to join on approval.
+          kind: form.coaching ? 'coach' : 'member',
           price: form.price ? `₪${form.price}` : 'Free',
           perLabel: form.price ? '/mo' : '',
           color,

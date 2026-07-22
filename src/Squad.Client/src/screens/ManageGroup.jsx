@@ -13,9 +13,10 @@ import { API_BASE } from '../lib/apiBase.js';
 import { DISCIPLINES, familyOf, disciplinesInFamily } from '../lib/disciplines.js';
 
 const LEVELS = ['All levels', 'Intermediate+', 'Advanced', 'Race focus'];
+// Every club is approval/invitation-gated — no instant-join "free/open" kind. A Membership club
+// with a blank price is simply free to join on approval.
 const KINDS = [
-  ['free', 'Free / open', 'Anyone can join instantly'],
-  ['member', 'Paid membership', 'Riders request; you approve'],
+  ['member', 'Membership', 'Riders request; you approve'],
   ['coach', 'Coached club', 'Approval + coaching services'],
 ];
 const COLORS = ['#e11d2a', '#ff6a2c', '#ffce4a', '#37c0ff', '#4ade80', '#a78bfa', '#ff6f61', '#0ea5e9'];
