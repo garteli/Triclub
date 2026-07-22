@@ -57,6 +57,7 @@ export const deleteSquadEvent = (token, squadId, eventId) => req(`/api/squads/${
 export const joinEvent = (token, eventId) => req(`/api/events/${eventId}/join`, { method: 'POST', token });
 export const leaveEvent = (token, eventId) => req(`/api/events/${eventId}/leave`, { method: 'POST', token });
 export const checkInEvent = (token, eventId) => req(`/api/events/${eventId}/checkin`, { method: 'POST', token });
+export const undoCheckInEvent = (token, eventId) => req(`/api/events/${eventId}/uncheckin`, { method: 'POST', token });
 
 // The caller's joined upcoming events across every squad, soonest first.
 export const listMyEvents = (token) => req('/api/events/mine', { token });

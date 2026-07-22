@@ -5,7 +5,7 @@ import { familyOf } from '../lib/disciplines.js';
 import SportIcon from './SportIcon.jsx';
 import {
   listSquadEvents, createSquadEvent, deleteSquadEvent,
-  joinEvent, leaveEvent, checkInEvent, toOffsetIso,
+  joinEvent, leaveEvent, checkInEvent, undoCheckInEvent, toOffsetIso,
 } from '../lib/events.js';
 
 // Ad-hoc group sessions a coach schedules for a squad. Two modes:
@@ -130,6 +130,12 @@ export default function SquadEvents({ squadId, getToken, mode = 'browse', standa
     catch (e) { setError(e?.message || 'Could not check in.'); }
     finally { setBusyId(null); }
   };
+  const undoCheckin = async (ev) => {
+    setBusyId(ev.id); setError('');
+    try { const t = await getToken?.(); await undoCheckInEvent(t, ev.id); patch(ev.id, { checkedIn: false, checkedInCount: Math.max(0, (ev.checkedInCount || 1) - 1) }); }
+    catch (e) { setError(e?.message || 'Could not undo check-in.'); }
+    finally { setBusyId(null); }
+  };
 
   if (items === null) return null;                              // loading — avoid flicker
   if (!manage && !standalone && items.length === 0) return null; // members: hide an empty inline section
@@ -210,7 +216,7 @@ export default function SquadEvents({ squadId, getToken, mode = 'browse', standa
                   </div>
                 ) : (
                   <MemberActions ev={ev} today={today} busy={busyId === ev.id}
-                    onJoin={() => join(ev)} onLeave={() => leave(ev)} onCheckIn={() => checkin(ev)} />
+                    onJoin={() => join(ev)} onLeave={() => leave(ev)} onCheckIn={() => checkin(ev)} onUndoCheckIn={() => undoCheckin(ev)} />
                 )}
               </div>
             );
@@ -222,11 +228,15 @@ export default function SquadEvents({ squadId, getToken, mode = 'browse', standa
 }
 
 // The member's action zone for one event, per state: not joined / joined-future / joined-today / checked-in.
-function MemberActions({ ev, today, busy, onJoin, onLeave, onCheckIn }) {
+function MemberActions({ ev, today, busy, onJoin, onLeave, onCheckIn, onUndoCheckIn }) {
   if (ev.checkedIn) {
     return (
-      <div style={s('flex:none;display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:var(--good)')}>
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>Checked in
+      <div style={s('flex:none;display:flex;align-items:center;gap:7px')}>
+        <div style={s('display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:var(--good)')}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>Checked in
+        </div>
+        <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : onUndoCheckIn}
+          style={s(`font-size:11px;font-weight:600;color:var(--text3);opacity:${busy ? 0.6 : 1}`)}>{busy ? '…' : 'Undo'}</div>
       </div>
     );
   }

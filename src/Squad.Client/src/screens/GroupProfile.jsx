@@ -148,7 +148,8 @@ export default function GroupProfile({ vm, actions, onJoinSquad, payments, meId,
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.4" strokeLinecap="round"><path d="M9 6l6 6-6 6" /></svg>
           </div>
         )}
-        {live && payments && !isOwner && (
+        {/* Record-a-payment entry point hidden for now */}
+        {false && live && payments && !isOwner && (
           <div className="ctl" onClick={actions.openRecordPay} style={s('display:flex;align-items:center;gap:11px;background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:12px 13px;margin-top:12px')}>
             <div style={s('width:36px;height:36px;border-radius:11px;background:var(--bg4);flex:none;display:flex;align-items:center;justify-content:center')}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round"><rect x="3" y="5" width="18" height="14" rx="2.5" /><path d="M3 10h18" /></svg>
