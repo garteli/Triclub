@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { s } from '../lib/style.js';
 import { Back } from './wizard.jsx';
-import { listCourses } from '../lib/courses.js';
+import { listCourses, createCourse, deleteCourse } from '../lib/courses.js';
+import CoursePicker from '../components/CoursePicker.jsx';
 import SportIcon from '../components/SportIcon.jsx';
 import { createSquadEvent, updateSquadEvent, toOffsetIso, toLocalInput } from '../lib/events.js';
 
@@ -49,6 +50,7 @@ export default function EventEditor({ vm, state, actions, getToken, onDataChange
   const [notes, setNotes] = useState(editing?.notes || '');
 
   const [courses, setCourses] = useState(null); // null = loading
+  const [picker, setPicker] = useState(false);  // route picker sheet open
   const [busy, setBusy] = useState('');         // '', 'publish', 'draft', 'save'
   const [error, setError] = useState('');
 
@@ -63,6 +65,25 @@ export default function EventEditor({ vm, state, actions, getToken, onDataChange
 
   const selectedCourse = useMemo(
     () => (courses || []).find((c) => String(c.id) === String(courseId)) || null, [courses, courseId]);
+
+  // Route ops for the shared CoursePicker (select existing / import GPX / draw on map). Same
+  // component the live ride uses; here "select" just picks the event's route (no ride to follow),
+  // so we reload the list on every pick so a freshly imported/drawn course resolves by name.
+  const courseOps = useMemo(() => ({
+    list: async () => listCourses(await getToken?.()),
+    select: async (id) => {
+      setCourseId(id ? String(id) : '');
+      try { setCourses(await listCourses(await getToken?.())); } catch { /* keep existing list */ }
+    },
+    clear: () => setCourseId(''),
+    save: async (name, points, distanceKm) => createCourse(await getToken?.(), { name, points, distanceKm }),
+    remove: async (id) => {
+      await deleteCourse(await getToken?.(), id);
+      setCourses((cs) => (cs || []).filter((c) => String(c.id) !== String(id)));
+      if (String(id) === String(courseId)) setCourseId('');
+    },
+    selected: selectedCourse || (courseId ? { id: courseId } : null),
+  }), [getToken, selectedCourse, courseId]);
 
   const canSave = title.trim() && when && !busy;
 
@@ -117,13 +138,16 @@ export default function EventEditor({ vm, state, actions, getToken, onDataChange
 
         <div>
           <div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin:0 2px 7px')}>Route</div>
-          <select value={courseId} onChange={(e) => setCourseId(e.target.value)} style={s(inputStyle)}>
-            <option value="">{courses === null ? 'Loading routes…' : 'No route (optional)'}</option>
-            {(courses || []).map((c) => (
-              <option key={c.id} value={c.id}>{c.name}{c.distanceKm ? ` · ${c.distanceKm.toFixed(1)} km` : ''}</option>
-            ))}
-          </select>
-          {selectedCourse && <div style={s('font-size:11px;color:var(--text3);margin:6px 2px 0')}>Route: {selectedCourse.name}</div>}
+          <div className="ctl" onClick={() => setPicker(true)}
+            style={s(inputStyle + ';display:flex;align-items:center;gap:10px;cursor:pointer')}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={selectedCourse ? 'var(--accent)' : 'var(--text3)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={s('flex:none')}><path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
+            <span style={s(`flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:${selectedCourse ? 'var(--text)' : 'var(--text3)'}`)}>
+              {selectedCourse
+                ? `${selectedCourse.name}${selectedCourse.distanceKm ? ` · ${selectedCourse.distanceKm.toFixed(1)} km` : ''}`
+                : (courses === null ? 'Loading routes…' : 'Select, import, or draw a route')}
+            </span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={s('flex:none')}><path d="M9 18l6-6-6-6" /></svg>
+          </div>
         </div>
 
         <div>
@@ -152,6 +176,10 @@ export default function EventEditor({ vm, state, actions, getToken, onDataChange
           </div>
         )}
       </div>
+
+      {picker && (
+        <CoursePicker courses={courseOps} onClose={() => setPicker(false)} title="Route for this event" allowSaveRide={false} />
+      )}
     </div>
   );
 }

@@ -6,6 +6,10 @@ import CourseDraw from './CourseDraw.jsx';
 
 // Pick a saved route to follow on the live map, save the ride you just recorded as a course,
 // or import a GPX. `courses` is the ops object from App (list/select/clear/save/remove/ridePath/selected).
+//
+// Reused by the event editor as a plain route picker: pass `title` to relabel the sheet and
+// `allowSaveRide={false}` to hide "Save last ride" (there's no recorded ride to save there) —
+// select-existing / import-GPX / draw-on-map still work.
 
 const distKm = (pts) => {
   let m = 0;
@@ -13,7 +17,7 @@ const distKm = (pts) => {
   return m / 1000;
 };
 
-export default function CoursePicker({ courses, onClose }) {
+export default function CoursePicker({ courses, onClose, title = 'Course for this ride', allowSaveRide = true }) {
   const [items, setItems] = useState(null); // null = loading
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -87,7 +91,7 @@ export default function CoursePicker({ courses, onClose }) {
         <div className="scr" style={s('width:100%;max-width:480px;pointer-events:auto;background:var(--bg);border-radius:24px 24px 0 0;border-top:1px solid var(--line2);max-height:86dvh;overflow-y:auto;padding:14px 18px 28px;animation:floatUp .3s ease')}>
           <div style={s('width:40px;height:4px;border-radius:3px;background:var(--line2);margin:0 auto 14px')} />
           <div style={s('display:flex;align-items:center;justify-content:space-between')}>
-            <div style={s('font-size:18px;font-weight:700')}>Course for this ride</div>
+            <div style={s('font-size:18px;font-weight:700')}>{title}</div>
             <div className="ctl" onClick={onClose} style={s('font-size:13px;color:var(--text2);font-weight:600')}>Close</div>
           </div>
 
@@ -134,9 +138,11 @@ export default function CoursePicker({ courses, onClose }) {
 
               {/* create */}
               <div style={s('display:flex;gap:10px;margin-top:16px')}>
-                <div className="ctl" onClick={startSaveRide} style={s('flex:1;display:flex;align-items:center;justify-content:center;gap:7px;background:var(--bg2);border:1px solid var(--line);color:var(--text);border-radius:13px;padding:12px;font-weight:700;font-size:13px')}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>Save last ride
-                </div>
+                {allowSaveRide && (
+                  <div className="ctl" onClick={startSaveRide} style={s('flex:1;display:flex;align-items:center;justify-content:center;gap:7px;background:var(--bg2);border:1px solid var(--line);color:var(--text);border-radius:13px;padding:12px;font-weight:700;font-size:13px')}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>Save last ride
+                  </div>
+                )}
                 <div className="ctl" onClick={() => gpxRef.current?.click()} style={s('flex:1;display:flex;align-items:center;justify-content:center;gap:7px;background:var(--bg2);border:1px solid var(--line);color:var(--text);border-radius:13px;padding:12px;font-weight:700;font-size:13px')}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v12" /><path d="M7 10l5 5 5-5" /><path d="M21 21H3" /></svg>Import GPX
                 </div>

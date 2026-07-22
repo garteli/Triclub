@@ -75,6 +75,7 @@ function CoachEventList({ squadId, getToken, actions, onDataChanged }) {
   const [busyId, setBusyId] = useState(null);
   const [openId, setOpenId] = useState(null);  // event whose roster is expanded
   const [rosters, setRosters] = useState({});  // eventId → attendees[] (null = loading)
+  const [confirmId, setConfirmId] = useState(null); // event pending delete-confirmation
 
   const load = useCallback(async () => {
     try { const t = await getToken?.(); setItems(await listSquadEvents(t, squadId)); }
@@ -86,7 +87,7 @@ function CoachEventList({ squadId, getToken, actions, onDataChanged }) {
 
   const remove = async (ev) => {
     setBusyId(ev.id); setError('');
-    try { const t = await getToken?.(); await deleteSquadEvent(t, squadId, ev.id); setItems((xs) => (xs || []).filter((x) => x.id !== ev.id)); onDataChanged?.(); }
+    try { const t = await getToken?.(); await deleteSquadEvent(t, squadId, ev.id); setItems((xs) => (xs || []).filter((x) => x.id !== ev.id)); onDataChanged?.(); setConfirmId(null); }
     catch (e) { setError(e?.message || 'Could not remove that event.'); }
     finally { setBusyId(null); }
   };
@@ -111,6 +112,9 @@ function CoachEventList({ squadId, getToken, actions, onDataChanged }) {
       catch { setRosters((r) => ({ ...r, [ev.id]: [] })); }
     }
   };
+
+  const pendingEvent = confirmId ? (items || []).find((x) => x.id === confirmId) : null;
+  const deleting = busyId === confirmId;
 
   if (items === null) return <div style={s('text-align:center;color:var(--text3);font-size:12.5px;margin-top:40px')}>Loading events…</div>;
   if (items.length === 0)
@@ -183,7 +187,7 @@ function CoachEventList({ squadId, getToken, actions, onDataChanged }) {
                 style={s(`flex:1;text-align:center;padding:9px;border-radius:10px;font-size:12px;font-weight:700;${ev.published ? 'background:var(--bg3);border:1px solid var(--line);color:var(--text2)' : 'background:var(--accent-dim);border:1px solid color-mix(in srgb,var(--accent) 40%,transparent);color:var(--accent)'}`)}>
                 {ev.published ? 'Unpublish' : 'Publish'}
               </div>
-              <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : () => remove(ev)}
+              <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : () => setConfirmId(ev.id)}
                 style={s('width:40px;flex:none;display:flex;align-items:center;justify-content:center;padding:9px;border-radius:10px;background:color-mix(in srgb,var(--bad) 12%,var(--bg3));border:1px solid color-mix(in srgb,var(--bad) 30%,transparent);color:var(--bad)')}>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6" /></svg>
               </div>
@@ -191,6 +195,23 @@ function CoachEventList({ squadId, getToken, actions, onDataChanged }) {
           </div>
         );
       })}
+
+      {/* delete-event confirmation — removing an event also drops its join/check-in roster */}
+      {pendingEvent && (
+        <>
+          <div className="ctl" onClick={deleting ? undefined : () => setConfirmId(null)} style={s('position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50;animation:floatUp .2s ease')} />
+          <div className="scr" style={s('position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(90%,420px);z-index:51;background:var(--bg);border:1px solid var(--line2);border-radius:20px;padding:20px;animation:floatUpCenter .25s ease')}>
+            <div style={s('font-size:17px;font-weight:700')}>Delete this event?</div>
+            <div style={s('font-size:13px;color:var(--text2);line-height:1.5;margin-top:8px')}>
+              <span style={s('color:var(--text);font-weight:600')}>{pendingEvent.title || 'Untitled event'}</span> will be permanently deleted, along with everyone’s joins and check-ins. This can’t be undone.
+            </div>
+            <div style={s('display:flex;gap:10px;margin-top:18px')}>
+              <div className="ctl" onClick={deleting ? undefined : () => setConfirmId(null)} style={s(`flex:1;text-align:center;padding:12px;border-radius:12px;font-weight:700;font-size:14px;background:var(--bg3);border:1px solid var(--line);color:var(--text2);opacity:${deleting ? 0.5 : 1}`)}>Cancel</div>
+              <div className="ctl" onClick={deleting ? undefined : () => remove(pendingEvent)} style={s(`flex:1;text-align:center;padding:12px;border-radius:12px;font-weight:700;font-size:14px;background:var(--bad);color:#fff;opacity:${deleting ? 0.7 : 1}`)}>{deleting ? 'Deleting…' : 'Delete'}</div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
