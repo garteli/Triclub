@@ -20,6 +20,7 @@ import { useHealthSync } from './hooks/useHealthSync.js';
 import { createSquad, joinSquad, activateSquad, getInvite, acceptInvite } from './lib/squads.js';
 import { captureInviteFromUrl, pendingInvite, clearInvite } from './lib/invite.js';
 import { listCourses, getCourse, createCourse, deleteCourse } from './lib/courses.js';
+import { listSquadEvents, joinEvent, leaveEvent, checkInEvent } from './lib/events.js';
 import { recordPayment, markPaymentPaid, waivePayment } from './lib/payments.js';
 import { publishPlan, unpublishPlan, listMyPlans, removeMyPlan, listPlans, getPlan, savePlan, deletePlan, listLibrary, getLibraryTemplate, adoptTemplate } from './lib/plan.js';
 // import { useLiveRide } from './hooks/useLiveRide.js'; // swap in for real telemetry
@@ -689,7 +690,16 @@ export default function App() {
   // Keep the screen awake for the whole ride — recording or watching — even on other screens.
   useWakeLock(rideLive);
 
-  const live = { riders: liveRide.riders, status: liveRide.status, pushTelemetry: liveRide.pushTelemetry, recorder, sensors, tel, livePages, peerRanging, uwb, courses: courseOps, course: selectedCourse, rideType: { value: rideSport, indoor: rideType.indoor, driver: !!rideType.driver, label: rideType.label, set: setRideSport } };
+  // Group events for the active club — the live lobby lists today's rides so you can join,
+  // check in on the day, and jump straight into recording the session (with its route).
+  const eventOps = useMemo(() => ({
+    list: () => listSquadEvents(getToken(), squadId),
+    join: (id) => joinEvent(getToken(), id),
+    leave: (id) => leaveEvent(getToken(), id),
+    checkIn: (id) => checkInEvent(getToken(), id),
+  }), [getToken, squadId]);
+
+  const live = { riders: liveRide.riders, status: liveRide.status, pushTelemetry: liveRide.pushTelemetry, recorder, sensors, tel, livePages, peerRanging, uwb, courses: courseOps, course: selectedCourse, events: eventOps, rideType: { value: rideSport, indoor: rideType.indoor, driver: !!rideType.driver, label: rideType.label, set: setRideSport } };
 
   // Unread count for the global header's bell badge.
   const notif = useNotifications({ getToken, enabled: authed });

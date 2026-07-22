@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { s } from '../lib/style.js';
 import RideRecorder from '../components/RideRecorder.jsx';
 import LivePages from '../components/LivePages.jsx';
@@ -17,6 +17,95 @@ const mmss = (sec) => {
   const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s2 = sec % 60;
   return (h ? `${h}:${String(m).padStart(2, '0')}` : `${m}`) + ':' + String(s2).padStart(2, '0');
 };
+
+const eventIsToday = (iso) => {
+  const d = new Date(iso); const n = new Date();
+  return !Number.isNaN(d.getTime())
+    && d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
+};
+const fmtEventTime = (iso) => {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+};
+
+// Today's scheduled group rides on the live lobby: join, check in on the day, or jump straight
+// into recording the session (selecting its route so the live map follows it).
+function TodayRides({ live, actions }) {
+  const [items, setItems] = useState(null); // null = loading
+  const [busyId, setBusyId] = useState(null);
+  const [err, setErr] = useState('');
+
+  const load = async () => {
+    try {
+      const evs = await live?.events?.list?.();
+      return (evs || []).filter((e) => eventIsToday(e.start)).sort((a, b) => new Date(a.start) - new Date(b.start));
+    } catch { return []; }
+  };
+  useEffect(() => {
+    let ok = true;
+    load().then((rows) => { if (ok) setItems(rows); });
+    return () => { ok = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const run = async (id, fn) => {
+    setBusyId(id); setErr('');
+    try { await fn(); setItems(await load()); }
+    catch (e) { setErr(e?.message || 'Something went wrong.'); }
+    finally { setBusyId(null); }
+  };
+
+  // Start recording this event: follow its route on the map (if it has one), then begin recording
+  // and open the ride display.
+  const startEvent = async (ev) => {
+    setBusyId(ev.id); setErr('');
+    try {
+      if (ev.courseId && live?.courses?.load) {
+        try { const c = await live.courses.load(ev.courseId); live.courses.setCourse?.(c); } catch { /* route is optional */ }
+      }
+      await live?.recorder?.start?.();
+      actions.startRide();
+    } catch (e) { setErr(e?.message || 'Could not start the ride.'); setBusyId(null); }
+  };
+
+  if (!items || items.length === 0) return null; // nothing scheduled today — keep the lobby clean
+
+  return (
+    <div style={s('margin-top:20px')}>
+      <div style={s('font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:1.4px;font-weight:600;margin-bottom:10px')}>Today's rides</div>
+      <div style={s('display:flex;flex-direction:column;gap:9px')}>
+        {items.map((ev) => {
+          const busy = busyId === ev.id;
+          const sub = [fmtEventTime(ev.start), ev.courseName, ev.courseKm ? `${ev.courseKm.toFixed(1)} km` : null].filter(Boolean).join(' · ');
+          return (
+            <div key={ev.id} style={s('background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:12px 13px')}>
+              <div style={s('display:flex;align-items:flex-start;gap:10px')}>
+                <div style={s('flex:1;min-width:0')}>
+                  <div style={s('font-size:14px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>{ev.title}</div>
+                  {sub && <div style={s('font-size:11.5px;color:var(--text2);margin-top:1px')}>{sub}</div>}
+                  <div style={s('font-size:10.5px;color:var(--text3);margin-top:2px')}>{ev.joinCount || 0} going{ev.checkedInCount ? ` · ${ev.checkedInCount} checked in` : ''}</div>
+                </div>
+                {ev.joined
+                  ? <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : () => run(ev.id, () => live.events.leave(ev.id))} style={s('flex:none;font-size:11.5px;font-weight:700;color:var(--text3);padding:7px 11px;border-radius:9px;border:1px solid var(--line)')}>Leave</div>
+                  : <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : () => run(ev.id, () => live.events.join(ev.id))} style={s('flex:none;font-size:11.5px;font-weight:700;color:var(--accent-ink);background:var(--accent);padding:7px 13px;border-radius:9px')}>Join</div>}
+              </div>
+              <div style={s('display:flex;gap:8px;margin-top:11px')}>
+                {ev.joined && !ev.checkedIn && (
+                  <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : () => run(ev.id, () => live.events.checkIn(ev.id))} style={s('flex:1;text-align:center;font-size:12.5px;font-weight:700;padding:10px;border-radius:11px;background:var(--bg3);border:1px solid var(--line);color:var(--text)')}>Check in</div>
+                )}
+                {ev.checkedIn && (
+                  <div style={s('flex:1;text-align:center;font-size:12px;font-weight:700;padding:10px;border-radius:11px;background:color-mix(in srgb,var(--good) 14%,var(--bg2));border:1px solid color-mix(in srgb,var(--good) 30%,transparent);color:var(--good)')}>✓ Checked in</div>
+                )}
+                <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : () => startEvent(ev)} style={s('flex:1.2;text-align:center;font-size:12.5px;font-weight:700;padding:10px;border-radius:11px;background:var(--accent);color:var(--accent-ink)')}>{busy ? '…' : 'Start ride'}</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {err && <div style={s('font-size:11.5px;color:var(--bad);margin-top:8px')}>{err}</div>}
+    </div>
+  );
+}
 
 function Lobby({ vm, actions, live }) {
   const riders = live?.riders || [];
@@ -51,6 +140,9 @@ function Lobby({ vm, actions, live }) {
           <div style={s('grid-column:1/-1;padding:16px;border:1px dashed var(--line2);border-radius:14px;text-align:center;font-size:12px;color:var(--text3);line-height:1.5')}>No one riding yet — start recording to go live, or wait for teammates to join.</div>
         )}
       </div>
+
+      {/* today's scheduled group rides — join, check in, or start recording the session */}
+      <TodayRides live={live} actions={actions} />
 
       {/* activity type — family-aware: endurance clubs record bike / run outdoors (GPS) or
           trainer / treadmill indoors (sensor speed); motorsport clubs record road / off-road /
