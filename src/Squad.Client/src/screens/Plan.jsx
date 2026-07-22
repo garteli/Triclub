@@ -176,6 +176,11 @@ export default function Plan({ vm, state, actions, planMine, live, meId }) {
         <div style={s('display:flex;align-items:center;justify-content:space-between;margin-bottom:14px')}>
           <div><div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.6px;font-weight:600')}>{week ? vm.planNav.weekEyebrow : 'Month'}</div><div style={s('font-size:23px;font-weight:700;letter-spacing:-.5px')}>Training Plan</div></div>
           <div style={s('display:flex;gap:7px')}>
+            {isClubCoach && (
+              <div className="ctl" onClick={() => actions.editEvent(null)} style={s('background:var(--accent);color:var(--accent-ink);border-radius:11px;padding:8px 11px;font-size:11.5px;font-weight:700;display:flex;align-items:center;gap:6px')}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>Event
+              </div>
+            )}
             {planMine && !isMotor && (
               <div className="ctl" onClick={() => setShowMine(true)} style={s('background:var(--bg3);color:var(--text2);border:1px solid var(--line);border-radius:11px;padding:8px 11px;font-size:11.5px;font-weight:700;display:flex;align-items:center;gap:6px')}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" /></svg>My plans
