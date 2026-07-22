@@ -53,17 +53,16 @@ export const navDef = [
   { id: 'plan',  label: { en: 'Plan',     he: 'תוכנית' },  icon: navIcons.plan },
   { id: 'ride',  label: { en: 'Live',     he: 'רכיבה' },   icon: navIcons.ride },
   { id: 'lb',    label: { en: 'Ranks',    he: 'טבלה' },    icon: navIcons.lb },
-  { id: 'coach', label: { en: 'Coach AI', he: 'מאמן' },    icon: navIcons.coach },
+  // Coach AI tab removed for now — re-add: { id: 'coach', label: { en: 'Coach AI', he: 'מאמן' }, icon: navIcons.coach }
 ];
 
 // Motorsport clubs don't run structured training plans — their second tab is Events
-// (scheduled group rides/sessions) instead of Plan — and they have no AI training coach,
-// so that tab is dropped too. The bottom nav is otherwise shared; the swap is keyed by
-// the active club's discipline family.
+// (scheduled group rides/sessions) instead of Plan. The bottom nav is otherwise shared;
+// the swap is keyed by the active club's discipline family.
 const eventsNavItem = { id: 'events', label: { en: 'Events', he: 'אירועים' }, icon: navIcons.events };
 export const navFor = (family) =>
   family === 'motorsport'
-    ? navDef.filter((n) => n.id !== 'coach').map((n) => (n.id === 'plan' ? eventsNavItem : n))
+    ? navDef.map((n) => (n.id === 'plan' ? eventsNavItem : n))
     : navDef;
 
 export const workoutDefs = {
