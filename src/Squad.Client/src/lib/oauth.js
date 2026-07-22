@@ -115,11 +115,11 @@ export async function getGoogleIdToken(cfg) {
       auto_select: false,
       cancel_on_tap_outside: true,
     });
-    // One Tap / prompt. If the browser suppresses it, surface a clear error so the
-    // caller can fall back to email (a rendered GSI button is the production-robust path).
+    // One Tap / prompt. If the browser suppresses it (common in in-app browsers), surface a
+    // clear error so the user can retry — a rendered GSI button is the production-robust path.
     id.prompt((notification) => {
       if (notification.isNotDisplayed?.() || notification.isSkippedMoment?.()) {
-        reject(new Error('Google sign-in was dismissed. Try email, or check pop-up settings.'));
+        reject(new Error('Google sign-in didn’t open. Try again, or open the app in Safari/Chrome (some in-app browsers block sign-in).'));
       }
     });
   }), SIGNIN_TIMEOUT_MS, 'Google sign-in timed out — please try again.');
