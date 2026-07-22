@@ -248,6 +248,10 @@ public interface IPlanService
     /// seeding a template week the first time it's requested.</summary>
     Task<IReadOnlyList<PlannedWorkoutRow>> GetWeekAsync(Guid athleteId, DateTime weekStart, CancellationToken ct);
 
+    /// <summary>Every planned workout in the inclusive [start..end] date range (used by the month
+    /// calendar to dot the whole visible month, including the weeks ahead).</summary>
+    Task<IReadOnlyList<PlannedWorkoutRow>> GetRangeAsync(Guid athleteId, DateTime start, DateTime end, CancellationToken ct);
+
     /// <summary>Publish a coach's plan (whole plan or a single week — the caller sets the span):
     /// replace each assigned athlete's PlannedWorkout rows in [spanStart..spanEnd] with
     /// <paramref name="workouts"/>, stamped with <paramref name="planId"/>/<paramref name="planName"/> so

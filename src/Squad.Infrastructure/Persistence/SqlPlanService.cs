@@ -36,6 +36,24 @@ public sealed class SqlPlanService(string connectionString) : IPlanService
         return rows.ToList();
     }
 
+    public async Task<IReadOnlyList<PlannedWorkoutRow>> GetRangeAsync(Guid athleteId, DateTime start, DateTime end, CancellationToken ct)
+    {
+        var from = start.Date;
+        var to = end.Date;
+
+        await using var conn = new SqlConnection(connectionString);
+
+        // Column order MUST match the PlannedWorkoutRow constructor (Dapper positional binding).
+        var rows = await conn.QueryAsync<PlannedWorkoutRow>(new CommandDefinition("""
+            SELECT Id, WorkoutDate, Discipline, Title, Sub, DurationMin, Load, CourseName, CoursePoints
+            FROM dbo.PlannedWorkout
+            WHERE AthleteId=@athleteId AND WorkoutDate BETWEEN @from AND @to
+            ORDER BY WorkoutDate;
+            """, new { athleteId, from, to }, cancellationToken: ct));
+
+        return rows.ToList();
+    }
+
     public async Task<IReadOnlyList<Guid>> PublishAsync(Guid coachId, Guid planId, string planName, IReadOnlyList<Guid> athleteIds,
         DateTime spanStart, DateTime spanEnd, IReadOnlyList<PlannedWorkoutWrite> workouts, CancellationToken ct)
     {
