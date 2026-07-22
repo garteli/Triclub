@@ -39,7 +39,9 @@ async function uploadFit(bytes, token) {
 // streams through pushTelemetry (live hub) AND is accumulated at full resolution so the
 // finished ride can be encoded as a real Garmin .fit and uploaded through the same
 // ingest path as a Garmin file (see lib/fitEncoder.js).
-export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, enabled = true, sport = FitSport.cycling, indoor = false, throttleMs = 1000 } = {}) {
+export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, enabled = true, sport = FitSport.cycling, indoor = false, driver = false, throttleMs = 1000 } = {}) {
+  const driverRef = useRef(driver);
+  driverRef.current = driver;
   const [recording, setRecording] = useState(false);
   const [paused, setPaused] = useState(false);       // web: backgrounded / screen locked
   const [distanceKm, setDistanceKm] = useState(0);
@@ -161,6 +163,7 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, ena
         radarClosestMeters: radar?.closestM ?? null,
         radarClosestClosingKph: radar?.closingKph ?? null,
         distanceKm: km,
+        driver: driverRef.current,
       });
     }
   }, [pushTelemetry, sensors, throttleMs]);
@@ -225,6 +228,14 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, ena
     setRecording(false);
     setPaused(false);
     setMode('idle');
+
+    // A driver/escort ride isn't a workout — discard it instead of offering to save (never
+    // uploaded, so it can't land as a bike activity). The live stream already served the group.
+    if (driverRef.current) {
+      clearDraft(); resetCapture(); setDistanceKm(0); setElapsedSec(0); setPhotos([]);
+      setPending(null); setSaveState('idle'); setSaveError(null);
+      return;
+    }
 
     const a = agg.current;
     const summary = buildSummary();

@@ -57,7 +57,7 @@ function Lobby({ vm, actions, live }) {
         <div style={s('margin-top:18px')}>
           <div style={s('font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:1.4px;font-weight:600;margin-bottom:9px')}>Activity type</div>
           <div style={s('display:flex;gap:6px;background:var(--bg2);border:1px solid var(--line);border-radius:13px;padding:5px')}>
-            {[['bike', 'Bike'], ['run', 'Run'], ['trainer', 'Trainer'], ['treadmill', 'Treadmill']].map(([id, label]) => {
+            {[['bike', 'Bike'], ['run', 'Run'], ['trainer', 'Trainer'], ['treadmill', 'Treadmill'], ['driver', 'Driver']].map(([id, label]) => {
               const on = live.rideType.value === id;
               const locked = !!live?.recorder?.recording;
               return (
@@ -67,6 +67,7 @@ function Lobby({ vm, actions, live }) {
             })}
           </div>
           {live.rideType.indoor && <div style={s('font-size:11px;color:var(--text3);margin-top:7px;line-height:1.4')}>Indoor — no GPS. Distance comes from your trainer / footpod speed sensor.</div>}
+          {live.rideType.driver && <div style={s('font-size:11px;color:var(--text3);margin-top:7px;line-height:1.4')}>Escort mode — you appear as a car on the map, stay out of the pack/leader stats, and this ride isn’t saved as an activity.</div>}
         </div>
       )}
 
