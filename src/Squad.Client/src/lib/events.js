@@ -31,10 +31,27 @@ export function toOffsetIso(local) {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:00${sign}${p(Math.floor(abs / 60))}:${p(abs % 60)}`;
 }
 
-// → [{ id, squadId, title, sport, start, courseId, courseName, courseKm, notes, joinCount, checkedInCount, joined, checkedIn }]
+// Turn a stored offset-ISO start back into a datetime-local value ("2026-07-25T07:00") for the
+// editor's <input type="datetime-local"> when editing an existing event.
+export function toLocalInput(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+// → [{ id, squadId, title, sport, start, courseId, courseName, courseKm, notes, joinCount, checkedInCount, joined, checkedIn, published }]
+// For the squad owner this includes their own unpublished drafts; members see published events only.
 export const listSquadEvents = (token, squadId) => req(`/api/squads/${squadId}/events`, { token });
-// body: { title, sport, start (offset ISO), courseId?, notes? } → the created event.
+// body: { title, sport, start (offset ISO), courseId?, notes?, published? } → the created event.
 export const createSquadEvent = (token, squadId, body) => req(`/api/squads/${squadId}/events`, { method: 'POST', token, body });
+// body: { title, sport, start (offset ISO), courseId?, notes? } — edit an event (publish state kept).
+export const updateSquadEvent = (token, squadId, eventId, body) => req(`/api/squads/${squadId}/events/${eventId}`, { method: 'PUT', token, body });
+export const publishEvent = (token, squadId, eventId) => req(`/api/squads/${squadId}/events/${eventId}/publish`, { method: 'POST', token });
+export const unpublishEvent = (token, squadId, eventId) => req(`/api/squads/${squadId}/events/${eventId}/unpublish`, { method: 'POST', token });
+// Owner-only join/check-in roster → [{ athleteId, name, initials, avatarColor, avatarUrl, joinedUtc, checkedIn, checkedInUtc }]
+export const listEventAttendees = (token, squadId, eventId) => req(`/api/squads/${squadId}/events/${eventId}/attendees`, { token });
 export const deleteSquadEvent = (token, squadId, eventId) => req(`/api/squads/${squadId}/events/${eventId}`, { method: 'DELETE', token });
 
 export const joinEvent = (token, eventId) => req(`/api/events/${eventId}/join`, { method: 'POST', token });

@@ -12,9 +12,13 @@ public static class SquadEventEndpoints
 {
     public static IEndpointRouteBuilder MapSquadEvents(this IEndpointRouteBuilder app)
     {
-        // Squad-scoped: any member lists; the owner creates/deletes.
+        // Squad-scoped: any member lists; the owner creates/edits/publishes/deletes + sees the roster.
         app.MapGet("/api/squads/{squadId:guid}/events", ListEvents).RequireAuthorization();
         app.MapPost("/api/squads/{squadId:guid}/events", CreateEvent).RequireAuthorization();
+        app.MapPut("/api/squads/{squadId:guid}/events/{eventId:guid}", UpdateEvent).RequireAuthorization();
+        app.MapPost("/api/squads/{squadId:guid}/events/{eventId:guid}/publish", PublishEvent).RequireAuthorization();
+        app.MapPost("/api/squads/{squadId:guid}/events/{eventId:guid}/unpublish", UnpublishEvent).RequireAuthorization();
+        app.MapGet("/api/squads/{squadId:guid}/events/{eventId:guid}/attendees", EventAttendees).RequireAuthorization();
         app.MapDelete("/api/squads/{squadId:guid}/events/{eventId:guid}", DeleteEvent).RequireAuthorization();
         // Member-scoped RSVP + check-in, plus the caller's own joined-events list.
         app.MapPost("/api/events/{eventId:guid}/join", JoinEvent).RequireAuthorization();
@@ -47,12 +51,101 @@ public static class SquadEventEndpoints
         if (!await events.IsOwnerAsync(squadId, me, ct))
             return Results.Json(new { error = "Only the group manager can schedule sessions." }, statusCode: 403);
 
+        var parsed = await ParseEvent(req, me, courses, ct);
+        if (parsed.Error is { } err) return err;
+
+        // A draft (published == false) is created silently; a published event fans out below.
+        var published = req.Published ?? true;
+        var created = await events.CreateAsync(
+            squadId, me, parsed.Title!, parsed.Sport, parsed.Start,
+            parsed.CourseId, parsed.CourseName, parsed.CourseKm, parsed.CoursePoints, parsed.Notes, published, ct);
+        if (created is null)
+            return Results.Json(new { error = "Only the group manager can schedule sessions." }, statusCode: 403);
+
+        if (published)
+            await NotifySquad(squadId, me, parsed.Title!, squads, notes, directory, ct);
+
+        return Results.Ok(ToDto(created));
+    }
+
+    private static async Task<IResult> UpdateEvent(
+        Guid squadId, Guid eventId, SquadEventRequest req, HttpContext http,
+        ISquadEventStore events, ICourseStore courses, CancellationToken ct)
+    {
+        if (Me(http) is not { } me) return Results.Unauthorized();
+        if (!await events.IsOwnerAsync(squadId, me, ct))
+            return Results.Json(new { error = "Only the group manager can edit sessions." }, statusCode: 403);
+
+        var parsed = await ParseEvent(req, me, courses, ct);
+        if (parsed.Error is { } err) return err;
+
+        var ok = await events.UpdateAsync(
+            squadId, me, eventId, parsed.Title!, parsed.Sport, parsed.Start,
+            parsed.CourseId, parsed.CourseName, parsed.CourseKm, parsed.CoursePoints, parsed.Notes, ct);
+        return ok
+            ? Results.Ok(new { updated = true })
+            : Results.NotFound(new { error = "That session no longer exists." });
+    }
+
+    private static async Task<IResult> PublishEvent(
+        Guid squadId, Guid eventId, HttpContext http, ISquadEventStore events,
+        ISquadService squads, INotificationService notes, IAthleteDirectory directory, CancellationToken ct)
+    {
+        if (Me(http) is not { } me) return Results.Unauthorized();
+        var result = await events.SetPublishedAsync(squadId, me, eventId, true, ct);
+        if (result == SetPublishedResult.NotAllowed)
+            return Results.Json(new { error = "Only the group manager can publish sessions." }, statusCode: 403);
+
+        // Notify the squad only on a genuine draft→published transition.
+        if (result == SetPublishedResult.PublishedNow)
+        {
+            var title = (await events.ListForSquadAsync(squadId, me, ct))
+                .FirstOrDefault(e => e.Id == eventId)?.Title ?? "a group session";
+            await NotifySquad(squadId, me, title, squads, notes, directory, ct);
+        }
+        return Results.Ok(new { published = true });
+    }
+
+    private static async Task<IResult> UnpublishEvent(
+        Guid squadId, Guid eventId, HttpContext http, ISquadEventStore events, CancellationToken ct)
+    {
+        if (Me(http) is not { } me) return Results.Unauthorized();
+        var result = await events.SetPublishedAsync(squadId, me, eventId, false, ct);
+        return result == SetPublishedResult.NotAllowed
+            ? Results.Json(new { error = "Only the group manager can unpublish sessions." }, statusCode: 403)
+            : Results.Ok(new { published = false });
+    }
+
+    private static async Task<IResult> EventAttendees(
+        Guid squadId, Guid eventId, HttpContext http, ISquadEventStore events, CancellationToken ct)
+    {
+        if (Me(http) is not { } me) return Results.Unauthorized();
+        var list = await events.ListAttendeesAsync(squadId, me, eventId, ct);
+        return list is null
+            ? Results.Json(new { error = "Only the group manager can see the roster." }, statusCode: 403)
+            : Results.Ok(list.Select(a => new
+            {
+                athleteId = a.AthleteId,
+                name = a.Name,
+                initials = a.Initials,
+                avatarColor = a.AvatarColor,
+                avatarUrl = a.AvatarUrl,
+                joinedUtc = a.JoinedUtc,
+                checkedIn = a.CheckedInUtc != null,
+                checkedInUtc = a.CheckedInUtc,
+            }));
+    }
+
+    // Resolve + validate the shared event fields (title/sport/start/route/notes). Returns a parsed
+    // bundle, or an Error result to short-circuit the handler.
+    private static async Task<ParsedEvent> ParseEvent(SquadEventRequest req, Guid me, ICourseStore courses, CancellationToken ct)
+    {
         var title = Trim(req.Title);
-        if (title is null) return Results.BadRequest(new { error = "Give the session a title." });
+        if (title is null) return ParsedEvent.Fail(Results.BadRequest(new { error = "Give the session a title." }));
         if (title.Length > 160) title = title[..160];
 
         if (!TryParseStart(req.Start, out var start))
-            return Results.BadRequest(new { error = "Pick a valid date and time." });
+            return ParsedEvent.Fail(Results.BadRequest(new { error = "Pick a valid date and time." }));
 
         var sport = (byte)Math.Clamp(req.Sport ?? 2, 0, 3);
         var notesText = Trim(req.Notes);
@@ -67,33 +160,38 @@ public static class SquadEventEndpoints
         if (Guid.TryParse(req.CourseId, out var cid) && cid != Guid.Empty)
         {
             var course = await courses.GetAsync(me, cid, ct);
-            if (course is null) return Results.BadRequest(new { error = "That route wasn't found." });
+            if (course is null) return ParsedEvent.Fail(Results.BadRequest(new { error = "That route wasn't found." }));
             courseId = course.Id;
             courseName = course.Name;
             courseKm = course.DistanceKm;
             coursePoints = course.Points;
         }
 
-        var created = await events.CreateAsync(
-            squadId, me, title, sport, start, courseId, courseName, courseKm, coursePoints, notesText, ct);
-        if (created is null)
-            return Results.Json(new { error = "Only the group manager can schedule sessions." }, statusCode: 403);
+        return new ParsedEvent(null, title, sport, start, courseId, courseName, courseKm, coursePoints, notesText);
+    }
 
-        // Tell the squad. Best-effort — a notification hiccup must not fail the create.
+    // Best-effort fan-out of an "event" notification to every other squad member.
+    private static async Task NotifySquad(
+        Guid squadId, Guid me, string title, ISquadService squads,
+        INotificationService notes, IAthleteDirectory directory, CancellationToken ct)
+    {
         try
         {
             var members = await squads.GetMembersAsync(squadId, me, ct);
-            if (members is not null)
-            {
-                var coachName = (await directory.GetAsync(me, ct))?.Name ?? "Your coach";
-                var text = $"scheduled a group session: \"{title}\"";
-                foreach (var m in members.Where(m => m.AthleteId != me))
-                    await notes.AddAsync(m.AthleteId, "event", me, coachName, text, ct);
-            }
+            if (members is null) return;
+            var coachName = (await directory.GetAsync(me, ct))?.Name ?? "Your coach";
+            var text = $"scheduled a group session: \"{title}\"";
+            foreach (var m in members.Where(m => m.AthleteId != me))
+                await notes.AddAsync(m.AthleteId, "event", me, coachName, text, ct);
         }
-        catch (Exception) { /* create already succeeded; notifications are best-effort */ }
+        catch (Exception) { /* the write already succeeded; notifications are best-effort */ }
+    }
 
-        return Results.Ok(ToDto(created));
+    private sealed record ParsedEvent(
+        IResult? Error, string? Title, byte Sport, DateTimeOffset Start,
+        Guid? CourseId, string? CourseName, double? CourseKm, string? CoursePoints, string? Notes)
+    {
+        public static ParsedEvent Fail(IResult error) => new(error, null, 0, default, null, null, null, null, null);
     }
 
     private static async Task<IResult> DeleteEvent(
@@ -150,6 +248,7 @@ public static class SquadEventEndpoints
         checkedInCount = e.CheckedInCount,
         joined = e.Joined,
         checkedIn = e.CheckedInUtc != null,
+        published = e.Published,
     };
 
     private static object ToDto(SquadEvent e) => new
@@ -167,6 +266,7 @@ public static class SquadEventEndpoints
         checkedInCount = 0,
         joined = false,
         checkedIn = false,
+        published = e.Published,
     };
 
     private static bool TryParseStart(string? raw, out DateTimeOffset start)
@@ -187,7 +287,8 @@ public static class SquadEventEndpoints
 
     private static string? Trim(string? v) => string.IsNullOrWhiteSpace(v) ? null : v.Trim();
 
-    /// <summary>Body for scheduling a session. Start is ISO 8601 (with the client's offset); CourseId
-    /// is an optional saved route; Sport is the ActivitySport byte (defaults to Bike).</summary>
-    public sealed record SquadEventRequest(string? Title, int? Sport, string? Start, string? CourseId, string? Notes);
+    /// <summary>Body for scheduling/editing a session. Start is ISO 8601 (with the client's offset);
+    /// CourseId is an optional saved route; Sport is the ActivitySport byte (defaults to Bike);
+    /// Published (create only, defaults true) schedules a draft when false.</summary>
+    public sealed record SquadEventRequest(string? Title, int? Sport, string? Start, string? CourseId, string? Notes, bool? Published = null);
 }
