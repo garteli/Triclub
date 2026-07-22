@@ -2,7 +2,10 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <!-- maximum-scale=1 stops iOS auto-zooming when a sub-16px input is focused — that zoom
+         shrinks the visual viewport and pans the page sideways ("the width breaks when the
+         keyboard opens"). Maps use MapLibre's own canvas pinch-zoom, so this doesn't affect them. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <title>Domestique Team · Team Training Platform</title>
 
     <!-- Earliest possible launch timestamp so the app can hold the splash for a minimum time. -->
