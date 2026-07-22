@@ -209,14 +209,14 @@ export function spreadRiders(tel) {
   });
 }
 
-// 2D peloton spread for the Peloton field. Fore-aft (y) comes from distance-covered — the
-// rider furthest up the road sits at the front; lateral (x) is the real GPS cross-track
-// offset (perpendicular to the pack's line of travel), so it's only shown when ≥2 riders
-// have a fix and there's a fore-aft baseline to orient from. All plotted coords are
-// normalized 0..1 for layout; the metre readouts (length/width/gap) are the real values.
+// 1D peloton spread for the Peloton field. Everyone sits on ONE centre axis (fore-aft only — no
+// left/right): position comes from distance-covered relative to YOU, over a fixed ±RADIUS window
+// (250 m). Riders beyond the window pin to the top/bottom edge with an arrow and the distance to
+// the next rider along the axis. Plotted coords are normalized 0..1; the metre readouts are real.
+const PELOTON_RADIUS_M = 250;
 export function pelotonView(tel) {
   const riders = (tel?.riders || []).slice();
-  if (!riders.length) return { empty: true, plot: [], board: [], lengthM: null, widthM: null, hasLateral: false, samples: 0 };
+  if (!riders.length) return { empty: true, plot: [], board: [], lengthM: null, samples: 0, radiusM: PELOTON_RADIUS_M };
 
   const distOf = (r) => parseFloat(r.dist) || 0;
   const pct = tel?.peloton?.leadPctById || {};
@@ -226,47 +226,34 @@ export function pelotonView(tel) {
   const dists = riders.map(distOf);
   const leadDist = Math.max(...dists);
   const tailDist = Math.min(...dists);
-  const span = leadDist - tailDist;                 // km front-to-back
-  const lengthM = Math.round(span * 1000);
+  const lengthM = Math.round((leadDist - tailDist) * 1000);
 
-  // Lateral (cross-track) offset in metres, + to the right of the travel direction.
-  const gps = riders.filter((r) => r.lat != null && r.lon != null);
-  const cross = {};
-  let widthM = null, hasLateral = false;
-  if (gps.length >= 2) {
-    const lat0 = gps.reduce((a, r) => a + r.lat, 0) / gps.length;
-    const lon0 = gps.reduce((a, r) => a + r.lon, 0) / gps.length;
-    const mPerLat = 110540, mPerLon = 111320 * Math.cos((lat0 * Math.PI) / 180);
-    const pos = gps.map((r) => ({ id: r.athleteId, e: (r.lon - lon0) * mPerLon, n: (r.lat - lat0) * mPerLat, d: distOf(r) }));
-    // Travel direction = from the back GPS rider to the front GPS rider.
-    let lead = pos[0], tail = pos[0];
-    for (const p of pos) { if (p.d > lead.d) lead = p; if (p.d < tail.d) tail = p; }
-    let de = lead.e - tail.e, dn = lead.n - tail.n;
-    const mag = Math.hypot(de, dn);
-    if (mag >= 1) {                                  // need a real baseline to define "sideways"
-      de /= mag; dn /= mag;
-      const pe = -dn, pn = de;                       // unit perpendicular
-      let maxAbs = 0;
-      for (const p of pos) { const c = p.e * pe + p.n * pn; cross[p.id] = c; if (Math.abs(c) > maxAbs) maxAbs = Math.abs(c); }
-      widthM = Math.round(maxAbs * 2 * 10) / 10;
-      hasLateral = maxAbs > 0.3;                      // sub-0.3m is GPS noise, not a real echelon
-    }
-  }
-  const maxAbsCross = Math.max(0.5, ...Object.values(cross).map((c) => Math.abs(c)));
+  // Reference = YOU (your along-route position); fall back to the pack centre when you're not a rider.
+  const youR = riders.find((r) => r.you);
+  const refDist = youR ? distOf(youR) : (leadDist + tailDist) / 2;
 
-  // Front (leader) at the top, back at the bottom; keep a 6% margin all round.
-  const n = riders.length;
-  const sorted = riders.slice().sort((a, b) => distOf(b) - distOf(a));
+  const sorted = riders.slice().sort((a, b) => distOf(b) - distOf(a)); // front → back
+  const sortedD = sorted.map(distOf);
   const plot = sorted.map((r, i) => {
     const d = distOf(r);
-    const yRaw = span > 0.0005 ? (leadDist - d) / span : (n > 1 ? i / (n - 1) : 0.5);
-    let x = 0.5;
-    if (hasLateral && cross[r.athleteId] != null) x = 0.5 + (cross[r.athleteId] / (2 * maxAbsCross)) * 0.88;
+    const offM = (d - refDist) * 1000;               // + = ahead of you, − = behind
+    const within = Math.abs(offM) <= PELOTON_RADIUS_M;
+    // Distance to the NEXT rider along the axis (nearest neighbour fore or aft).
+    const neigh = [];
+    if (i > 0) neigh.push((sortedD[i - 1] - d) * 1000);
+    if (i < sorted.length - 1) neigh.push((d - sortedD[i + 1]) * 1000);
+    const nextGapM = neigh.length ? Math.round(Math.min(...neigh)) : 0;
+    // ahead → up (small y). Within window scales linearly; beyond pins to the edge.
+    const y = within ? 0.5 - (offM / PELOTON_RADIUS_M) * 0.43 : (offM > 0 ? 0.07 : 0.93);
     return {
       id: r.athleteId, initials: r.initials, color: r.color, you: !!r.you, dropped: !!r.dropped,
       isLeader: r.athleteId === leaderId,
-      x: Math.max(0.07, Math.min(0.93, x)),
-      y: Math.max(0.07, Math.min(0.93, 0.07 + yRaw * 0.86)),
+      x: 0.5,                                          // single centre axis — no left/right
+      y: Math.max(0.07, Math.min(0.93, y)),
+      offRadius: !within,
+      arrow: within ? null : (offM > 0 ? 'up' : 'down'),
+      offM: Math.round(offM),
+      nextGapM,
       gapM: Math.round((leadDist - d) * 1000),
       leadPct: Math.round((pct[r.athleteId] || 0) * 100),
     };
@@ -274,7 +261,7 @@ export function pelotonView(tel) {
 
   // "% time in lead" board — highest first; falls back to pack order before any lead accrues.
   const board = plot.slice().sort((a, b) => b.leadPct - a.leadPct || a.gapM - b.gapM);
-  return { empty: false, plot, board, lengthM, widthM, hasLateral, samples };
+  return { empty: false, plot, board, lengthM, samples, radiusM: PELOTON_RADIUS_M };
 }
 
 // Connected bike components (lobby "Bike & gear" panel) — battery levels come from the

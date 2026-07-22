@@ -78,23 +78,22 @@ function PelotonField({ v }) {
       <div style={s('display:flex;justify-content:space-between;align-items:baseline;flex:none')}>
         <div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;font-weight:600')}>Peloton</div>
         <div className="mono" style={s('font-size:10px;color:var(--text2);font-weight:600')}>
-          {v.lengthM != null ? `${v.lengthM}m long` : ''}{v.hasLateral && v.widthM != null ? ` · ${v.widthM}m wide` : ''}
+          {v.lengthM != null ? `${v.lengthM}m long · ` : ''}{v.radiusM}m view
         </div>
       </div>
-      {/* the field: front (leader) at top, back at bottom; centre line = travel direction */}
+      {/* the field: everyone on ONE centre axis (fore-aft only); ±radius window, edges = beyond it */}
       <div style={s('position:relative;flex:1;min-height:120px;margin-top:8px;border-radius:11px;background:var(--bg3);border:1px solid var(--line);overflow:hidden')}>
         <div style={s('position:absolute;left:50%;top:6%;bottom:6%;width:2px;background:var(--line2);transform:translateX(-50%)')} />
         <div style={s('position:absolute;top:5px;left:0;right:0;text-align:center;font-size:8px;font-weight:700;letter-spacing:1px;color:var(--text3)')}>▲ FRONT</div>
         <div style={s('position:absolute;bottom:5px;left:0;right:0;text-align:center;font-size:8px;font-weight:700;letter-spacing:1px;color:var(--text3)')}>BACK</div>
-        {!v.hasLateral && (
-          <div style={s('position:absolute;bottom:5px;right:8px;font-size:8px;color:var(--text3)')}>lateral needs GPS</div>
-        )}
         {v.plot.map((r) => (
-          <div key={r.id} style={s(`position:absolute;left:${(r.x * 100).toFixed(1)}%;top:${(r.y * 100).toFixed(1)}%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:1px;transition:left .9s linear,top .9s linear;z-index:${r.isLeader ? 3 : 2}`)}>
-            <div style={s(`width:24px;height:24px;border-radius:7px;background:${r.color};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#0c0e11;${r.you ? 'box-shadow:0 0 0 2px var(--accent)' : ''}${r.isLeader ? ';outline:2px solid var(--good);outline-offset:1px' : ''};${r.dropped ? 'opacity:.55' : ''}`)}>{r.initials}</div>
-            {r.isLeader
-              ? <span style={s('font-size:8px;font-weight:700;color:var(--good);line-height:1')}>lead</span>
-              : r.dropped && r.gapM > 0 && <span className="mono" style={s('font-size:8px;font-weight:700;color:var(--behind);line-height:1')}>+{r.gapM}m</span>}
+          <div key={r.id} style={s(`position:absolute;left:50%;top:${(r.y * 100).toFixed(1)}%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:1px;transition:top .9s linear;z-index:${r.isLeader ? 3 : 2}`)}>
+            <div style={s(`width:24px;height:24px;border-radius:7px;background:${r.color};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#0c0e11;${r.you ? 'box-shadow:0 0 0 2px var(--accent)' : ''}${r.isLeader ? ';outline:2px solid var(--good);outline-offset:1px' : ''};${r.offRadius ? ';opacity:.6;outline:1.5px dashed var(--behind);outline-offset:1px' : ''}`)}>{r.initials}</div>
+            {r.offRadius
+              ? <span className="mono" style={s('font-size:8.5px;font-weight:700;color:var(--behind);line-height:1')}>{r.arrow === 'up' ? '▲' : '▼'} {r.nextGapM}m</span>
+              : r.isLeader
+                ? <span style={s('font-size:8px;font-weight:700;color:var(--good);line-height:1')}>lead</span>
+                : r.dropped && r.gapM > 0 && <span className="mono" style={s('font-size:8px;font-weight:700;color:var(--behind);line-height:1')}>+{r.gapM}m</span>}
           </div>
         ))}
       </div>
