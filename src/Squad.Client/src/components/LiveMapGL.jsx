@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { s } from '../lib/style.js';
 import { BASEMAP_LABEL, baseSource, applyBasemap, nextBasemap, inIsrael } from '../lib/basemaps.js';
-import { getRouteStyle, setRouteStyle as persistRouteStyle, ROUTE_COLORS, ROUTE_WIDTHS } from '../lib/routeStyle.js';
+import { getRouteStyle, setRouteStyle as persistRouteStyle, ROUTE_COLORS, ARROW_COLORS, ROUTE_WIDTHS } from '../lib/routeStyle.js';
 import { addRouteArrows, styleArrows } from '../lib/mapArrows.js';
 
 // Interactive live-ride map tile: a real MapLibre basemap you can pinch-zoom, pan and rotate,
@@ -117,9 +117,9 @@ export default function LiveMapGL({ pts, course, path, riders, mySport, interact
           map.addLayer({ id: 'course', type: 'line', source: 'course', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': rs.color || accent, 'line-width': rs.width || 4, 'line-opacity': 0.6, 'line-dasharray': [2, 2] } });
           map.addSource('path', { type: 'geojson', data: lineFC(path) });
           map.addLayer({ id: 'path', type: 'line', source: 'path', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': rs.color || accent, 'line-width': rs.width || 4 } });
-          // Direction chevrons (in the route colour) along the course (route to follow) + your breadcrumb.
-          addRouteArrows(map, 'course', 'course-arrows', { color: rs.color, width: rs.width });
-          addRouteArrows(map, 'path', 'path-arrows', { color: rs.color, width: rs.width });
+          // Direction chevrons (own arrow colour) along the course (route to follow) + your breadcrumb.
+          addRouteArrows(map, 'course', 'course-arrows', { color: rs.arrowColor, width: rs.width });
+          addRouteArrows(map, 'path', 'path-arrows', { color: rs.arrowColor, width: rs.width });
           // Riders are DOM markers (initials dots + clusters), not a circle layer — see rebuildMarkers.
           readyRef.current = true;
           setFailed(false);
@@ -284,7 +284,7 @@ export default function LiveMapGL({ pts, course, path, riders, mySport, interact
     if (!map || !readyRef.current) return;
     if (map.getLayer('course')) { map.setPaintProperty('course', 'line-color', rstyle.color); map.setPaintProperty('course', 'line-width', rstyle.width); }
     if (map.getLayer('path')) { map.setPaintProperty('path', 'line-color', rstyle.color); map.setPaintProperty('path', 'line-width', rstyle.width); }
-    styleArrows(map, ['course-arrows', 'path-arrows'], rstyle);
+    styleArrows(map, ['course-arrows', 'path-arrows'], { color: rstyle.arrowColor, width: rstyle.width });
   }, [rstyle]);
   const applyRstyle = (next) => { setRstyle(next); persistRouteStyle(next); };
 
@@ -330,6 +330,13 @@ export default function LiveMapGL({ pts, course, path, riders, mySport, interact
             {ROUTE_COLORS.map((c) => (
               <div key={c} className="ctl" onClick={(e) => { stop(e); applyRstyle({ ...rstyle, color: c }); }}
                 style={s(`width:24px;height:24px;border-radius:50%;background:${c};cursor:pointer;box-shadow:0 0 0 ${rstyle.color === c ? '2.5px var(--text)' : '1px var(--line2)'}`)} />
+            ))}
+          </div>
+          <div style={s('font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text3);margin:11px 0 7px')}>Arrow colour</div>
+          <div style={s('display:flex;flex-wrap:wrap;gap:7px')}>
+            {ARROW_COLORS.map((c) => (
+              <div key={c} className="ctl" onClick={(e) => { stop(e); applyRstyle({ ...rstyle, arrowColor: c }); }}
+                style={s(`width:24px;height:24px;border-radius:50%;background:${c};cursor:pointer;box-shadow:0 0 0 ${rstyle.arrowColor === c ? '2.5px var(--accent)' : '1px var(--line2)'}`)} />
             ))}
           </div>
           <div style={s('font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text3);margin:11px 0 7px')}>Width</div>
