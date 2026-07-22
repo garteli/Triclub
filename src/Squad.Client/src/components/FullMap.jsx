@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { s } from '../lib/style.js';
-import { BASEMAP_ORDER, BASEMAP_LABEL, baseSource, applyBasemap } from '../lib/basemaps.js';
+import { BASEMAP_LABEL, baseSource, applyBasemap, nextBasemap, inIsrael } from '../lib/basemaps.js';
+import { getRouteStyle, setRouteStyle as persistRouteStyle, ROUTE_COLORS, ROUTE_WIDTHS } from '../lib/routeStyle.js';
 import AuthedAvatar from './AuthedAvatar.jsx';
 
 // Full-screen 3D route map (MapLibre GL): our CARTO basemap draped over free AWS terrain
@@ -10,6 +11,20 @@ import AuthedAvatar from './AuthedAvatar.jsx';
 // bundle. Portaled to <body> so it's a true viewport overlay (and reliably exitable).
 const glass = 'background:rgba(20,23,29,.82);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.14);color:#fff';
 const validPts = (route) => (route || []).filter((p) => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]));
+
+// A white, dark-haloed chevron drawn to a canvas — placed repeatedly ALONG the route (symbol-
+// placement:line), so each one auto-rotates to the travel direction (start→end). Returns ImageData
+// for map.addImage.
+function makeArrowImage() {
+  const S = 30, cv = document.createElement('canvas');
+  cv.width = S; cv.height = S;
+  const x = cv.getContext('2d');
+  x.lineCap = 'round'; x.lineJoin = 'round';
+  const chevron = () => { x.beginPath(); x.moveTo(S * 0.36, S * 0.24); x.lineTo(S * 0.64, S * 0.5); x.lineTo(S * 0.36, S * 0.76); x.stroke(); };
+  x.strokeStyle = 'rgba(0,0,0,.5)'; x.lineWidth = S * 0.2; chevron();  // halo for contrast on any basemap
+  x.strokeStyle = '#fff'; x.lineWidth = S * 0.12; chevron();          // white chevron
+  return x.getImageData(0, 0, S, S);
+}
 
 const buildStyle = (style) => ({
   version: 8,
@@ -37,6 +52,12 @@ export default function FullMap({ route, style: initialStyle = 'voyager', a, tok
   const [bearing, setBearing] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [error, setError] = useState(false);
+  const [rstyle, setRstyle] = useState(getRouteStyle); // per-user route colour + width
+  const [styleOpen, setStyleOpen] = useState(false);
+  const rstyleRef = useRef(rstyle);
+  rstyleRef.current = rstyle;
+  // Off-road basemap only makes sense over Israel (its tiles are blank elsewhere).
+  const israel = (() => { const p = validPts(route)[0]; return p ? inIsrael(p[0], p[1]) : true; })();
 
   useEffect(() => {
     let map, cancelled = false;
@@ -58,8 +79,16 @@ export default function FullMap({ route, style: initialStyle = 'voyager', a, tok
         map.on('load', () => {
           try { map.setTerrain({ source: 'dem', exaggeration: 1.3 }); } catch { /* no webgl2 terrain */ }
           if (pts.length > 1) {
+            const rs = rstyleRef.current;
             map.addSource('route', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: pts.map(([la, lo]) => [lo, la]) } } });
-            map.addLayer({ id: 'route', type: 'line', source: 'route', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#ff6a2c', 'line-width': 4 } });
+            map.addLayer({ id: 'route', type: 'line', source: 'route', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': rs.color, 'line-width': rs.width } });
+            // Direction chevrons repeated along the route (auto-rotated to travel direction).
+            let arrowsOk = false;
+            try { if (!map.hasImage('route-arrow')) map.addImage('route-arrow', makeArrowImage(), { pixelRatio: 2 }); arrowsOk = true; } catch { arrowsOk = false; }
+            if (arrowsOk) map.addLayer({ id: 'route-arrows', type: 'symbol', source: 'route', layout: {
+              'symbol-placement': 'line', 'symbol-spacing': 85, 'icon-image': 'route-arrow', 'icon-size': 0.62,
+              'icon-rotation-alignment': 'map', 'icon-allow-overlap': true, 'icon-ignore-placement': true,
+            } });
             // Start/end as circle layers (canvas-rendered, same reliable path as the line).
             map.addSource('ends', { type: 'geojson', data: { type: 'FeatureCollection', features: [
               { type: 'Feature', properties: { c: '#4fe08b' }, geometry: { type: 'Point', coordinates: [pts[0][1], pts[0][0]] } },
@@ -81,7 +110,19 @@ export default function FullMap({ route, style: initialStyle = 'voyager', a, tok
   // Swap the basemap on style change — kept beneath the route line so the track stays on top.
   useEffect(() => { const m = mapRef.current; if (m && m.getSource('base')) applyBasemap(m, mapStyle); }, [mapStyle]);
 
-  const cycleStyle = () => setMapStyle((st) => BASEMAP_ORDER[(BASEMAP_ORDER.indexOf(st) + 1) % BASEMAP_ORDER.length]);
+  // Apply the per-user route colour/width live (and on first paint after the layer exists).
+  useEffect(() => {
+    const m = mapRef.current;
+    if (!m || !m.getLayer || !m.getLayer('route')) return;
+    m.setPaintProperty('route', 'line-color', rstyle.color);
+    m.setPaintProperty('route', 'line-width', rstyle.width);
+  }, [rstyle]);
+
+  // If we opened on Off-road but the route isn't in Israel, fall back to a global basemap.
+  useEffect(() => { if (!israel && mapStyle === 'offroad') setMapStyle('voyager'); }, [israel, mapStyle]);
+
+  const applyRstyle = (next) => { setRstyle(next); persistRouteStyle(next); };
+  const cycleStyle = () => setMapStyle((st) => nextBasemap(st, israel));
   const toggle3D = () => { const m = mapRef.current; if (!m) return; const next = !is3D; setIs3D(next); m.easeTo({ pitch: next ? 62 : 0, duration: 600 }); };
   const resetNorth = () => mapRef.current?.easeTo({ bearing: 0, duration: 400 });
 
@@ -136,7 +177,33 @@ export default function FullMap({ route, style: initialStyle = 'voyager', a, tok
           <div className="ctl" onClick={resetNorth} title="Reset north" style={s(`width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;${glass}`)}>
             <svg width="20" height="20" viewBox="0 0 24 24" style={{ transform: `rotate(${-bearing}deg)` }}><path d="M12 3l3.2 8H8.8z" fill="var(--bad)" /><path d="M12 21l-3.2-8h6.4z" fill="#fff" /></svg>
           </div>
+          {/* route style (colour + width) */}
+          <div className="ctl" onClick={() => setStyleOpen((o) => !o)} title="Route colour & width" style={s(`width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;${glass}${styleOpen ? ';border-color:rgba(255,255,255,.4)' : ''}`)}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 18l7-7" /><circle cx="15.5" cy="8.5" r="1.5" fill="currentColor" stroke="none" /><path d="M12 3l3 3-8 8-3 1 1-3z" /><path d="M17 5l2-2 2 2-2 2z" /></svg>
+          </div>
         </div>
+
+        {/* route-style picker panel (anchored left of the control column) */}
+        {styleOpen && (
+          <div style={{ ...s(`position:absolute;right:66px;z-index:1200;width:186px;border-radius:14px;padding:12px;${glass}`), top: safeTop(64) }}>
+            <div style={s('font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:rgba(255,255,255,.6);margin-bottom:8px')}>Route colour</div>
+            <div style={s('display:flex;flex-wrap:wrap;gap:8px')}>
+              {ROUTE_COLORS.map((c) => (
+                <div key={c} className="ctl" onClick={() => applyRstyle({ ...rstyle, color: c })} title={c}
+                  style={s(`width:26px;height:26px;border-radius:50%;background:${c};cursor:pointer;box-shadow:0 0 0 ${rstyle.color === c ? '2.5px #fff' : '1px rgba(255,255,255,.25)'}`)} />
+              ))}
+            </div>
+            <div style={s('font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:rgba(255,255,255,.6);margin:12px 0 8px')}>Width</div>
+            <div style={s('display:flex;gap:8px')}>
+              {ROUTE_WIDTHS.map(({ label, w }) => (
+                <div key={w} className="ctl" onClick={() => applyRstyle({ ...rstyle, width: w })}
+                  style={s(`flex:1;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;gap:7px;font-size:12px;font-weight:700;cursor:pointer;background:${rstyle.width === w ? 'rgba(255,255,255,.18)' : 'rgba(255,255,255,.06)'};border:1px solid ${rstyle.width === w ? 'rgba(255,255,255,.45)' : 'rgba(255,255,255,.14)'}`)}>
+                  <span style={s(`width:20px;height:${w}px;border-radius:${w}px;background:${rstyle.color}`)} />{label}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         {/* play (route replay · 4×) */}
         {validPts(route).length > 1 && (
           <button onClick={togglePlay} aria-label={playing ? 'Pause replay' : 'Play replay'}
