@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { s } from '../lib/style.js';
 
 // Interactive live-ride map tile: a real MapLibre basemap you can pinch-zoom, pan and rotate,
-// with the course route, your breadcrumb and the pack drawn on top. A compass toggle switches
-// between pinned-north (free pan) and follow-heading (map rotates to your GPS heading and keeps
-// you centred). Lazy-loads MapLibre so it never touches the main bundle.
+// with the course route + your breadcrumb, and each rider as a coloured dot with their initials.
+// Riders that overlap on screen collapse into one cluster dot (showing the count); tapping a
+// cluster zooms in to expand it into the individuals. A compass toggle switches between pinned-
+// north (free pan) and follow-heading. Lazy-loads MapLibre so it never touches the main bundle.
 //
-// props: pts (frame [lat,lon][]), course/path ([lat,lon][]), riders ([{lat,lon,color,you}]),
+// props: pts (frame [lat,lon][]), course/path ([lat,lon][]), riders ([{lat,lon,initials,color,you}]),
 //        interactive (gestures on — off during tile drag-reorder).
 
 const baseTiles = () => ['a', 'b', 'c', 'd'].map((sd) => `https://${sd}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png`);
@@ -49,7 +50,7 @@ function headingFromPath(path) {
 
 const lineFC = (pts) => ({ type: 'Feature', geometry: { type: 'LineString', coordinates: (pts || []).map(([la, lo]) => [lo, la]) } });
 const youPos = (riders, path) => {
-  const you = (riders || []).find((r) => r.you);
+  const you = (riders || []).find((r) => r.you && Number.isFinite(r.lat) && Number.isFinite(r.lon));
   if (you) return [you.lat, you.lon];
   return path && path.length ? path[path.length - 1] : null;
 };
@@ -61,6 +62,9 @@ export default function LiveMapGL({ pts, course, path, riders, interactive = tru
   const readyRef = useRef(false);
   const framedRef = useRef(false);
   const headingRef = useRef(0);
+  const markersRef = useRef([]);      // live DOM markers (rider dots + clusters)
+  const rebuildRef = useRef(() => {}); // always the latest rider-marker rebuild (for map event listeners)
+  const markerSigRef = useRef('');     // last rider signature, so we only rebuild on real change
   const [follow, setFollow] = useState(false); // false = north-up (free pan), true = follow heading
   const [failed, setFailed] = useState(false);
 
@@ -86,15 +90,13 @@ export default function LiveMapGL({ pts, course, path, riders, interactive = tru
           map.addLayer({ id: 'course', type: 'line', source: 'course', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#7c8794', 'line-width': 3, 'line-opacity': 0.7, 'line-dasharray': [2, 2] } });
           map.addSource('path', { type: 'geojson', data: lineFC(path) });
           map.addLayer({ id: 'path', type: 'line', source: 'path', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': accent, 'line-width': 4 } });
-          map.addSource('riders', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-          map.addLayer({ id: 'riders', type: 'circle', source: 'riders', paint: { 'circle-radius': 6, 'circle-color': ['get', 'color'], 'circle-stroke-color': '#fff', 'circle-stroke-width': 2.5 } });
-          map.addSource('you', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-          map.addLayer({ id: 'you-halo', type: 'circle', source: 'you', paint: { 'circle-radius': 16, 'circle-color': accent, 'circle-opacity': 0.22 } });
-          map.addLayer({ id: 'you', type: 'circle', source: 'you', paint: { 'circle-radius': 9, 'circle-color': accent, 'circle-stroke-color': '#fff', 'circle-stroke-width': 3 } });
+          // Riders are DOM markers (initials dots + clusters), not a circle layer — see rebuildMarkers.
           readyRef.current = true;
           setFailed(false);
-          // seed the overlays + initial frame right away
-          drawAll();
+          // Re-cluster when the zoom changes (pixel distances between riders change with zoom).
+          map.on('zoomend', () => rebuildRef.current());
+          drawAll();          // seed the route + breadcrumb
+          rebuildRef.current(); // seed the rider markers
         });
         setTimeout(() => map && map.resize(), 60);
         const ro = new ResizeObserver(() => map && map.resize());
@@ -102,26 +104,90 @@ export default function LiveMapGL({ pts, course, path, riders, interactive = tru
         map._ro = ro;
       } catch { if (!cancelled) setFailed(true); }
     })();
-    return () => { cancelled = true; if (map?._ro) map._ro.disconnect(); if (map) map.remove(); mapRef.current = null; readyRef.current = false; framedRef.current = false; };
+    return () => { cancelled = true; markersRef.current.forEach((m) => m.remove()); markersRef.current = []; if (map?._ro) map._ro.disconnect(); if (map) map.remove(); mapRef.current = null; readyRef.current = false; framedRef.current = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Push the current geometry into the map's sources (also called once on load).
+  // Push the route + breadcrumb lines into the map's sources (riders are DOM markers — see below).
   const drawAll = () => {
     const map = mapRef.current;
     if (!map || !readyRef.current) return;
     map.getSource('course')?.setData(lineFC(course));
     map.getSource('path')?.setData(lineFC(path));
-    map.getSource('riders')?.setData({
-      type: 'FeatureCollection',
-      features: (riders || []).filter((r) => !r.you).map((r) => ({ type: 'Feature', properties: { color: resolveColor(r.color) }, geometry: { type: 'Point', coordinates: [r.lon, r.lat] } })),
-    });
-    const yp = youPos(riders, path);
-    map.getSource('you')?.setData({ type: 'FeatureCollection', features: yp ? [{ type: 'Feature', geometry: { type: 'Point', coordinates: [yp[1], yp[0]] } }] : [] });
   };
 
-  // Redraw overlays whenever the live data changes.
-  useEffect(() => { drawAll(); }); // eslint-disable-line react-hooks/exhaustive-deps
+  // Rider markers with initials, clustering nearby riders into one dot. Greedy pixel-distance
+  // clustering (so dots that overlap on screen merge); tapping a cluster zooms to expand it into
+  // the individuals. Rebuilt on data change + zoom (pixel gaps between riders change with zoom).
+  const CLUSTER_PX = 42;
+  const rebuildMarkers = () => {
+    const map = mapRef.current, maplibregl = mlRef.current;
+    if (!map || !maplibregl || !readyRef.current) return false;
+    const accent = resolveColor('var(--accent)');
+    const accentInk = resolveColor('var(--accent-ink)');
+
+    const list = (riders || [])
+      .filter((r) => Number.isFinite(r.lat) && Number.isFinite(r.lon))
+      .map((r) => ({ lat: r.lat, lon: r.lon, initials: r.initials || '··', color: resolveColor(r.color), you: !!r.you }));
+    // Always show "you" — when your rider isn't positioned (solo, or presence-without-GPS), fall back
+    // to your breadcrumb position, keeping your initials from the rider row if it exists.
+    if (!list.some((r) => r.you)) {
+      const yp = youPos(riders, path);
+      const yr = (riders || []).find((r) => r.you);
+      if (yp) list.push({ lat: yp[0], lon: yp[1], initials: yr?.initials || 'You', color: resolveColor(yr?.color || 'var(--accent)'), you: true });
+    }
+
+    // Greedy cluster by on-screen pixel distance.
+    const proj = list.map((r) => ({ ...r, px: map.project([r.lon, r.lat]) }));
+    const used = new Array(proj.length).fill(false);
+    const clusters = [];
+    for (let i = 0; i < proj.length; i++) {
+      if (used[i]) continue;
+      const members = [proj[i]]; used[i] = true;
+      for (let j = i + 1; j < proj.length; j++) {
+        if (used[j]) continue;
+        if (Math.hypot(proj[i].px.x - proj[j].px.x, proj[i].px.y - proj[j].px.y) < CLUSTER_PX) { members.push(proj[j]); used[j] = true; }
+      }
+      clusters.push(members);
+    }
+
+    markersRef.current.forEach((m) => m.remove());
+    markersRef.current = clusters.map((members) => {
+      const hasYou = members.some((m) => m.you);
+      const cLat = members.reduce((a, m) => a + m.lat, 0) / members.length;
+      const cLon = members.reduce((a, m) => a + m.lon, 0) / members.length;
+      const el = document.createElement('div');
+      if (members.length > 1) {
+        el.style.cssText = `width:30px;height:30px;border-radius:50%;background:#0c0e11;color:#fff;border:2px solid ${hasYou ? accent : '#fff'};display:flex;align-items:center;justify-content:center;font:700 12px system-ui;box-shadow:0 1px 4px rgba(0,0,0,.45);cursor:pointer`;
+        el.textContent = String(members.length);
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const b = new maplibregl.LngLatBounds();
+          members.forEach((m) => b.extend([m.lon, m.lat]));
+          map.fitBounds(b, { padding: 80, maxZoom: 18, duration: 500 });
+        });
+      } else {
+        const m0 = members[0];
+        const bg = m0.you ? accent : m0.color;
+        const fg = m0.you ? accentInk : '#0c0e11';
+        el.style.cssText = `width:26px;height:26px;border-radius:50%;background:${bg};color:${fg};border:2.5px solid #fff;display:flex;align-items:center;justify-content:center;font:700 10px system-ui;box-shadow:0 1px 4px rgba(0,0,0,.45)${m0.you ? `,0 0 0 3px ${accent}66` : ''}`;
+        el.textContent = m0.initials;
+      }
+      return new maplibregl.Marker({ element: el }).setLngLat([cLon, cLat]).addTo(map);
+    });
+    return true;
+  };
+  rebuildRef.current = rebuildMarkers;
+
+  // Redraw lines + the clustered markers when riders/breadcrumb change. Only advance the signature
+  // once a rebuild actually ran (the map may not be ready on the first renders), so it isn't skipped.
+  useEffect(() => {
+    drawAll();
+    const tail = (path && path.length) ? path[path.length - 1] : null; // "you" falls back to the breadcrumb
+    const sig = (riders || []).map((r) => `${r.you ? 'Y' : ''}${r.initials || ''}:${(r.lat ?? 0).toFixed(5)},${(r.lon ?? 0).toFixed(5)}`).join('|')
+      + (tail ? `|@${tail[0].toFixed(5)},${tail[1].toFixed(5)}` : '');
+    if (sig !== markerSigRef.current && rebuildMarkers()) markerSigRef.current = sig;
+  }); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Initial framing to the whole route+pack (north-up only; once).
   useEffect(() => {
