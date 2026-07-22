@@ -29,6 +29,11 @@ END;
 -- existing rows default to published (they were already live under the create-and-fan-out model).
 IF COL_LENGTH('dbo.SquadEvent', 'Published') IS NULL
     ALTER TABLE dbo.SquadEvent ADD Published BIT NOT NULL CONSTRAINT DF_SquadEvent_Published DEFAULT 1;
+
+-- Optional per-event branding — logo + banner blob names (bytes live in the private image
+-- container, same as squad branding). Additive + idempotent.
+IF COL_LENGTH('dbo.SquadEvent', 'LogoBlob')   IS NULL ALTER TABLE dbo.SquadEvent ADD LogoBlob   NVARCHAR(200) NULL;
+IF COL_LENGTH('dbo.SquadEvent', 'BannerBlob') IS NULL ALTER TABLE dbo.SquadEvent ADD BannerBlob NVARCHAR(200) NULL;
 GO
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_SquadEvent_Squad' AND object_id = OBJECT_ID('dbo.SquadEvent'))

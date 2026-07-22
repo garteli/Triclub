@@ -1,10 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { s } from '../lib/style.js';
 import { Back } from './wizard.jsx';
+import AuthedImage from '../components/AuthedImage.jsx';
 import { listCourses, createCourse, deleteCourse } from '../lib/courses.js';
 import CoursePicker from '../components/CoursePicker.jsx';
 import SportIcon from '../components/SportIcon.jsx';
-import { createSquadEvent, updateSquadEvent, toOffsetIso, toLocalInput } from '../lib/events.js';
+import { createSquadEvent, updateSquadEvent, uploadEventImage, deleteEventImage, toOffsetIso, toLocalInput } from '../lib/events.js';
+import { downscaleToJpeg } from '../lib/photos.js';
+import { dataUrlToBlob } from '../lib/avatar.js';
+import { bustAuthedImage } from '../lib/authedImage.js';
 
 // Add / edit a group session (event). Reached from the Events tab: coach taps "Add event"
 // (new) or a row's Edit (state.selEvent set). On save it POSTs (create) or PUTs (edit) and
@@ -85,6 +89,42 @@ export default function EventEditor({ vm, state, actions, getToken, onDataChange
     selected: selectedCourse || (courseId ? { id: courseId } : null),
   }), [getToken, selectedCourse, courseId]);
 
+  // ── per-event branding (edit mode only — needs a saved event id to attach images to) ──
+  const bannerInput = useRef(null);
+  const logoInput = useRef(null);
+  const [logoUrl, setLogoUrl] = useState(editing?.logoUrl || null);
+  const [bannerUrl, setBannerUrl] = useState(editing?.bannerUrl || null);
+  const [imgBusy, setImgBusy] = useState('');
+  const [imgErr, setImgErr] = useState('');
+  const evSquadId = editing?.squadId || squadId;
+  const imgBase = editing ? `/api/images/squads/${String(evSquadId).toLowerCase()}/events/${String(editing.id).toLowerCase()}` : null;
+
+  const pickImage = (kind) => async (e) => {
+    const file = e.target.files?.[0]; e.target.value = '';
+    if (!file || !editing) return;
+    setImgBusy(kind); setImgErr('');
+    try {
+      const dataUrl = await downscaleToJpeg(file, kind === 'banner' ? 1600 : 512, 0.85);
+      const t = await getToken?.();
+      await uploadEventImage(t, evSquadId, editing.id, kind, dataUrlToBlob(dataUrl));
+      const url = `${imgBase}/${kind}`;
+      bustAuthedImage(url);
+      if (kind === 'banner') setBannerUrl(url); else setLogoUrl(url);
+      onDataChanged?.();
+    } catch (ex) { setImgErr(ex.message || 'Upload failed.'); }
+    finally { setImgBusy(''); }
+  };
+  const removeImage = (kind) => async () => {
+    if (!editing) return;
+    setImgBusy(kind); setImgErr('');
+    try {
+      await deleteEventImage(await getToken?.(), evSquadId, editing.id, kind);
+      if (kind === 'banner') setBannerUrl(null); else setLogoUrl(null);
+      onDataChanged?.();
+    } catch (ex) { setImgErr(ex.message || 'Could not remove.'); }
+    finally { setImgBusy(''); }
+  };
+
   const canSave = title.trim() && when && !busy;
 
   // mode: 'publish' | 'draft' (create) or 'save' (edit). published only applies on create.
@@ -155,6 +195,35 @@ export default function EventEditor({ vm, state, actions, getToken, onDataChange
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} placeholder="Meeting point, pace, what to bring…"
             style={s(inputStyle + ';resize:vertical;line-height:1.4')} />
         </div>
+
+        {isEdit ? (
+          <div>
+            <div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin:0 2px 7px')}>Branding · optional</div>
+            <div className="ctl" onClick={() => bannerInput.current?.click()}
+              style={s('position:relative;height:120px;border-radius:14px;overflow:hidden;border:1px dashed var(--line2);background:var(--bg3);display:flex;align-items:center;justify-content:center')}>
+              {bannerUrl
+                ? <AuthedImage url={bannerUrl} token={getToken?.()} style="width:100%;height:100%;object-fit:cover" />
+                : <span style={s('font-size:12.5px;color:var(--text3)')}>{imgBusy === 'banner' ? 'Uploading…' : '+ Event banner'}</span>}
+            </div>
+            <div style={s('display:flex;align-items:center;gap:12px;margin-top:10px')}>
+              <div className="ctl" onClick={() => logoInput.current?.click()}
+                style={s('width:56px;height:56px;border-radius:14px;overflow:hidden;border:1px dashed var(--line2);background:var(--bg3);display:flex;align-items:center;justify-content:center;flex:none')}>
+                {logoUrl
+                  ? <AuthedImage url={logoUrl} token={getToken?.()} style="width:100%;height:100%;object-fit:cover" />
+                  : <span style={s('font-size:22px;color:var(--text3);line-height:1')}>{imgBusy === 'logo' ? '…' : '+'}</span>}
+              </div>
+              <div style={s('flex:1;font-size:12px;color:var(--text3);line-height:1.4')}>Logo + banner shown on the event card and its page.</div>
+              {(logoUrl || bannerUrl) && (
+                <div className="ctl" onClick={() => { if (logoUrl) removeImage('logo')(); if (bannerUrl) removeImage('banner')(); }} style={s('font-size:11.5px;font-weight:700;color:var(--bad);flex:none')}>Clear</div>
+              )}
+            </div>
+            {imgErr && <div style={s('font-size:11.5px;color:var(--bad);margin-top:6px')}>{imgErr}</div>}
+            <input ref={bannerInput} type="file" accept="image/*" onChange={pickImage('banner')} style={s('display:none')} />
+            <input ref={logoInput} type="file" accept="image/*" onChange={pickImage('logo')} style={s('display:none')} />
+          </div>
+        ) : (
+          <div style={s('font-size:11.5px;color:var(--text3);line-height:1.4;padding:2px')}>Tip: save the event, then reopen it to add a banner and logo.</div>
+        )}
 
         {error && <div style={s('font-size:12.5px;color:var(--bad);font-weight:600')}>{error}</div>}
 

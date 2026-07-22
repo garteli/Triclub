@@ -17,19 +17,23 @@ function eventIsToday(iso) {
 
 // The "today" hero for a motorsport club: a group ride scheduled for today (from the club's
 // events), mirroring the endurance plan card so a coach's just-added ride actually shows here.
-function TodayEventCard({ ev, onOpen, rtl = false }) {
+function TodayEventCard({ ev, onOpen, token, rtl = false }) {
   const d = new Date(ev.start);
   const time = Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString(rtl ? 'he-IL' : 'en-US', { hour: 'numeric', minute: '2-digit' });
   const sub = [time, ev.courseName, ev.courseKm ? `${ev.courseKm.toFixed(1)} km` : null].filter(Boolean).join(' · ');
   const going = ev.joinCount || 0;
   return (
     <div className="ctl" onClick={() => onOpen?.(ev)} style={s('background:linear-gradient(160deg,var(--bg3),var(--bg2));border:1px solid var(--line);border-radius:22px;overflow:hidden')}>
-      <div style={s('height:4px;background:var(--accent)')} />
+      {ev.bannerUrl
+        ? <div style={s('height:96px;overflow:hidden')}><AuthedImage url={ev.bannerUrl} token={token} style="width:100%;height:100%;object-fit:cover" /></div>
+        : <div style={s('height:4px;background:var(--accent)')} />}
       <div style={s(`padding:17px 18px 18px;${rtl ? 'text-align:right' : ''}`)}>
         <div style={s(`display:flex;justify-content:space-between;align-items:flex-start;${rtl ? 'flex-direction:row-reverse' : ''}`)}>
           <div style={s(`display:flex;gap:12px;align-items:center;${rtl ? 'flex-direction:row-reverse' : ''}`)}>
-            <div style={s('width:46px;height:46px;border-radius:14px;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;flex:none')}>
-              <SportIcon name="moto" size={24} color="var(--accent)" />
+            <div style={s('width:46px;height:46px;border-radius:14px;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;flex:none;overflow:hidden')}>
+              {ev.logoUrl
+                ? <AuthedImage url={ev.logoUrl} token={token} style="width:100%;height:100%;object-fit:cover" />
+                : <SportIcon name="moto" size={24} color="var(--accent)" />}
             </div>
             <div>
               <div style={s('font-size:19px;font-weight:700;letter-spacing:-.4px')}>{ev.title}</div>
@@ -174,7 +178,7 @@ function DashboardEN({ vm, go, openAthlete, openActivity, openEvent, getToken, o
               </div>
             ) : vm.family === 'motorsport' ? (
               todayEvent ? (
-                <TodayEventCard ev={todayEvent} onOpen={openEvent} />
+                <TodayEventCard ev={todayEvent} onOpen={openEvent} token={token} />
               ) : (
                 <div className="ctl" onClick={() => go('events')} style={s('background:var(--bg2);border:1px dashed var(--line2);border-radius:20px;padding:22px 18px;text-align:center')}>
                   <div style={s('font-size:15px;font-weight:600')}>No ride scheduled for today</div>
@@ -249,7 +253,7 @@ function DashboardHE({ vm, go, openAthlete, openActivity, openEvent, getToken, o
               </div>
             ) : vm.family === 'motorsport' ? (
               todayEvent ? (
-                <TodayEventCard ev={todayEvent} onOpen={openEvent} rtl />
+                <TodayEventCard ev={todayEvent} onOpen={openEvent} token={token} rtl />
               ) : (
                 <div className="ctl" onClick={() => go('events')} style={s('background:var(--bg2);border:1px dashed var(--line2);border-radius:20px;padding:22px 18px;text-align:center')}>
                   <div style={s('font-size:15px;font-weight:600')}>אין רכיבה מתוזמנת להיום</div>

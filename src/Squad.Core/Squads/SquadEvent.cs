@@ -22,7 +22,9 @@ public sealed record SquadEventView(
     int JoinCount, int CheckedInCount, bool Joined, DateTimeOffset? CheckedInUtc, bool Published,
     // The caller's activity recorded for this event (null if they haven't ridden it yet) — lets
     // the client show "you rode this" and open the ride. Column order matches ViewSelect.
-    Guid? MyActivityId = null);
+    Guid? MyActivityId = null,
+    // Optional per-event branding — proxy paths (null when unset). Column order matches ViewSelect.
+    string? LogoUrl = null, string? BannerUrl = null);
 
 /// <summary>One member's attendance on an event, for the coach's joins/check-ins roster:
 /// who joined, when, and whether (and when) they checked in.</summary>
@@ -77,4 +79,8 @@ public interface ISquadEventStore
     /// <summary>Undo a check-in — clears the caller's recorded attendance while keeping their RSVP.
     /// Idempotent: succeeds whether or not a check-in was present, as long as the RSVP exists.</summary>
     Task<bool> UndoCheckInAsync(Guid eventId, Guid meId, CancellationToken ct);
+    /// <summary>The event's logo/banner blob name (kind = "logo" | "banner"), or null.</summary>
+    Task<string?> GetImageBlobAsync(Guid squadId, Guid eventId, string kind, CancellationToken ct);
+    /// <summary>Owner sets (or clears, when null) the event's logo/banner blob name. False if not owner.</summary>
+    Task<bool> SetImageBlobAsync(Guid squadId, Guid eventId, string kind, string? blobName, Guid ownerId, CancellationToken ct);
 }

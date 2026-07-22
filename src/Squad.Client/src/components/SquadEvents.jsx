@@ -3,6 +3,7 @@ import { s } from '../lib/style.js';
 import { listCourses } from '../lib/courses.js';
 import { familyOf } from '../lib/disciplines.js';
 import SportIcon from './SportIcon.jsx';
+import AuthedImage from './AuthedImage.jsx';
 import {
   listSquadEvents, createSquadEvent, deleteSquadEvent,
   joinEvent, leaveEvent, checkInEvent, undoCheckInEvent, toOffsetIso,
@@ -194,8 +195,10 @@ export default function SquadEvents({ squadId, getToken, mode = 'browse', standa
             const today = isToday(ev.start);
             return (
               <div key={ev.id} style={s('background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:13px 14px;display:flex;align-items:center;gap:11px')}>
-                <div style={s('width:38px;height:38px;border-radius:11px;flex:none;display:flex;align-items:center;justify-content:center;background:var(--accent-dim);color:var(--accent)')}>
-                  <SportIcon name={glyphForSport(ev.sport, family)} size={18} />
+                <div style={s('width:38px;height:38px;border-radius:11px;flex:none;display:flex;align-items:center;justify-content:center;background:var(--accent-dim);color:var(--accent);overflow:hidden')}>
+                  {ev.logoUrl
+                    ? <AuthedImage url={ev.logoUrl} token={getToken?.()} style="width:100%;height:100%;object-fit:cover" />
+                    : <SportIcon name={glyphForSport(ev.sport, family)} size={18} />}
                 </div>
                 <div className={onOpen ? 'ctl' : undefined} onClick={onOpen ? () => onOpen(ev) : undefined} style={s('flex:1;min-width:0')}>
                   <div style={s('font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>{ev.title}</div>

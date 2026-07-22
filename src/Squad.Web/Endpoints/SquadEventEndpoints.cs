@@ -280,6 +280,8 @@ public static class SquadEventEndpoints
         checkedIn = e.CheckedInUtc != null,
         published = e.Published,
         myActivityId = e.MyActivityId,      // the caller's recorded ride for this event, if any
+        logoUrl = e.LogoUrl,
+        bannerUrl = e.BannerUrl,
     };
 
     private static object ToDto(SquadEvent e) => new

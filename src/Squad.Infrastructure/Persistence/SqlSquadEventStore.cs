@@ -29,7 +29,9 @@ public sealed class SqlSquadEventStore(string connectionString) : ISquadEventSto
             CAST(me.CheckedInUtc AS datetimeoffset(0)) AS CheckedInUtc,
             e.Published,
             (SELECT TOP 1 a.Id FROM dbo.Activity a
-             WHERE a.EventId = e.Id AND a.AthleteId = @meId ORDER BY a.StartUtc DESC) AS MyActivityId
+             WHERE a.EventId = e.Id AND a.AthleteId = @meId ORDER BY a.StartUtc DESC) AS MyActivityId,
+            CASE WHEN e.LogoBlob   IS NOT NULL THEN '/api/images/squads/' + LOWER(CONVERT(varchar(36), e.SquadId)) + '/events/' + LOWER(CONVERT(varchar(36), e.Id)) + '/logo'   END AS LogoUrl,
+            CASE WHEN e.BannerBlob IS NOT NULL THEN '/api/images/squads/' + LOWER(CONVERT(varchar(36), e.SquadId)) + '/events/' + LOWER(CONVERT(varchar(36), e.Id)) + '/banner' END AS BannerUrl
         FROM dbo.SquadEvent e
         LEFT JOIN dbo.SquadEventRsvp me ON me.EventId = e.Id AND me.AthleteId = @meId
         """;
@@ -170,6 +172,28 @@ public sealed class SqlSquadEventStore(string connectionString) : ISquadEventSto
             ORDER BY CASE WHEN r.CheckedInUtc IS NULL THEN 1 ELSE 0 END, r.JoinedUtc;
             """, new { squadId, eventId }, cancellationToken: ct));
         return rows.ToList();
+    }
+
+    // Per-event branding blob name. `kind` is whitelisted to a fixed column — never user text in SQL.
+    private static string ImageCol(string kind) => string.Equals(kind, "banner", StringComparison.OrdinalIgnoreCase) ? "BannerBlob" : "LogoBlob";
+
+    public async Task<string?> GetImageBlobAsync(Guid squadId, Guid eventId, string kind, CancellationToken ct)
+    {
+        await using var conn = new SqlConnection(connectionString);
+        return await conn.ExecuteScalarAsync<string?>(new CommandDefinition(
+            $"SELECT {ImageCol(kind)} FROM dbo.SquadEvent WHERE Id = @eventId AND SquadId = @squadId;",
+            new { eventId, squadId }, cancellationToken: ct));
+    }
+
+    public async Task<bool> SetImageBlobAsync(Guid squadId, Guid eventId, string kind, string? blobName, Guid ownerId, CancellationToken ct)
+    {
+        await using var conn = new SqlConnection(connectionString);
+        var rows = await conn.ExecuteAsync(new CommandDefinition($"""
+            UPDATE e SET e.{ImageCol(kind)} = @blobName
+            FROM dbo.SquadEvent e JOIN dbo.Squad s ON s.Id = e.SquadId
+            WHERE e.Id = @eventId AND e.SquadId = @squadId AND s.OwnerId = @ownerId;
+            """, new { eventId, squadId, blobName, ownerId }, cancellationToken: ct));
+        return rows > 0;
     }
 
     public async Task<bool> DeleteAsync(Guid squadId, Guid ownerId, Guid eventId, CancellationToken ct)
