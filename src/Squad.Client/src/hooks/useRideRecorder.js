@@ -15,6 +15,11 @@ function isNativePlatform() {
 const MAX_GAP_MS = 10_000;
 // Below this ground speed we count the rider as stopped (traffic light, café stop).
 const MOVING_MPS = 0.8;
+// GPS quality gate — after the first fix, drop readings the OS reports as poor (accuracy worse than
+// this many metres) and "teleport" spikes (implied speed above the max) so noise doesn't zig-zag the
+// track or inflate distance while standing still. The first fix is always kept so recording starts.
+const GPS_ACCURACY_MAX_M = 40;
+const GPS_MAX_JUMP_MPS = 45; // ~160 km/h — passes fast driving, catches large noise jumps
 
 async function uploadFit(bytes, token) {
   const file = new File([bytes], `ride-${new Date().toISOString().replace(/[:.]/g, '-')}.fit`, { type: 'application/octet-stream' });
@@ -114,6 +119,16 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, ena
 
   const onSample = useCallback((s) => {
     const nowTs = s.ts ?? Date.now();
+
+    // GPS quality gate (after the first fix): drop OS-reported poor-accuracy readings and implausible
+    // "teleport" jumps so they don't zig-zag the track or inflate distance while barely moving.
+    if (s.lat != null && s.lon != null && prevCoord.current) {
+      if (s.accuracy != null && s.accuracy > GPS_ACCURACY_MAX_M) return;
+      const jump = haversineMeters(prevCoord.current, s);
+      const dtS = lastSampleTs.current != null ? (nowTs - lastSampleTs.current) / 1000 : 0;
+      if (dtS > 0 && dtS < 30 && jump / dtS > GPS_MAX_JUMP_MPS) return;
+    }
+
     const speedKph = s.speedMps != null ? mpsToKph(s.speedMps) : null;
 
     // Auto-pause: when moving speed drops near zero, pause (freeze distance + the elapsed clock);
