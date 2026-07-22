@@ -146,6 +146,32 @@ public sealed class SqlSquadEventStore(string connectionString) : ISquadEventSto
         return rows.ToList();
     }
 
+    public async Task<IReadOnlyList<SquadEventAttendee>?> ListParticipantsAsync(Guid squadId, Guid meId, Guid eventId, CancellationToken ct)
+    {
+        await using var conn = new SqlConnection(connectionString);
+        // Any signed-in athlete may see a PUBLISHED event's roster (the event page); the owner also
+        // sees their unpublished drafts. Null (→404) if the event isn't visible to the caller.
+        var visible = await conn.ExecuteScalarAsync<int>(new CommandDefinition("""
+            SELECT COUNT(1) FROM dbo.SquadEvent e JOIN dbo.Squad s ON s.Id = e.SquadId
+            WHERE e.Id = @eventId AND e.SquadId = @squadId AND (e.Published = 1 OR s.OwnerId = @meId);
+            """, new { squadId, eventId, meId }, cancellationToken: ct));
+        if (visible == 0) return null;
+
+        var rows = await conn.QueryAsync<SquadEventAttendee>(new CommandDefinition("""
+            SELECT a.Id AS AthleteId, a.DisplayName AS Name, a.Initials, a.AvatarColor,
+                   CAST(r.JoinedUtc AS datetimeoffset(0)) AS JoinedUtc,
+                   CAST(r.CheckedInUtc AS datetimeoffset(0)) AS CheckedInUtc,
+                   CASE WHEN a.AvatarBlob IS NOT NULL
+                        THEN '/api/images/avatars/' + LOWER(CONVERT(varchar(36), a.Id)) END AS AvatarUrl
+            FROM dbo.SquadEventRsvp r
+            JOIN dbo.SquadEvent e ON e.Id = r.EventId AND e.SquadId = @squadId
+            JOIN dbo.Athlete a ON a.Id = r.AthleteId
+            WHERE r.EventId = @eventId
+            ORDER BY CASE WHEN r.CheckedInUtc IS NULL THEN 1 ELSE 0 END, r.JoinedUtc;
+            """, new { squadId, eventId }, cancellationToken: ct));
+        return rows.ToList();
+    }
+
     public async Task<bool> DeleteAsync(Guid squadId, Guid ownerId, Guid eventId, CancellationToken ct)
     {
         await using var conn = new SqlConnection(connectionString);
