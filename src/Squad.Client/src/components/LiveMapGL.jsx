@@ -107,9 +107,11 @@ export default function LiveMapGL({ pts, course, path, riders, mySport, interact
         map.on('error', (e) => { const m = e?.error?.message || String(e?.error || e); if (!/tile|404|Failed to fetch|AbortError/i.test(m)) console.error('MAPLIBRE', m); });
         map.on('load', () => {
           const accent = resolveColor('var(--accent)');
-          map.addSource('course', { type: 'geojson', data: lineFC(course) });
-          map.addLayer({ id: 'course', type: 'line', source: 'course', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#7c8794', 'line-width': 3, 'line-opacity': 0.7, 'line-dasharray': [2, 2] } });
           const rs = rstyleRef.current; // per-user route colour/width (shared with the full map)
+          // Course = the route to follow: the user's colour + width, kept dashed + dimmed so it still
+          // reads as the guide vs the solid breadcrumb.
+          map.addSource('course', { type: 'geojson', data: lineFC(course) });
+          map.addLayer({ id: 'course', type: 'line', source: 'course', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': rs.color || accent, 'line-width': rs.width || 4, 'line-opacity': 0.6, 'line-dasharray': [2, 2] } });
           map.addSource('path', { type: 'geojson', data: lineFC(path) });
           map.addLayer({ id: 'path', type: 'line', source: 'path', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': rs.color || accent, 'line-width': rs.width || 4 } });
           // Direction chevrons (in the route colour) along the course (route to follow) + your breadcrumb.
@@ -273,10 +275,11 @@ export default function LiveMapGL({ pts, course, path, riders, mySport, interact
     if (map && readyRef.current) applyBasemap(map, basemap);
   }, [basemap]);
 
-  // Apply the per-user route colour/width live to the breadcrumb line AND the direction arrows.
+  // Apply the per-user route colour/width live to the course + breadcrumb lines AND the arrows.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !readyRef.current) return;
+    if (map.getLayer('course')) { map.setPaintProperty('course', 'line-color', rstyle.color); map.setPaintProperty('course', 'line-width', rstyle.width); }
     if (map.getLayer('path')) { map.setPaintProperty('path', 'line-color', rstyle.color); map.setPaintProperty('path', 'line-width', rstyle.width); }
     styleArrows(map, ['course-arrows', 'path-arrows'], rstyle);
   }, [rstyle]);
