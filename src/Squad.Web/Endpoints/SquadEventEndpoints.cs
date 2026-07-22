@@ -24,6 +24,7 @@ public static class SquadEventEndpoints
         app.MapPost("/api/events/{eventId:guid}/join", JoinEvent).RequireAuthorization();
         app.MapPost("/api/events/{eventId:guid}/leave", LeaveEvent).RequireAuthorization();
         app.MapPost("/api/events/{eventId:guid}/checkin", CheckIn).RequireAuthorization();
+        app.MapPost("/api/events/{eventId:guid}/uncheckin", UndoCheckIn).RequireAuthorization();
         app.MapGet("/api/events/mine", MyEvents).RequireAuthorization();
         return app;
     }
@@ -230,6 +231,13 @@ public static class SquadEventEndpoints
             CheckInOutcome.NotToday => Results.Json(new { error = "Check-in opens on the day of the session." }, statusCode: 409),
             _ => Results.Problem("Couldn't check in."),
         };
+    }
+
+    private static async Task<IResult> UndoCheckIn(Guid eventId, HttpContext http, ISquadEventStore events, CancellationToken ct)
+    {
+        if (Me(http) is not { } me) return Results.Unauthorized();
+        var ok = await events.UndoCheckInAsync(eventId, me, ct);
+        return ok ? Results.Ok(new { checkedIn = false }) : Results.NotFound(new { error = "That session no longer exists." });
     }
 
     // ── helpers ──

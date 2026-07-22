@@ -68,4 +68,7 @@ public interface ISquadEventStore
     /// <summary>Mark attendance. Only allowed on the calendar day of the event (in its own offset),
     /// and only for a member who has already joined.</summary>
     Task<CheckInOutcome> CheckInAsync(Guid eventId, Guid meId, CancellationToken ct);
+    /// <summary>Undo a check-in — clears the caller's recorded attendance while keeping their RSVP.
+    /// Idempotent: succeeds whether or not a check-in was present, as long as the RSVP exists.</summary>
+    Task<bool> UndoCheckInAsync(Guid eventId, Guid meId, CancellationToken ct);
 }

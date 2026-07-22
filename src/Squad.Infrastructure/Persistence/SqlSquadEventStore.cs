@@ -212,5 +212,19 @@ public sealed class SqlSquadEventStore(string connectionString) : ISquadEventSto
         return CheckInOutcome.Ok;
     }
 
+    public async Task<bool> UndoCheckInAsync(Guid eventId, Guid meId, CancellationToken ct)
+    {
+        await using var conn = new SqlConnection(connectionString);
+        // Clear the recorded attendance but keep the RSVP row, so the member stays joined and can
+        // check in again. Succeeds as long as the caller has an RSVP for the event (idempotent).
+        await conn.ExecuteAsync(new CommandDefinition("""
+            UPDATE dbo.SquadEventRsvp SET CheckedInUtc = NULL
+            WHERE EventId = @eventId AND AthleteId = @meId;
+            """, new { eventId, meId }, cancellationToken: ct));
+        return await conn.ExecuteScalarAsync<int>(new CommandDefinition(
+            "SELECT COUNT(1) FROM dbo.SquadEventRsvp WHERE EventId = @eventId AND AthleteId = @meId;",
+            new { eventId, meId }, cancellationToken: ct)) > 0;
+    }
+
     private sealed record CheckInProbe(bool EventExists, bool Joined, bool AlreadyCheckedIn, bool IsToday);
 }
