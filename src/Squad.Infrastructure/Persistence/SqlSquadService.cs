@@ -7,6 +7,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
@@ -266,6 +267,87 @@ public sealed class SqlSquadService(string connectionString) : ISquadService
 
         await tx.CommitAsync(ct);
         return true;
+    }
+
+    // ----- invite links -------------------------------------------------------
+
+    public async Task<string?> CreateInviteAsync(Guid squadId, Guid ownerId, bool reset, CancellationToken ct)
+    {
+        await using var conn = new SqlConnection(connectionString);
+        await conn.OpenAsync(ct);
+        if (!await OwnsSquad(conn, squadId, ownerId, ct)) return null;
+
+        if (reset)
+            await conn.ExecuteAsync(new CommandDefinition(
+                "UPDATE dbo.SquadInvite SET RevokedUtc = SYSDATETIMEOFFSET() WHERE SquadId = @squadId AND RevokedUtc IS NULL;",
+                new { squadId }, cancellationToken: ct));
+        else
+        {
+            // Reuse the squad's current active link so the coach can hand out one stable URL.
+            var existing = await conn.QuerySingleOrDefaultAsync<string>(new CommandDefinition(
+                "SELECT TOP 1 Token FROM dbo.SquadInvite WHERE SquadId = @squadId AND RevokedUtc IS NULL ORDER BY CreatedUtc DESC;",
+                new { squadId }, cancellationToken: ct));
+            if (existing is not null) return existing;
+        }
+
+        var token = NewToken();
+        await conn.ExecuteAsync(new CommandDefinition(
+            "INSERT INTO dbo.SquadInvite (Token, SquadId, CreatedBy) VALUES (@token, @squadId, @ownerId);",
+            new { token, squadId, ownerId }, cancellationToken: ct));
+        return token;
+    }
+
+    public async Task<InviteInfo?> GetInviteAsync(string token, CancellationToken ct)
+    {
+        await using var conn = new SqlConnection(connectionString);
+        return await conn.QuerySingleOrDefaultAsync<InviteInfo>(new CommandDefinition("""
+            SELECT i.Token, i.SquadId, s.Name AS SquadName, s.Discipline, s.Color,
+                   (SELECT COUNT(*) FROM dbo.Membership m WHERE m.SquadId = s.Id) AS MemberCount,
+                   CASE WHEN s.LogoBlob IS NOT NULL
+                        THEN '/api/images/squads/' + LOWER(CONVERT(varchar(36), s.Id)) + '/logo' END AS LogoUrl
+            FROM dbo.SquadInvite i
+            JOIN dbo.Squad s ON s.Id = i.SquadId
+            WHERE i.Token = @token AND i.RevokedUtc IS NULL;
+            """, new { token }, cancellationToken: ct));
+    }
+
+    public async Task<AcceptInviteResult?> AcceptInviteAsync(string token, Guid athleteId, CancellationToken ct)
+    {
+        await using var conn = new SqlConnection(connectionString);
+        await conn.OpenAsync(ct);
+
+        var sq = await conn.QuerySingleOrDefaultAsync<InviteSquadRow>(new CommandDefinition("""
+            SELECT i.SquadId, s.Name AS SquadName, s.OwnerId
+            FROM dbo.SquadInvite i
+            JOIN dbo.Squad s ON s.Id = i.SquadId
+            WHERE i.Token = @token AND i.RevokedUtc IS NULL;
+            """, new { token }, cancellationToken: ct));
+        if (sq is null) return null;
+
+        var alreadyMember = await conn.ExecuteScalarAsync<int>(new CommandDefinition(
+            "SELECT CASE WHEN EXISTS (SELECT 1 FROM dbo.Membership WHERE SquadId=@squadId AND AthleteId=@athleteId) THEN 1 ELSE 0 END;",
+            new { squadId = sq.SquadId, athleteId }, cancellationToken: ct)) == 1;
+
+        // An invite is the coach vouching for the invitee, so join immediately even on a gated
+        // squad. Either way make it their active squad so they land in the group's feed.
+        await using var tx = (SqlTransaction)await conn.BeginTransactionAsync(ct);
+        await AddMembership(conn, tx, sq.SquadId, athleteId, "member", ct);
+        await SetActiveSquad(conn, tx, athleteId, sq.SquadId, ct);
+        await tx.CommitAsync(ct);
+
+        return new AcceptInviteResult(
+            alreadyMember ? AcceptInviteOutcome.AlreadyMember : AcceptInviteOutcome.Joined,
+            sq.SquadId, sq.SquadName, sq.OwnerId);
+    }
+
+    private sealed record InviteSquadRow(Guid SquadId, string SquadName, Guid? OwnerId);
+
+    // URL-safe, unguessable invite token (16 random bytes → base64url, ~22 chars).
+    private static string NewToken()
+    {
+        Span<byte> bytes = stackalloc byte[16];
+        RandomNumberGenerator.Fill(bytes);
+        return Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
     }
 
     public async Task<string?> GetImageBlobAsync(Guid squadId, string kind, CancellationToken ct)
