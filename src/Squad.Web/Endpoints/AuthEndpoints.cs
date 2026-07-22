@@ -51,8 +51,7 @@ public static class AuthEndpoints
             });
         });
 
-        g.MapPost("/register", Register);
-        g.MapPost("/login", Login);
+        // Email/password auth has been removed — Google and Apple are the only sign-in methods.
         g.MapPost("/google", (ExternalLoginRequest req, HttpContext http, IAthleteAccounts accounts, ITokenIssuer issuer, IEnumerable<IExternalTokenVerifier> verifiers, CancellationToken ct)
             => External(ExternalProvider.Google, req, accounts, issuer, verifiers, ct));
         g.MapPost("/apple", (ExternalLoginRequest req, HttpContext http, IAthleteAccounts accounts, ITokenIssuer issuer, IEnumerable<IExternalTokenVerifier> verifiers, CancellationToken ct)
@@ -61,35 +60,6 @@ public static class AuthEndpoints
         g.MapGet("/me", Me).RequireAuthorization();
 
         return app;
-    }
-
-    // --- email / password ---
-
-    private static async Task<IResult> Register(
-        RegisterRequest req, IAthleteAccounts accounts, ITokenIssuer issuer, CancellationToken ct)
-    {
-        var email = req.Email?.Trim().ToLowerInvariant() ?? "";
-        if (string.IsNullOrWhiteSpace(req.Name) || !IsEmail(email) || (req.Password?.Length ?? 0) < 6)
-            return Results.BadRequest(new { error = "Name, a valid email, and a 6+ character password are required." });
-
-        if (await accounts.FindByEmailAsync(email, ct) is not null)
-            return Results.Conflict(new { error = "An account with that email already exists." });
-
-        var account = NewAccount(req.Name.Trim(), email, passwordHash: PasswordHasher.Hash(req.Password!));
-        await accounts.CreateAsync(account, ct);
-
-        return Ok(ToAccount(account), issuer, "password");
-    }
-
-    private static async Task<IResult> Login(
-        LoginRequest req, IAthleteAccounts accounts, ITokenIssuer issuer, CancellationToken ct)
-    {
-        var email = req.Email?.Trim().ToLowerInvariant() ?? "";
-        var account = await accounts.FindByEmailAsync(email, ct);
-        if (account is null || !PasswordHasher.Verify(req.Password ?? "", account.PasswordHash))
-            return Results.Json(new { error = "Incorrect email or password." }, statusCode: 401);
-
-        return Ok(account, issuer, "password");
     }
 
     // --- Google / Apple id_token exchange ---
@@ -199,6 +169,4 @@ public static class AuthEndpoints
 
     private static string EmailLocalPart(string? email)
         => string.IsNullOrEmpty(email) ? "Athlete" : email.Split('@')[0];
-
-    private static bool IsEmail(string s) => s.Contains('@') && s.Contains('.') && s.Length >= 5;
 }
