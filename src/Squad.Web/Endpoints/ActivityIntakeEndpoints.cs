@@ -40,6 +40,10 @@ public static class ActivityIntakeEndpoints
         }
         string contentHash = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
 
+        // Optional: the scheduled group event this ride was recorded for (set by the live recorder
+        // when you start from a "today's ride"). Carried through ingest onto the committed Activity.
+        Guid? eventId = Guid.TryParse(http.Request.Form["eventId"].ToString(), out var ev) ? ev : null;
+
         var raw = new RawActivity
         {
             AthleteId = athleteId.Value,
@@ -47,6 +51,7 @@ public static class ActivityIntakeEndpoints
             SourceExternalId = contentHash,   // re-uploaded identical file == same id
             PayloadKind = "fit",
             Payload = bytes,
+            EventId = eventId,
         };
 
         bool isNew = await store.TrySaveAsync(raw, ct);

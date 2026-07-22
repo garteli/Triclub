@@ -37,6 +37,9 @@ public sealed class IngestWorker(
             ?? throw new InvalidOperationException($"No adapter registered for source {raw.Source}");
 
         var activity = await adapter.NormalizeAsync(raw, ct);
+        // Carry the event link (set when the athlete recorded a scheduled group ride) through —
+        // adapters are source-only and don't know about it, so stamp it here from the raw record.
+        if (raw.EventId is not null) activity = activity with { EventId = raw.EventId };
         activity = await EnrichWeatherAsync(sp, activity, ct);
         var outcome = await repo.UpsertByFingerprintAsync(activity, SourceRank.Of(activity.Source), ct);
 

@@ -68,7 +68,7 @@ function TodayRides({ live, actions }) {
       if (ev.courseId && live?.courses?.load) {
         try { const c = await live.courses.load(ev.courseId); live.courses.setCourse?.(c); } catch { /* route is optional */ }
       }
-      await live?.recorder?.start?.();
+      await live?.recorder?.start?.({ eventId: ev.id });
       actions.startRide();
     } catch (e) { setErr(e?.message || 'Could not start the ride.'); setBusyId(null); }
   };
@@ -95,12 +95,13 @@ function TodayRides({ live, actions }) {
                   : <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : () => run(ev.id, () => live.events.join(ev.id))} style={s('flex:none;font-size:11.5px;font-weight:700;color:var(--accent-ink);background:var(--accent);padding:7px 13px;border-radius:9px')}>Join</div>}
               </div>
               <div style={s('display:flex;gap:8px;margin-top:11px')}>
-                {ev.joined && !ev.checkedIn && (
-                  <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : () => run(ev.id, () => live.events.checkIn(ev.id))} style={s('flex:1;text-align:center;font-size:12.5px;font-weight:700;padding:10px;border-radius:11px;background:var(--bg3);border:1px solid var(--line);color:var(--text)')}>Check in</div>
-                )}
-                {ev.checkedIn && (
-                  <div style={s('flex:1;text-align:center;font-size:12px;font-weight:700;padding:10px;border-radius:11px;background:color-mix(in srgb,var(--good) 14%,var(--bg2));border:1px solid color-mix(in srgb,var(--good) 30%,transparent);color:var(--good)')}>✓ Checked in</div>
-                )}
+                {ev.myActivityId
+                  ? <div className="ctl" onClick={() => actions.openActivity?.(ev.myActivityId)} style={s('flex:1;text-align:center;font-size:12px;font-weight:700;padding:10px;border-radius:11px;background:color-mix(in srgb,var(--good) 14%,var(--bg2));border:1px solid color-mix(in srgb,var(--good) 30%,transparent);color:var(--good)')}>✓ Rode this · View</div>
+                  : ev.checkedIn
+                    ? <div style={s('flex:1;text-align:center;font-size:12px;font-weight:700;padding:10px;border-radius:11px;background:color-mix(in srgb,var(--good) 14%,var(--bg2));border:1px solid color-mix(in srgb,var(--good) 30%,transparent);color:var(--good)')}>✓ Checked in</div>
+                    : ev.joined
+                      ? <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : () => run(ev.id, () => live.events.checkIn(ev.id))} style={s('flex:1;text-align:center;font-size:12.5px;font-weight:700;padding:10px;border-radius:11px;background:var(--bg3);border:1px solid var(--line);color:var(--text)')}>Check in</div>
+                      : null}
                 <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : () => startEvent(ev)} style={s('flex:1.2;text-align:center;font-size:12.5px;font-weight:700;padding:10px;border-radius:11px;background:var(--accent);color:var(--accent-ink)')}>{busy ? '…' : 'Start ride'}</div>
               </div>
             </div>

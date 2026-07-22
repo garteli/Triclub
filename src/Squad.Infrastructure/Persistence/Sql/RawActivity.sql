@@ -45,10 +45,14 @@ CREATE TABLE dbo.RawActivity (
     SourceExternalId  NVARCHAR(128)     NULL,       -- SHA-256 (uploads) / provider id (webhooks)
     PayloadKind       NVARCHAR(8)       NOT NULL,   -- 'fit' | 'gpx' | 'tcx' | 'json'
     Payload           VARBINARY(MAX)    NOT NULL,
+    EventId           UNIQUEIDENTIFIER  NULL,       -- SquadEvent this ride was recorded for (optional)
     ReceivedUtc       DATETIMEOFFSET(0) NOT NULL DEFAULT SYSDATETIMEOFFSET(),
     CONSTRAINT PK_RawActivity PRIMARY KEY (Id),
     CONSTRAINT FK_RawActivity_Athlete FOREIGN KEY (AthleteId) REFERENCES dbo.Athlete (Id)
 );
+
+-- Additive: the optional group-event link (existing deployments — CREATE only runs on a fresh DB).
+IF COL_LENGTH('dbo.RawActivity', 'EventId') IS NULL ALTER TABLE dbo.RawActivity ADD EventId UNIQUEIDENTIFIER NULL;
 
 -- Idempotency: same (Source, SourceExternalId) can't be stored twice. Filtered so many
 -- NULL external ids don't collide.
@@ -87,6 +91,7 @@ CREATE TABLE dbo.Activity (
     WeatherJson       NVARCHAR(400)     NULL,       -- ActivityWeather at start, JSON; enriched from Open-Meteo
     StartLat          FLOAT             NULL,       -- first GPS point latitude  (matched-rides seek)
     StartLon          FLOAT             NULL,       -- first GPS point longitude (matched-rides seek)
+    EventId           UNIQUEIDENTIFIER  NULL,       -- SquadEvent this ride was recorded for (optional)
     CONSTRAINT PK_Activity PRIMARY KEY (Id),
     CONSTRAINT FK_Activity_Athlete FOREIGN KEY (AthleteId) REFERENCES dbo.Athlete (Id)
 );
@@ -96,8 +101,9 @@ CREATE TABLE dbo.Activity (
 -- matched-rides query seeks on. Guarded so the script stays re-runnable.
 IF COL_LENGTH('dbo.Activity', 'DeviceName')  IS NULL ALTER TABLE dbo.Activity ADD DeviceName  NVARCHAR(128) NULL;
 IF COL_LENGTH('dbo.Activity', 'WeatherJson') IS NULL ALTER TABLE dbo.Activity ADD WeatherJson NVARCHAR(400) NULL;
-IF COL_LENGTH('dbo.Activity', 'StartLat')    IS NULL ALTER TABLE dbo.Activity ADD StartLat    FLOAT         NULL;
-IF COL_LENGTH('dbo.Activity', 'StartLon')    IS NULL ALTER TABLE dbo.Activity ADD StartLon    FLOAT         NULL;
+IF COL_LENGTH('dbo.Activity', 'StartLat')    IS NULL ALTER TABLE dbo.Activity ADD StartLat    FLOAT            NULL;
+IF COL_LENGTH('dbo.Activity', 'StartLon')    IS NULL ALTER TABLE dbo.Activity ADD StartLon    FLOAT            NULL;
+IF COL_LENGTH('dbo.Activity', 'EventId')     IS NULL ALTER TABLE dbo.Activity ADD EventId     UNIQUEIDENTIFIER NULL;
 
 -- Dedup key: the repository's insert relies on this unique constraint (catches
 -- SQL errors 2601/2627 to resolve concurrent-insert races into a discard).

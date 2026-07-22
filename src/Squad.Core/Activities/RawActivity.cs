@@ -24,5 +24,9 @@ public sealed record RawActivity
     /// <summary>The raw bytes: a .FIT/.GPX/.TCX file, or the companion app's JSON.</summary>
     public byte[] Payload { get; init; } = [];
 
+    /// <summary>The group event (SquadEvent) this ride was recorded for, when the athlete started
+    /// it from a scheduled ride — carried through ingest onto the committed <see cref="Activity"/>.</summary>
+    public Guid? EventId { get; init; }
+
     public DateTimeOffset ReceivedUtc { get; init; } = DateTimeOffset.UtcNow;
 }

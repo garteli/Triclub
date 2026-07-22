@@ -27,7 +27,9 @@ public sealed class SqlSquadEventStore(string connectionString) : ISquadEventSto
             (SELECT COUNT(1) FROM dbo.SquadEventRsvp r WHERE r.EventId = e.Id AND r.CheckedInUtc IS NOT NULL) AS CheckedInCount,
             CAST(CASE WHEN me.EventId IS NULL THEN 0 ELSE 1 END AS bit) AS Joined,
             CAST(me.CheckedInUtc AS datetimeoffset(0)) AS CheckedInUtc,
-            e.Published
+            e.Published,
+            (SELECT TOP 1 a.Id FROM dbo.Activity a
+             WHERE a.EventId = e.Id AND a.AthleteId = @meId ORDER BY a.StartUtc DESC) AS MyActivityId
         FROM dbo.SquadEvent e
         LEFT JOIN dbo.SquadEventRsvp me ON me.EventId = e.Id AND me.AthleteId = @meId
         """;

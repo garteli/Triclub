@@ -12,9 +12,9 @@ public sealed class SqlRawActivityStore(string connectionString) : IRawActivityS
     {
         const string sql = """
             INSERT INTO dbo.RawActivity
-                (Id, AthleteId, Source, SourceExternalId, PayloadKind, Payload, ReceivedUtc)
+                (Id, AthleteId, Source, SourceExternalId, PayloadKind, Payload, EventId, ReceivedUtc)
             VALUES
-                (@Id, @AthleteId, @Source, @SourceExternalId, @PayloadKind, @Payload, @ReceivedUtc);
+                (@Id, @AthleteId, @Source, @SourceExternalId, @PayloadKind, @Payload, @EventId, @ReceivedUtc);
             """;
 
         await using var conn = new SqlConnection(connectionString);
@@ -28,6 +28,7 @@ public sealed class SqlRawActivityStore(string connectionString) : IRawActivityS
                 raw.SourceExternalId,
                 raw.PayloadKind,
                 raw.Payload,
+                raw.EventId,
                 raw.ReceivedUtc,
             }, cancellationToken: ct));
             return true;
@@ -41,7 +42,7 @@ public sealed class SqlRawActivityStore(string connectionString) : IRawActivityS
     public async Task<RawActivity?> GetAsync(Guid id, CancellationToken ct)
     {
         const string sql = """
-            SELECT Id, AthleteId, Source, SourceExternalId, PayloadKind, Payload, ReceivedUtc
+            SELECT Id, AthleteId, Source, SourceExternalId, PayloadKind, Payload, EventId, ReceivedUtc
             FROM dbo.RawActivity WHERE Id = @id;
             """;
 
@@ -57,11 +58,12 @@ public sealed class SqlRawActivityStore(string connectionString) : IRawActivityS
             SourceExternalId = row.SourceExternalId,
             PayloadKind = row.PayloadKind,
             Payload = row.Payload,
+            EventId = row.EventId,
             ReceivedUtc = row.ReceivedUtc,
         };
     }
 
     private sealed record Row(
         Guid Id, Guid AthleteId, byte Source, string? SourceExternalId,
-        string PayloadKind, byte[] Payload, DateTimeOffset ReceivedUtc);
+        string PayloadKind, byte[] Payload, Guid? EventId, DateTimeOffset ReceivedUtc);
 }
