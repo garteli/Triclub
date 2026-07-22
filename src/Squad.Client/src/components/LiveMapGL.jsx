@@ -108,10 +108,6 @@ export default function LiveMapGL({ pts, course, path, riders, mySport, interact
         // If the map is created while its pager page is off-screen, basemap tiles load with no frame
         // scheduled → a blank basemap until you pan. Repaint whenever the base finishes loading tiles.
         map.on('sourcedata', (e) => { if (mapRef.current && e.sourceId === 'base' && e.isSourceLoaded) map.triggerRepaint(); });
-        // …and the canvas can be created at a transient (undersized) container size that never fires a
-        // resize once the page settles → the map renders into a smaller box. resize() on idle no-ops
-        // when the size is already right, and corrects (+ repaints) when it isn't.
-        map.on('idle', () => { if (mapRef.current) map.resize(); });
         map.on('load', () => {
           const accent = resolveColor('var(--accent)');
           const rs = rstyleRef.current; // per-user route colour/width (shared with the full map)
