@@ -147,6 +147,18 @@ export async function getGoogleIdToken(cfg) {
 
 // --- Apple ---
 // Native: @capgo native Sign in with Apple (ASAuthorization). Web: Sign in with
+// Preload + init Apple's SDK on the login screen so the sign-in popup opens synchronously on the
+// user's tap. Without this, the first tap loads the script over the network THEN opens the popup —
+// and the browser blocks that popup because it's no longer tied to the click gesture.
+const APPLE_JS = 'https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js';
+export async function preloadApple(cfg) {
+  if (isNative() || !cfg?.apple?.clientId) return;
+  try {
+    await loadScript(APPLE_JS);
+    window.AppleID?.auth?.init({ clientId: cfg.apple.clientId, scope: 'name email', redirectURI: window.location.origin, usePopup: true });
+  } catch { /* best-effort — getAppleIdToken re-inits if needed */ }
+}
+
 // Apple JS (https://appleid.cdn-apple.com/.../appleid.auth.js → window.AppleID.auth).
 // `cfg` is the full /api/auth/config object.
 export async function getAppleIdToken(cfg) {
@@ -159,7 +171,7 @@ export async function getAppleIdToken(cfg) {
     return idToken;
   }
   const clientId = cfg?.apple?.clientId;
-  await loadScript('https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js');
+  await loadScript(APPLE_JS);
   const auth = window.AppleID?.auth;
   if (!auth) throw new Error('Apple sign-in failed to load.');
 
