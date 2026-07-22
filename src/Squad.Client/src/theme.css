@@ -76,6 +76,8 @@ body {
   max-width: 100%;
 }
 .phone input[type="date"],
+.phone input[type="datetime-local"],
+.phone input[type="time"],
 .phone input[type="number"] {
   -webkit-appearance: none;
   appearance: none;
