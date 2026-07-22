@@ -8,6 +8,7 @@ export function mapClubRows(server) {
     name: r.name,
     initials: r.initials,
     color: r.color,
+    disc: r.discipline, // the club's discipline — scopes the board to same-discipline peers
     emblem: r.emblem, // peak | wave | wheel | bolt (decorative glyph)
     you: r.you,
     load: Math.round(r.load),
