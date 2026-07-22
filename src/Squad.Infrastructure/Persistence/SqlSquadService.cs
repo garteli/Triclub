@@ -108,17 +108,12 @@ public sealed class SqlSquadService(string connectionString) : ISquadService
                 new { squadId, athleteId }, cancellationToken: ct)) == 1)
             return JoinOutcome.AlreadyMember;
 
-        // Free squads: join immediately.
-        if (string.Equals(kind, "free", StringComparison.OrdinalIgnoreCase))
-        {
-            await using var tx = (SqlTransaction)await conn.BeginTransactionAsync(ct);
-            await AddMembership(conn, tx, squadId, athleteId, "member", ct);
-            await SetActiveSquad(conn, tx, athleteId, squadId, ct);
-            await tx.CommitAsync(ct);
-            return JoinOutcome.Joined;
-        }
+        // Every club is gated now — no instant join. Requesting to join creates a pending request
+        // the owner approves (or the athlete joins via a coach's invite link, handled separately in
+        // AcceptInviteAsync). `kind` is retained for the signature but no longer grants instant entry.
+        _ = kind;
 
-        // Gated squads: create a pending request (no-op if one already exists).
+        // Create a pending request (no-op if one already exists).
         var rows = await conn.ExecuteAsync(new CommandDefinition("""
             IF NOT EXISTS (SELECT 1 FROM dbo.JoinRequest WHERE SquadId=@squadId AND AthleteId=@athleteId AND Status='pending')
                 INSERT INTO dbo.JoinRequest (Id, SquadId, AthleteId, Status) VALUES (NEWID(), @squadId, @athleteId, 'pending');
