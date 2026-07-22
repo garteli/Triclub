@@ -709,6 +709,7 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
   const token = getToken?.() ?? null;
   const [confirmDel, setConfirmDel] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [delErr, setDelErr] = useState('');
   const [saveOpen, setSaveOpen] = useState(false);
 
   const { track, laps, matched, status } = useActivityTrack(a?.id, { getToken });
@@ -731,13 +732,18 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
 
   const doDelete = async () => {
     if (!a || deleting) return;
-    setDeleting(true);
+    setDeleting(true); setDelErr('');
     try {
       const tk = getToken ? await getToken() : null;
       await deleteActivity(a.id, tk);
       onDataChanged?.();
       actions.go(state.activityBack || 'activities');
-    } catch { setDeleting(false); }
+    } catch (e) {
+      // Surface the reason instead of failing silently. A 404 here means the activity isn't
+      // attributed to the signed-in athlete (delete is owner-scoped) or is already gone.
+      const msg = /404/.test(e?.message || '') ? "This activity isn't on your account, so it can't be deleted here." : (e?.message || 'Could not delete this activity.');
+      setDelErr(msg); setDeleting(false);
+    }
   };
 
   if (!a) {
@@ -844,6 +850,7 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
           <div className="scr" style={s('position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(90%,420px);z-index:51;background:var(--bg);border:1px solid var(--line2);border-radius:20px;padding:20px;animation:floatUpCenter .25s ease')}>
             <div style={s('font-size:17px;font-weight:700')}>Delete this training?</div>
             <div style={s('font-size:13px;color:var(--text2);line-height:1.5;margin-top:8px')}>{a.title} · {a.when}. This removes it from your activities, feed and leaderboard. You can re-import it later.</div>
+            {delErr && <div style={s('font-size:12.5px;color:var(--bad);font-weight:600;margin-top:10px')}>{delErr}</div>}
             <div style={s('display:flex;gap:10px;margin-top:18px')}>
               <div className="ctl" onClick={() => !deleting && setConfirmDel(false)} style={s('flex:1;text-align:center;padding:12px;border-radius:12px;font-weight:700;font-size:14px;background:var(--bg3);border:1px solid var(--line);color:var(--text2)')}>Cancel</div>
               <div className="ctl" onClick={doDelete} style={s(`flex:1;text-align:center;padding:12px;border-radius:12px;font-weight:700;font-size:14px;background:var(--bad);color:#fff;opacity:${deleting ? 0.7 : 1}`)}>{deleting ? 'Deleting…' : 'Delete'}</div>
