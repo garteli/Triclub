@@ -26,6 +26,11 @@ public static class SquadEndpoints
         g.MapGet("/{id:guid}/members", Members);
         g.MapPost("/{id:guid}/members", AddMember);
         g.MapDelete("/{id:guid}/members/{athleteId:guid}", RemoveMember);
+        // Invite links: owner mints a shareable link; the invitee looks it up (anonymous, before
+        // sign-up) and accepts it (authorized) to auto-join.
+        g.MapPost("/{id:guid}/invite", CreateInvite);
+        app.MapGet("/api/invites/{token}", InviteLookup);
+        app.MapPost("/api/invites/{token}/accept", AcceptInvite).RequireAuthorization();
         // The owner's cross-squad pending-request inbox.
         app.MapGet("/api/requests", Requests).RequireAuthorization();
         return app;
@@ -157,6 +162,50 @@ public static class SquadEndpoints
         return await squads.RemoveMemberAsync(id, athleteId, me, ct)
             ? Results.Ok(new { status = "removed" })
             : Results.NotFound(new { error = "Couldn't remove that member (not a member, the owner, or you don't manage this squad)." });
+    }
+
+    // ----- invite links -------------------------------------------------------
+
+    private static async Task<IResult> CreateInvite(
+        Guid id, InviteCreateRequest? body, HttpContext http, ISquadService squads, CancellationToken ct)
+    {
+        if (Me(http) is not { } me) return Results.Unauthorized();
+        var token = await squads.CreateInviteAsync(id, me, body?.Reset ?? false, ct);
+        return token is null
+            ? Results.NotFound(new { error = "Squad not found, or you don't manage it." })
+            : Results.Ok(new { token });
+    }
+
+    private static async Task<IResult> InviteLookup(string token, ISquadService squads, CancellationToken ct)
+    {
+        var info = await squads.GetInviteAsync(token, ct);
+        return info is null
+            ? Results.NotFound(new { error = "This invite link is invalid or no longer active." })
+            : Results.Ok(info);
+    }
+
+    private static async Task<IResult> AcceptInvite(
+        string token, HttpContext http, ISquadService squads,
+        IAthleteDirectory directory, INotificationService notes, CancellationToken ct)
+    {
+        if (Me(http) is not { } me) return Results.Unauthorized();
+        var result = await squads.AcceptInviteAsync(token, me, ct);
+        if (result is null) return Results.NotFound(new { error = "This invite link is invalid or no longer active." });
+
+        // Notify the owner of a genuinely-new member who came in via their invite.
+        if (result.Outcome == AcceptInviteOutcome.Joined && result.OwnerId is { } owner && owner != me)
+        {
+            var actor = await directory.GetAsync(me, ct);
+            if (actor is not null)
+                await notes.AddAsync(owner, "join", me, actor.Name, $"joined {result.SquadName} via your invite", ct);
+        }
+
+        return Results.Ok(new
+        {
+            outcome = result.Outcome.ToString().ToLowerInvariant(),
+            squadId = result.SquadId,
+            squadName = result.SquadName,
+        });
     }
 
     private static Guid? Me(HttpContext http)

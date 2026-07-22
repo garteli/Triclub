@@ -17,7 +17,8 @@ import { useSquads } from './hooks/useSquads.js';
 import { usePlan } from './hooks/usePlan.js';
 import { useGarminSync } from './hooks/useGarminSync.js';
 import { useHealthSync } from './hooks/useHealthSync.js';
-import { createSquad, joinSquad, activateSquad } from './lib/squads.js';
+import { createSquad, joinSquad, activateSquad, getInvite, acceptInvite } from './lib/squads.js';
+import { captureInviteFromUrl, pendingInvite, clearInvite } from './lib/invite.js';
 import { listCourses, getCourse, createCourse, deleteCourse } from './lib/courses.js';
 import { recordPayment, markPaymentPaid, waivePayment } from './lib/payments.js';
 import { publishPlan, unpublishPlan, listMyPlans, removeMyPlan, listPlans, getPlan, savePlan, deletePlan, listLibrary, getLibraryTemplate, adoptTemplate } from './lib/plan.js';
@@ -98,6 +99,10 @@ const RIDE_TYPES = {
   // and NOT saved as an activity (escorting isn't a workout).
   driver: { label: 'Driver', fitSport: FitSport.cycling, indoor: false, driver: true },
 };
+
+// Stash any ?invite=TOKEN from the launch URL before the app renders, so it survives the
+// Welcome → Register → sign-in flow and can be redeemed once a session exists.
+captureInviteFromUrl();
 
 const screens = {
   dash: Dashboard, ride: LiveRide, plan: Plan, plans: PlansList, planeditor: PlanEditor, planlibrary: PlanLibrary, lb: Leaderboard, clubrank: ClubRanking,
@@ -301,6 +306,40 @@ export default function App() {
       if (me) setState((s) => ({ ...s, session: { ...s.session, ...me } }));
     } catch { /* ignore */ }
   }, [session?.token]);
+
+  // A pending invite (opened via a coach's ?invite=TOKEN link). While logged out, fetch its
+  // public info so Welcome / Register can show "You've been invited to join <club>". Once a
+  // session exists, redeem it exactly once: the athlete auto-joins the group, it becomes their
+  // active squad, and we drop them straight into it.
+  const [inviteInfo, setInviteInfo] = useState(null);
+  useEffect(() => {
+    if (authed || !pendingInvite()) { setInviteInfo(null); return; }
+    let cancelled = false;
+    getInvite(pendingInvite())
+      .then((info) => { if (!cancelled) setInviteInfo(info); })
+      .catch(() => { if (!cancelled) { setInviteInfo(null); clearInvite(); } }); // dead/invalid link
+    return () => { cancelled = true; };
+  }, [authed]);
+
+  const invitedRef = useRef(false);
+  useEffect(() => {
+    if (!authed || invitedRef.current) return;
+    const token = pendingInvite();
+    if (!token) return;
+    invitedRef.current = true;
+    (async () => {
+      try {
+        const r = await acceptInvite(session.token, token);
+        clearInvite();
+        await refreshSession();
+        setRefreshSignal((n) => n + 1);
+        if (r?.squadId) setState((s) => ({ ...s, selGroup: r.squadId, screen: 'group' }));
+      } catch {
+        clearInvite(); // invalid/expired — fall through to the normal signed-in experience
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authed, session?.token]);
 
   const squadOps = useMemo(() => ({
     onJoinSquad: async (id) => {
@@ -677,6 +716,7 @@ export default function App() {
           plans={authed ? planOps : undefined} plan={selectedPlan}
           planMine={authed ? planMineOps : undefined}
           notif={notif}
+          inviteInfo={inviteInfo}
           meId={session?.athleteId} />
       </Phone>
     </div>

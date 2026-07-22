@@ -3,6 +3,7 @@ import { s } from '../lib/style.js';
 import { SocialButton, BiometricButton, OrDivider } from '../components/AuthButtons.jsx';
 import Logo from '../components/Logo.jsx';
 import SportIcon from '../components/SportIcon.jsx';
+import InviteBanner from '../components/InviteBanner.jsx';
 import { isNativePlatform } from '../lib/platform.js';
 import {
   oauthSignIn, authConfig,
@@ -11,7 +12,7 @@ import {
 
 // Logged-out landing. Google/Apple OAuth or biometric quick-unlock sign the
 // athlete straight in; "Create account" opens the sign-up wizard.
-export default function Welcome({ actions }) {
+export default function Welcome({ actions, inviteInfo }) {
   const [bioReady, setBioReady] = useState(false);
   const [providers, setProviders] = useState({ google: false, apple: false });
   const [error, setError] = useState('');
@@ -62,6 +63,7 @@ export default function Welcome({ actions }) {
 
       {/* actions */}
       <div style={s('flex:none')}>
+        <InviteBanner info={inviteInfo} />
         {bioReady && (
           <div style={s('margin-bottom:10px')}>
             <BiometricButton onClick={bioSignIn} label="Unlock with Face ID" />
