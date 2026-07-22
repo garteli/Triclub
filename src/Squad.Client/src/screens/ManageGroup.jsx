@@ -13,12 +13,6 @@ import { API_BASE } from '../lib/apiBase.js';
 import { DISCIPLINES, familyOf, disciplinesInFamily } from '../lib/disciplines.js';
 
 const LEVELS = ['All levels', 'Intermediate+', 'Advanced', 'Race focus'];
-// Every club is approval/invitation-gated — no instant-join "free/open" kind. A Membership club
-// with a blank price is simply free to join on approval.
-const KINDS = [
-  ['member', 'Membership', 'Riders request; you approve'],
-  ['coach', 'Coached club', 'Approval + coaching services'],
-];
 const COLORS = ['#e11d2a', '#ff6a2c', '#ffce4a', '#37c0ff', '#4ade80', '#a78bfa', '#ff6f61', '#0ea5e9'];
 
 const Avatar = ({ m, token }) => (
@@ -51,9 +45,7 @@ export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged
   const setFamily = (fam) => { if (fam !== family) setDisc(disciplinesInFamily(fam)[0]); };
   const [level, setLevel] = useState(LEVELS.includes(g.level) ? g.level : 'All levels');
   const [desc, setDesc] = useState(g.desc || '');
-  const [kind, setKind] = useState(g.kind || 'member');
   const [color, setColor] = useState(g.color || '#e11d2a');
-  const [priceNum, setPriceNum] = useState((g.price || '').replace(/[^\d]/g, ''));
 
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -119,15 +111,14 @@ export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged
     setBusy(true); setErr(''); setSaved(false);
     try {
       const t = await getToken?.();
-      const digits = String(priceNum).replace(/[^\d]/g, '');
       await updateSquad(t, g.id, {
         name: name.trim() || null,
         discipline: disc,
         location: loc.trim(),
         level,
-        kind,
-        price: digits ? `₪${digits}` : 'Free',
-        perLabel: digits ? '/mo' : '',
+        kind: 'member',    // every club is approval-gated membership for now (no coached/paid tiers)
+        price: 'Free',
+        perLabel: '',
         color,
         description: desc,
       });
@@ -266,22 +257,7 @@ export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged
         ))}
       </div>
 
-      {/* ---- pricing ---- */}
-      <FieldLabel>Joining model</FieldLabel>
-      <div style={s('display:flex;flex-direction:column;gap:8px')}>
-        {KINDS.map(([k, label, hint]) => (
-          <div key={k} className="ctl" onClick={() => setKind(k)}
-            style={s(`display:flex;align-items:center;gap:11px;background:var(--bg2);border:1px solid ${kind === k ? 'var(--accent)' : 'var(--line)'};border-radius:12px;padding:11px 13px`)}>
-            <div style={s(`width:18px;height:18px;border-radius:50%;flex:none;border:2px solid ${kind === k ? 'var(--accent)' : 'var(--text3)'};display:flex;align-items:center;justify-content:center`)}>
-              {kind === k && <div style={s('width:8px;height:8px;border-radius:50%;background:var(--accent)')} />}
-            </div>
-            <div style={s('flex:1')}><div style={s('font-size:13.5px;font-weight:700')}>{label}</div><div style={s('font-size:11px;color:var(--text2)')}>{hint}</div></div>
-          </div>
-        ))}
-      </div>
-      <Field label="Membership price (₪ / month)" value={priceNum} onChange={setPriceNum} placeholder="90 — leave blank for free" type="number" mono />
-
-      {err && <div style={s('color:var(--bad);font-size:12.5px;margin-top:12px;text-align:center')}>{err}</div>}
+      {err &&<div style={s('color:var(--bad);font-size:12.5px;margin-top:12px;text-align:center')}>{err}</div>}
       {saved && !err && <div style={s('color:var(--good);font-size:12.5px;margin-top:12px;text-align:center')}>Saved. Changes are live for members.</div>}
       <PrimaryBtn onClick={busy ? undefined : save} disabled={busy}>{busy ? 'Saving…' : 'Save changes'}</PrimaryBtn>
 
