@@ -140,7 +140,7 @@ public sealed class SqlClubRankingService(string connectionString) : IClubRankin
     }
 
     private const string ClubsSql = """
-        SELECT Id, Name, Color, Discipline FROM dbo.Squad;
+        SELECT Id, Name, Color, Discipline FROM dbo.Squad WHERE Kind <> 'personal';
         """;
 
     private const string MembersSql = """

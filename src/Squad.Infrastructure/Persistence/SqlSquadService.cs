@@ -39,7 +39,8 @@ public sealed class SqlSquadService(string connectionString) : ISquadService
     {
         await using var conn = new SqlConnection(connectionString);
         var rows = await conn.QueryAsync<SquadSummary>(new CommandDefinition(
-            SelectSummary + " ORDER BY MemberCount DESC, s.CreatedUtc DESC;",
+            // Personal "Solo" squads (one per signup) are private — never list them in Discover.
+            SelectSummary + " WHERE s.Kind <> 'personal' ORDER BY MemberCount DESC, s.CreatedUtc DESC;",
             new { me = me ?? Guid.Empty }, cancellationToken: ct));
         return rows.ToList();
     }
@@ -259,11 +260,16 @@ public sealed class SqlSquadService(string connectionString) : ISquadService
             new { squadId, athleteId }, tx, cancellationToken: ct));
         if (deleted == 0) { await tx.RollbackAsync(ct); return false; }
 
-        // Athlete.SquadId is NOT NULL: if this was their active squad, move them to the
-        // landing club so their feed/leaderboard stays valid (skip when this IS landing).
-        await conn.ExecuteAsync(new CommandDefinition(
-            "UPDATE dbo.Athlete SET SquadId=@landing WHERE Id=@athleteId AND SquadId=@squadId AND @squadId<>@landing;",
-            new { athleteId, squadId, landing = Squads.Landing }, tx, cancellationToken: ct));
+        // Athlete.SquadId is NOT NULL: if this was their active squad, move them off it so their
+        // feed/leaderboard stays valid — to their own private "Solo" squad when they have one (don't
+        // re-drop them into a shared club they never chose), else the landing club for legacy users.
+        await conn.ExecuteAsync(new CommandDefinition("""
+            UPDATE dbo.Athlete
+            SET SquadId = COALESCE(
+                (SELECT TOP 1 Id FROM dbo.Squad WHERE OwnerId = @athleteId AND Kind = 'personal' ORDER BY CreatedUtc),
+                @landing)
+            WHERE Id = @athleteId AND SquadId = @squadId AND @squadId <> @landing;
+            """, new { athleteId, squadId, landing = Squads.Landing }, tx, cancellationToken: ct));
 
         await tx.CommitAsync(ct);
         return true;

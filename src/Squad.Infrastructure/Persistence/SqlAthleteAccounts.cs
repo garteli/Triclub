@@ -32,12 +32,30 @@ public sealed class SqlAthleteAccounts(string connectionString) : IAthleteAccoun
 
     public async Task CreateAsync(NewAthleteAccount a, CancellationToken ct)
     {
-        const string sql = """
+        // Self-service signups don't auto-join any club. Instead each new account gets its OWN
+        // private "Solo" squad (Kind='personal') as its active squad, created atomically with the
+        // athlete + an owner membership. Personal squads are hidden from Discover and the club board,
+        // so a new user's feed/leaderboard/plan show only themselves until they deliberately join a
+        // real club — via Discover or a coach's invite link. a.SquadId is that personal squad's id.
+        await using var conn = new SqlConnection(connectionString);
+        await conn.OpenAsync(ct);
+        await using var tx = (SqlTransaction)await conn.BeginTransactionAsync(ct);
+
+        await conn.ExecuteAsync(new CommandDefinition("""
+            INSERT INTO dbo.Squad (Id, Name, Discipline, Kind, Color, OwnerId)
+            VALUES (@SquadId, N'Solo', 'Triathlon', 'personal', @AvatarColor, @Id);
+            """, a, tx, cancellationToken: ct));
+
+        await conn.ExecuteAsync(new CommandDefinition("""
             INSERT INTO dbo.Athlete (Id, DisplayName, Initials, AvatarColor, SquadId, Email, PasswordHash, GoogleSub, AppleSub)
             VALUES (@Id, @DisplayName, @Initials, @AvatarColor, @SquadId, @Email, @PasswordHash, @GoogleSub, @AppleSub);
-            """;
-        await using var conn = new SqlConnection(connectionString);
-        await conn.ExecuteAsync(new CommandDefinition(sql, a, cancellationToken: ct));
+            """, a, tx, cancellationToken: ct));
+
+        await conn.ExecuteAsync(new CommandDefinition("""
+            INSERT INTO dbo.Membership (SquadId, AthleteId, Role) VALUES (@SquadId, @Id, 'owner');
+            """, a, tx, cancellationToken: ct));
+
+        await tx.CommitAsync(ct);
     }
 
     public async Task LinkProviderAsync(Guid id, ExternalProvider provider, string subject, CancellationToken ct)
