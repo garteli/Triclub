@@ -145,6 +145,15 @@ app.MapSquadHub();         // /hubs/squad
 app.MapChatHub();          // /hubs/chat
 app.MapRideHub();          // /hubs/ride
 
+// "Sign in with Apple" domain verification. Apple fetches this exact path; the default static-file
+// provider skips dot-folders and the SPA fallback would return index.html, so serve it explicitly
+// from config (set Apple__DomainAssociation to the file Apple gives you — no code deploy needed).
+app.MapGet("/.well-known/apple-developer-domain-association.txt", (IConfiguration cfg) =>
+{
+    var body = cfg["Apple:DomainAssociation"];
+    return string.IsNullOrWhiteSpace(body) ? Results.NotFound() : Results.Text(body, "text/plain");
+});
+
 // SPA fallback for client-side routes.
 app.MapFallbackToFile("index.html");
 
