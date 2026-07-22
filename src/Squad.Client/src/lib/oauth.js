@@ -170,7 +170,17 @@ export async function getAppleIdToken(cfg) {
     usePopup: true,
   });
 
-  const res = await auth.signIn();   // throws/ rejects if the user cancels
+  let res;
+  try {
+    res = await auth.signIn();
+  } catch (e) {
+    const code = e?.error || '';
+    if (['popup_closed_by_user', 'user_cancelled_authorize', 'user_trigger_new_signin_flow'].includes(code)) {
+      throw new Error('Apple sign-in was cancelled.');
+    }
+    // invalid_client / invalid redirect etc. → the Services ID isn't set up for this domain.
+    throw new Error('Apple sign-in couldn’t complete here. Open the app in Safari/Chrome, or (setup) add this site’s domain + return URL to the Apple Services ID.');
+  }
   const idToken = res?.authorization?.id_token;
   if (!idToken) throw new Error('Apple sign-in did not return a token.');
   return idToken;
