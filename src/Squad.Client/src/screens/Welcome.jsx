@@ -4,8 +4,10 @@ import { SocialButton, BiometricButton } from '../components/AuthButtons.jsx';
 import Logo from '../components/Logo.jsx';
 import SportIcon from '../components/SportIcon.jsx';
 import InviteBanner from '../components/InviteBanner.jsx';
+import GoogleButton from '../components/GoogleButton.jsx';
+import { isInAppBrowser, isNativePlatform } from '../lib/platform.js';
 import {
-  oauthSignIn, authConfig,
+  oauthSignIn, authConfig, exchangeGoogleCredential,
   biometricAvailable, biometricEnrolled, signInWithBiometric,
 } from '../lib/auth.js';
 
@@ -15,11 +17,17 @@ export default function Welcome({ actions, inviteInfo }) {
   const [bioReady, setBioReady] = useState(false);
   const [providers, setProviders] = useState({ google: false, apple: false });
   const [error, setError] = useState('');
+  const [copied, setCopied] = useState(false);
+  const inApp = isInAppBrowser();
+  const copyLink = async () => {
+    try { await navigator.clipboard.writeText(window.location.href); setCopied(true); setTimeout(() => setCopied(false), 2000); }
+    catch { /* clipboard blocked — the user can copy from the address bar */ }
+  };
 
   useEffect(() => {
     let alive = true;
     biometricAvailable().then((ok) => alive && setBioReady(ok && biometricEnrolled()));
-    authConfig().then((cfg) => alive && setProviders({ google: !!cfg?.google, apple: !!cfg?.apple }));
+    authConfig().then((cfg) => alive && setProviders({ google: cfg?.google || null, apple: cfg?.apple || null }));
     return () => { alive = false; };
   }, []);
 
@@ -30,6 +38,12 @@ export default function Welcome({ actions, inviteInfo }) {
     } catch (e) {
       setError(e.message || `${provider} sign-in failed.`);
     }
+  };
+  // Credential from the rendered Google button (web) → exchange for a session.
+  const onGoogleCredential = async (credential) => {
+    setError('');
+    try { actions.signIn(await exchangeGoogleCredential(credential), { remember: true }); }
+    catch (e) { setError(e.message || 'Google sign-in failed.'); }
   };
   const bioSignIn = async () => {
     setError('');
@@ -62,6 +76,15 @@ export default function Welcome({ actions, inviteInfo }) {
       {/* actions */}
       <div style={s('flex:none')}>
         <InviteBanner info={inviteInfo} />
+        {/* In-app browsers (WhatsApp, Instagram, …) block Google/Apple sign-in — tell the user up
+            front to open in a real browser, and offer to copy the link. */}
+        {inApp && (
+          <div style={s('background:color-mix(in srgb,var(--warn) 12%,var(--bg2));border:1px solid color-mix(in srgb,var(--warn) 35%,transparent);border-radius:14px;padding:12px 14px;margin-bottom:12px')}>
+            <div style={s('font-size:12.5px;color:var(--text);font-weight:700;margin-bottom:3px')}>Open in your browser to sign in</div>
+            <div style={s('font-size:11.5px;color:var(--text2);line-height:1.45')}>Google and Apple sign-in don’t work inside this in-app browser. Tap the ••• (or share) menu and choose <b style={s('color:var(--text)')}>Open in Safari / Chrome</b>.</div>
+            <div className="ctl" onClick={copyLink} style={s('display:inline-block;margin-top:9px;font-size:11.5px;font-weight:700;color:var(--accent);background:var(--accent-dim);border-radius:9px;padding:6px 11px')}>{copied ? '✓ Link copied' : 'Copy link'}</div>
+          </div>
+        )}
         {bioReady && (
           <div style={s('margin-bottom:10px')}>
             <BiometricButton onClick={bioSignIn} label="Unlock with Face ID" />
@@ -71,7 +94,9 @@ export default function Welcome({ actions, inviteInfo }) {
             returning athlete straight in (the server's External endpoint creates-or-signs-in). */}
         {anySocial ? (
           <div style={s('display:flex;flex-direction:column;gap:10px')}>
-            {providers.google && <SocialButton provider="google" onClick={() => social('google')} />}
+            {providers.google && (isNativePlatform()
+              ? <SocialButton provider="google" onClick={() => social('google')} />
+              : <GoogleButton clientId={providers.google.clientId} onCredential={onGoogleCredential} onError={setError} />)}
             {providers.apple && <SocialButton provider="apple" onClick={() => social('apple')} />}
           </div>
         ) : (

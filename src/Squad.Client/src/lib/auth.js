@@ -125,6 +125,11 @@ export async function oauthSignIn(provider) {
   return api(`/api/auth/${provider}`, { method: 'POST', body: { idToken } });
 }
 
+// Exchange a Google id_token (from the rendered GSI button) for the app session.
+export async function exchangeGoogleCredential(credential) {
+  return api('/api/auth/google', { method: 'POST', body: { idToken: credential } });
+}
+
 // --- biometric (WebAuthn platform authenticator) ---------------------------
 
 export async function biometricAvailable() {

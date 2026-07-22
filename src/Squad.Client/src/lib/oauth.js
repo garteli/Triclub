@@ -81,6 +81,26 @@ function withTimeout(promise, ms, msg) {
   return Promise.race([promise, guard]).finally(() => clearTimeout(timer));
 }
 
+// Render Google's OFFICIAL Sign In button into `container` (web only). Far more reliable in
+// mobile browsers than One Tap (`id.prompt`), which they routinely suppress. `onCredential`
+// receives the id_token on a real button click; `onError` fires if GSI can't load.
+export async function renderGoogleButton(clientId, container, onCredential, onError) {
+  if (isNative() || !container) return;
+  try {
+    await loadScript('https://accounts.google.com/gsi/client');
+    const id = window.google?.accounts?.id;
+    if (!id) { onError?.(new Error('Google sign-in failed to load.')); return; }
+    id.initialize({
+      client_id: clientId,
+      callback: (resp) => (resp?.credential ? onCredential(resp.credential) : onError?.(new Error('Google sign-in was cancelled.'))),
+      auto_select: false,
+    });
+    container.innerHTML = '';
+    const w = Math.min(400, Math.max(240, Math.floor(container.getBoundingClientRect().width) || 320));
+    id.renderButton(container, { type: 'standard', theme: 'outline', size: 'large', text: 'continue_with', shape: 'pill', logo_alignment: 'center', width: w });
+  } catch (e) { onError?.(e); }
+}
+
 // --- Google ---
 // Native: @capgo native Google SDK. Web: Google Identity Services
 // (https://accounts.google.com/gsi/client → window.google.accounts.id).
