@@ -84,12 +84,29 @@ export default function CoursePicker({ courses, onClose, title = 'Course for thi
     if (created?.id) await courses.select(created.id);
   };
 
+  // Pull the sheet down by its handle to dismiss (native bottom-sheet feel). Pointer events cover
+  // both touch and mouse; touch-action:none on the handle stops the page scrolling mid-drag.
+  const [dragY, setDragY] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const dragStartRef = useRef(null);
+  const onHandleDown = (e) => { dragStartRef.current = e.clientY; setDragging(true); e.currentTarget.setPointerCapture?.(e.pointerId); };
+  const onHandleMove = (e) => { if (dragStartRef.current != null) setDragY(Math.max(0, e.clientY - dragStartRef.current)); };
+  const onHandleUp = () => {
+    if (dragStartRef.current == null) return;
+    const shouldClose = dragY > 90; // dragged far enough → dismiss
+    dragStartRef.current = null; setDragging(false);
+    if (shouldClose) onClose(); else setDragY(0);
+  };
+
   return (
     <>
       <div className="ctl" onClick={busy ? undefined : onClose} style={s('position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50;animation:floatUp .2s ease')} />
       <div style={s('position:fixed;left:0;right:0;bottom:0;z-index:51;display:flex;justify-content:center;pointer-events:none')}>
-        <div className="scr" style={s('width:100%;max-width:480px;pointer-events:auto;background:var(--bg);border-radius:24px 24px 0 0;border-top:1px solid var(--line2);max-height:86dvh;overflow-y:auto;padding:14px 18px 28px;animation:floatUp .3s ease')}>
-          <div style={s('width:40px;height:4px;border-radius:3px;background:var(--line2);margin:0 auto 14px')} />
+        <div className="scr" style={s(`width:100%;max-width:480px;pointer-events:auto;background:var(--bg);border-radius:24px 24px 0 0;border-top:1px solid var(--line2);max-height:86dvh;overflow-y:auto;padding:14px 18px 28px;transform:translateY(${dragY}px);transition:transform ${dragging ? '0s' : '.25s'} ease;animation:floatUp .3s ease`)}>
+          <div onPointerDown={onHandleDown} onPointerMove={onHandleMove} onPointerUp={onHandleUp} onPointerCancel={onHandleUp}
+            style={s('display:flex;justify-content:center;padding:4px 0 12px;margin-top:-4px;cursor:grab;touch-action:none')}>
+            <div style={s('width:40px;height:4px;border-radius:3px;background:var(--line2)')} />
+          </div>
           <div style={s('display:flex;align-items:center;justify-content:space-between')}>
             <div style={s('font-size:18px;font-weight:700')}>{title}</div>
             <div className="ctl" onClick={onClose} style={s('font-size:13px;color:var(--text2);font-weight:600')}>Close</div>
