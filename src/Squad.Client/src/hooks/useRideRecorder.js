@@ -415,6 +415,12 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, onE
     prevCoord.current = draft.prevCoord || null;
     startedAtRef.current = draft.startedAtMs ?? draft.agg?.startMs ?? null;
     eventIdRef.current = draft.eventId ?? null;
+    // Restore the auto-pause machine so the elapsed clock keeps excluding paused time.
+    pausedMsRef.current = draft.pausedMs || 0;
+    autoPausedRef.current = !!draft.autoPaused;
+    pauseStartRef.current = draft.pauseStartMs ?? null;
+    resumeStartRef.current = draft.resumeStartMs ?? null;
+    setAutoPaused(!!draft.autoPaused);
     lastPush.current = 0;
     setDistanceKm((draft.distMeters || 0) / 1000);
     if (how === 'resume') {
@@ -450,6 +456,12 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, onE
       agg: agg.current,
       samples: samples.current,
       eventId: eventIdRef.current,
+      // Auto-pause state, so a reload keeps the banked paused time (elapsed clock stays correct)
+      // and stays paused if you were stopped, instead of resetting and counting the pause.
+      pausedMs: pausedMsRef.current,
+      autoPaused: autoPausedRef.current,
+      pauseStartMs: pauseStartRef.current,
+      resumeStartMs: resumeStartRef.current,
       pending: isRecording ? null : pending,
     });
     if (recording) {
