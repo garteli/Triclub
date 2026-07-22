@@ -15,6 +15,7 @@ import { useClubRanking } from './hooks/useClubRanking.js';
 import { useActivities } from './hooks/useActivities.js';
 import { useSquads } from './hooks/useSquads.js';
 import { usePlan } from './hooks/usePlan.js';
+import { usePlanMonth } from './hooks/usePlanMonth.js';
 import { useGarminSync } from './hooks/useGarminSync.js';
 import { useHealthSync } from './hooks/useHealthSync.js';
 import { createSquad, joinSquad, activateSquad, getInvite, acceptInvite } from './lib/squads.js';
@@ -282,6 +283,14 @@ export default function App() {
     return `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, '0')}-${String(monday.getDate()).padStart(2, '0')}`;
   }, [state.planWeekOffset]);
   const { plan: livePlan, summary: livePlanSummary } = usePlan({ getToken, enabled: authed, weekStart: planWeekStart, refreshSignal });
+  // The calendar month currently being viewed ('yyyy-MM', shifted by the month date-nav
+  // offset) — drives the month grid's plan dots on the weeks ahead.
+  const planMonth = useMemo(() => {
+    const now = new Date();
+    const m = new Date(now.getFullYear(), now.getMonth() + state.planMonthOffset, 1);
+    return `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, '0')}`;
+  }, [state.planMonthOffset]);
+  const { monthDays: livePlanMonth } = usePlanMonth({ getToken, enabled: authed, month: planMonth, refreshSignal });
 
   // The signed-in athlete's persisted profile (drives vm.me + Edit profile).
   const [profile, setProfile] = useState(null);
@@ -308,14 +317,14 @@ export default function App() {
   const vm = useMemo(
     () => buildViewModel(state, t, {
       feedItems: liveFeed, leaderboardRows: liveLeaderboard, activityItems: liveActivities,
-      profile, squads: liveSquads, plan: livePlan, planSummary: livePlanSummary, avatar: state.avatar,
+      profile, squads: liveSquads, plan: livePlan, planSummary: livePlanSummary, planMonth: livePlanMonth, avatar: state.avatar,
       // The athlete's active squad (name + logo/banner for the dashboard header).
       squadName: authed ? liveSquads.find((sq) => sq.id === squadId)?.name : undefined,
       activeSquad: authed ? liveSquads.find((sq) => sq.id === squadId) : null,
       activeClubId: authed ? squadId : null,
       meId: session?.athleteId ?? null,
     }),
-    [state, t, liveFeed, liveLeaderboard, liveActivities, profile, liveSquads, livePlan, livePlanSummary, authed, squadId, session?.athleteId],
+    [state, t, liveFeed, liveLeaderboard, liveActivities, profile, liveSquads, livePlan, livePlanSummary, livePlanMonth, authed, squadId, session?.athleteId],
   );
 
   // After joining/creating a squad the athlete's active SquadId changes server-side;
@@ -522,6 +531,18 @@ export default function App() {
       ? { ...s, planWeekOffset: s.planWeekOffset + dir }
       : { ...s, planMonthOffset: s.planMonthOffset + dir })),
     planToday: () => patch({ planWeekOffset: 0, planMonthOffset: 0 }),
+    // Tapping a calendar day opens that day's week: switch to week view and set the week
+    // offset to the number of Mondays between today's week and the tapped date's week.
+    planJumpToWeek: (iso) => setState((s) => {
+      const [y, m, d] = String(iso).split('-').map(Number);
+      if (!y || !m || !d) return s;
+      const mondayOf = (dt) => {
+        const x = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate() - ((dt.getDay() + 6) % 7));
+        x.setHours(0, 0, 0, 0); return x;
+      };
+      const weeks = Math.round((mondayOf(new Date(y, m - 1, d)) - mondayOf(new Date())) / 6048e5);
+      return { ...s, planView: 'week', planWeekOffset: weeks };
+    }),
     toggleCoach: () => setState((s) => ({ ...s, coachView: !s.coachView })),
     // Accepts either a discipline key (legacy) or the full plan row; the row carries any
     // coach-attached course through to the workout sheet's "Start now".

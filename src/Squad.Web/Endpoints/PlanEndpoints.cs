@@ -35,6 +35,8 @@ public static class PlanEndpoints
     public static IEndpointRouteBuilder MapPlan(this IEndpointRouteBuilder app)
     {
         app.MapGet("/api/plan", GetPlan).RequireAuthorization();
+        // Lightweight month dots for the calendar (whole visible month, incl. weeks ahead).
+        app.MapGet("/api/plan/month", GetPlanMonth).RequireAuthorization();
         app.MapPost("/api/plan/publish", PublishPlan).RequireAuthorization();
         // Coach pulls a published plan back off all athletes' calendars.
         app.MapPost("/api/plan/plans/{id:guid}/unpublish", UnpublishPlan).RequireAuthorization();
@@ -335,5 +337,29 @@ public static class PlanEndpoints
         };
 
         return Results.Ok(new { week, summary });
+    }
+
+    // GET /api/plan/month?month=yyyy-MM — one dot per planned (non-rest) workout in the month,
+    // so the calendar can show the active plan on the weeks ahead. Defaults to the current month.
+    private static async Task<IResult> GetPlanMonth(HttpContext http, IPlanService plans, CancellationToken ct)
+    {
+        var claim = http.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? http.User.FindFirstValue("sub");
+        if (!Guid.TryParse(claim, out var athleteId)) return Results.Unauthorized();
+
+        var today = DateTime.UtcNow.Date;
+        var first = new DateTime(today.Year, today.Month, 1);
+        if (http.Request.Query.TryGetValue("month", out var mq) &&
+            DateTime.TryParseExact(mq, "yyyy-MM", System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var parsed))
+            first = new DateTime(parsed.Year, parsed.Month, 1);
+
+        var last = first.AddMonths(1).AddDays(-1);
+        var rows = await plans.GetRangeAsync(athleteId, first, last, ct);
+
+        var days = rows
+            .Where(r => r.Discipline != "rest")
+            .Select(r => new { date = r.WorkoutDate.ToString("yyyy-MM-dd"), discipline = r.Discipline });
+
+        return Results.Ok(new { days });
     }
 }

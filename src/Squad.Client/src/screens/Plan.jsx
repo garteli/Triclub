@@ -318,7 +318,9 @@ export default function Plan({ vm, state, actions, planMine, live, meId, getToke
             </div>
             <div style={s('display:grid;grid-template-columns:repeat(7,1fr);gap:5px')}>
               {vm.monthCells.map((c, i) => (
-                <div key={i} style={s(`${c.cellStyle};aspect-ratio:1;border-radius:9px;padding:5px 4px;display:flex;flex-direction:column;justify-content:space-between`)}>
+                <div key={i} className={c.inMonth ? 'ctl' : undefined}
+                  onClick={c.inMonth ? () => actions.planJumpToWeek(c.iso) : undefined}
+                  style={s(`${c.cellStyle};aspect-ratio:1;border-radius:9px;padding:5px 4px;display:flex;flex-direction:column;justify-content:space-between${c.inMonth ? ';cursor:pointer' : ''}`)}>
                   <div className="mono" style={s(`font-size:11px;font-weight:600;opacity:${c.dayOpacity}`)}>{c.day}</div>
                   <div style={s('display:flex;gap:2px;justify-content:center')}>{c.disc && <div style={s(`width:5px;height:5px;border-radius:50%;background:${c.dotColor};opacity:${c.dotOpacity}`)} />}</div>
                 </div>
