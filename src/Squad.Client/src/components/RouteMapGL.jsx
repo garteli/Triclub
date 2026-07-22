@@ -1,16 +1,15 @@
 import { useEffect, useRef } from 'react';
+import { baseSource, applyBasemap } from '../lib/basemaps.js';
 
-// Reusable interactive MapLibre route map — CARTO basemap (+ optional 3D terrain drape),
+// Reusable interactive MapLibre route map — shared basemap set (+ optional 3D terrain drape),
 // the route line and start/end markers, pan/pinch-zoom/rotate. Lazy-loads MapLibre so it
 // never touches the main bundle. Fills its (positioned) parent. `onReady(map, maplibregl)`
 // hands the instance back so the caller can drive replay / camera.
-const TILE_SEG = { voyager: 'voyager', light: 'light_all', dark: 'dark_all' };
-const baseTiles = (style) => ['a', 'b', 'c', 'd'].map((sd) => `https://${sd}.basemaps.cartocdn.com/rastertiles/${TILE_SEG[style] || 'voyager'}/{z}/{x}/{y}.png`);
 const validPts = (route) => (route || []).filter((p) => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]));
 const buildStyle = (style) => ({
   version: 8,
   sources: {
-    base: { type: 'raster', tiles: baseTiles(style), tileSize: 256, attribution: '© OpenStreetMap · © CARTO' },
+    base: baseSource(style),
     dem: { type: 'raster-dem', tiles: ['https://elevation-tiles-prod.s3.amazonaws.com/terrarium/{z}/{x}/{y}.png'], tileSize: 256, encoding: 'terrarium', maxzoom: 14 },
   },
   layers: [{ id: 'base', type: 'raster', source: 'base' }],
@@ -61,8 +60,9 @@ export default function RouteMapGL({ route, styleName = 'voyager', pitch = 0, te
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route]);
 
-  // React to control changes without re-creating the map.
-  useEffect(() => { const src = mapRef.current?.getSource('base'); if (src) src.setTiles(baseTiles(styleName)); }, [styleName]);
+  // React to control changes without re-creating the map. Rebuild the base (via applyBasemap) so
+  // maxzoom + attribution track the layer — the route line stays above it.
+  useEffect(() => { const m = mapRef.current; if (m && m.getSource && m.getSource('base')) applyBasemap(m, styleName); }, [styleName]);
   useEffect(() => {
     const m = mapRef.current;
     if (!m || !readyRef.current) return;

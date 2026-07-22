@@ -8,8 +8,9 @@ import { downscaleToJpeg } from '../lib/photos.js';
 import { dataUrlToBlob } from '../lib/avatar.js';
 import { bustAuthedImage } from '../lib/authedImage.js';
 import {
-  updateSquad, listMembers, addMember, removeMember, uploadSquadImage, deleteSquadImage,
+  updateSquad, listMembers, addMember, removeMember, uploadSquadImage, deleteSquadImage, createInvite,
 } from '../lib/squads.js';
+import { API_BASE } from '../lib/apiBase.js';
 
 const LEVELS = ['All levels', 'Intermediate+', 'Advanced', 'Race focus'];
 const KINDS = [
@@ -59,6 +60,11 @@ export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged
   const [email, setEmail] = useState('');
   const [memberMsg, setMemberMsg] = useState('');
   const [memberErr, setMemberErr] = useState('');
+
+  // invite link (friends who sign up with it auto-join this group)
+  const [inviteUrl, setInviteUrl] = useState('');
+  const [inviteBusy, setInviteBusy] = useState(false);
+  const [inviteMsg, setInviteMsg] = useState('');
 
   const loadMembers = useCallback(async () => {
     try {
@@ -135,6 +141,35 @@ export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged
       await loadMembers();
       onDataChanged?.();
     } catch (ex) { setMemberErr(ex.message || 'Could not add that athlete.'); }
+  };
+
+  // Public web origin for the shareable link: same-origin on web, the deployed backend
+  // (which also serves the web SPA) on native — never the capacitor:// app origin.
+  const inviteLinkFor = (token) => `${API_BASE || window.location.origin}/?invite=${token}`;
+
+  // Create (or rotate, when reset) the group's invite link, then copy / share it.
+  const makeInvite = async (reset = false) => {
+    setInviteBusy(true); setInviteMsg('');
+    try {
+      const t = await getToken?.();
+      const r = await createInvite(t, g.id, reset);
+      const url = inviteLinkFor(r.token);
+      setInviteUrl(url);
+      // Native share sheet if available; otherwise copy to the clipboard.
+      if (navigator.share) {
+        try { await navigator.share({ title: `Join ${g.name || 'our group'} on Domestique Team`, url }); setInviteMsg(reset ? 'New link ready — shared.' : 'Link shared.'); return; }
+        catch { /* user dismissed the sheet — fall through to clipboard */ }
+      }
+      try { await navigator.clipboard?.writeText(url); setInviteMsg(reset ? 'New link copied to clipboard.' : 'Invite link copied to clipboard.'); }
+      catch { setInviteMsg('Invite link ready — copy it below.'); }
+    } catch (ex) { setInviteMsg(ex.message || 'Could not create an invite link.'); }
+    finally { setInviteBusy(false); }
+  };
+
+  const copyInvite = async () => {
+    if (!inviteUrl) return;
+    try { await navigator.clipboard?.writeText(inviteUrl); setInviteMsg('Invite link copied to clipboard.'); }
+    catch { setInviteMsg('Select the link above to copy it.'); }
   };
 
   const doRemove = async (m) => {
@@ -242,11 +277,35 @@ export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged
         ))}
       </div>
 
+      {/* ---- invite link (friends who sign up with it auto-join this group) ---- */}
+      <FieldLabel>Invite friends</FieldLabel>
+      <div style={s('font-size:12px;color:var(--text2);line-height:1.5;margin:-4px 0 10px')}>
+        Share a link — anyone who signs up with it joins {name || 'your group'} automatically.
+      </div>
+      {!inviteUrl ? (
+        <div className="ctl" onClick={inviteBusy ? undefined : () => makeInvite(false)}
+          style={s(`background:var(--accent);color:var(--accent-ink);text-align:center;padding:13px;border-radius:12px;font-weight:700;font-size:14px${inviteBusy ? ';opacity:.6' : ''}`)}>
+          {inviteBusy ? 'Creating…' : 'Create invite link'}
+        </div>
+      ) : (
+        <>
+          <div style={s('display:flex;gap:8px;align-items:stretch')}>
+            <div style={s('flex:1;min-width:0;background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:12.5px;color:var(--text2);font-family:var(--mono, monospace);white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>{inviteUrl}</div>
+            <div className="ctl" onClick={copyInvite} style={s('background:var(--accent);color:var(--accent-ink);font-size:13px;font-weight:700;padding:12px 16px;border-radius:12px;flex:none;display:flex;align-items:center')}>Copy</div>
+          </div>
+          <div className="ctl" onClick={inviteBusy ? undefined : () => makeInvite(true)}
+            style={s(`text-align:center;font-size:12px;font-weight:600;color:var(--text3);margin-top:10px${inviteBusy ? ';opacity:.6' : ''}`)}>
+            Reset link
+          </div>
+        </>
+      )}
+      {inviteMsg && <div style={s('color:var(--good);font-size:12px;margin-top:8px;text-align:center')}>{inviteMsg}</div>}
+
       {/* ---- group sessions (coach schedules an ad-hoc ride/run/swim for the squad) ---- */}
-      <SquadEvents squadId={g.id} getToken={getToken} mode="manage" />
+      <div style={s('margin-top:22px')}><SquadEvents squadId={g.id} getToken={getToken} mode="manage" /></div>
 
       {/* ---- group targets (coach sets club races from an event link) ---- */}
-      <GroupTargets squadId={g.id} getToken={getToken} mode="manage" />
+      <div style={s('margin-top:22px')}><GroupTargets squadId={g.id} getToken={getToken} mode="manage" /></div>
     </div>
   );
 }

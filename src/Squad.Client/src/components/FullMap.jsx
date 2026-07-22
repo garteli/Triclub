@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { s } from '../lib/style.js';
 import { BASEMAP_LABEL, baseSource, applyBasemap, nextBasemap, inIsrael } from '../lib/basemaps.js';
-import { getRouteStyle, setRouteStyle as persistRouteStyle, ROUTE_COLORS, ROUTE_WIDTHS } from '../lib/routeStyle.js';
+import { getRouteStyle, setRouteStyle as persistRouteStyle, ROUTE_COLORS, ARROW_COLORS, ROUTE_WIDTHS } from '../lib/routeStyle.js';
 import { addRouteArrows, styleArrows } from '../lib/mapArrows.js';
+import { setMapView } from '../lib/mapView.js';
 import AuthedAvatar from './AuthedAvatar.jsx';
 
 // Full-screen 3D route map (MapLibre GL): our CARTO basemap draped over free AWS terrain
@@ -22,7 +23,7 @@ const buildStyle = (style) => ({
   layers: [{ id: 'base', type: 'raster', source: 'base' }],
 });
 
-export default function FullMap({ route, style: initialStyle = 'voyager', a, token, onClose }) {
+export default function FullMap({ route, style: initialStyle = 'voyager', is3D: initial3D, a, token, onClose, onView }) {
   const elRef = useRef(null);
   const mapRef = useRef(null);
   const headRef = useRef(null);
@@ -35,7 +36,7 @@ export default function FullMap({ route, style: initialStyle = 'voyager', a, tok
   const inPhone = targetRef.current && targetRef.current !== document.body;
   const safeTop = (px) => `calc(env(safe-area-inset-top, 0px) + ${px}px)`;
   const [mapStyle, setMapStyle] = useState(initialStyle);
-  const [is3D, setIs3D] = useState(true);
+  const [is3D, setIs3D] = useState(initial3D ?? true);
   const [bearing, setBearing] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [error, setError] = useState(false);
@@ -70,7 +71,7 @@ export default function FullMap({ route, style: initialStyle = 'voyager', a, tok
             map.addSource('route', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: pts.map(([la, lo]) => [lo, la]) } } });
             map.addLayer({ id: 'route', type: 'line', source: 'route', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': rs.color, 'line-width': rs.width } });
             // Direction chevrons repeated along the route (auto-rotated to travel direction).
-            addRouteArrows(map, 'route', 'route-arrows', { color: rs.color, width: rs.width });
+            addRouteArrows(map, 'route', 'route-arrows', { color: rs.arrowColor, width: rs.width });
             // Start/end as circle layers (canvas-rendered, same reliable path as the line).
             map.addSource('ends', { type: 'geojson', data: { type: 'FeatureCollection', features: [
               { type: 'Feature', properties: { c: '#4fe08b' }, geometry: { type: 'Point', coordinates: [pts[0][1], pts[0][0]] } },
@@ -98,11 +99,14 @@ export default function FullMap({ route, style: initialStyle = 'voyager', a, tok
     if (!m || !m.getLayer || !m.getLayer('route')) return;
     m.setPaintProperty('route', 'line-color', rstyle.color);
     m.setPaintProperty('route', 'line-width', rstyle.width);
-    styleArrows(m, ['route-arrows'], rstyle);
+    styleArrows(m, ['route-arrows'], { color: rstyle.arrowColor, width: rstyle.width });
   }, [rstyle]);
 
   // If we opened on Off-road but the route isn't in Israel, fall back to a global basemap.
   useEffect(() => { if (!israel && mapStyle === 'offroad') setMapStyle('voyager'); }, [israel, mapStyle]);
+
+  // Persist the last-selected layer + view, and sync the inline hero behind us (onView).
+  useEffect(() => { setMapView({ style: mapStyle, is3D }); onView?.(mapStyle, is3D); }, [mapStyle, is3D]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const applyRstyle = (next) => { setRstyle(next); persistRouteStyle(next); };
   const cycleStyle = () => setMapStyle((st) => nextBasemap(st, israel));
@@ -174,6 +178,13 @@ export default function FullMap({ route, style: initialStyle = 'voyager', a, tok
               {ROUTE_COLORS.map((c) => (
                 <div key={c} className="ctl" onClick={() => applyRstyle({ ...rstyle, color: c })} title={c}
                   style={s(`width:26px;height:26px;border-radius:50%;background:${c};cursor:pointer;box-shadow:0 0 0 ${rstyle.color === c ? '2.5px #fff' : '1px rgba(255,255,255,.25)'}`)} />
+              ))}
+            </div>
+            <div style={s('font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:rgba(255,255,255,.6);margin:12px 0 8px')}>Arrow colour</div>
+            <div style={s('display:flex;flex-wrap:wrap;gap:8px')}>
+              {ARROW_COLORS.map((c) => (
+                <div key={c} className="ctl" onClick={() => applyRstyle({ ...rstyle, arrowColor: c })} title={c}
+                  style={s(`width:26px;height:26px;border-radius:50%;background:${c};cursor:pointer;box-shadow:0 0 0 ${rstyle.arrowColor === c ? '2.5px var(--accent)' : '1px rgba(255,255,255,.25)'}`)} />
               ))}
             </div>
             <div style={s('font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:rgba(255,255,255,.6);margin:12px 0 8px')}>Width</div>

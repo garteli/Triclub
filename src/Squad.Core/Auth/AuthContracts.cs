@@ -106,6 +106,21 @@ public enum AddMemberOutcome { Added, AlreadyMember, AthleteNotFound, NotOwner }
 /// <summary>Body for the owner's "add member by email" call.</summary>
 public sealed record AddMemberRequest(string Email);
 
+/// <summary>Body for the owner's "create invite link" call. Reset=true rotates the link.</summary>
+public sealed record InviteCreateRequest(bool Reset = false);
+
+/// <summary>Public view of a squad invite link — shown to the invitee (who may not be signed in yet)
+/// so they know which club they're about to join.</summary>
+public sealed record InviteInfo(
+    string Token, Guid SquadId, string SquadName, string Discipline, string Color,
+    int MemberCount, string? LogoUrl);
+
+public enum AcceptInviteOutcome { Joined, AlreadyMember }
+
+/// <summary>Result of accepting an invite: what happened, which squad (for navigation), and the
+/// owner id so the caller can notify them of a genuinely-new member.</summary>
+public sealed record AcceptInviteResult(AcceptInviteOutcome Outcome, Guid SquadId, string SquadName, Guid? OwnerId);
+
 public interface ISquadService
 {
     Task<IReadOnlyList<SquadSummary>> ListAsync(Guid? me, CancellationToken ct);
@@ -138,6 +153,18 @@ public interface ISquadService
     Task<AddMemberOutcome> AddMemberByEmailAsync(Guid squadId, string email, Guid ownerId, CancellationToken ct);
     /// <summary>Owner removes a member. Returns false if not owner, or the target is the owner / not a member.</summary>
     Task<bool> RemoveMemberAsync(Guid squadId, Guid athleteId, Guid ownerId, CancellationToken ct);
+
+    // ----- invite links (coach invites friends to join their group) -----------
+
+    /// <summary>Owner creates a shareable invite token (or returns the squad's existing active one).
+    /// Anyone who signs up / accepts with it joins the squad immediately, bypassing gating.
+    /// <paramref name="reset"/> revokes the current link and mints a fresh one. Null if not owner.</summary>
+    Task<string?> CreateInviteAsync(Guid squadId, Guid ownerId, bool reset, CancellationToken ct);
+    /// <summary>Public lookup of a non-revoked invite token → the squad it joins (null if unknown/revoked).</summary>
+    Task<InviteInfo?> GetInviteAsync(string token, CancellationToken ct);
+    /// <summary>Accept an invite: join the squad immediately (idempotent) and make it the athlete's
+    /// active squad. Null if the token is unknown or revoked.</summary>
+    Task<AcceptInviteResult?> AcceptInviteAsync(string token, Guid athleteId, CancellationToken ct);
 
     /// <summary>The blob name of the squad's logo/banner image (kind = "logo" | "banner"), or null.</summary>
     Task<string?> GetImageBlobAsync(Guid squadId, string kind, CancellationToken ct);

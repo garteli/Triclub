@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { s } from '../lib/style.js';
 import { BASEMAP_LABEL, baseSource, applyBasemap, nextBasemap, inIsrael } from '../lib/basemaps.js';
-import { getRouteStyle, setRouteStyle as persistRouteStyle, ROUTE_COLORS, ROUTE_WIDTHS } from '../lib/routeStyle.js';
+import { getRouteStyle, setRouteStyle as persistRouteStyle, ROUTE_COLORS, ARROW_COLORS, ROUTE_WIDTHS } from '../lib/routeStyle.js';
 import { addRouteArrows, styleArrows } from '../lib/mapArrows.js';
 
 // Interactive live-ride map tile: a real MapLibre basemap you can pinch-zoom, pan and rotate,
@@ -105,16 +105,21 @@ export default function LiveMapGL({ pts, course, path, riders, mySport, interact
         mapRef.current = map;
         mlRef.current = maplibregl;
         map.on('error', (e) => { const m = e?.error?.message || String(e?.error || e); if (!/tile|404|Failed to fetch|AbortError/i.test(m)) console.error('MAPLIBRE', m); });
+        // If the map is created while its pager page is off-screen, basemap tiles load with no frame
+        // scheduled → a blank basemap until you pan. Repaint whenever the base finishes loading tiles.
+        map.on('sourcedata', (e) => { if (mapRef.current && e.sourceId === 'base' && e.isSourceLoaded) map.triggerRepaint(); });
         map.on('load', () => {
           const accent = resolveColor('var(--accent)');
-          map.addSource('course', { type: 'geojson', data: lineFC(course) });
-          map.addLayer({ id: 'course', type: 'line', source: 'course', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#7c8794', 'line-width': 3, 'line-opacity': 0.7, 'line-dasharray': [2, 2] } });
           const rs = rstyleRef.current; // per-user route colour/width (shared with the full map)
+          // Course = the route to follow: the user's colour + width, kept dashed + dimmed so it still
+          // reads as the guide vs the solid breadcrumb.
+          map.addSource('course', { type: 'geojson', data: lineFC(course) });
+          map.addLayer({ id: 'course', type: 'line', source: 'course', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': rs.color || accent, 'line-width': rs.width || 4, 'line-opacity': 0.6, 'line-dasharray': [2, 2] } });
           map.addSource('path', { type: 'geojson', data: lineFC(path) });
           map.addLayer({ id: 'path', type: 'line', source: 'path', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': rs.color || accent, 'line-width': rs.width || 4 } });
-          // Direction chevrons (in the route colour) along the course (route to follow) + your breadcrumb.
-          addRouteArrows(map, 'course', 'course-arrows', { color: rs.color, width: rs.width });
-          addRouteArrows(map, 'path', 'path-arrows', { color: rs.color, width: rs.width });
+          // Direction chevrons (own arrow colour) along the course (route to follow) + your breadcrumb.
+          addRouteArrows(map, 'course', 'course-arrows', { color: rs.arrowColor, width: rs.width });
+          addRouteArrows(map, 'path', 'path-arrows', { color: rs.arrowColor, width: rs.width });
           // Riders are DOM markers (initials dots + clusters), not a circle layer — see rebuildMarkers.
           readyRef.current = true;
           setFailed(false);
@@ -126,8 +131,8 @@ export default function LiveMapGL({ pts, course, path, riders, mySport, interact
         // Tiles never load if the map is created while its pager page is off-screen / zero-size (the
         // pages stay mounted). So nudge a resize on any size change (ResizeObserver), when it scrolls
         // into view (IntersectionObserver), and a few times just after creation — so it always paints.
-        const nudge = () => { if (map) map.resize(); };
-        [60, 250, 600].forEach((t) => setTimeout(nudge, t));
+        const nudge = () => { if (map) { map.resize(); map.triggerRepaint(); } };
+        [60, 250, 600, 1200].forEach((t) => setTimeout(nudge, t));
         const ro = new ResizeObserver(nudge);
         ro.observe(elRef.current);
         map._ro = ro;
@@ -273,12 +278,13 @@ export default function LiveMapGL({ pts, course, path, riders, mySport, interact
     if (map && readyRef.current) applyBasemap(map, basemap);
   }, [basemap]);
 
-  // Apply the per-user route colour/width live to the breadcrumb line AND the direction arrows.
+  // Apply the per-user route colour/width live to the course + breadcrumb lines AND the arrows.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !readyRef.current) return;
+    if (map.getLayer('course')) { map.setPaintProperty('course', 'line-color', rstyle.color); map.setPaintProperty('course', 'line-width', rstyle.width); }
     if (map.getLayer('path')) { map.setPaintProperty('path', 'line-color', rstyle.color); map.setPaintProperty('path', 'line-width', rstyle.width); }
-    styleArrows(map, ['course-arrows', 'path-arrows'], rstyle);
+    styleArrows(map, ['course-arrows', 'path-arrows'], { color: rstyle.arrowColor, width: rstyle.width });
   }, [rstyle]);
   const applyRstyle = (next) => { setRstyle(next); persistRouteStyle(next); };
 
@@ -324,6 +330,13 @@ export default function LiveMapGL({ pts, course, path, riders, mySport, interact
             {ROUTE_COLORS.map((c) => (
               <div key={c} className="ctl" onClick={(e) => { stop(e); applyRstyle({ ...rstyle, color: c }); }}
                 style={s(`width:24px;height:24px;border-radius:50%;background:${c};cursor:pointer;box-shadow:0 0 0 ${rstyle.color === c ? '2.5px var(--text)' : '1px var(--line2)'}`)} />
+            ))}
+          </div>
+          <div style={s('font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text3);margin:11px 0 7px')}>Arrow colour</div>
+          <div style={s('display:flex;flex-wrap:wrap;gap:7px')}>
+            {ARROW_COLORS.map((c) => (
+              <div key={c} className="ctl" onClick={(e) => { stop(e); applyRstyle({ ...rstyle, arrowColor: c }); }}
+                style={s(`width:24px;height:24px;border-radius:50%;background:${c};cursor:pointer;box-shadow:0 0 0 ${rstyle.arrowColor === c ? '2.5px var(--accent)' : '1px var(--line2)'}`)} />
             ))}
           </div>
           <div style={s('font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text3);margin:11px 0 7px')}>Width</div>

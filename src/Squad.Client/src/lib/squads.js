@@ -33,6 +33,13 @@ export const listMembers = (token, id) => req(`/api/squads/${id}/members`, { tok
 export const addMember = (token, id, email) => req(`/api/squads/${id}/members`, { method: 'POST', token, body: { email } });
 export const removeMember = (token, id, athleteId) => req(`/api/squads/${id}/members/${athleteId}`, { method: 'DELETE', token });
 
+// Invite links: owner mints a shareable link (reset=true rotates it → { token }); anyone can look
+// up an invite before signing up ({ token, squadId, squadName, discipline, color, memberCount, logoUrl });
+// a signed-in athlete accepts it to auto-join ({ outcome, squadId, squadName }).
+export const createInvite = (token, id, reset = false) => req(`/api/squads/${id}/invite`, { method: 'POST', token, body: { reset } });
+export const getInvite = (inviteToken) => req(`/api/invites/${encodeURIComponent(inviteToken)}`);
+export const acceptInvite = (token, inviteToken) => req(`/api/invites/${encodeURIComponent(inviteToken)}/accept`, { method: 'POST', token });
+
 // Group targets: coach (owner) sets club target races; members browse + adopt.
 // listSquadTargets → [{ id, name, date, location, url }]
 export const listSquadTargets = (token, id) => req(`/api/squads/${id}/targets`, { token });

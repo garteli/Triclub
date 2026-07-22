@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { s } from '../lib/style.js';
 import EmptyState from '../components/EmptyState.jsx';
 
@@ -26,7 +26,22 @@ const TAB_DEFS = [['load', 'Load'], ['vol', 'Volume'], ['members', 'Athletes'], 
 
 export default function ClubRanking({ clubRanking }) {
   const [tab, setTab] = useState('load');
+  const [disc, setDisc] = useState('All');
   const rows = clubRanking?.rows ?? [];
+
+  // Default the board to the caller's own discipline once rows arrive (so it opens on
+  // "clubs like mine"), unless they've already picked one. 'All' cancels the auto-pick.
+  const [autoPicked, setAutoPicked] = useState(false);
+  useEffect(() => {
+    if (autoPicked) return;
+    const mine = rows.find((r) => r.you)?.disc;
+    if (mine) { setDisc(mine); setAutoPicked(true); }
+  }, [rows, autoPicked]);
+
+  // Discipline chips: only disciplines that actually field a club, plus 'All'.
+  const discList = ['All', ...Array.from(new Set(rows.map((r) => r.disc).filter(Boolean)))];
+  // Compare clubs against same-discipline peers: everything below ranks the scoped set.
+  const scoped = disc === 'All' ? rows : rows.filter((r) => r.disc === disc);
 
   // Real days until the weekly board resets (next Monday). Mon=0..Sun=6.
   const dayIdx = (new Date().getDay() + 6) % 7;
@@ -36,10 +51,10 @@ export default function ClubRanking({ clubRanking }) {
   const sortKey = (r) => (tab === 'vol' ? r.volHours : tab === 'members' ? r.members : tab === 'streak' ? r.streak : r.load);
   const unit = tab === 'streak' ? 'd' : '';
 
-  const sorted = [...rows].sort((a, b) => sortKey(b) - sortKey(a));
+  const sorted = [...scoped].sort((a, b) => sortKey(b) - sortKey(a));
   const maxV = Math.max(1, ...sorted.map(sortKey));
   // Load leader gets the 🔥 badge; the caller's own club gets ⚡ (as in the design's first rows).
-  const loadLeaderId = [...rows].sort((a, b) => b.load - a.load)[0]?.id;
+  const loadLeaderId = [...scoped].sort((a, b) => b.load - a.load)[0]?.id;
   const lbRows = sorted.map((r, i) => {
     const rank = i + 1;
     return {
@@ -73,6 +88,16 @@ export default function ClubRanking({ clubRanking }) {
           <div style={s('font-size:9px;color:var(--text3);text-transform:uppercase')}>resets</div>
         </div>
       </div>
+
+      {/* discipline scope — rank clubs against same-discipline peers */}
+      {discList.length > 2 && (
+        <div className="hscroll" style={s('display:flex;gap:7px;overflow-x:auto;margin:14px -18px 0;padding:0 18px 4px')}>
+          {discList.map((d) => (
+            <div key={d} className="ctl" onClick={() => { setDisc(d); setAutoPicked(true); }}
+              style={s(`flex:none;padding:7px 13px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap;${disc === d ? 'background:var(--text);color:var(--bg)' : 'background:var(--bg2);border:1px solid var(--line);color:var(--text2)'}`)}>{d === 'All' ? 'All disciplines' : d}</div>
+          ))}
+        </div>
+      )}
 
       {/* metric tabs */}
       <div className="hscroll" style={s('display:flex;gap:7px;overflow-x:auto;margin:14px -18px 0;padding:0 18px 4px')}>

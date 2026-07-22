@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { s } from '../lib/style.js';
 import EmptyState from '../components/EmptyState.jsx';
 import AuthedImage from '../components/AuthedImage.jsx';
+import { DISCIPLINES } from '../lib/disciplines.js';
 
 // Group bike glyph, reused as the tile mark on each club row (fallback when no logo).
 const GroupBike = () => (
@@ -20,7 +21,7 @@ const GroupMark = ({ g, token }) => (
 
 // Chip label → the discipline it keeps. 'All' matches everything; the rest match a
 // club whose `disc` string contains the chip (so "Triathlon" catches "Triathlon", etc.).
-const filters = ['All', 'Cycling', 'Triathlon', 'Swim'];
+const filters = ['All', ...DISCIPLINES];
 
 export default function Discover({ vm, actions, getToken }) {
   const [token, setToken] = useState(null);

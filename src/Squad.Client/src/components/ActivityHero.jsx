@@ -1,9 +1,10 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { s } from '../lib/style.js';
+import { BASEMAP_LABEL, nextBasemap, inIsrael } from '../lib/basemaps.js';
+import { getMapView, setMapView } from '../lib/mapView.js';
 import RouteMapGL from './RouteMapGL.jsx';
 import FullMap from './FullMap.jsx';
 
-const MAP_STYLES = ['voyager', 'light', 'dark'];
 const validPts = (route) => (route || []).filter((p) => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]));
 
 // Strava-style hero: an interactive route map (pan / pinch-zoom / rotate) with glass
@@ -12,8 +13,11 @@ const validPts = (route) => (route || []).filter((p) => Array.isArray(p) && Numb
 const glass = 'background:rgba(20,23,29,.72);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.1);color:#fff';
 
 export default function ActivityHero({ a, route, frames, hasMap, status, token, onBack, onDelete, onSaveRoute }) {
-  const [mapStyle, setMapStyle] = useState('voyager');
-  const [is3D, setIs3D] = useState(false);
+  // Off-road only makes sense over Israel (its tiles are blank elsewhere).
+  const israel = (() => { const p = validPts(route)[0]; return p ? inIsrael(p[0], p[1]) : true; })();
+  // Restore the athlete's last-selected layer + 2D/3D view (persisted); drop Off-road when not in Israel.
+  const [mapStyle, setMapStyle] = useState(() => { const v = getMapView(); return (v.style === 'offroad' && !israel) ? 'voyager' : v.style; });
+  const [is3D, setIs3D] = useState(() => getMapView().is3D);
   const [full, setFull] = useState(false);
   const [menu, setMenu] = useState(false); // overflow (···) sheet: Save route / Delete
   const [playing, setPlaying] = useState(false);
@@ -22,7 +26,9 @@ export default function ActivityHero({ a, route, frames, hasMap, status, token, 
   const headRef = useRef(null);
   const rafRef = useRef(0);
   const canPlay = hasMap && validPts(route).length > 1;
-  const cycleStyle = () => setMapStyle((st) => MAP_STYLES[(MAP_STYLES.indexOf(st) + 1) % MAP_STYLES.length]);
+  const cycleStyle = () => setMapStyle((st) => nextBasemap(st, israel));
+  // Persist the last layer + view so reopening any activity map restores them.
+  useEffect(() => { setMapView({ style: mapStyle, is3D }); }, [mapStyle, is3D]);
 
   // Replay: glide a head marker along the route at a fixed 4×.
   const togglePlay = () => {
@@ -63,7 +69,7 @@ export default function ActivityHero({ a, route, frames, hasMap, status, token, 
       {/* layers (cycle basemap) + 3D (inline terrain tilt) */}
       {hasMap && (
         <div style={s('position:absolute;top:64px;right:16px;z-index:3;display:flex;flex-direction:column;gap:8px')}>
-          <div className="ctl" onClick={cycleStyle} title={`Map: ${mapStyle}`} style={s(`width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;${glass}`)}>
+          <div className="ctl" onClick={cycleStyle} title={`Map: ${BASEMAP_LABEL[mapStyle] || mapStyle}`} style={s(`width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;${glass}`)}>
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"><path d="M12 2l9 5-9 5-9-5z" /><path d="M3 12l9 5 9-5M3 17l9 5 9-5" /></svg>
           </div>
           <div className="ctl" onClick={() => setIs3D((v) => !v)} title={is3D ? 'Switch to 2D' : 'Switch to 3D'} style={s(`width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;${is3D ? 'background:var(--accent);color:var(--accent-ink);border:1px solid var(--accent)' : glass}`)}>{is3D ? '2D' : '3D'}</div>
@@ -138,7 +144,8 @@ export default function ActivityHero({ a, route, frames, hasMap, status, token, 
         fitPadding={{ top: 62, bottom: 66, left: 30, right: 30 }}
         onReady={(m, gl) => { mapRef.current = m; glRef.current = gl; }} />
       {controls}
-      {full && <FullMap route={route} style={mapStyle} a={a} token={token} onClose={() => setFull(false)} />}
+      {full && <FullMap route={route} style={mapStyle} is3D={is3D} a={a} token={token}
+        onView={(style, threeD) => { setMapStyle(style); setIs3D(threeD); }} onClose={() => setFull(false)} />}
     </div>
   );
 }

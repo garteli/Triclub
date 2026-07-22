@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { s } from '../lib/style.js';
 import { StepHeader, Title, Sub, FieldLabel, Field, Chips, PrimaryBtn } from './wizard.jsx';
 import { SocialButton, BiometricButton, OrDivider, RememberRow } from '../components/AuthButtons.jsx';
+import InviteBanner from '../components/InviteBanner.jsx';
 import {
   registerWithEmail, updateProfile, oauthSignIn, authConfig,
   biometricAvailable, biometricEnrolled, signInWithBiometric,
@@ -13,7 +14,7 @@ const LEVELS = ['New to it', 'Intermediate', 'Advanced', 'Racing'];
 // Athlete sign-up. Social (Google/Apple) or email create a real account server-side
 // (POST /api/auth/*) and return the app's JWT, which becomes the session. "Stay
 // signed in" persists it; enrolled devices can later unlock with Face ID / Touch ID.
-export default function Register({ actions }) {
+export default function Register({ actions, inviteInfo }) {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState({ name: '', email: '', pass: '', sport: 'Triathlon', level: 'Intermediate', ftp: '', hours: '' });
   const [remember, setRemember] = useState(true);
@@ -85,6 +86,8 @@ export default function Register({ actions }) {
         <>
           <Title>Create your account</Title>
           <Sub>Join your squad and start training together.</Sub>
+
+          {inviteInfo && <div style={s('margin-top:16px')}><InviteBanner info={inviteInfo} /></div>}
 
           {(anySocial || bioReady) && (
             <div style={s('display:flex;flex-direction:column;gap:10px;margin-top:18px')}>

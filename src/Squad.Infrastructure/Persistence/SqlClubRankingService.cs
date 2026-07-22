@@ -75,6 +75,7 @@ public sealed class SqlClubRankingService(string connectionString) : IClubRankin
                 Name = c.Name,
                 Initials = Initials(c.Name),
                 Color = c.Color,
+                Discipline = c.Discipline ?? "",
                 Emblem = Emblem(c.Id),
                 You = mySquad is not null && c.Id == mySquad.Value,
                 Load = agg?.Load ?? 0,
@@ -139,7 +140,7 @@ public sealed class SqlClubRankingService(string connectionString) : IClubRankin
     }
 
     private const string ClubsSql = """
-        SELECT Id, Name, Color FROM dbo.Squad;
+        SELECT Id, Name, Color, Discipline FROM dbo.Squad;
         """;
 
     private const string MembersSql = """
@@ -168,7 +169,7 @@ public sealed class SqlClubRankingService(string connectionString) : IClubRankin
         WHERE ath.SquadId IS NOT NULL AND a.StartUtc >= @since;
         """;
 
-    private sealed record ClubRow(Guid Id, string Name, string Color);
+    private sealed record ClubRow(Guid Id, string Name, string Color, string? Discipline);
     private sealed record MemberCountRow(Guid SquadId, int Members);
     private sealed record Agg(Guid SquadId, double Load, double VolumeHours);
     private sealed record AthleteDayRow(Guid SquadId, Guid AthleteId, DateTime Dt);

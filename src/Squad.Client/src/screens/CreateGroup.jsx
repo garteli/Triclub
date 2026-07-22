@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { s } from '../lib/style.js';
 import { StepHeader, Title, Sub, FieldLabel, Field, TextArea, Chips, Switch, PrimaryBtn } from './wizard.jsx';
+import { DISCIPLINES, DISC_COLOR } from '../lib/disciplines.js';
 
-const DISCIPLINES = ['Cycling', 'Triathlon', 'Swim', 'Run'];
 const LEVELS = ['All levels', 'Intermediate+', 'Advanced', 'Race focus'];
-const DISC_COLOR = { Cycling: '#ffce4a', Triathlon: '#ff6a2c', Swim: '#37c0ff', Run: '#ff6f61' };
 
 const GroupBike = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0c0e11" strokeWidth="2.2" strokeLinecap="round">
