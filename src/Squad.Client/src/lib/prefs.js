@@ -25,6 +25,12 @@ export const defaultPrefs = {
     productNews: false,   // product news & tips
     quietHours: false,    // mute 22:00–07:00
   },
+  // Auto-pause the recorder when you stop, resume after sustained movement (km/h thresholds).
+  autoPause: {
+    enabled: true,
+    pauseKph: 2,   // pause when speed drops below this
+    resumeKph: 4,  // resume after speed holds above this for 5 s
+  },
   privacy: {
     profile: 'squad',      // who can see your profile: 'public' | 'squad' | 'private'
     activityMap: 'squad',  // who can see your activity maps
@@ -46,6 +52,7 @@ function merge(saved) {
     units: saved.units ?? defaultPrefs.units,
     temp: saved.temp ?? defaultPrefs.temp,
     notif: { ...defaultPrefs.notif, ...(saved.notif || {}) },
+    autoPause: { ...defaultPrefs.autoPause, ...(saved.autoPause || {}) },
     privacy: { ...defaultPrefs.privacy, ...(saved.privacy || {}) },
   };
 }
@@ -61,8 +68,8 @@ export function loadPrefs() {
 // Persist just the preference slice of app state.
 export function savePrefs(state) {
   try {
-    const { theme, accent, lang, units, temp, notif, privacy } = state;
-    localStorage.setItem(KEY, JSON.stringify({ theme, accent, lang, units, temp, notif, privacy }));
+    const { theme, accent, lang, units, temp, notif, autoPause, privacy } = state;
+    localStorage.setItem(KEY, JSON.stringify({ theme, accent, lang, units, temp, notif, autoPause, privacy }));
   } catch { /* storage unavailable */ }
   return state;
 }
