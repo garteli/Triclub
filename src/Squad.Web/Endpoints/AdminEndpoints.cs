@@ -44,8 +44,10 @@ public static class AdminEndpoints
             async (Guid id, Guid athleteId, ISysAdminService admin, CancellationToken ct)
                 => ToResult(await admin.RemoveMemberAsync(id, athleteId, ct)));
 
-        g.MapDelete("/users/{id:guid}", async (Guid id, ISysAdminService admin, CancellationToken ct)
-            => ToResult(await admin.DeleteUserAsync(id, ct)));
+        // deleteOwnedClubs=true also deletes the club(s) this user owns (the client gates that
+        // behind a type-the-group-name confirmation).
+        g.MapDelete("/users/{id:guid}", async (Guid id, ISysAdminService admin, CancellationToken ct, bool deleteOwnedClubs = false)
+            => ToResult(await admin.DeleteUserAsync(id, deleteOwnedClubs, ct)));
 
         return app;
     }

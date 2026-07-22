@@ -22,4 +22,7 @@ export const adminSquadMembers = (token, id) => req(`/api/admin/squads/${id}/mem
 export const adminDeleteSquad = (token, id) => req(`/api/admin/squads/${id}`, { method: 'DELETE', token });
 export const adminRemoveMember = (token, id, athleteId) =>
   req(`/api/admin/squads/${id}/members/${athleteId}`, { method: 'DELETE', token });
-export const adminDeleteUser = (token, id) => req(`/api/admin/users/${id}`, { method: 'DELETE', token });
+// deleteOwnedClubs also deletes the club(s) this user owns (server-gated; the UI requires
+// typing the group name first).
+export const adminDeleteUser = (token, id, { deleteOwnedClubs = false } = {}) =>
+  req(`/api/admin/users/${id}${deleteOwnedClubs ? '?deleteOwnedClubs=true' : ''}`, { method: 'DELETE', token });

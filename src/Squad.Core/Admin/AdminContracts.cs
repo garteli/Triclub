@@ -51,6 +51,8 @@ public interface ISysAdminService
     Task<AdminActionResult> RemoveMemberAsync(Guid squadId, Guid athleteId, CancellationToken ct);
 
     /// <summary>Delete a user account and everything they own (activities, memberships, their private
-    /// squad, …). Blocked (OwnsClub) if they own a real club — that must be deleted/transferred first.</summary>
-    Task<AdminActionResult> DeleteUserAsync(Guid athleteId, CancellationToken ct);
+    /// squad, …). If they own real club(s): blocked (OwnsClub) unless <paramref name="deleteOwnedClubs"/>
+    /// is set, in which case those clubs are deleted too (members moved to their private squads; the
+    /// seeded landing club is orphaned rather than deleted).</summary>
+    Task<AdminActionResult> DeleteUserAsync(Guid athleteId, bool deleteOwnedClubs, CancellationToken ct);
 }
