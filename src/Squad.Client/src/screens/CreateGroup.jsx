@@ -45,11 +45,10 @@ export default function CreateGroup({ actions, onCreateSquad }) {
           discipline: form.disc,
           location: form.city.trim(),
           level: form.level,
-          // Every club is approval-gated (no instant-join "free/open" kind). Coaching → coach,
-          // otherwise a membership club; a blank price just means it's free to join on approval.
-          kind: form.coaching ? 'coach' : 'member',
-          price: form.price ? `₪${form.price}` : 'Free',
-          perLabel: form.price ? '/mo' : '',
+          // Every club is a free, approval-gated membership for now (no coached/paid tiers).
+          kind: 'member',
+          price: 'Free',
+          perLabel: '',
           color,
           description: form.desc,
         });
@@ -110,15 +109,11 @@ export default function CreateGroup({ actions, onCreateSquad }) {
 
       {step === 1 && (
         <>
-          <Title>Membership &amp; services</Title>
-          <Sub>Set what you charge. Payments go to the group owner.</Sub>
-          <Field label="Membership (₪ / month)" value={form.price} onChange={set('price')} placeholder="90" type="number" mono />
-          <Field label="One-time drop-in ride (₪)" value={form.dropin} onChange={set('dropin')} placeholder="35" type="number" mono />
-          <div style={s('display:flex;align-items:center;gap:12px;background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:13px 14px;margin-top:18px')}>
-            <div style={s('flex:1')}><div style={s('font-size:14px;font-weight:700')}>Offer 1:1 coaching</div><div style={s('font-size:11.5px;color:var(--text2)')}>Personalised plans + weekly review</div></div>
-            <Switch on={form.coaching} onChange={set('coaching')} />
+          <Title>Membership</Title>
+          <Sub>Your club is free to join — riders request and you approve who's in.</Sub>
+          <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:14px;margin-top:16px;font-size:13px;color:var(--text2);line-height:1.5')}>
+            <span style={s('color:var(--text);font-weight:700')}>Free to join, by approval.</span> Members get full access to your group rides, plan and leaderboard once you approve their request.
           </div>
-          {form.coaching && <Field label="Coaching (₪ / month)" value={form.coachPrice} onChange={set('coachPrice')} placeholder="450" type="number" mono />}
           <PrimaryBtn onClick={() => setStep(2)}>Review</PrimaryBtn>
         </>
       )}
@@ -136,22 +131,12 @@ export default function CreateGroup({ actions, onCreateSquad }) {
               <div style={s('display:flex;gap:9px;margin-top:6px;font-size:10.5px;color:var(--text3)')}><span>★ —</span><span>· 1 rider</span><span>· {form.disc}</span></div>
             </div>
             <div style={s('text-align:right;flex:none')}>
-              <div style={s('font-size:9.5px;font-weight:700;padding:3px 8px;border-radius:7px;color:var(--accent);background:var(--accent-dim)')}><span className="mono">{form.price ? '₪' + form.price : 'Free'}</span>{form.price ? '/mo' : ''}</div>
+              <div style={s('font-size:9.5px;font-weight:700;padding:3px 8px;border-radius:7px;color:var(--good);background:color-mix(in srgb,var(--good) 15%,transparent)')}>Free</div>
               <div style={s('font-size:10px;color:var(--text3);margin-top:6px')}>{form.level}</div>
             </div>
           </div>
 
           {form.desc && <div style={s('font-size:12.5px;color:var(--text2);line-height:1.5;margin-top:14px')}>{form.desc}</div>}
-
-          <FieldLabel>What athletes can buy</FieldLabel>
-          <div style={s('display:flex;flex-direction:column;gap:8px')}>
-            {[['Membership', form.price ? '₪' + form.price + '/mo' : 'Free'], ['One-time ride', '₪' + (form.dropin || '35')], ...(form.coaching ? [['1:1 Coaching', '₪' + (form.coachPrice || '450') + '/mo']] : [])].map(([k, v]) => (
-              <div key={k} style={s('display:flex;background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:11px 13px')}>
-                <span style={s('flex:1;font-size:13px;font-weight:600')}>{k}</span>
-                <span className="mono" style={s('font-size:13px;font-weight:700;color:var(--accent)')}>{v}</span>
-              </div>
-            ))}
-          </div>
           {error && <div style={s('color:var(--bad);font-size:12.5px;margin-top:12px;text-align:center')}>{error}</div>}
           <PrimaryBtn onClick={busy ? undefined : publish} disabled={busy}>{busy ? 'Publishing…' : 'Publish group'}</PrimaryBtn>
         </>
