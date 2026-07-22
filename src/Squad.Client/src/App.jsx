@@ -73,6 +73,7 @@ import NotificationPrefs from './screens/NotificationPrefs.jsx';
 import Privacy from './screens/Privacy.jsx';
 import Help from './screens/Help.jsx';
 import Legal from './screens/Legal.jsx';
+import Admin from './screens/Admin.jsx';
 
 // Initial prototype state (matches the handoff's Component.state).
 const initialState = {
@@ -112,6 +113,7 @@ const screens = {
   athlete: AthleteProfile, editprofile: EditProfile, notifs: Notifications, activities: Activities,
   upload: UploadActivity, sensors: Sensors,
   units: Units, zones: TrainingZones, notifprefs: NotificationPrefs, privacy: Privacy, help: Help, legal: Legal,
+  admin: Admin,
 };
 
 // Screens that render the persistent global header (AppHeader) via the Phone shell.
@@ -146,6 +148,7 @@ const HEADER_META = {
   // Coach/group management.
   manage: { title: 'Manage group' },
   ledger: { title: 'Ride payments' },
+  admin: { title: 'System admin' },
   // Tab root + contextual screens (dynamic titles from the view model).
   plan: { root: true },
   athlete: { title: (vm) => vm.athlete?.name || 'Athlete' },

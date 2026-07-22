@@ -71,6 +71,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IHealthDailyStore>(_ => new SqlHealthDailyStore(sqlConnectionString));
         services.AddScoped<IGoalStore>(_ => new SqlGoalStore(sqlConnectionString));
         services.AddScoped<IProfileStatsService>(_ => new SqlProfileStatsService(sqlConnectionString));
+        services.AddScoped<ISysAdminService>(_ => new SqlSysAdminService(sqlConnectionString));
 
         // AI plan generation (spec → CoachPlan doc via Anthropic), used by the library seeder. The
         // named client gets a generous 420s timeout — a detailed 16-week plan is a slow single call

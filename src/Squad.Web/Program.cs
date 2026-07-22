@@ -84,6 +84,9 @@ builder.Services
     });
 builder.Services.AddAuthorization();
 
+// Sysadmin allowlist (Admin:Emails in config, plus the founding admin). Gates /api/admin.
+builder.Services.AddSingleton<AdminRegistry>();
+
 // ---- token issuance + social sign-in ----
 // JWT minting (same "Jwt" config the bearer middleware validates above).
 builder.Services.AddSingleton<ITokenIssuer, JwtTokenIssuer>();
@@ -137,6 +140,7 @@ app.MapAthletes();         // GET /api/athletes/{id} (+ follow/unfollow)
 app.MapNotifications();     // GET /api/notifications (+ /read)
 app.MapPlan();             // GET /api/plan
 app.MapChat();             // GET/POST /api/messages
+app.MapAdmin();            // GET/DELETE /api/admin/* (sysadmin-only: users + clubs)
 app.MapSquadHub();         // /hubs/squad
 app.MapChatHub();          // /hubs/chat
 app.MapRideHub();          // /hubs/ride
