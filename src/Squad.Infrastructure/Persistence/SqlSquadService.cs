@@ -303,8 +303,9 @@ public sealed class SqlSquadService(string connectionString) : ISquadService
         return await conn.QuerySingleOrDefaultAsync<InviteInfo>(new CommandDefinition("""
             SELECT i.Token, i.SquadId, s.Name AS SquadName, s.Discipline, s.Color,
                    (SELECT COUNT(*) FROM dbo.Membership m WHERE m.SquadId = s.Id) AS MemberCount,
+                   -- Public, invite-scoped logo URL (no auth) so a logged-out invitee can see the club logo.
                    CASE WHEN s.LogoBlob IS NOT NULL
-                        THEN '/api/images/squads/' + LOWER(CONVERT(varchar(36), s.Id)) + '/logo' END AS LogoUrl
+                        THEN '/api/invites/' + i.Token + '/logo' END AS LogoUrl
             FROM dbo.SquadInvite i
             JOIN dbo.Squad s ON s.Id = i.SquadId
             WHERE i.Token = @token AND i.RevokedUtc IS NULL;
