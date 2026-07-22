@@ -44,6 +44,8 @@ export const navIcons = {
   ride:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 17.5l-3-6.5H8.5m6.5 0l-2.5 6.5M9.5 6.5h3l2 4.5"/></svg>',
   lb:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M6 4h12v5a6 6 0 0 1-12 0V4zM6 6H3v2a3 3 0 0 0 3 3M18 6h3v2a3 3 0 0 1-3 3"/></svg>',
   coach: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 4.6L18.5 9l-3.5 3 1 5-4-2.7L8 17l1-5L5.5 9l4.6-1.4z"/></svg>',
+  // waving flag — the motorsport clubs' Events tab (they run on scheduled sessions, not a training plan)
+  events:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4"/><path d="M5 4c2.5-1.6 5 1.4 7.5 0S18 4 19 4v8c-1 0-4-1.6-6.5 0S7.5 12 5 12"/></svg>',
 };
 
 export const navDef = [
@@ -53,6 +55,16 @@ export const navDef = [
   { id: 'lb',    label: { en: 'Ranks',    he: 'טבלה' },    icon: navIcons.lb },
   { id: 'coach', label: { en: 'Coach AI', he: 'מאמן' },    icon: navIcons.coach },
 ];
+
+// Motorsport clubs don't run structured training plans — their second tab is Events
+// (scheduled group rides/sessions) instead of Plan — and they have no AI training coach,
+// so that tab is dropped too. The bottom nav is otherwise shared; the swap is keyed by
+// the active club's discipline family.
+const eventsNavItem = { id: 'events', label: { en: 'Events', he: 'אירועים' }, icon: navIcons.events };
+export const navFor = (family) =>
+  family === 'motorsport'
+    ? navDef.filter((n) => n.id !== 'coach').map((n) => (n.id === 'plan' ? eventsNavItem : n))
+    : navDef;
 
 export const workoutDefs = {
   bike: { disc: 'bike', color: 'var(--bike)', title: 'Bike · Threshold', meta: 'Key session · Zone 4',

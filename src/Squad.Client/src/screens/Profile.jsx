@@ -130,12 +130,13 @@ export default function Profile({ vm, actions, getToken }) {
         </>
       )}
 
-      {/* this block · by discipline */}
-      <DisciplineBreakdown disciplines={page?.disciplines} />
+      {/* this block · by discipline — endurance only; the swim/bike/run split is
+          meaningless for a motorsport club, so it's hidden there (see vm.family). */}
+      {vm.family === 'endurance' && <DisciplineBreakdown disciplines={page?.disciplines} />}
 
-      {/* squad card */}
+      {/* squad card — opens the club's group profile (falls back to Discover if no active club) */}
       <div style={s(eyebrow + ';margin:22px 2px 12px')}>Squad</div>
-      <div className="ctl" onClick={() => actions?.go('discover')} style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:13px 14px;display:flex;align-items:center;gap:12px')}>
+      <div className="ctl" onClick={() => (vm.activeClubId ? actions?.openGroup(vm.activeClubId) : actions?.go('discover'))} style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:13px 14px;display:flex;align-items:center;gap:12px')}>
         <div style={s('width:44px;height:44px;border-radius:13px;background:linear-gradient(135deg,#ff8a3d,#ef5f1f);flex:none;display:flex;align-items:center;justify-content:center')}><SquadLogo /></div>
         <div style={s('flex:1;min-width:0')}>
           <div style={s('font-size:14px;font-weight:700')}>{page?.squadName || me.club || 'Your club'}</div>
