@@ -14,8 +14,9 @@ export function makeArrowImage(color = '#ff6a2c') {
   return x.getImageData(0, 0, S, S);
 }
 
-// Arrow icon-size scaled to the route width (S/M/L), so bolder routes get bolder arrows.
-export const arrowSize = (width) => 0.42 + (width || 5) * 0.045;
+// Arrow icon-size scaled to the route width (S/M/L) so the arrows visibly track the line weight:
+// S(3)→0.68, M(5)→0.88, L(8)→1.18.
+export const arrowSize = (width) => 0.38 + (width || 5) * 0.1;
 
 // Register the shared arrow image (once per map) and add a symbol layer drawing direction chevrons
 // along `sourceId`. Safe to call repeatedly. opts: { color, width, beforeId }.
