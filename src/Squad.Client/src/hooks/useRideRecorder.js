@@ -61,6 +61,11 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, onE
   const pauseStartRef = useRef(null); // when the current pause began
   const resumeStartRef = useRef(null); // when speed first crossed the resume threshold (5s sustain)
   const [recording, setRecording] = useState(false);
+  // Synchronous mirror of `recording` so onSample can hard-ignore any fixes a location source
+  // delivers AFTER stop (native/web watches can emit a few residual callbacks). Without this, a
+  // stopped ride keeps pushing telemetry (you stay "live" on the hub) and the auto-pause 5 s
+  // resume timer can still fire — the ride appears to "come back" seconds after you stopped it.
+  const recordingRef = useRef(false);
   const [paused, setPaused] = useState(false);       // web: backgrounded / screen locked
   const [distanceKm, setDistanceKm] = useState(0);
   const [elapsedSec, setElapsedSec] = useState(0);   // wall-clock since the ride started, ticks live
@@ -123,6 +128,9 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, onE
   }, []);
 
   const onSample = useCallback((s) => {
+    // Ignore any fixes that arrive after the ride has stopped — a not-fully-detached source must
+    // not keep counting distance, pushing presence telemetry, or driving the auto-pause machine.
+    if (!recordingRef.current) return;
     const nowTs = s.ts ?? Date.now();
 
     // GPS quality gate (after the first fix): drop OS-reported poor-accuracy readings and implausible
@@ -235,6 +243,7 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, onE
       setMode('web');
       await acquireWakeLock(); // keep the screen alive so the foreground watch survives
     }
+    recordingRef.current = true; // open the onSample gate before the source can deliver a fix
     source.current.start(onSample, (err) => setError(err?.message || 'Location error'));
   }, [onSample, acquireWakeLock, indoor, sensors]);
 
@@ -271,12 +280,16 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, onE
 
   // Stop the location source and hand the ride to the save/discard summary card.
   const stop = useCallback(async () => {
+    recordingRef.current = false; // close the onSample gate FIRST — ignore any in-flight fixes
     try { await source.current?.stop?.(); } catch { /* ignore */ }
     source.current = null;
     await releaseWakeLock();
     setRecording(false);
     setPaused(false);
     setMode('idle');
+    // Clear the auto-pause machine so a stopped ride can't sit in (or resume from) a paused state.
+    autoPausedRef.current = false; pauseStartRef.current = null; resumeStartRef.current = null;
+    setAutoPaused(false);
 
     // A driver/escort ride isn't a workout — discard it instead of offering to save (never
     // uploaded, so it can't land as a bike activity). The live stream already served the group.
