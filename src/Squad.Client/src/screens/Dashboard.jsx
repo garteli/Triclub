@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { s, html } from '../lib/style.js';
 import Avatar from '../components/Avatar.jsx';
+import AuthedAvatar from '../components/AuthedAvatar.jsx';
 import AuthedImage from '../components/AuthedImage.jsx';
 import FeedActivityCard from '../components/FeedActivityCard.jsx';
 import { useNotifications } from '../hooks/useNotifications.js';
@@ -62,7 +63,7 @@ function ClubSwitcher({ vm, token, rtl, onSwitch, children }) {
   );
 }
 
-function SquadRail({ squad, rtl, onOpen }) {
+function SquadRail({ squad, rtl, onOpen, token }) {
   if (!squad.length) {
     return (
       <div style={s('margin:2px 0 6px;padding:16px;border:1px dashed var(--line2);border-radius:16px;text-align:center;font-size:12.5px;color:var(--text3);line-height:1.5')}>
@@ -79,7 +80,9 @@ function SquadRail({ squad, rtl, onOpen }) {
               <circle cx="26" cy="26" r="22" fill="none" stroke="var(--bg4)" strokeWidth="4" />
               <circle cx="26" cy="26" r="22" fill="none" stroke={m.ringColor} strokeWidth="4" strokeLinecap="round" strokeDasharray={m.dash} />
             </svg>
-            <div style={s(`position:absolute;inset:5px;border-radius:50%;background:${m.color};display:flex;align-items:center;justify-content:center;font-weight:700;font-size:${rtl ? '13px' : '14px'};color:#0c0e11`)}>{rtl ? m.he : m.initials}</div>
+            <div style={s('position:absolute;inset:5px')}>
+              <AuthedAvatar avatarUrl={m.avatarUrl} token={token} initials={rtl ? m.he : m.initials} color={m.color} size={42} radius={21} fontSize={rtl ? 13 : 14} />
+            </div>
             <div style={s(`position:absolute;bottom:2px;right:2px;width:12px;height:12px;border-radius:50%;background:${m.statusColor};border:2px solid var(--bg2)`)} />
           </div>
           <div style={s('font-size:11.5px;font-weight:600;margin-top:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>{rtl ? m.nameHe : m.name}</div>
@@ -147,7 +150,7 @@ function DashboardEN({ vm, go, openAthlete, openActivity, getToken, onSwitchSqua
         <div style={s('font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:1.4px;font-weight:600')}>Domestique Team this week</div>
         <div className="ctl" onClick={() => go('lb')} style={s('font-size:11.5px;color:var(--accent);font-weight:600')}>Leaderboard →</div>
       </div>
-      <SquadRail squad={vm.squad} onOpen={openAthlete} />
+      <SquadRail squad={vm.squad} onOpen={openAthlete} token={token} />
 
       {/* team feed — last 7 days of squad activity, with route maps + photos */}
       <div style={s('display:flex;justify-content:space-between;align-items:baseline;margin:20px 2px 12px')}>
@@ -217,7 +220,7 @@ function DashboardHE({ vm, go, openAthlete, openActivity, getToken, onSwitchSqua
         <div style={s('font-size:12px;color:var(--text3);font-weight:600')}>המועדון השבוע</div>
         <div className="ctl" onClick={() => go('lb')} style={s('font-size:11.5px;color:var(--accent);font-weight:600')}>← טבלה</div>
       </div>
-      <SquadRail squad={vm.squad} rtl onOpen={openAthlete} />
+      <SquadRail squad={vm.squad} rtl onOpen={openAthlete} token={token} />
 
       <div style={s('display:flex;justify-content:space-between;align-items:baseline;margin:20px 2px 12px;flex-direction:row-reverse')}>
         <div style={s('font-size:12px;color:var(--text3);font-weight:600')}>פעילות המועדון · 7 ימים אחרונים</div>

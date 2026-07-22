@@ -10,6 +10,7 @@ export function mapLeaderboardRows(server) {
     name: r.name,
     initials: r.initials,
     color: r.color,
+    avatarUrl: r.avatarUrl ?? null,
     you: r.you,
     load: Math.round(r.load),
     vol: `${r.volumeHours.toFixed(1)}h`,
