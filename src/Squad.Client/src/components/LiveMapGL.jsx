@@ -48,6 +48,16 @@ function headingFromPath(path) {
   return null;
 }
 
+// Activity-type glyphs for your own marker (indoor variants reuse the outdoor icon).
+const SPORT_ICON = {
+  bike: '<circle cx="5.5" cy="17" r="3.4"/><circle cx="18.5" cy="17" r="3.4"/><path d="M5.5 17l4.5-8.5h4"/><path d="M14 8.5l4.5 8.5"/><path d="M8 8.5h4l2 4"/>',
+  run: '<circle cx="16" cy="5" r="1.8"/><path d="M14.5 8l-4 3.5 2.5 2 1 5.5"/><path d="M10.5 11.5l-4 1"/><path d="M13 13.5l3.5 1"/>',
+};
+const sportGlyph = (sport) => {
+  const p = sport === 'trainer' ? SPORT_ICON.bike : sport === 'treadmill' ? SPORT_ICON.run : SPORT_ICON[sport];
+  return p ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${p}</svg>` : null;
+};
+
 const lineFC = (pts) => ({ type: 'Feature', geometry: { type: 'LineString', coordinates: (pts || []).map(([la, lo]) => [lo, la]) } });
 const youPos = (riders, path) => {
   const you = (riders || []).find((r) => r.you && Number.isFinite(r.lat) && Number.isFinite(r.lon));
@@ -55,7 +65,7 @@ const youPos = (riders, path) => {
   return path && path.length ? path[path.length - 1] : null;
 };
 
-export default function LiveMapGL({ pts, course, path, riders, interactive = true }) {
+export default function LiveMapGL({ pts, course, path, riders, mySport, interactive = true }) {
   const elRef = useRef(null);
   const mapRef = useRef(null);
   const mlRef = useRef(null);
@@ -176,7 +186,9 @@ export default function LiveMapGL({ pts, course, path, riders, interactive = tru
           const bg = m0.you ? accent : m0.color;
           const fg = m0.you ? accentInk : '#0c0e11';
           el.style.cssText = `width:26px;height:26px;border-radius:50%;background:${bg};color:${fg};border:2.5px solid #fff;display:flex;align-items:center;justify-content:center;font:700 10px system-ui;box-shadow:0 1px 4px rgba(0,0,0,.45)${m0.you ? `,0 0 0 3px ${accent}66` : ''};cursor:pointer`;
-          el.textContent = m0.initials;
+          // Your own marker shows your activity icon (bike/run/…); everyone else keeps their initials.
+          const glyph = m0.you ? sportGlyph(mySport) : null;
+          if (glyph) el.innerHTML = glyph; else el.textContent = m0.initials;
         }
         // Tap an individual rider to zoom in on them (mirrors a cluster tap, which fits its members).
         el.addEventListener('click', (e) => {
@@ -196,7 +208,7 @@ export default function LiveMapGL({ pts, course, path, riders, interactive = tru
     drawAll();
     const tail = (path && path.length) ? path[path.length - 1] : null; // "you" falls back to the breadcrumb
     const sig = (riders || []).map((r) => `${r.you ? 'Y' : ''}${r.driver ? 'D' : ''}${r.initials || ''}:${(r.lat ?? 0).toFixed(5)},${(r.lon ?? 0).toFixed(5)}`).join('|')
-      + (tail ? `|@${tail[0].toFixed(5)},${tail[1].toFixed(5)}` : '');
+      + (tail ? `|@${tail[0].toFixed(5)},${tail[1].toFixed(5)}` : '') + `|s:${mySport || ''}`;
     if (sig !== markerSigRef.current && rebuildMarkers()) markerSigRef.current = sig;
   }); // eslint-disable-line react-hooks/exhaustive-deps
 

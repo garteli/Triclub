@@ -153,7 +153,7 @@ function Active({ actions, live }) {
       {/* precise UWB distance/direction to teammates (native + U1 devices; hidden otherwise) */}
       <UwbReadout uwb={live?.uwb} riders={live?.riders} blePeers={live?.peerRanging?.peers} />
 
-      <LivePages tel={tel} lp={live?.livePages} uwb={live?.uwb} blePeers={live?.peerRanging?.peers} indoor={!!live?.rideType?.indoor} />
+      <LivePages tel={tel} lp={live?.livePages} uwb={live?.uwb} blePeers={live?.peerRanging?.peers} indoor={!!live?.rideType?.indoor} mySport={live?.rideType?.value} />
     </div>
   );
 }
