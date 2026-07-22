@@ -94,6 +94,9 @@ const RIDE_TYPES = {
   run: { label: 'Run', fitSport: FitSport.running, indoor: false },
   trainer: { label: 'Trainer', fitSport: FitSport.cycling, indoor: true },
   treadmill: { label: 'Treadmill', fitSport: FitSport.running, indoor: true },
+  // Escort vehicle — GPS, but shown as a car on the map, kept out of the peloton/leader stats,
+  // and NOT saved as an activity (escorting isn't a workout).
+  driver: { label: 'Driver', fitSport: FitSport.cycling, indoor: false, driver: true },
 };
 
 const screens = {
@@ -550,7 +553,7 @@ export default function App() {
     try { localStorage.setItem('squad.rideSport', v); } catch { /* ignore */ }
   }, []);
   const rideType = RIDE_TYPES[rideSport] || RIDE_TYPES.bike;
-  const recorder = useRideRecorder({ pushTelemetry: liveRide.pushTelemetry, sensors, getToken, onSaved: () => setRefreshSignal((n) => n + 1), enabled: authed, sport: rideType.fitSport, indoor: rideType.indoor, throttleMs: 500 });
+  const recorder = useRideRecorder({ pushTelemetry: liveRide.pushTelemetry, sensors, getToken, onSaved: () => setRefreshSignal((n) => n + 1), enabled: authed, sport: rideType.fitSport, indoor: rideType.indoor, driver: !!rideType.driver, throttleMs: 500 });
   // A ride is "live" whenever it's active OR still recording — independent of which screen you're on,
   // so sensors, ranging, the hub, telemetry, wake lock and presence all keep running as you navigate.
   const rideLive = rideSessionActive || recorder.recording;
@@ -595,11 +598,13 @@ export default function App() {
   // known spot). Read the recorder via a ref so a moving fix doesn't reset the interval.
   const recorderRef = useRef(recorder);
   recorderRef.current = recorder;
+  const driverModeRef = useRef(!!rideType.driver);
+  driverModeRef.current = !!rideType.driver;
   useEffect(() => {
     if (!rideLive || typeof liveRide.pushTelemetry !== 'function') return undefined;
     const beat = () => {
       const r = recorderRef.current;
-      liveRide.pushTelemetry({ lat: r?.lastFix?.lat ?? null, lon: r?.lastFix?.lon ?? null, distanceKm: r?.distanceKm ?? null });
+      liveRide.pushTelemetry({ lat: r?.lastFix?.lat ?? null, lon: r?.lastFix?.lon ?? null, distanceKm: r?.distanceKm ?? null, driver: driverModeRef.current });
     };
     beat();
     const id = setInterval(beat, 2500);
@@ -611,7 +616,7 @@ export default function App() {
   // Keep the screen awake for the whole ride — recording or watching — even on other screens.
   useWakeLock(rideLive);
 
-  const live = { riders: liveRide.riders, status: liveRide.status, pushTelemetry: liveRide.pushTelemetry, recorder, sensors, tel, livePages, peerRanging, uwb, courses: courseOps, course: selectedCourse, rideType: { value: rideSport, indoor: rideType.indoor, label: rideType.label, set: setRideSport } };
+  const live = { riders: liveRide.riders, status: liveRide.status, pushTelemetry: liveRide.pushTelemetry, recorder, sensors, tel, livePages, peerRanging, uwb, courses: courseOps, course: selectedCourse, rideType: { value: rideSport, indoor: rideType.indoor, driver: !!rideType.driver, label: rideType.label, set: setRideSport } };
 
   // Unread count for the global header's bell badge.
   const notif = useNotifications({ getToken, enabled: authed });

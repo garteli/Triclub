@@ -72,6 +72,7 @@ public sealed class RideHub(IAthleteDirectory directory, IRideSessionState state
             RadarThreatLevel = t.RadarThreatLevel,
             RadarVehicleCount = t.RadarVehicleCount,
             RadarClosestMeters = t.RadarClosestMeters,
+            Driver = t.Driver,
             Ts = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
         };
 

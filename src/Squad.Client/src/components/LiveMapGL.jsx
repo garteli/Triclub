@@ -128,7 +128,7 @@ export default function LiveMapGL({ pts, course, path, riders, interactive = tru
 
     const list = (riders || [])
       .filter((r) => Number.isFinite(r.lat) && Number.isFinite(r.lon))
-      .map((r) => ({ lat: r.lat, lon: r.lon, initials: r.initials || '··', color: resolveColor(r.color), you: !!r.you }));
+      .map((r) => ({ lat: r.lat, lon: r.lon, initials: r.initials || '··', color: resolveColor(r.color), you: !!r.you, driver: !!r.driver }));
     // Always show "you" — when your rider isn't positioned (solo, or presence-without-GPS), fall back
     // to your breadcrumb position, keeping your initials from the rider row if it exists.
     if (!list.some((r) => r.you)) {
@@ -168,10 +168,16 @@ export default function LiveMapGL({ pts, course, path, riders, interactive = tru
         });
       } else {
         const m0 = members[0];
-        const bg = m0.you ? accent : m0.color;
-        const fg = m0.you ? accentInk : '#0c0e11';
-        el.style.cssText = `width:26px;height:26px;border-radius:50%;background:${bg};color:${fg};border:2.5px solid #fff;display:flex;align-items:center;justify-content:center;font:700 10px system-ui;box-shadow:0 1px 4px rgba(0,0,0,.45)${m0.you ? `,0 0 0 3px ${accent}66` : ''}`;
-        el.textContent = m0.initials;
+        if (m0.driver) {
+          // Escort vehicle — a car icon instead of an initials dot.
+          el.style.cssText = 'width:30px;height:22px;border-radius:7px;background:#0c0e11;color:#fff;border:2px solid #fff;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.5)';
+          el.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 11l1.5-4.5A2 2 0 0 1 8.4 5h7.2a2 2 0 0 1 1.9 1.5L19 11"/><path d="M3 11h18v4a1 1 0 0 1-1 1h-1a2 2 0 0 1-4 0H9a2 2 0 0 1-4 0H4a1 1 0 0 1-1-1z"/></svg>';
+        } else {
+          const bg = m0.you ? accent : m0.color;
+          const fg = m0.you ? accentInk : '#0c0e11';
+          el.style.cssText = `width:26px;height:26px;border-radius:50%;background:${bg};color:${fg};border:2.5px solid #fff;display:flex;align-items:center;justify-content:center;font:700 10px system-ui;box-shadow:0 1px 4px rgba(0,0,0,.45)${m0.you ? `,0 0 0 3px ${accent}66` : ''}`;
+          el.textContent = m0.initials;
+        }
       }
       return new maplibregl.Marker({ element: el }).setLngLat([cLon, cLat]).addTo(map);
     });
@@ -184,7 +190,7 @@ export default function LiveMapGL({ pts, course, path, riders, interactive = tru
   useEffect(() => {
     drawAll();
     const tail = (path && path.length) ? path[path.length - 1] : null; // "you" falls back to the breadcrumb
-    const sig = (riders || []).map((r) => `${r.you ? 'Y' : ''}${r.initials || ''}:${(r.lat ?? 0).toFixed(5)},${(r.lon ?? 0).toFixed(5)}`).join('|')
+    const sig = (riders || []).map((r) => `${r.you ? 'Y' : ''}${r.driver ? 'D' : ''}${r.initials || ''}:${(r.lat ?? 0).toFixed(5)},${(r.lon ?? 0).toFixed(5)}`).join('|')
       + (tail ? `|@${tail[0].toFixed(5)},${tail[1].toFixed(5)}` : '');
     if (sig !== markerSigRef.current && rebuildMarkers()) markerSigRef.current = sig;
   }); // eslint-disable-line react-hooks/exhaustive-deps

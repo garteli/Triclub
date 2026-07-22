@@ -94,7 +94,7 @@ export const metricGroups = ['Timers', 'Distance', 'Speed', 'Cadence', 'Heart Ra
 // progress (distance-covered) — the reliable signal that needs no BLE/UWB direction, only that
 // riders are streaming. Prefers the server-designated leaderId, falling back to the furthest rider.
 function packVals(tel) {
-  const riders = (tel?.riders || []).map((r) => ({ ...r, d: parseFloat(r.dist) || 0 }));
+  const riders = (tel?.riders || []).filter((r) => !r.driver).map((r) => ({ ...r, d: parseFloat(r.dist) || 0 }));
   if (riders.length < 1) return { leader: { v: DASH }, leadgap: { v: DASH }, packpos: { v: DASH } };
   const byDist = riders.slice().sort((a, b) => b.d - a.d);
   const lid = tel?.peloton?.leaderId;
@@ -193,7 +193,7 @@ export function liveRadarView(tel) {
 // Teammates stacked front→back along the Group column rail (from real hub riders),
 // sorted by distance; the leader sits at the top, anyone off the back tagged with a gap.
 export function spreadRiders(tel) {
-  const riders = (tel?.riders || []).slice();
+  const riders = (tel?.riders || []).filter((r) => !r.driver).slice(); // drivers escort — not on the rail
   if (!riders.length) return [];
   riders.sort((a, b) => (parseFloat(b.dist) || 0) - (parseFloat(a.dist) || 0));
   const leadDist = parseFloat(riders[0]?.dist) || 0;
@@ -215,7 +215,7 @@ export function spreadRiders(tel) {
 // the next rider along the axis. Plotted coords are normalized 0..1; the metre readouts are real.
 const PELOTON_RADIUS_M = 250;
 export function pelotonView(tel) {
-  const riders = (tel?.riders || []).slice();
+  const riders = (tel?.riders || []).filter((r) => !r.driver).slice(); // drivers escort — not in the pack
   if (!riders.length) return { empty: true, plot: [], board: [], lengthM: null, samples: 0, radiusM: PELOTON_RADIUS_M };
 
   const distOf = (r) => parseFloat(r.dist) || 0;

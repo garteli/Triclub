@@ -81,7 +81,10 @@ public sealed record RiderTelemetry(
     double? Lat, double? Lon, double? ElevM,
     double? SpeedKph, double? HeartRate, double? Cadence, double? PowerW, double? DistanceKm,
     int? RadarThreatLevel = null, int? RadarVehicleCount = null,
-    double? RadarClosestMeters = null, double? RadarClosestClosingKph = null);
+    double? RadarClosestMeters = null, double? RadarClosestClosingKph = null,
+    // A driver/escort vehicle accompanying the group — shown as a car on the map, kept out of the
+    // peloton/leader stats, and its ride isn't saved as a bike activity.
+    bool Driver = false);
 
 /// <summary>One phone-to-phone BLE range observation a device uploads: the caller
 /// (observer, resolved from the connection — never trusted from the payload) saw
@@ -110,6 +113,8 @@ public sealed record RiderUpdate
     public int? RadarThreatLevel { get; init; }
     public int? RadarVehicleCount { get; init; }
     public double? RadarClosestMeters { get; init; }
+    // A driver/escort vehicle (car icon on the map; excluded from peloton/leader stats).
+    public bool Driver { get; init; }
     public long Ts { get; init; }
 
     // Pack-position fusion output (null until BLE peer ranges refine this rider). FusedLat/Lon

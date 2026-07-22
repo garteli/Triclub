@@ -14,6 +14,8 @@ export function mapLiveRider(u, meId) {
     name: u.name,
     initials: u.initials,
     color: u.color,
+    driver: !!u.driver,   // escort vehicle — car on the map, out of the peloton/leader stats
+
     // Prefer the pack-fused position when the server has one (BLE ranges tighten in-pack
     // spacing); fall back to raw GPS otherwise.
     lat: u.fusedLat ?? u.lat,
