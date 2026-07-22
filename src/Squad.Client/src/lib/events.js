@@ -52,6 +52,8 @@ export const publishEvent = (token, squadId, eventId) => req(`/api/squads/${squa
 export const unpublishEvent = (token, squadId, eventId) => req(`/api/squads/${squadId}/events/${eventId}/unpublish`, { method: 'POST', token });
 // Owner-only join/check-in roster → [{ athleteId, name, initials, avatarColor, avatarUrl, joinedUtc, checkedIn, checkedInUtc }]
 export const listEventAttendees = (token, squadId, eventId) => req(`/api/squads/${squadId}/events/${eventId}/attendees`, { token });
+// Member-facing participant roster (the event page) → [{ athleteId, name, initials, avatarColor, avatarUrl, checkedIn }]
+export const listEventParticipants = (token, squadId, eventId) => req(`/api/squads/${squadId}/events/${eventId}/participants`, { token });
 export const deleteSquadEvent = (token, squadId, eventId) => req(`/api/squads/${squadId}/events/${eventId}`, { method: 'DELETE', token });
 
 export const joinEvent = (token, eventId) => req(`/api/events/${eventId}/join`, { method: 'POST', token });

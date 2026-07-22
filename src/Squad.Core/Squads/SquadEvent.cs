@@ -64,6 +64,9 @@ public interface ISquadEventStore
     Task<SetPublishedResult> SetPublishedAsync(Guid squadId, Guid ownerId, Guid eventId, bool published, CancellationToken ct);
     /// <summary>The full join/check-in roster for an event — owner-only; null if the caller isn't the owner.</summary>
     Task<IReadOnlyList<SquadEventAttendee>?> ListAttendeesAsync(Guid squadId, Guid ownerId, Guid eventId, CancellationToken ct);
+    /// <summary>The event's participant roster for the member-facing event page — any signed-in athlete
+    /// may see a published event's roster (owner also sees drafts). Null if not visible to the caller.</summary>
+    Task<IReadOnlyList<SquadEventAttendee>?> ListParticipantsAsync(Guid squadId, Guid meId, Guid eventId, CancellationToken ct);
     /// <summary>Delete an event if <paramref name="ownerId"/> owns its squad; false otherwise.</summary>
     Task<bool> DeleteAsync(Guid squadId, Guid ownerId, Guid eventId, CancellationToken ct);
     Task<bool> JoinAsync(Guid eventId, Guid meId, CancellationToken ct);

@@ -46,7 +46,7 @@ const defaultWhen = () => {
 // standalone=true — rendered as its own screen (the motorsport Events tab): keep the
 // empty state visible instead of collapsing the section, and drop the section heading.
 // `disc` is the club's discipline; it drives the family-aware sport choices + glyphs.
-export default function SquadEvents({ squadId, getToken, mode = 'browse', standalone = false, disc }) {
+export default function SquadEvents({ squadId, getToken, mode = 'browse', standalone = false, disc, onOpen }) {
   const manage = mode === 'manage';
   const family = familyOf(disc);
   const sportOptions = SPORT_OPTIONS[family] || SPORT_OPTIONS.endurance;
@@ -197,7 +197,7 @@ export default function SquadEvents({ squadId, getToken, mode = 'browse', standa
                 <div style={s('width:38px;height:38px;border-radius:11px;flex:none;display:flex;align-items:center;justify-content:center;background:var(--accent-dim);color:var(--accent)')}>
                   <SportIcon name={glyphForSport(ev.sport, family)} size={18} />
                 </div>
-                <div style={s('flex:1;min-width:0')}>
+                <div className={onOpen ? 'ctl' : undefined} onClick={onOpen ? () => onOpen(ev) : undefined} style={s('flex:1;min-width:0')}>
                   <div style={s('font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>{ev.title}</div>
                   <div style={s('font-size:11.5px;color:var(--text3);margin-top:2px')}>
                     {fmtWhen(ev.start)}
@@ -205,7 +205,7 @@ export default function SquadEvents({ squadId, getToken, mode = 'browse', standa
                     {today ? <span style={s('color:var(--accent);font-weight:700')}>{'  ·  Today'}</span> : null}
                   </div>
                   <div style={s('font-size:10.5px;color:var(--text3);margin-top:3px')}>
-                    {ev.joinCount || 0} going{manage && (ev.checkedInCount ? ` · ${ev.checkedInCount} checked in` : '')}
+                    {ev.joinCount || 0} going{manage && (ev.checkedInCount ? ` · ${ev.checkedInCount} checked in` : '')}{onOpen ? ' · Details ›' : ''}
                   </div>
                 </div>
 
@@ -215,8 +215,7 @@ export default function SquadEvents({ squadId, getToken, mode = 'browse', standa
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6" /></svg>
                   </div>
                 ) : (
-                  <MemberActions ev={ev} today={today} busy={busyId === ev.id}
-                    onJoin={() => join(ev)} onLeave={() => leave(ev)} onCheckIn={() => checkin(ev)} onUndoCheckIn={() => undoCheckin(ev)} />
+                  <MemberActions ev={ev} busy={busyId === ev.id} onJoin={() => join(ev)} onLeave={() => leave(ev)} />
                 )}
               </div>
             );
@@ -227,19 +226,9 @@ export default function SquadEvents({ squadId, getToken, mode = 'browse', standa
   );
 }
 
-// The member's action zone for one event, per state: not joined / joined-future / joined-today / checked-in.
-function MemberActions({ ev, today, busy, onJoin, onLeave, onCheckIn, onUndoCheckIn }) {
-  if (ev.checkedIn) {
-    return (
-      <div style={s('flex:none;display:flex;align-items:center;gap:7px')}>
-        <div style={s('display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:var(--good)')}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>Checked in
-        </div>
-        <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : onUndoCheckIn}
-          style={s(`font-size:11px;font-weight:600;color:var(--text3);opacity:${busy ? 0.6 : 1}`)}>{busy ? '…' : 'Undo'}</div>
-      </div>
-    );
-  }
+// The member's action zone for one event on the group list: Join, or Joined + Leave.
+// Check-in deliberately lives only on the Live page (on the day of the ride).
+function MemberActions({ ev, busy, onJoin, onLeave }) {
   if (!ev.joined) {
     return (
       <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : onJoin}
@@ -248,17 +237,9 @@ function MemberActions({ ev, today, busy, onJoin, onLeave, onCheckIn, onUndoChec
       </div>
     );
   }
-  // joined, not yet checked in
   return (
-    <div style={s('flex:none;display:flex;align-items:center;gap:7px')}>
-      {today ? (
-        <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : onCheckIn}
-          style={s(`padding:9px 14px;border-radius:10px;font-weight:700;font-size:12px;background:var(--good);color:#04140b;opacity:${busy ? 0.6 : 1}`)}>
-          {busy ? '…' : 'Check in'}
-        </div>
-      ) : (
-        <span style={s('font-size:11px;font-weight:700;color:var(--good)')}>Joined</span>
-      )}
+    <div style={s('flex:none;display:flex;align-items:center;gap:8px')}>
+      <span style={s('font-size:11px;font-weight:700;color:var(--good)')}>Joined</span>
       <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : onLeave}
         style={s('font-size:11px;font-weight:600;color:var(--text3)')}>Leave</div>
     </div>

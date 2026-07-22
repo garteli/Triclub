@@ -19,6 +19,7 @@ public static class SquadEventEndpoints
         app.MapPost("/api/squads/{squadId:guid}/events/{eventId:guid}/publish", PublishEvent).RequireAuthorization();
         app.MapPost("/api/squads/{squadId:guid}/events/{eventId:guid}/unpublish", UnpublishEvent).RequireAuthorization();
         app.MapGet("/api/squads/{squadId:guid}/events/{eventId:guid}/attendees", EventAttendees).RequireAuthorization();
+        app.MapGet("/api/squads/{squadId:guid}/events/{eventId:guid}/participants", EventParticipants).RequireAuthorization();
         app.MapDelete("/api/squads/{squadId:guid}/events/{eventId:guid}", DeleteEvent).RequireAuthorization();
         // Member-scoped RSVP + check-in, plus the caller's own joined-events list.
         app.MapPost("/api/events/{eventId:guid}/join", JoinEvent).RequireAuthorization();
@@ -134,6 +135,26 @@ public static class SquadEventEndpoints
                 joinedUtc = a.JoinedUtc,
                 checkedIn = a.CheckedInUtc != null,
                 checkedInUtc = a.CheckedInUtc,
+            }));
+    }
+
+    // Member-facing roster for the event page — any signed-in athlete can see a published event's
+    // participants (404 if the event isn't visible to them).
+    private static async Task<IResult> EventParticipants(
+        Guid squadId, Guid eventId, HttpContext http, ISquadEventStore events, CancellationToken ct)
+    {
+        if (Me(http) is not { } me) return Results.Unauthorized();
+        var list = await events.ListParticipantsAsync(squadId, me, eventId, ct);
+        return list is null
+            ? Results.NotFound(new { error = "That session no longer exists." })
+            : Results.Ok(list.Select(a => new
+            {
+                athleteId = a.AthleteId,
+                name = a.Name,
+                initials = a.Initials,
+                avatarColor = a.AvatarColor,
+                avatarUrl = a.AvatarUrl,
+                checkedIn = a.CheckedInUtc != null,
             }));
     }
 

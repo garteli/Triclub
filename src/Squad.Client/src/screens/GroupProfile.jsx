@@ -162,8 +162,8 @@ export default function GroupProfile({ vm, actions, onJoinSquad, payments, meId,
         {/* group sessions — only surface publicly-joinable rides: a free/open group (anyone can
             join), or when the viewer is already a member / the owner. A gated or paid group's
             sessions stay hidden from non-members (they must join the group first). */}
-        {live && (g.kind === 'free' || g.member || isOwner) && (
-          <SquadEvents squadId={g.id} getToken={getToken} mode="browse" disc={g.disc} />
+        {live && (g.member || isOwner) && (
+          <SquadEvents squadId={g.id} getToken={getToken} mode="browse" disc={g.disc} onOpen={(ev) => actions.openEvent(ev)} />
         )}
 
         {/* group target races — members can add one to their own goals */}

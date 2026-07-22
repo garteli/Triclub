@@ -85,10 +85,10 @@ function TodayRides({ live, actions }) {
           return (
             <div key={ev.id} style={s('background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:12px 13px')}>
               <div style={s('display:flex;align-items:flex-start;gap:10px')}>
-                <div style={s('flex:1;min-width:0')}>
+                <div className="ctl" onClick={() => actions.openEvent?.(ev)} style={s('flex:1;min-width:0')}>
                   <div style={s('font-size:14px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>{ev.title}</div>
                   {sub && <div style={s('font-size:11.5px;color:var(--text2);margin-top:1px')}>{sub}</div>}
-                  <div style={s('font-size:10.5px;color:var(--text3);margin-top:2px')}>{ev.joinCount || 0} going{ev.checkedInCount ? ` · ${ev.checkedInCount} checked in` : ''}</div>
+                  <div style={s('font-size:10.5px;color:var(--text3);margin-top:2px')}>{ev.joinCount || 0} going{ev.checkedInCount ? ` · ${ev.checkedInCount} checked in` : ''} · Details ›</div>
                 </div>
                 {ev.joined
                   ? <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : () => run(ev.id, () => live.events.leave(ev.id))} style={s('flex:none;font-size:11.5px;font-weight:700;color:var(--text3);padding:7px 11px;border-radius:9px;border:1px solid var(--line)')}>Leave</div>
