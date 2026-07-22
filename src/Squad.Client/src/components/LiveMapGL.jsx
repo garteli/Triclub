@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { s } from '../lib/style.js';
 import { BASEMAP_LABEL, baseSource, applyBasemap, nextBasemap, inIsrael } from '../lib/basemaps.js';
 import { getRouteStyle } from '../lib/routeStyle.js';
+import { addRouteArrows } from '../lib/mapArrows.js';
 
 // Interactive live-ride map tile: a real MapLibre basemap you can pinch-zoom, pan and rotate,
 // with the course route + your breadcrumb, and each rider as a coloured dot with their initials.
@@ -107,6 +108,9 @@ export default function LiveMapGL({ pts, course, path, riders, mySport, interact
           const rs = getRouteStyle(); // per-user route colour/width (shared with the full map)
           map.addSource('path', { type: 'geojson', data: lineFC(path) });
           map.addLayer({ id: 'path', type: 'line', source: 'path', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': rs.color || accent, 'line-width': rs.width || 4 } });
+          // Direction chevrons along the course (route to follow) + your breadcrumb.
+          addRouteArrows(map, 'course', 'course-arrows');
+          addRouteArrows(map, 'path', 'path-arrows');
           // Riders are DOM markers (initials dots + clusters), not a circle layer — see rebuildMarkers.
           readyRef.current = true;
           setFailed(false);
