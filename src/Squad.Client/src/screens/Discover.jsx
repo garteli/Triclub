@@ -2,30 +2,27 @@ import { useEffect, useMemo, useState } from 'react';
 import { s } from '../lib/style.js';
 import EmptyState from '../components/EmptyState.jsx';
 import AuthedImage from '../components/AuthedImage.jsx';
-import { DISCIPLINES } from '../lib/disciplines.js';
+import SportIcon from '../components/SportIcon.jsx';
+import { FAMILY, familyOf, familyMeta, disciplinesInFamily } from '../lib/disciplines.js';
 
-// Group bike glyph, reused as the tile mark on each club row (fallback when no logo).
-const GroupBike = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0c0e11" strokeWidth="2.2" strokeLinecap="round">
-    <circle cx="5.5" cy="17.5" r="3.5" /><circle cx="18.5" cy="17.5" r="3.5" />
-    <path d="M15 17.5l-3-6.5H8.5m6.5 0l-2.5 6.5M9.5 6.5h3l2 4.5" />
-  </svg>
-);
+// Two worlds a user can browse — the segmented control at the top of Discover.
+const FAMILY_TABS = [['endurance', FAMILY.endurance.label], ['motorsport', FAMILY.motorsport.label]];
 
-// Club tile: the uploaded logo when set, else the colour-filled bike glyph.
+// Club tile: the uploaded logo when set, else the family glyph (bike / motorcycle)
+// on the club's discipline colour, so a motorsport club reads differently at a glance.
 const GroupMark = ({ g, token }) => (
   g.logoUrl
     ? <AuthedImage url={g.logoUrl} token={token} style="width:46px;height:46px;border-radius:13px;flex:none" />
-    : <div style={s(`width:46px;height:46px;border-radius:13px;background:${g.color};flex:none;display:flex;align-items:center;justify-content:center`)}><GroupBike /></div>
+    : <div style={s(`width:46px;height:46px;border-radius:13px;background:${g.color};flex:none;display:flex;align-items:center;justify-content:center`)}>
+        <SportIcon name={familyMeta(g.disc).glyph} size={24} color="#0c0e11" strokeWidth={2.2} />
+      </div>
 );
-
-// Chip label → the discipline it keeps. 'All' matches everything; the rest match a
-// club whose `disc` string contains the chip (so "Triathlon" catches "Triathlon", etc.).
-const filters = ['All', ...DISCIPLINES];
 
 export default function Discover({ vm, actions, getToken }) {
   const [token, setToken] = useState(null);
   const [query, setQuery] = useState('');
+  // Which world we're browsing — defaults to the active club's family.
+  const [family, setFamily] = useState(vm.family || 'endurance');
   const [active, setActive] = useState('All');
   useEffect(() => {
     let ok = true;
@@ -33,17 +30,21 @@ export default function Discover({ vm, actions, getToken }) {
     return () => { ok = false; };
   }, [getToken]);
 
-  // Client-side search + discipline filter over the loaded groups. Case-insensitive
-  // free-text over name / location / discipline, ANDed with the active chip.
+  // Discipline chips are scoped to the chosen family; 'All' means every discipline in it.
+  const filters = ['All', ...disciplinesInFamily(family)];
+
+  // Client-side family + discipline + text filter over the loaded groups. A group must
+  // be in the selected family, match the active discipline chip, and match the free text.
   const groups = vm.nearbyGroups;
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
     return groups.filter((g) => {
-      const byChip = active === 'All' || (g.disc || '').toLowerCase().includes(active.toLowerCase());
+      const byFamily = familyOf(g.disc) === family;
+      const byChip = active === 'All' || (g.disc || '').toLowerCase() === active.toLowerCase();
       const byText = !q || [g.name, g.loc, g.disc].some((v) => (v || '').toLowerCase().includes(q));
-      return byChip && byText;
+      return byFamily && byChip && byText;
     });
-  }, [groups, query, active]);
+  }, [groups, query, active, family]);
 
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
@@ -82,7 +83,18 @@ export default function Discover({ vm, actions, getToken }) {
         )}
       </div>
 
-      {/* filters */}
+      {/* family switch — endurance vs motorsport are two separate worlds of clubs */}
+      <div style={s('display:flex;gap:6px;margin-top:12px;background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:4px')}>
+        {FAMILY_TABS.map(([id, label]) => {
+          const on = family === id;
+          return (
+            <div key={id} className="ctl" onClick={() => { setFamily(id); setActive('All'); }}
+              style={s('flex:1;text-align:center;padding:8px 10px;border-radius:9px;font-size:12.5px;font-weight:700;' + (on ? `background:${FAMILY[id].accent};color:#0c0e11` : 'color:var(--text2)'))}>{label}</div>
+          );
+        })}
+      </div>
+
+      {/* discipline filters (scoped to the chosen family) */}
       <div style={s('display:flex;gap:7px;margin-top:12px;flex-wrap:wrap')}>
         {filters.map((f) => {
           const on = active === f;

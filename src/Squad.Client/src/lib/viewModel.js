@@ -22,11 +22,18 @@ function timeAgo(iso) {
 const SPORT_COLOR = { Bike: 'var(--bike)', Run: 'var(--run)', Swim: 'var(--swim)', Gym: 'var(--gym)' };
 const SPORT_ICON = { Bike: '🚴', Run: '🏃', Swim: '🏊', Gym: '🏋️' };
 import { activityAnalysis } from './activityAnalysis.js';
+import { familyOf, familyMeta } from './disciplines.js';
 
 // Builds everything the screens need for a given (state, tick). This is the
 // React port of the prototype's renderVals() — same derivations, same numbers.
 export function buildViewModel(state, t, opts = {}) {
   const { workoutKey, lbTab } = state;
+
+  // ---- discipline family (drives terminology / metrics / identity / grouping) ----
+  // The active club's discipline decides whether the app runs in its endurance or
+  // motorsport world. No active club (logged-out prototype) → endurance default.
+  const familyId = familyOf(opts.activeSquad?.disc);
+  const fam = familyMeta(opts.activeSquad?.disc);
 
   // ---- squad members (progress rings) ----
   // Live: derive the roster from the weekly leaderboard (real members + this-week
@@ -136,7 +143,12 @@ export function buildViewModel(state, t, opts = {}) {
   };
 
   // ---- leaderboard ----
-  const tab = lbTab;
+  // Motorsport clubs have no swim/bike/run breakdown — only overall Load/Volume/Streak.
+  const lbTabDefs = fam.splits
+    ? [['load', 'Load'], ['vol', 'Volume'], ['streak', 'Streak'], ['swim', 'Swim'], ['bike', 'Bike'], ['run', 'Run']]
+    : [['load', 'Load'], ['vol', 'Volume'], ['streak', 'Streak']];
+  // Clamp a stale tab (e.g. 'bike' selected then switched to a motorsport club) to Load.
+  const tab = lbTabDefs.some(([id]) => id === lbTab) ? lbTab : 'load';
   const valOf = (r) => (tab === 'load' ? r.load : tab === 'vol' ? r.vol : tab === 'streak' ? r.streak : tab === 'swim' ? r.swim : tab === 'bike' ? r.bike : r.run);
   const unitOf = tab === 'streak' ? 'd' : '';
   const sortKey = (r) => (tab === 'vol' ? parseFloat(r.vol) : valOf(r));
@@ -161,7 +173,6 @@ export function buildViewModel(state, t, opts = {}) {
     };
   });
   const podium = [lbRows[1], lbRows[0], lbRows[2]].filter(Boolean);
-  const lbTabDefs = [['load', 'Load'], ['vol', 'Volume'], ['streak', 'Streak'], ['swim', 'Swim'], ['bike', 'Bike'], ['run', 'Run']];
   const lbTabs = lbTabDefs.map(([id, labelText]) => ({
     id, label: labelText,
     style: 'flex:none;padding:8px 14px;border-radius:11px;font-size:12.5px;font-weight:600;white-space:nowrap;' +
@@ -396,6 +407,9 @@ export function buildViewModel(state, t, opts = {}) {
   return {
     squad, squadOnTrack, squadTotal,
     todayLabel, todayLabelHe,
+    // Active club's discipline family — screens read this to swap terminology,
+    // which metrics they show, and their visual identity.
+    family: familyId, fam,
     squadName: opts.squadName || null,
     // Active squad branding (proxy paths, null until the owner uploads) — surfaced
     // on the dashboard header so the club's identity carries across the app.
