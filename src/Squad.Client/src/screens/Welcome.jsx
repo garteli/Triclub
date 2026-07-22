@@ -6,6 +6,7 @@ import SportIcon from '../components/SportIcon.jsx';
 import InviteBanner from '../components/InviteBanner.jsx';
 import GoogleButton from '../components/GoogleButton.jsx';
 import { isInAppBrowser, isNativePlatform } from '../lib/platform.js';
+import { preloadApple } from '../lib/oauth.js';
 import {
   oauthSignIn, authConfig, exchangeGoogleCredential,
   biometricAvailable, biometricEnrolled, signInWithBiometric,
@@ -27,7 +28,11 @@ export default function Welcome({ actions, inviteInfo }) {
   useEffect(() => {
     let alive = true;
     biometricAvailable().then((ok) => alive && setBioReady(ok && biometricEnrolled()));
-    authConfig().then((cfg) => alive && setProviders({ google: cfg?.google || null, apple: cfg?.apple || null }));
+    authConfig().then((cfg) => {
+      if (!alive) return;
+      setProviders({ google: cfg?.google || null, apple: cfg?.apple || null });
+      preloadApple(cfg); // warm Apple's SDK so the sign-in popup opens on tap (not blocked)
+    });
     return () => { alive = false; };
   }, []);
 
