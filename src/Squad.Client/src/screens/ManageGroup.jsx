@@ -3,7 +3,6 @@ import { s } from '../lib/style.js';
 import { Back, Title, Sub, FieldLabel, Field, TextArea, Chips, PrimaryBtn } from './wizard.jsx';
 import AuthedImage from '../components/AuthedImage.jsx';
 import GroupTargets from '../components/GroupTargets.jsx';
-import SquadEvents from '../components/SquadEvents.jsx';
 import { downscaleToJpeg } from '../lib/photos.js';
 import { dataUrlToBlob } from '../lib/avatar.js';
 import { bustAuthedImage } from '../lib/authedImage.js';
@@ -335,9 +334,6 @@ export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged
         </>
       )}
       {inviteMsg && <div style={s('color:var(--good);font-size:12px;margin-top:8px;text-align:center')}>{inviteMsg}</div>}
-
-      {/* ---- group sessions (coach schedules an ad-hoc ride/run/swim for the squad) ---- */}
-      <div style={s('margin-top:22px')}><SquadEvents squadId={g.id} getToken={getToken} mode="manage" disc={g.disc} /></div>
 
       {/* ---- group targets (coach sets club races from an event link) ---- */}
       <div style={s('margin-top:22px')}><GroupTargets squadId={g.id} getToken={getToken} mode="manage" /></div>
