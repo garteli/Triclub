@@ -63,6 +63,8 @@ import JoinRequests from './screens/JoinRequests.jsx';
 import Messages from './screens/Messages.jsx';
 import Settings from './screens/Settings.jsx';
 import Welcome from './screens/Welcome.jsx';
+import Register from './screens/Register.jsx';
+import Login from './screens/Login.jsx';
 import CreateGroup from './screens/CreateGroup.jsx';
 import AthleteProfile from './screens/AthleteProfile.jsx';
 import EditProfile from './screens/EditProfile.jsx';
@@ -125,7 +127,7 @@ const screens = {
   dash: Dashboard, ride: LiveRide, plan: Plan, events: Events, eventeditor: EventEditor, eventdetail: EventDetail, plans: PlansList, planeditor: PlanEditor, planlibrary: PlanLibrary, lb: Leaderboard, clubrank: ClubRanking,
   feed: Feed, seg: Segments, coach: Coach, profile: Profile,
   discover: Discover, group: GroupProfile, manage: ManageGroup, pay: Checkout, recordpay: RidePayment, ledger: CoachLedger, requests: JoinRequests, chat: Messages,
-  settings: Settings, welcome: Welcome, newgroup: CreateGroup,
+  settings: Settings, welcome: Welcome, register: Register, login: Login, newgroup: CreateGroup,
   athlete: AthleteProfile, editprofile: EditProfile, notifs: Notifications, activities: Activities,
   upload: UploadActivity, sensors: Sensors,
   units: Units, zones: TrainingZones, notifprefs: NotificationPrefs, privacy: Privacy, help: Help, legal: Legal,
