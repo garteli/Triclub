@@ -207,7 +207,7 @@ export function buildViewModel(state, t, opts = {}) {
   });
 
   // ---- discover / groups / join / pay / requests / chat ----
-  const { selGroup = 'galilee', selApplicant = null, payPlan = null } = state;
+  const { selGroup = 'galilee', selApplicant = null } = state;
   const joinState = state.joinState || {};
   const reqStatus = state.reqStatus || {};
 
@@ -234,7 +234,6 @@ export function buildViewModel(state, t, opts = {}) {
       owned: !!opts.meId && !!c.owner && String(c.owner).toLowerCase() === String(opts.meId).toLowerCase(),
     }));
 
-  const joinBtnLock = 'margin-top:5px;background:var(--bg4);color:var(--text3);font-size:11px;font-weight:700;padding:5px 12px;border-radius:8px;opacity:.7';
   const g2 = selGroupData || {};
   const jState = joinState[selGroup];
   const open = jState === 'approved';
@@ -245,16 +244,8 @@ export function buildViewModel(state, t, opts = {}) {
     approvedPaid: jState === 'approved' && g2.kind !== 'free',
     approvedFree: jState === 'approved' && g2.kind === 'free',
     paid: jState === 'paid' || g2.member,
-    joinBtnStyle: open ? 'margin-top:5px;background:var(--accent);color:var(--accent-ink);font-size:11px;font-weight:700;padding:5px 12px;border-radius:8px' : joinBtnLock,
-    bookBtnStyle: open ? 'margin-top:5px;background:var(--bg4);border:1px solid var(--line);color:var(--text);font-size:11px;font-weight:700;padding:5px 12px;border-radius:8px' : joinBtnLock,
-    coachBtnStyle: open ? 'margin-top:5px;background:color-mix(in srgb,var(--gym) 18%,transparent);color:var(--gym);font-size:11px;font-weight:700;padding:5px 12px;border-radius:8px' : joinBtnLock,
-    tierLabel: open ? '' : '🔒',
   };
-  const tierOpenNote = open ? 'Approved — choose how to pay' : 'Locked until your application is approved';
-  const payTitle = payPlan === 'dropin' ? 'One-time group ride' : payPlan === 'coach' ? '1:1 Coaching' : 'Membership';
-  const payPrice = payPlan === 'dropin' ? '₪35'
-    : payPlan === 'coach' ? '₪450/mo'
-    : (g2.price || '₪90') + (payPlan === 'coach' ? '' : (g2.per || '/mo'));
+  const tierOpenNote = open ? 'Approved — the coach will confirm your membership' : 'Locked until your application is approved';
 
   const fitColor = (a) => (a.fitKind === 'good' ? 'var(--good)' : 'var(--warn)');
   const fitBg = (a) => (a.fitKind === 'good' ? 'color-mix(in srgb,var(--good) 15%,transparent)' : 'color-mix(in srgb,var(--warn) 15%,transparent)');
@@ -429,7 +420,7 @@ export function buildViewModel(state, t, opts = {}) {
     feed: liveFeedRows ?? feedRows,
     activities, myActivities, activityDetail,
     athlete, me: meFull,
-    nearbyGroups, selGroupData, applyState, tierOpenNote, payTitle, payPrice,
+    nearbyGroups, selGroupData, applyState, tierOpenNote,
     applicantList, pendingCount, selApplicant: selApplicantData,
     noApplicantOpen: !selApplicant, applicantOpen: !!selApplicant,
     applicantPending: !!selApplicant && (reqStatus[selApplicant] || 'pending') === 'pending',

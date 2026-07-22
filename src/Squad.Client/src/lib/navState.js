@@ -5,9 +5,9 @@
 const KEY = 'squad.nav';
 
 // Screens we never restore into: the logged-out auth flow and mid-flow / transient screens
-// that don't make sense to reopen cold (a half-finished payment, a modal-ish list that
-// needs a live selection). Everything else is restored as-is.
-const NO_RESTORE = new Set(['welcome', 'login', 'register', 'pay', 'requests', 'chat', 'newgroup']);
+// that don't make sense to reopen cold (a modal-ish list that needs a live selection).
+// Everything else is restored as-is.
+const NO_RESTORE = new Set(['welcome', 'login', 'register', 'requests', 'chat', 'newgroup']);
 
 export function loadNav() {
   try {
