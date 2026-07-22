@@ -44,9 +44,14 @@ async function uploadFit(bytes, token) {
 // streams through pushTelemetry (live hub) AND is accumulated at full resolution so the
 // finished ride can be encoded as a real Garmin .fit and uploaded through the same
 // ingest path as a Garmin file (see lib/fitEncoder.js).
-export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, enabled = true, sport = FitSport.cycling, indoor = false, driver = false, autoPause = { enabled: false, pauseKph: 2, resumeKph: 4 }, throttleMs = 1000 } = {}) {
+export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, onEnded, enabled = true, sport = FitSport.cycling, indoor = false, driver = false, autoPause = { enabled: false, pauseKph: 2, resumeKph: 4 }, throttleMs = 1000 } = {}) {
   const driverRef = useRef(driver);
   driverRef.current = driver;
+  // Called whenever a ride fully ends (discarded, saved-and-dismissed, or a driver stop with no
+  // save card) so the host can end the ride SESSION (drop back to the lobby) — otherwise a ride
+  // with no pending summary can leave the app stuck showing the active ride display.
+  const onEndedRef = useRef(onEnded);
+  onEndedRef.current = onEnded;
   // Auto-pause: freeze distance + the elapsed clock when you stop, resume after sustained movement.
   const apCfgRef = useRef(autoPause);
   apCfgRef.current = autoPause;
@@ -278,6 +283,7 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, ena
     if (driverRef.current) {
       clearDraft(); resetCapture(); setDistanceKm(0); setElapsedSec(0); setPhotos([]);
       setPending(null); setSaveState('idle'); setSaveError(null);
+      onEndedRef.current?.(); // no save card for a driver ride — end the session so we return to the lobby
       return;
     }
 
@@ -348,6 +354,7 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, ena
     samples.current = []; agg.current = null; startedAtRef.current = null;
     clearDraft();
     setPending(null); setSaveState('idle'); setSaveError(null); setDistanceKm(0); setElapsedSec(0); setPhotos([]);
+    onEndedRef.current?.(); // ride is done (discarded, or dismissed after saving) — end the session
   }, []);
 
   // Tick the live elapsed (wall-clock) time once a second while recording. Anchored to the

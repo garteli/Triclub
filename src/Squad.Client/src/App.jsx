@@ -619,7 +619,14 @@ export default function App() {
     if (!list.includes(rideSport)) setRideSport(list[0]);
   }, [vm.family, rideSport, setRideSport]);
   const rideType = RIDE_TYPES[rideSport] || RIDE_TYPES.bike;
-  const recorder = useRideRecorder({ pushTelemetry: liveRide.pushTelemetry, sensors, getToken, onSaved: () => setRefreshSignal((n) => n + 1), enabled: authed, sport: rideType.fitSport, indoor: rideType.indoor, driver: !!rideType.driver, autoPause: state.autoPause, throttleMs: 500 });
+  const recorder = useRideRecorder({
+    pushTelemetry: liveRide.pushTelemetry, sensors, getToken,
+    onSaved: () => setRefreshSignal((n) => n + 1),
+    // A finished ride (discarded, dismissed after saving, or a driver stop) ends the session:
+    // drop back to the lobby so the app never stays on / returns to the active ride display.
+    onEnded: () => setState((s) => (s.rideState === 'active' ? { ...s, rideState: 'lobby' } : s)),
+    enabled: authed, sport: rideType.fitSport, indoor: rideType.indoor, driver: !!rideType.driver, autoPause: state.autoPause, throttleMs: 500,
+  });
   // A ride is "live" whenever it's active OR still recording — independent of which screen you're on,
   // so sensors, ranging, the hub, telemetry, wake lock and presence all keep running as you navigate.
   const rideLive = rideSessionActive || recorder.recording;
