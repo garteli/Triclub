@@ -52,12 +52,17 @@ function Lobby({ vm, actions, live }) {
         )}
       </div>
 
-      {/* activity type — bike / run outdoors (GPS), trainer / treadmill indoors (sensor speed) */}
+      {/* activity type — family-aware: endurance clubs record bike / run outdoors (GPS) or
+          trainer / treadmill indoors (sensor speed); motorsport clubs record road / off-road /
+          touring motorcycle rides. Driver (escort) is offered in both. */}
       {live?.rideType && (
         <div style={s('margin-top:18px')}>
           <div style={s('font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:1.4px;font-weight:600;margin-bottom:9px')}>Activity type</div>
           <div style={s('display:flex;gap:6px;background:var(--bg2);border:1px solid var(--line);border-radius:13px;padding:5px')}>
-            {[['bike', 'Bike'], ['run', 'Run'], ['trainer', 'Trainer'], ['treadmill', 'Treadmill'], ['driver', 'Driver']].map(([id, label]) => {
+            {(vm.family === 'motorsport'
+              ? [['road', 'Road'], ['offroad', 'Off-road'], ['touring', 'Touring'], ['driver', 'Driver']]
+              : [['bike', 'Bike'], ['run', 'Run'], ['trainer', 'Trainer'], ['treadmill', 'Treadmill'], ['driver', 'Driver']]
+            ).map(([id, label]) => {
               const on = live.rideType.value === id;
               const locked = !!live?.recorder?.recording;
               return (
