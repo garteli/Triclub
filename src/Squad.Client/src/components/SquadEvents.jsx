@@ -43,7 +43,10 @@ const defaultWhen = () => {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 };
 
-export default function SquadEvents({ squadId, getToken, mode = 'browse', disc }) {
+// standalone=true — rendered as its own screen (the motorsport Events tab): keep the
+// empty state visible instead of collapsing the section, and drop the section heading.
+// `disc` is the club's discipline; it drives the family-aware sport choices + glyphs.
+export default function SquadEvents({ squadId, getToken, mode = 'browse', standalone = false, disc }) {
   const manage = mode === 'manage';
   const family = familyOf(disc);
   const sportOptions = SPORT_OPTIONS[family] || SPORT_OPTIONS.endurance;
@@ -128,12 +131,12 @@ export default function SquadEvents({ squadId, getToken, mode = 'browse', disc }
     finally { setBusyId(null); }
   };
 
-  if (items === null) return null;                 // loading — avoid flicker
-  if (!manage && items.length === 0) return null;  // members: hide an empty section
+  if (items === null) return null;                              // loading — avoid flicker
+  if (!manage && !standalone && items.length === 0) return null; // members: hide an empty inline section
 
   return (
     <div style={s('margin-top:16px')}>
-      <div style={s('font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text2);margin:0 2px 10px')}>Group sessions</div>
+      {!standalone && <div style={s('font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text2);margin:0 2px 10px')}>Group sessions</div>}
 
       {/* manager: schedule a session */}
       {manage && (
@@ -178,7 +181,7 @@ export default function SquadEvents({ squadId, getToken, mode = 'browse', disc }
       {error && <div style={s('font-size:12px;color:var(--bad);font-weight:600;margin-bottom:10px')}>{error}</div>}
 
       {items.length === 0 ? (
-        manage && <div style={s('font-size:12.5px;color:var(--text3);background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:14px;text-align:center')}>No sessions scheduled yet — publish your next group ride above.</div>
+        (manage || standalone) && <div style={s('font-size:12.5px;color:var(--text3);background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:14px;text-align:center')}>{manage ? 'No sessions scheduled yet — publish your next group ride above.' : 'No sessions scheduled yet — your club’s upcoming rides will show up here.'}</div>
       ) : (
         <div style={s('display:flex;flex-direction:column;gap:9px')}>
           {items.map((ev) => {

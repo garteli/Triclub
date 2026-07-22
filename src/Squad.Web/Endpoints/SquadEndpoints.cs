@@ -30,6 +30,7 @@ public static class SquadEndpoints
         // sign-up) and accepts it (authorized) to auto-join.
         g.MapPost("/{id:guid}/invite", CreateInvite);
         app.MapGet("/api/invites/{token}", InviteLookup);
+        app.MapGet("/api/invites/{token}/logo", InviteLogo);
         app.MapPost("/api/invites/{token}/accept", AcceptInvite).RequireAuthorization();
         // The owner's cross-squad pending-request inbox.
         app.MapGet("/api/requests", Requests).RequireAuthorization();
@@ -182,6 +183,18 @@ public static class SquadEndpoints
         return info is null
             ? Results.NotFound(new { error = "This invite link is invalid or no longer active." })
             : Results.Ok(info);
+    }
+
+    // Public (anonymous) squad logo for a valid invite — lets the logged-out invitee see the
+    // club's logo on the Welcome / Register banner before they've signed in.
+    private static async Task<IResult> InviteLogo(
+        string token, ISquadService squads, IImageStore images, CancellationToken ct)
+    {
+        var info = await squads.GetInviteAsync(token, ct);
+        if (info is null) return Results.NotFound();
+        var blob = await squads.GetImageBlobAsync(info.SquadId, "logo", ct);
+        if (string.IsNullOrEmpty(blob)) return Results.NotFound();
+        return await ImageEndpoints.StreamBlob(images, blob, ct);
     }
 
     private static async Task<IResult> AcceptInvite(

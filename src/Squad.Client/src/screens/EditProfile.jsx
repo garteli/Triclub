@@ -5,8 +5,11 @@ import { updateProfile } from '../lib/auth.js';
 import Avatar from '../components/Avatar.jsx';
 import AvatarEditor from '../components/AvatarEditor.jsx';
 import { loadImageFile } from '../lib/avatar.js';
+import { disciplinesInFamily } from '../lib/disciplines.js';
 
-const SPORTS = ['Triathlon', 'Cycling', 'Running', 'Swimming'];
+// Endurance sports first, then the motorsport disciplines (single-sourced from
+// lib/disciplines.js so they stay in step with the club discipline list).
+const SPORTS = ['Triathlon', 'Cycling', 'Running', 'Swimming', ...disciplinesInFamily('motorsport')];
 const LEVELS = ['New to it', 'Intermediate', 'Advanced', 'Racing'];
 const GENDERS = ['Male', 'Female', 'Non-binary', 'Prefer not to say'];
 

@@ -127,6 +127,11 @@ function DashboardEN({ vm, go, openAthlete, openActivity, getToken, onSwitchSqua
                   </div>
                 </div>
               </div>
+            ) : vm.family === 'motorsport' ? (
+              <div className="ctl" onClick={() => go('events')} style={s('background:var(--bg2);border:1px dashed var(--line2);border-radius:20px;padding:22px 18px;text-align:center')}>
+                <div style={s('font-size:15px;font-weight:600')}>No ride scheduled for today</div>
+                <div style={s('font-size:12.5px;color:var(--text3);margin-top:5px;line-height:1.5')}>Your club's group rides show up here. Tap to see upcoming events.</div>
+              </div>
             ) : (
               <div className="ctl" onClick={() => go('plan')} style={s('background:var(--bg2);border:1px dashed var(--line2);border-radius:20px;padding:22px 18px;text-align:center')}>
                 <div style={s('font-size:15px;font-weight:600')}>No session planned for today</div>
@@ -192,6 +197,11 @@ function DashboardHE({ vm, go, openAthlete, openActivity, getToken, onSwitchSqua
                   </div>
                   <div className="ctl" onClick={() => go('ride')} style={s('background:var(--accent);color:var(--accent-ink);text-align:center;padding:13px;border-radius:13px;font-weight:700;font-size:14px;margin-top:14px')}>התחל אימון</div>
                 </div>
+              </div>
+            ) : vm.family === 'motorsport' ? (
+              <div className="ctl" onClick={() => go('events')} style={s('background:var(--bg2);border:1px dashed var(--line2);border-radius:20px;padding:22px 18px;text-align:center')}>
+                <div style={s('font-size:15px;font-weight:600')}>אין רכיבה מתוזמנת להיום</div>
+                <div style={s('font-size:12.5px;color:var(--text3);margin-top:5px;line-height:1.5')}>הרכיבות הקבוצתיות של המועדון יופיעו כאן. הקש לצפייה באירועים.</div>
               </div>
             ) : (
               <div className="ctl" onClick={() => go('plan')} style={s('background:var(--bg2);border:1px dashed var(--line2);border-radius:20px;padding:22px 18px;text-align:center')}>
