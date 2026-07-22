@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { s } from '../lib/style.js';
+import { BASEMAP_LABEL, baseSource, applyBasemap, nextBasemap } from '../lib/basemaps.js';
 
 // Interactive live-ride map tile: a real MapLibre basemap you can pinch-zoom, pan and rotate,
 // with the course route + your breadcrumb, and each rider as a coloured dot with their initials.
@@ -10,10 +11,9 @@ import { s } from '../lib/style.js';
 // props: pts (frame [lat,lon][]), course/path ([lat,lon][]), riders ([{lat,lon,initials,color,you}]),
 //        interactive (gestures on — off during tile drag-reorder).
 
-const baseTiles = () => ['a', 'b', 'c', 'd'].map((sd) => `https://${sd}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png`);
-const buildStyle = () => ({
+const buildStyle = (basemap) => ({
   version: 8,
-  sources: { base: { type: 'raster', tiles: baseTiles(), tileSize: 256, attribution: '© OpenStreetMap · © CARTO' } },
+  sources: { base: baseSource(basemap) },
   layers: [{ id: 'base', type: 'raster', source: 'base' }],
 });
 
@@ -77,6 +77,8 @@ export default function LiveMapGL({ pts, course, path, riders, mySport, interact
   const markerSigRef = useRef('');     // last rider signature, so we only rebuild on real change
   const [follow, setFollow] = useState(false); // false = north-up (free pan), true = follow heading
   const [failed, setFailed] = useState(false);
+  const [basemap, setBasemap] = useState('voyager'); // cycle Voyager → Light → Dark → Off-road
+  const basemapRef = useRef('voyager');
 
   // Create the map once.
   useEffect(() => {
@@ -88,7 +90,7 @@ export default function LiveMapGL({ pts, course, path, riders, mySport, interact
         if (cancelled || !elRef.current) return;
         const c = Array.isArray(pts) && pts.length ? [pts[0][1], pts[0][0]] : [34.9, 32.0];
         map = new maplibregl.Map({
-          container: elRef.current, style: buildStyle(), center: c, zoom: 14,
+          container: elRef.current, style: buildStyle(basemapRef.current), center: c, zoom: 14,
           attributionControl: false, fadeDuration: 0, renderWorldCopies: false, maxPitch: 0, dragRotate: true,
         });
         mapRef.current = map;
@@ -244,6 +246,13 @@ export default function LiveMapGL({ pts, course, path, riders, mySport, interact
     map.easeTo({ bearing: 0, duration: 300 });
   }, [follow]);
 
+  // Swap the basemap when cycled — kept beneath the course line so route/riders stay on top.
+  useEffect(() => {
+    basemapRef.current = basemap;
+    const map = mapRef.current;
+    if (map && readyRef.current) applyBasemap(map, basemap, 'course');
+  }, [basemap]);
+
   // Enable/disable gesture handlers (off during tile drag-reorder so the tile can be dragged).
   useEffect(() => {
     const map = mapRef.current;
@@ -271,6 +280,13 @@ export default function LiveMapGL({ pts, course, path, riders, mySport, interact
           // compass N
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7l2.5 6L12 12l-2.5 1z" fill="currentColor" stroke="none" /><text x="12" y="6" fontSize="4.5" textAnchor="middle" fill="currentColor" stroke="none">N</text></svg>
         )}
+      </div>
+      {/* Basemap cycle (Voyager → Light → Dark → Off-road) */}
+      <div
+        className="ctl" onPointerDown={stop} onClick={(e) => { stop(e); setBasemap((b) => nextBasemap(b)); }}
+        title={`Map: ${BASEMAP_LABEL[basemap] || basemap} — tap to change`}
+        style={s(`position:absolute;bottom:8px;right:8px;z-index:3;width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--bg) 78%,transparent);border:1px solid var(--line2);color:${basemap === 'offroad' ? 'var(--accent)' : 'var(--text)'}`)}>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"><path d="M12 2l9 5-9 5-9-5z" /><path d="M3 12l9 5 9-5M3 17l9 5 9-5" /></svg>
       </div>
     </div>
   );
