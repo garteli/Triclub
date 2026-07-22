@@ -174,8 +174,10 @@ public static class AuthEndpoints
         string name, string? email, string? passwordHash = null, string? googleSub = null, string? appleSub = null)
     {
         var id = Guid.NewGuid();
+        // A fresh, private "Solo" squad id (materialised in SqlAthleteAccounts.CreateAsync) — new
+        // signups get their own squad, not the shared landing club, so they don't auto-join a group.
         return new NewAthleteAccount(
-            id, name, Initials(name), AvatarColor(id), Squads.Landing,
+            id, name, Initials(name), AvatarColor(id), Guid.NewGuid(),
             email, passwordHash, googleSub, appleSub);
     }
 

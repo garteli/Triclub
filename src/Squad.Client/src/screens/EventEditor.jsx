@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { s, html } from '../lib/style.js';
+import { s } from '../lib/style.js';
 import { Back } from './wizard.jsx';
 import { listCourses, createCourse, deleteCourse } from '../lib/courses.js';
 import CoursePicker from '../components/CoursePicker.jsx';
+import SportIcon from '../components/SportIcon.jsx';
 import { createSquadEvent, updateSquadEvent, toOffsetIso, toLocalInput } from '../lib/events.js';
 
 // Add / edit a group session (event). Reached from the Events tab: coach taps "Add event"
@@ -10,11 +11,13 @@ import { createSquadEvent, updateSquadEvent, toOffsetIso, toLocalInput } from '.
 // returns to the Events list. New events can be published now or saved as a draft; editing
 // keeps the event's current publish state.
 
-const SPORTS = {
-  0: { label: 'Session', icon: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>' },
-  1: { label: 'Swim', icon: '<path d="M2 16c1.5 0 1.5 1.5 3 1.5S8.5 16 10 16s1.5 1.5 3 1.5 1.5-1.5 3-1.5 1.5 1.5 3 1.5"/><path d="M2 20c1.5 0 1.5 1.5 3 1.5S8.5 20 10 20s1.5 1.5 3 1.5 1.5-1.5 3-1.5 1.5 1.5 3 1.5"/><circle cx="15" cy="6" r="2"/><path d="M6 13l5-4 3 2 3-3"/>' },
-  2: { label: 'Ride', icon: '<circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 17.5l-3-6.5H8.5m6.5 0l-2.5 6.5M9.5 6.5h3l2 4.5"/>' },
-  3: { label: 'Run', icon: '<circle cx="14" cy="5" r="2"/><path d="M11 21l1.5-5-2.5-2 1-5 3 2 2 1M8 12l1-4 3-1"/>' },
+// The sport choices offered when scheduling, keyed by the club's discipline family — matches
+// the inline scheduler in SquadEvents.jsx so both entry points show the same, club-appropriate
+// options. Values are the ActivitySport byte stored on the event (0..3); motorsport clubs
+// schedule a single "Ride" (stored as the generic bike=2, rendered with the motorcycle glyph).
+const SPORT_OPTIONS = {
+  endurance: [{ v: 1, label: 'Swim', glyph: 'swim' }, { v: 2, label: 'Bike', glyph: 'bike' }, { v: 3, label: 'Run', glyph: 'run' }],
+  motorsport: [{ v: 2, label: 'Ride', glyph: 'moto' }],
 };
 
 // datetime-local default: the next round hour ("yyyy-MM-ddTHH:mm" in local time).
@@ -24,11 +27,6 @@ const defaultWhen = () => {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 };
 
-const SportIcon = ({ sport, size = 16 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-    strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={html((SPORTS[sport] || SPORTS[0]).icon)} />
-);
-
 const inputStyle = 'background:var(--bg3);border:1px solid var(--line);border-radius:11px;padding:11px 12px;font-size:13px;color:var(--text);outline:none;font-family:inherit;width:100%';
 
 export default function EventEditor({ vm, state, actions, getToken, onDataChanged }) {
@@ -36,8 +34,17 @@ export default function EventEditor({ vm, state, actions, getToken, onDataChange
   const editing = state?.selEvent || null;
   const isEdit = !!editing;
 
+  // Sport choices adapt to the active club's discipline family (endurance vs motorsport),
+  // so a motorsport club only offers "Ride" and an endurance club offers Swim/Bike/Run.
+  const sportOptions = SPORT_OPTIONS[vm.family] || SPORT_OPTIONS.endurance;
+
   const [title, setTitle] = useState(editing?.title || '');
-  const [sport, setSport] = useState(editing?.sport ?? 2);
+  // Keep an existing event's sport if it's valid for this family; otherwise fall back to the
+  // first option (e.g. a motorsport club opening a legacy run event lands on "Ride").
+  const [sport, setSport] = useState(() => {
+    const cur = editing?.sport ?? 2;
+    return sportOptions.some((o) => o.v === cur) ? cur : sportOptions[0].v;
+  });
   const [when, setWhen] = useState(() => (editing ? toLocalInput(editing.start) : defaultWhen()));
   const [courseId, setCourseId] = useState(editing?.courseId ? String(editing.courseId) : '');
   const [notes, setNotes] = useState(editing?.notes || '');
@@ -115,10 +122,10 @@ export default function EventEditor({ vm, state, actions, getToken, onDataChange
         <div>
           <div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin:0 2px 7px')}>Type</div>
           <div style={s('display:flex;gap:7px')}>
-            {[2, 0, 1, 3].map((n) => (
-              <div key={n} className="ctl" onClick={() => setSport(n)}
-                style={s(`flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;border-radius:10px;font-size:12px;font-weight:700;border:1px solid ${sport === n ? 'var(--accent)' : 'var(--line)'};background:${sport === n ? 'var(--accent-dim)' : 'var(--bg3)'};color:${sport === n ? 'var(--accent)' : 'var(--text2)'}`)}>
-                <SportIcon sport={n} />{SPORTS[n].label}
+            {sportOptions.map((o) => (
+              <div key={o.v} className="ctl" onClick={() => setSport(o.v)}
+                style={s(`flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;border-radius:10px;font-size:12px;font-weight:700;border:1px solid ${sport === o.v ? 'var(--accent)' : 'var(--line)'};background:${sport === o.v ? 'var(--accent-dim)' : 'var(--bg3)'};color:${sport === o.v ? 'var(--accent)' : 'var(--text2)'}`)}>
+                <SportIcon name={o.glyph} size={16} />{o.label}
               </div>
             ))}
           </div>
