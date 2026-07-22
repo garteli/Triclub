@@ -54,6 +54,11 @@ body {
 .phone[data-accent="blue"]   { --accent: #5a86ff; --accent-ink: #fff; --accent-dim: rgba(90, 134, 255, .18); }
 .phone[data-lang="he"]       { font-family: 'Heebo', sans-serif; }
 
+/* iPad / large screens: fill the viewport instead of the 480px phone column. */
+@media (min-width: 700px) {
+  .phone { max-width: 100%; }
+}
+
 .scr::-webkit-scrollbar { width: 0; }
 .hscroll::-webkit-scrollbar { height: 0; }
 
