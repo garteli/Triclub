@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { s, html } from '../lib/style.js';
 import EmptyState from '../components/EmptyState.jsx';
+import SquadEvents from '../components/SquadEvents.jsx';
 
 const fmtRange = (a, b) => {
   const f = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
@@ -153,7 +154,7 @@ function WorkoutSheet({ wkDetail, actions, live }) {
 const dowLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 const legend = [['Bike', 'var(--bike)'], ['Swim', 'var(--swim)'], ['Run', 'var(--run)'], ['Gym', 'var(--gym)']];
 
-export default function Plan({ vm, state, actions, planMine, live, meId }) {
+export default function Plan({ vm, state, actions, planMine, live, meId, getToken }) {
   const week = state.planView === 'week';
   const [showMine, setShowMine] = useState(false);
   // Coach mode is only for the coach of the active club — i.e. its owner (the app gates every
@@ -265,6 +266,14 @@ export default function Plan({ vm, state, actions, planMine, live, meId }) {
               ))}
             </div>
           </>
+        )}
+
+        {/* club group sessions the coach scheduled — members join here and check in on the day
+            from the Live page. Collapses when there's nothing upcoming. */}
+        {vm.activeClubId && (
+          <div style={s('margin-top:20px')}>
+            <SquadEvents squadId={vm.activeClubId} getToken={getToken} mode="browse" disc={vm.activeSquad?.disc} onOpen={(ev) => actions.openEvent(ev)} />
+          </div>
         )}
       </div>
 
