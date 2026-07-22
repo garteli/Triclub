@@ -12,10 +12,12 @@ export const BASEMAPS = {
   voyager: { tiles: cartoTiles('voyager'), maxzoom: 20, attribution: '© OpenStreetMap · © CARTO' },
   light: { tiles: cartoTiles('light_all'), maxzoom: 20, attribution: '© OpenStreetMap · © CARTO' },
   dark: { tiles: cartoTiles('dark_all'), maxzoom: 20, attribution: '© OpenStreetMap · © CARTO' },
+  // Esri World Imagery — global aerial/satellite (JPEG, open CORS). ArcGIS tile scheme is z/y/x.
+  satellite: { tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], maxzoom: 19, attribution: '© Esri · Maxar · Earthstar Geographics' },
   offroad: { tiles: ['https://hiking.off-road.io/hiking_map/{z}/{x}/{y}.png'], maxzoom: 15, attribution: '© off-road.io · © OpenStreetMap' },
 };
-export const BASEMAP_ORDER = ['voyager', 'light', 'dark', 'offroad'];
-export const BASEMAP_LABEL = { voyager: 'Voyager', light: 'Light', dark: 'Dark', offroad: 'Off-road' };
+export const BASEMAP_ORDER = ['voyager', 'light', 'dark', 'satellite', 'offroad'];
+export const BASEMAP_LABEL = { voyager: 'Voyager', light: 'Light', dark: 'Dark', satellite: 'Satellite', offroad: 'Off-road' };
 export const nextBasemap = (key) => BASEMAP_ORDER[(BASEMAP_ORDER.indexOf(key) + 1) % BASEMAP_ORDER.length];
 
 // A MapLibre raster-source spec for the given basemap key (falls back to voyager).
