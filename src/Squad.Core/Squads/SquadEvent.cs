@@ -19,7 +19,10 @@ public sealed record SquadEvent(
 public sealed record SquadEventView(
     Guid Id, Guid SquadId, string Title, byte Sport, DateTimeOffset StartUtc,
     Guid? CourseId, string? CourseName, double? CourseKm, string? Notes,
-    int JoinCount, int CheckedInCount, bool Joined, DateTimeOffset? CheckedInUtc, bool Published);
+    int JoinCount, int CheckedInCount, bool Joined, DateTimeOffset? CheckedInUtc, bool Published,
+    // The caller's activity recorded for this event (null if they haven't ridden it yet) — lets
+    // the client show "you rode this" and open the ride. Column order matches ViewSelect.
+    Guid? MyActivityId = null);
 
 /// <summary>One member's attendance on an event, for the coach's joins/check-ins roster:
 /// who joined, when, and whether (and when) they checked in.</summary>

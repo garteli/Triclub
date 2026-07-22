@@ -39,6 +39,10 @@ public sealed record Activity
     public string? SourceExternalId { get; init; }   // Garmin activityId, HK uuid, ...
     public string Fingerprint { get; init; } = string.Empty;
 
+    // The group event (SquadEvent) this ride was recorded for, when started from a scheduled
+    // group ride. Null for ad-hoc activities. Lets a ride be listed under its event.
+    public Guid? EventId { get; init; }
+
     // Detailed track + laps — stored compressed, hydrated only for the detail view.
     public IReadOnlyList<TrackPoint> Track { get; init; } = [];
     public IReadOnlyList<Lap> Laps { get; init; } = [];

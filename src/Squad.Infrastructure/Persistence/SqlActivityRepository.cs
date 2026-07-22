@@ -58,13 +58,13 @@ public sealed class SqlActivityRepository(string connectionString) : IActivityRe
                  DistanceMeters, ElevationGainM, AvgHeartRate, MaxHeartRate,
                  AvgPowerWatts, AvgCadence, Calories, TrainingLoad,
                  Source, SourceExternalId, Fingerprint, TrackBlob,
-                 DeviceName, WeatherJson, StartLat, StartLon)
+                 DeviceName, WeatherJson, StartLat, StartLon, EventId)
             VALUES
                 (@Id, @AthleteId, @Sport, @StartUtc, @MovingTimeSec, @ElapsedTimeSec,
                  @DistanceMeters, @ElevationGainM, @AvgHeartRate, @MaxHeartRate,
                  @AvgPowerWatts, @AvgCadence, @Calories, @TrainingLoad,
                  @Source, @SourceExternalId, @Fingerprint, @TrackBlob,
-                 @DeviceName, @WeatherJson, @StartLat, @StartLon);
+                 @DeviceName, @WeatherJson, @StartLat, @StartLon, @EventId);
             """;
         Bind(cmd, a);
         await cmd.ExecuteNonQueryAsync(ct);
@@ -83,7 +83,9 @@ public sealed class SqlActivityRepository(string connectionString) : IActivityRe
                 Calories = @Calories, TrainingLoad = @TrainingLoad,
                 Source = @Source, SourceExternalId = @SourceExternalId, TrackBlob = @TrackBlob,
                 DeviceName = @DeviceName, WeatherJson = @WeatherJson,
-                StartLat = @StartLat, StartLon = @StartLon
+                StartLat = @StartLat, StartLon = @StartLon,
+                -- keep an existing event link if a richer re-sync (e.g. Garmin) has none
+                EventId = COALESCE(@EventId, EventId)
             WHERE Id = @ExistingId;
             """;
         Bind(cmd, a);
@@ -119,6 +121,7 @@ public sealed class SqlActivityRepository(string connectionString) : IActivityRe
         var start = a.Track.Count > 0 ? a.Track[0] : null;
         P("@StartLat", SqlDbType.Float, start?.Lat);
         P("@StartLon", SqlDbType.Float, start?.Lon);
+        P("@EventId", SqlDbType.UniqueIdentifier, a.EventId);
     }
 
     // Gzipped JSON of the detail payload (track + laps). Format v2 is an ActivityDetail

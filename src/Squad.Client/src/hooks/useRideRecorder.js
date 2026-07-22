@@ -21,10 +21,11 @@ const MOVING_MPS = 0.8;
 const GPS_ACCURACY_MAX_M = 40;
 const GPS_MAX_JUMP_MPS = 45; // ~160 km/h — passes fast driving, catches large noise jumps
 
-async function uploadFit(bytes, token) {
+async function uploadFit(bytes, token, eventId) {
   const file = new File([bytes], `ride-${new Date().toISOString().replace(/[:.]/g, '-')}.fit`, { type: 'application/octet-stream' });
   const fd = new FormData();
   fd.append('file', file, file.name);
+  if (eventId) fd.append('eventId', eventId); // attribute the ride to the group event it was recorded for
   const res = await fetch(apiUrl('/api/activities/upload'), {
     method: 'POST',
     headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -66,6 +67,10 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, onE
   // stopped ride keeps pushing telemetry (you stay "live" on the hub) and the auto-pause 5 s
   // resume timer can still fire — the ride appears to "come back" seconds after you stopped it.
   const recordingRef = useRef(false);
+  // The group event this ride is being recorded for (set when started from a "today's ride");
+  // sent with the FIT upload so the saved activity is attributed to the event. Survives reload
+  // via the draft. Null for an ad-hoc ride.
+  const eventIdRef = useRef(null);
   const [paused, setPaused] = useState(false);       // web: backgrounded / screen locked
   const [distanceKm, setDistanceKm] = useState(0);
   const [elapsedSec, setElapsedSec] = useState(0);   // wall-clock since the ride started, ticks live
@@ -247,10 +252,11 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, onE
     source.current.start(onSample, (err) => setError(err?.message || 'Location error'));
   }, [onSample, acquireWakeLock, indoor, sensors]);
 
-  const start = useCallback(async () => {
+  const start = useCallback(async (opts) => {
     setError(null);
     setPending(null); setSaveState('idle'); setSaveError(null); setPhotos([]);
     resetCapture(); setDistanceKm(0); setElapsedSec(0);
+    eventIdRef.current = opts?.eventId ?? null; // attribute this ride to a group event, if started from one
     startedAtRef.current = Date.now();
     clearDraft(); // a fresh ride supersedes any recovered draft
     try {
@@ -295,7 +301,7 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, onE
     // uploaded, so it can't land as a bike activity). The live stream already served the group.
     if (driverRef.current) {
       clearDraft(); resetCapture(); setDistanceKm(0); setElapsedSec(0); setPhotos([]);
-      setPending(null); setSaveState('idle'); setSaveError(null);
+      setPending(null); setSaveState('idle'); setSaveError(null); eventIdRef.current = null;
       onEndedRef.current?.(); // no save card for a driver ride — end the session so we return to the lobby
       return;
     }
@@ -323,7 +329,7 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, onE
         sport: pending.sport, samples: samples.current, summary: pending.summary,
       });
       const token = getToken ? await getToken() : null;
-      const result = await uploadFit(bytes, token);
+      const result = await uploadFit(bytes, token, eventIdRef.current);
 
       // Upload any photos taken during the ride. They carry a real capture time,
       // clamped into the ride's [start, end] window so the backend resolves them to
@@ -340,6 +346,7 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, onE
       setSaveState('saved');
       samples.current = [];
       setPhotos([]);
+      eventIdRef.current = null;
       clearDraft(); // uploaded — no longer recoverable
       if (result?.status !== 'already-received') onSaved?.();
     } catch (e) {
@@ -365,6 +372,7 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, onE
 
   const discardRide = useCallback(() => {
     samples.current = []; agg.current = null; startedAtRef.current = null;
+    eventIdRef.current = null;
     clearDraft();
     setPending(null); setSaveState('idle'); setSaveError(null); setDistanceKm(0); setElapsedSec(0); setPhotos([]);
     onEndedRef.current?.(); // ride is done (discarded, or dismissed after saving) — end the session
@@ -406,6 +414,7 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, onE
     distMeters.current = draft.distMeters || 0;
     prevCoord.current = draft.prevCoord || null;
     startedAtRef.current = draft.startedAtMs ?? draft.agg?.startMs ?? null;
+    eventIdRef.current = draft.eventId ?? null;
     lastPush.current = 0;
     setDistanceKm((draft.distMeters || 0) / 1000);
     if (how === 'resume') {
@@ -440,6 +449,7 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, onE
       startedAtMs: startedAtRef.current,
       agg: agg.current,
       samples: samples.current,
+      eventId: eventIdRef.current,
       pending: isRecording ? null : pending,
     });
     if (recording) {

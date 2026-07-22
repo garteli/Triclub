@@ -257,6 +257,7 @@ public static class SquadEventEndpoints
         joined = e.Joined,
         checkedIn = e.CheckedInUtc != null,
         published = e.Published,
+        myActivityId = e.MyActivityId,      // the caller's recorded ride for this event, if any
     };
 
     private static object ToDto(SquadEvent e) => new
