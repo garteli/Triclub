@@ -67,7 +67,8 @@ public sealed class SqlSysAdminService(string connectionString) : ISysAdminServi
                         THEN '/api/images/squads/' + LOWER(CONVERT(varchar(36), s.Id)) + '/logo' END AS LogoUrl
             FROM dbo.Squad s
             LEFT JOIN dbo.Athlete o ON o.Id = s.OwnerId
-            ORDER BY CASE WHEN s.Kind = 'personal' THEN 1 ELSE 0 END, MemberCount DESC, s.CreatedUtc DESC;
+            WHERE s.Kind <> 'personal'   -- per-user private "Solo" squads are not listed
+            ORDER BY MemberCount DESC, s.CreatedUtc DESC;
             """, cancellationToken: ct));
         return rows.ToList();
     }
@@ -111,8 +112,8 @@ public sealed class SqlSysAdminService(string connectionString) : ISysAdminServi
             SELECT s.Id, s.Name, s.Kind, m.Role,
                    (SELECT COUNT(*) FROM dbo.Membership mm WHERE mm.SquadId = s.Id) AS MemberCount
             FROM dbo.Membership m JOIN dbo.Squad s ON s.Id = m.SquadId
-            WHERE m.AthleteId = @athleteId
-            ORDER BY CASE WHEN s.Kind = 'personal' THEN 1 ELSE 0 END, s.Name;
+            WHERE m.AthleteId = @athleteId AND s.Kind <> 'personal'   -- hide the user's own Solo squad
+            ORDER BY s.Name;
             """;
         await using var conn = new SqlConnection(connectionString);
         await using var multi = await conn.QueryMultipleAsync(new CommandDefinition(sql, new { athleteId }, cancellationToken: ct));

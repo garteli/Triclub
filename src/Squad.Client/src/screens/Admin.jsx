@@ -126,7 +126,6 @@ export default function Admin({ getToken, actions }) {
       <div style={s('display:flex;gap:9px;margin-top:16px')}>
         <Stat n={overview?.users} label="Users" />
         <Stat n={overview?.clubs} label="Clubs" />
-        <Stat n={overview?.personalSquads} label="Solo" />
         <Stat n={overview?.activities} label="Activities" />
       </div>
 
