@@ -292,10 +292,12 @@ public sealed class SqlSquadEventStore(string connectionString) : ISquadEventSto
     {
         await using var conn = new SqlConnection(connectionString);
         // Published events only (drafts stay private). Place = the cached start-point name, else the
-        // denormalized course name.
+        // course name — but never an auto-generated route filename ("offroad-6309…", a run of 5+ digits),
+        // which isn't a real place. Mirrors the client's displayPlace() filter.
         return await conn.QuerySingleOrDefaultAsync<EventCalendarInfo>(new CommandDefinition("""
             SELECT e.Title, CAST(e.StartUtc AS datetimeoffset(0)) AS StartUtc, e.Notes,
-                   COALESCE(e.StartPlace, e.CourseName) AS Place
+                   COALESCE(e.StartPlace,
+                            CASE WHEN e.CourseName LIKE '%[0-9][0-9][0-9][0-9][0-9]%' THEN NULL ELSE e.CourseName END) AS Place
             FROM dbo.SquadEvent e
             WHERE e.Id = @eventId AND e.SquadId = @squadId AND e.Published = 1;
             """, new { squadId, eventId }, cancellationToken: ct));
