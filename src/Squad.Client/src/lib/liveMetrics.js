@@ -206,10 +206,11 @@ export function liveChartsView(tel) {
     const avgv = nums.reduce((a, b) => a + b, 0) / nums.length;
     return { pts, area, color, unit, label, cur: String(Math.round(cur)), avg: String(Math.round(avgv)), max: String(Math.round(mx)) };
   };
+  // Per-metric chart colours from the ride-computer handoff (bright, read on the dark display).
   return {
-    'chart:spd': build(tel?.hist?.spd, 'var(--accent)', 'kph', 'Speed'),
-    'chart:hr': build(tel?.hist?.hr, 'var(--run)', 'bpm', 'Heart rate'),
-    'chart:power': build(tel?.hist?.pwr, 'var(--bike)', 'W', 'Power'),
+    'chart:spd': build(tel?.hist?.spd, '#c3e83a', 'kph', 'Speed'),
+    'chart:hr': build(tel?.hist?.hr, '#ff5064', 'bpm', 'Heart rate'),
+    'chart:power': build(tel?.hist?.pwr, '#ffc24d', 'W', 'Power'),
   };
 }
 

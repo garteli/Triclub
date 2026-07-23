@@ -149,13 +149,19 @@ function FieldCell({ f, editing, actions, index, indoor, mySport, climb }) {
       )}
       {f.kind === 'chart' && (
         <>
-          <div style={s('display:flex;justify-content:space-between;align-items:baseline')}>
-            <div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;font-weight:600')}>{f.label}</div>
-            <div className="mono" style={s(`font-size:16px;font-weight:700;color:${f.color}`)}>{f.value}<span style={s('font-size:9px;color:var(--text2)')}> {f.unit}</span></div>
+          <div style={s('display:flex;align-items:flex-start;justify-content:space-between;gap:6px')}>
+            <div style={s('display:flex;align-items:center;gap:6px;min-width:0')}>
+              <span style={s(`width:8px;height:8px;border-radius:2px;background:${f.color};flex:none`)} />
+              <span style={s('font-size:9.5px;color:var(--text3);text-transform:uppercase;letter-spacing:1.1px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>{f.label}</span>
+            </div>
+            <div style={s('display:flex;align-items:baseline;gap:3px;flex:none')}>
+              <span className="mono" style={s(`font-size:20px;font-weight:700;line-height:.9;color:${f.color};letter-spacing:-.5px`)}>{f.value}</span>
+              {f.unit && <span style={s('font-size:10px;font-weight:600;color:var(--text2)')}>{f.unit}</span>}
+            </div>
           </div>
-          <svg viewBox="0 0 300 64" preserveAspectRatio="none" style={{ width: '100%', flex: 1, minHeight: 36, marginTop: 6, display: 'block' }}>
-            <polygon points={f.area} fill={f.color} opacity=".14" />
-            <polyline points={f.pts} fill="none" stroke={f.color} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+          <svg viewBox="0 0 300 64" preserveAspectRatio="none" style={{ width: '100%', flex: 1, minHeight: 36, marginTop: 8, display: 'block' }}>
+            <polygon points={f.area} fill={f.color} opacity=".2" />
+            <polyline points={f.pts} fill="none" stroke={f.color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </>
       )}
