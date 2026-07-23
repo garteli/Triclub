@@ -17,7 +17,10 @@ export default function Phone({ theme, accent, lang, dir, screen, go, recording,
       <div
         ref={scrollRef}
         className="scr"
-        style={s('position:absolute;top:0;left:0;right:0;bottom:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior-y:contain')}
+        // overscroll-behavior-y:none disables the browser's native pull-to-refresh and
+        // rubber-band bounce at the top of the page (the app's own pull-to-refresh — which
+        // used to suppress these via a non-passive touchmove preventDefault — is gone).
+        style={s('position:absolute;top:0;left:0;right:0;bottom:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior-y:none')}
       >
         {/* Persistent global header — sticks to the top of the scroll port so it stays visible
             on every migrated screen. It carries its own safe-area top padding. */}
