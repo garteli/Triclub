@@ -2,6 +2,8 @@ import { useRef } from 'react';
 import { s } from '../lib/style.js';
 import { metricCatalog, metricGroupsFor, liveMetricValues, liveChartsView, liveRadarView, spreadRiders, pelotonView } from '../lib/liveMetrics.js';
 import LiveMapGL from './LiveMapGL.jsx';
+import LiveElevationStrip from './LiveElevationStrip.jsx';
+import LiveElevationChart from './LiveElevationChart.jsx';
 import { mergePeerRanges } from '../lib/ranging.js';
 
 // ---- Group side column: teammates front→back on a rail + rear-radar vehicle blip ----
@@ -156,16 +158,23 @@ function FieldCell({ f, editing, actions, index, indoor, mySport }) {
           </svg>
         </>
       )}
+      {f.kind === 'elev' && <LiveElevationChart route={f.route} you={f.you} source={f.source} indoor={indoor} />}
       {f.kind === 'peloton' && <PelotonField v={f.v} />}
       {f.kind === 'map' && (
         <>
-          <div style={s('position:absolute;inset:0')}>
+          {/* When following a course, reserve a strip at the bottom for its elevation profile. */}
+          {(() => { const EH = f.course.length >= 2 ? 60 : 0; return (
+          <>
+          <div style={s(`position:absolute;top:0;left:0;right:0;bottom:${EH}px`)}>
             {f.pts.length ? (
               <LiveMapGL pts={f.pts} course={f.course} path={f.path} riders={f.riders} mySport={mySport} interactive={!editing} />
             ) : (
               <div style={s('position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg3);color:var(--text3);font-size:11px;text-align:center;padding:0 16px')}>{indoor ? 'Indoor session — no map' : 'Waiting for GPS…'}</div>
             )}
           </div>
+          {EH > 0 && <LiveElevationStrip route={f.course} you={f.you} height={EH} />}
+          </>
+          ); })()}
           <div style={s('position:absolute;top:10px;left:11px;font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.8px;font-weight:600;background:color-mix(in srgb,var(--bg) 60%,transparent);padding:2px 7px;border-radius:6px;z-index:2')}>Route</div>
           {f.packFused && (
             // BLE pack-ranging is live: badge the map with a pulse + the fused gap to the
@@ -236,8 +245,8 @@ function PickerSheet({ page, slot, actions, family }) {
   const cur = page.fields[slot];
   const motor = family === 'motorsport';
   // Motorsport has no power meter — drop the power chart (metricGroupsFor hides the rest).
-  const charts = [['chart:spd', 'Speed chart', 'graph'], ['chart:hr', 'HR chart', 'graph'], ...(motor ? [] : [['chart:power', 'Power chart', 'graph']])];
-  const maps = [['map', 'Route map', 'map']];
+  const charts = [['chart:spd', 'Speed chart', 'graph'], ['chart:hr', 'HR chart', 'graph'], ...(motor ? [] : [['chart:power', 'Power chart', 'graph']]), ['elev:track', 'Elevation chart', 'graph']];
+  const maps = [['map', 'Route map', 'map'], ['elev:route', 'Route elevation', 'chart']];
   const group = [['peloton', 'Peloton spread', '2D']];
   const section = (title, rows) => (
     <>
@@ -300,7 +309,19 @@ export default function LivePages({ tel, lp, uwb, blePeers, indoor = false, mySp
       const pts = [...riders.map((r) => [r.lat, r.lon]), ...path, ...course];
       // Phone-to-phone BLE pack-spacing readout, shown only when fusion is live this tick.
       const packGap = tel?.packFused ? (tel?.gap != null ? Math.round(tel.gap) : null) : null;
-      return { ...base, kind: 'map', label: 'Route', riders, path, course, pts, packFused: !!tel?.packFused, packGap };
+      // Your position for the elevation "you are here" marker: your rider fix, else the breadcrumb tail.
+      const youR = riders.find((r) => r.you);
+      const you = youR ? [youR.lat, youR.lon] : (path.length ? path[path.length - 1] : null);
+      return { ...base, kind: 'map', label: 'Route', riders, path, course, pts, you, packFused: !!tel?.packFused, packGap };
+    }
+    if (tok === 'elev:track' || tok === 'elev:route') {
+      const isRoute = tok === 'elev:route';
+      const riders = (tel?.riders || []).filter((r) => r.lat != null && r.lon != null);
+      const path = (tel?.path || []).filter((p) => p && p[0] != null && p[1] != null);
+      const course = (tel?.course || []).filter((p) => p && p[0] != null && p[1] != null);
+      const youR = riders.find((r) => r.you);
+      const you = youR ? [youR.lat, youR.lon] : (path.length ? path[path.length - 1] : null);
+      return { ...base, kind: 'elev', source: isRoute ? 'route' : 'track', route: isRoute ? course : path, you };
     }
     if (tok === 'peloton') return { ...base, kind: 'peloton', v: { ...pelotonView(tel), uwb, blePeers } };
     if (charts[tok]) { const c = charts[tok]; return { ...base, kind: 'chart', label: c.label, value: c.cur, unit: c.unit, color: c.color, pts: c.pts, area: c.area }; }
