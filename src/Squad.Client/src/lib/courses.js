@@ -46,6 +46,11 @@ export const getCourse = (token, id) => req(`/api/courses/${id}`, { token });
 export const createCourse = (token, body) => req('/api/courses', { method: 'POST', token, body });
 export const deleteCourse = (token, id) => req(`/api/courses/${id}`, { method: 'DELETE', token });
 
+// Import a route from an external link (a GPX URL, or an off-road.io track page) — the server fetches
+// and parses it (the browser can't: those hosts send no CORS headers) and saves it as a course.
+// body: { url } → { id, name, distanceKm, pointCount }
+export const importCourseFromUrl = (token, url) => req('/api/courses/import', { method: 'POST', token, body: { url } });
+
 // Parse a GPX file's <trkpt>/<rtept> lat/lon into a [[lat,lon],…] array (client-side, no lib).
 export function parseGpx(text) {
   const out = [];

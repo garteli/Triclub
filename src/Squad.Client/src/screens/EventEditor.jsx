@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { s } from '../lib/style.js';
 import { Back } from './wizard.jsx';
 import AuthedImage from '../components/AuthedImage.jsx';
-import { listCourses, createCourse, deleteCourse } from '../lib/courses.js';
+import { listCourses, createCourse, deleteCourse, importCourseFromUrl } from '../lib/courses.js';
 import CoursePicker from '../components/CoursePicker.jsx';
 import SportIcon from '../components/SportIcon.jsx';
 import { createSquadEvent, updateSquadEvent, uploadEventImage, deleteEventImage, toOffsetIso, toLocalInput } from '../lib/events.js';
@@ -81,6 +81,7 @@ export default function EventEditor({ vm, state, actions, getToken, onDataChange
     },
     clear: () => setCourseId(''),
     save: async (name, points, distanceKm) => createCourse(await getToken?.(), { name, points, distanceKm }),
+    importUrl: async (url) => importCourseFromUrl(await getToken?.(), url),
     remove: async (id) => {
       await deleteCourse(await getToken?.(), id);
       setCourses((cs) => (cs || []).filter((c) => String(c.id) !== String(id)));
