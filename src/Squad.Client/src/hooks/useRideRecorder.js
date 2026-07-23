@@ -10,6 +10,18 @@ function isNativePlatform() {
   return !!(typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.());
 }
 
+// Turn a raw geolocation error into something a rider can act on. GeolocationPositionError codes:
+// 1 = permission denied, 2 = position unavailable, 3 = timeout. (A bare "Permission denied." is
+// otherwise cryptic — see the recorder card.)
+function locErrorMessage(err) {
+  switch (err?.code) {
+    case 1: return 'Location access is off — allow GPS for the app (iOS: Settings → the app → Location → Always) to record your route and share your position.';
+    case 2: return 'Can’t get a GPS fix right now — move to a spot with a clearer view of the sky.';
+    case 3: return 'GPS is slow to respond — check that location is on, then try again.';
+    default: return err?.message || 'Location error';
+  }
+}
+
 // Gaps longer than this (e.g. web GPS paused while backgrounded) are treated as stopped
 // time, so a pocketed-and-locked phase doesn't inflate moving time.
 const MAX_GAP_MS = 10_000;
@@ -252,7 +264,7 @@ export function useRideRecorder({ pushTelemetry, sensors, getToken, onSaved, onE
       await acquireWakeLock(); // keep the screen alive so the foreground watch survives
     }
     recordingRef.current = true; // open the onSample gate before the source can deliver a fix
-    source.current.start(onSample, (err) => setError(err?.message || 'Location error'));
+    source.current.start(onSample, (err) => setError(locErrorMessage(err)));
   }, [onSample, acquireWakeLock, indoor, sensors]);
 
   const start = useCallback(async (opts) => {

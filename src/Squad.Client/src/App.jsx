@@ -758,6 +758,15 @@ export default function App() {
       lon: recorderRef.current?.lastFix?.lon ?? null,
     });
   }, []);
+  // Manual SOS (button on the live ride) — same alert path, but a deliberate confirm instead of a
+  // detected-fall countdown. Covers crashes the auto-detector misses (or when it's not armed).
+  const triggerSos = useCallback(() => {
+    setCrashPending((p) => p || {
+      lat: recorderRef.current?.lastFix?.lat ?? null,
+      lon: recorderRef.current?.lastFix?.lon ?? null,
+      manual: true,
+    });
+  }, []);
   const fall = useFallDetection({ active: fallArmed && rideLive && !crashPending, onFall: handleFall });
   // Arm toggle: on → request the (iOS) motion permission from this tap, arm only if granted.
   const armFall = useCallback(async (on) => {
@@ -794,7 +803,7 @@ export default function App() {
   const live = { riders: liveRide.riders, status: liveRide.status, pushTelemetry: liveRide.pushTelemetry, recorder, sensors, tel, livePages, peerRanging, uwb, courses: courseOps, course: selectedCourse, events: eventOps, rideType: { value: rideSport, indoor: rideType.indoor, driver: !!rideType.driver, label: rideType.label, set: setRideSport },
     // Fall detection: arm/disarm + capability, plus incoming teammate crash alerts.
     fall: { armed: fallArmed, arm: armFall, supported: fall.supported, permission: fall.permission, hasContact: !!profile?.emergencyPhone },
-    crash: liveRide.crash, dismissCrash: liveRide.dismissCrash };
+    sos: triggerSos, crash: liveRide.crash, dismissCrash: liveRide.dismissCrash };
 
   // Unread count for the global header's bell badge.
   const notif = useNotifications({ getToken, enabled: authed });
@@ -863,6 +872,7 @@ export default function App() {
         <CrashAlertOverlay
           contact={{ name: profile?.emergencyName || null, phone: profile?.emergencyPhone || null }}
           location={crashPending}
+          manual={!!crashPending.manual}
           onAlert={() => liveRide.raiseCrashAlert(crashPending.lat, crashPending.lon)}
           onClose={() => setCrashPending(null)} />
       )}

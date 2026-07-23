@@ -14,8 +14,10 @@ const fmtCoord = (lat, lon) =>
 const mapsUrl = (lat, lon) => `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
 const openUrl = (url) => { try { window.open(url, '_blank', 'noopener'); } catch { /* ignore */ } };
 
-export function CrashAlertOverlay({ contact, location, onAlert, onClose }) {
-  const [phase, setPhase] = useState('countdown'); // 'countdown' | 'alerted'
+export function CrashAlertOverlay({ contact, location, manual = false, onAlert, onClose }) {
+  // Auto (detected fall) → a cancellable "Are you OK?" countdown. Manual (SOS button) → a deliberate
+  // confirm first (a stray tap opens the confirm, never sends). Both end in the 'alerted' state.
+  const [phase, setPhase] = useState(manual ? 'confirm' : 'countdown'); // 'confirm' | 'countdown' | 'alerted'
   const [left, setLeft] = useState(COUNTDOWN_SEC);
   const firedRef = useRef(false);
   const loc = location && fmtCoord(location.lat, location.lon);
@@ -40,13 +42,27 @@ export function CrashAlertOverlay({ contact, location, onAlert, onClose }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, left]);
 
-  const isCountdown = phase === 'countdown';
   return (
     <div style={s('position:fixed;inset:0;z-index:400;background:rgba(120,10,10,.94);backdrop-filter:blur(4px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px 22px;text-align:center;animation:floatUp .2s ease')}>
       <div style={s('font-size:44px;line-height:1;margin-bottom:14px')} aria-hidden="true">⚠️</div>
-      <div style={s('font-size:13px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:rgba(255,255,255,.75)')}>Possible crash detected</div>
+      <div style={s('font-size:13px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:rgba(255,255,255,.75)')}>{manual ? 'Emergency SOS' : 'Possible crash detected'}</div>
 
-      {isCountdown ? (
+      {phase === 'confirm' ? (
+        <>
+          <div style={s('font-size:30px;font-weight:800;color:#fff;margin-top:8px;letter-spacing:-.5px')}>Send an SOS?</div>
+          <div style={s('font-size:13px;color:rgba(255,255,255,.82);line-height:1.5;max-width:300px;margin-top:12px')}>
+            This alerts your whole squad with your location{phone ? ` and calls ${contact?.name || 'your emergency contact'}` : ''}.
+          </div>
+          <div className="ctl" onClick={trigger}
+            style={s('margin-top:26px;width:100%;max-width:340px;padding:18px;border-radius:16px;background:#fff;color:#8a0f0f;font-weight:800;font-size:18px;letter-spacing:.3px')}>
+            Send SOS
+          </div>
+          <div className="ctl" onClick={onClose}
+            style={s('margin-top:12px;font-size:14px;font-weight:700;color:rgba(255,255,255,.9);padding:10px')}>
+            Cancel
+          </div>
+        </>
+      ) : phase === 'countdown' ? (
         <>
           <div style={s('font-size:30px;font-weight:800;color:#fff;margin-top:8px;letter-spacing:-.5px')}>Are you OK?</div>
           <div style={s('position:relative;width:120px;height:120px;margin:22px auto')}>
