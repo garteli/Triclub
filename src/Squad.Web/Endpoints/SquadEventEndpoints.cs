@@ -224,7 +224,7 @@ public static class SquadEventEndpoints
             var coachName = (await directory.GetAsync(me, ct))?.Name ?? "Your coach";
             var text = $"scheduled a group session: \"{title}\"";
             foreach (var m in members.Where(m => m.AthleteId != me))
-                await notes.AddAsync(m.AthleteId, "event", me, coachName, text, ct);
+                await notes.AddAsync(m.AthleteId, "event", me, coachName, text, squadId, ct);
         }
         catch (Exception) { /* the write already succeeded; notifications are best-effort */ }
     }
@@ -262,7 +262,7 @@ public static class SquadEventEndpoints
                 {
                     var asker = (await directory.GetAsync(me, ct))?.Name ?? "Someone";
                     if (result.OwnerId != me)
-                        await notes.AddAsync(result.OwnerId, "request", me, asker, $"asked to join \"{result.Title}\"", ct);
+                        await notes.AddAsync(result.OwnerId, "request", me, asker, $"asked to join \"{result.Title}\"", result.SquadId, ct);
                 }
                 catch (Exception) { /* the request is saved; the notification is best-effort */ }
                 return Results.Ok(new { requested = true });
@@ -320,7 +320,7 @@ public static class SquadEventEndpoints
         try
         {
             var coach = (await directory.GetAsync(me, ct))?.Name ?? "Your coach";
-            await notes.AddAsync(athleteId, "approved", me, coach, $"approved you to join \"{title}\"", ct);
+            await notes.AddAsync(athleteId, "approved", me, coach, $"approved you to join \"{title}\"", squadId, ct);
         }
         catch (Exception) { /* the approval is saved; the notification is best-effort */ }
         return Results.Ok(new { status = "approved" });
@@ -336,7 +336,7 @@ public static class SquadEventEndpoints
         try
         {
             var coach = (await directory.GetAsync(me, ct))?.Name ?? "Your coach";
-            await notes.AddAsync(athleteId, "declined", me, coach, $"declined your request to join \"{title}\"", ct);
+            await notes.AddAsync(athleteId, "declined", me, coach, $"declined your request to join \"{title}\"", squadId, ct);
         }
         catch (Exception) { /* the decline is saved; the notification is best-effort */ }
         return Results.Ok(new { status = "declined" });

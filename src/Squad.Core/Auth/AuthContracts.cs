@@ -223,11 +223,16 @@ public interface IFollowService
 // ----- Notifications -----
 
 public sealed record Notification(
-    Guid Id, Guid RecipientId, string Kind, Guid? ActorId, string ActorName, string Text, bool Read, DateTimeOffset CreatedUtc);
+    Guid Id, Guid RecipientId, string Kind, Guid? ActorId, string ActorName, string Text, bool Read, DateTimeOffset CreatedUtc,
+    // The squad this notification is about (null for non-group kinds like follow). SquadName is joined
+    // live for display; column order matches the GetRecentAsync SELECT.
+    Guid? SquadId = null, string? SquadName = null);
 
 public interface INotificationService
 {
-    Task AddAsync(Guid recipientId, string kind, Guid? actorId, string actorName, string text, CancellationToken ct);
+    /// <summary><paramref name="squadId"/> ties the notification to a group (join/request/approved/
+    /// declined/event) so the client can label it and switch to that squad on tap; null for others.</summary>
+    Task AddAsync(Guid recipientId, string kind, Guid? actorId, string actorName, string text, Guid? squadId, CancellationToken ct);
     Task<IReadOnlyList<Notification>> GetRecentAsync(Guid recipientId, int take, CancellationToken ct);
     Task MarkReadAsync(Guid recipientId, Guid notificationId, CancellationToken ct);
     Task MarkAllReadAsync(Guid recipientId, CancellationToken ct);

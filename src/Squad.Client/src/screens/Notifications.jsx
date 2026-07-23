@@ -13,7 +13,7 @@ const ICONS = {
   calendar: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/>',
 };
 
-export default function Notifications({ actions, getToken, notif }) {
+export default function Notifications({ actions, getToken, notif, onSwitchSquad }) {
   // Share the app-level notifications state (so tapping one updates the header bell too);
   // fall back to a local instance if rendered without it. The prototype (signed-out) uses
   // the seed list until the live feed is ready.
@@ -23,9 +23,11 @@ export default function Notifications({ actions, getToken, notif }) {
 
   const [read, setRead] = useState(() => new Set());
   const markAll = () => { setRead(new Set(notifications.map((n) => n.id))); if (ready) markAllRead?.(); };
-  const open = (n) => {
+  const open = async (n) => {
     setRead((r) => new Set(r).add(n.id));
     if (ready && n.unread) markRead?.(n.id); // persist + clear the bell badge
+    // Switch the active group to the one this notification is about, so the app context follows.
+    if (n.squadId && onSwitchSquad) { try { await onSwitchSquad(n.squadId); } catch { /* stay put */ } }
     if (n.athlete) actions.openAthlete(n.athlete);
     else if (n.target) actions.go(n.target);
   };
@@ -57,7 +59,14 @@ export default function Notifications({ actions, getToken, notif }) {
               </div>
               <div style={s('flex:1;min-width:0')}>
                 <div style={s('font-size:13px;line-height:1.35')}><span style={s('font-weight:700')}>{n.actor}</span> <span style={s('color:var(--text2)')}>{n.text}</span></div>
-                <div style={s('font-size:10.5px;color:var(--text3);margin-top:3px')}>{n.time}</div>
+                <div style={s('display:flex;align-items:center;gap:7px;margin-top:4px')}>
+                  {n.squadName && (
+                    <span style={s(`display:inline-flex;align-items:center;gap:4px;font-size:9.5px;font-weight:700;color:${n.color};background:color-mix(in srgb,${n.color} 14%,transparent);padding:2px 7px;border-radius:6px;max-width:60%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis`)}>
+                      <span style={s(`width:4px;height:4px;border-radius:50%;background:${n.color};flex:none`)} />{n.squadName}
+                    </span>
+                  )}
+                  <span style={s('font-size:10.5px;color:var(--text3)')}>{n.time}</span>
+                </div>
               </div>
               {isUnread && <div style={s('width:8px;height:8px;border-radius:50%;background:var(--accent);flex:none')} />}
             </div>

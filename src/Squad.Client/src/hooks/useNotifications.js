@@ -37,6 +37,10 @@ function mapNote(n) {
     // Kinds with a `target` navigate to that screen; the rest open the actor's athlete profile.
     target: k.target || null,
     athlete: k.target ? null : (n.actorId || null),
+    // The group this notification is about — shown as a label, and switched to on tap (null for
+    // non-group kinds like follow).
+    squadId: n.squadId || null,
+    squadName: n.squadName || null,
   };
 }
 

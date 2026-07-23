@@ -80,7 +80,7 @@ public static class SquadEndpoints
             var actor = await directory.GetAsync(me, ct);
             if (actor is not null)
                 await notes.AddAsync(owner, outcome == JoinOutcome.Joined ? "join" : "request", me, actor.Name,
-                    outcome == JoinOutcome.Joined ? $"joined {squad.Name}" : $"asked to join {squad.Name}", ct);
+                    outcome == JoinOutcome.Joined ? $"joined {squad.Name}" : $"asked to join {squad.Name}", id, ct);
         }
 
         return Results.Ok(new { outcome = outcome.ToString().ToLowerInvariant(), squad = await squads.GetAsync(id, me, ct) });
@@ -109,7 +109,7 @@ public static class SquadEndpoints
         if (name is null) return Results.NotFound(new { error = "No pending request, or you don't own this squad." });
 
         var squad = await squads.GetAsync(id, me, ct);
-        await notes.AddAsync(athleteId, "approved", me, squad?.Name ?? "A squad", $"approved you to join {squad?.Name}", ct);
+        await notes.AddAsync(athleteId, "approved", me, squad?.Name ?? "A squad", $"approved you to join {squad?.Name}", id, ct);
         return Results.Ok(new { status = "approved" });
     }
 
@@ -122,7 +122,7 @@ public static class SquadEndpoints
         if (name is null) return Results.NotFound(new { error = "No pending request, or you don't own this squad." });
 
         var squad = await squads.GetAsync(id, me, ct);
-        await notes.AddAsync(athleteId, "declined", me, squad?.Name ?? "A squad", $"declined your request to join {squad?.Name}", ct);
+        await notes.AddAsync(athleteId, "declined", me, squad?.Name ?? "A squad", $"declined your request to join {squad?.Name}", id, ct);
         return Results.Ok(new { status = "declined" });
     }
 
@@ -239,7 +239,7 @@ public static class SquadEndpoints
         {
             var actor = await directory.GetAsync(me, ct);
             if (actor is not null)
-                await notes.AddAsync(owner, "join", me, actor.Name, $"joined {result.SquadName} via your invite", ct);
+                await notes.AddAsync(owner, "join", me, actor.Name, $"joined {result.SquadName} via your invite", result.SquadId, ct);
         }
 
         return Results.Ok(new

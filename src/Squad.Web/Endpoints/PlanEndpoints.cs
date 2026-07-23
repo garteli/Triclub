@@ -201,7 +201,7 @@ public static class PlanEndpoints
             var text = isWeek ? $"added a week of \"{planName}\" to your calendar"
                               : $"published \"{planName}\" to your calendar";
             foreach (var athleteId in recipients)
-                await notes.AddAsync(athleteId, "plan", coachId, coachName, text, ct);
+                await notes.AddAsync(athleteId, "plan", coachId, coachName, text, null, ct);
         }
         catch (Exception) { /* publish already succeeded; notifications are best-effort */ }
 
