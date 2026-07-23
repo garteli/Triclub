@@ -30,10 +30,15 @@ export default function RouteBreakdown({ route, elev, loading }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [analysis, route]);
 
-  if (loading && !analysis) {
-    return <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:18px;padding:20px;text-align:center;color:var(--text3);font-size:12.5px;margin-top:12px')}>Reading the terrain…</div>;
+  // The event always has a route here (the parent gates on it), so never render blank: show a
+  // loading state while the terrain is read, and an explicit fallback if it couldn't be resolved.
+  if (!analysis) {
+    return (
+      <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:18px;padding:20px;text-align:center;color:var(--text3);font-size:12.5px;margin-top:12px')}>
+        {loading ? 'Reading the terrain…' : 'Elevation profile unavailable'}
+      </div>
+    );
   }
-  if (!analysis) return null;
 
   const { totalKm, totalGainM, climbCount, minE, maxE, sections } = analysis;
   const totalM = totalKm * 1000 || 1;
