@@ -41,6 +41,17 @@ function SensorChip({ label, kind, status, value, connect, disconnect }) {
   );
 }
 
+// Motorsport telemetry readout (Speed / RPM / G-Force) — not BLE tap-to-pair like the endurance
+// sensors. Speed comes from GPS; RPM/G-Force stay "—" until a real ECU/telemetry source is wired.
+function ReadoutChip({ label, value, unit }) {
+  return (
+    <div style={s('flex:1;background:var(--bg3);border:1px solid var(--line);border-radius:11px;padding:8px 9px;text-align:center')}>
+      <span style={s('font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text2)')}>{label}</span>
+      <div className="mono" style={s('font-size:15px;font-weight:700;margin-top:3px')}>{value}{unit && value !== '—' && <span style={s('font-size:10px;color:var(--text2)')}> {unit}</span>}</div>
+    </div>
+  );
+}
+
 const Dot = ({ color, pulse }) => (
   <span style={s(`width:9px;height:9px;border-radius:50%;background:${color};${pulse ? 'animation:pulseDot 1.1s infinite' : ''}`)} />
 );
@@ -137,7 +148,9 @@ function RideSummary({ pending, saveState, saveError, saveRide, discardRide, pho
 // Presentational: the shared recorder + sensors are owned by App (so recording and the
 // hub connection persist across lobby→active). `streaming` reflects whether fixes are
 // going to the ride hub.
-export default function RideRecorder({ recorder, sensors, streaming, sport }) {
+export default function RideRecorder({ recorder, sensors, streaming, sport, family }) {
+  // Motorsport records a vehicle session — Speed/RPM/G-Force telemetry, no BLE HR/power/radar.
+  const motor = family === 'motorsport';
   // Off-road motorcycle rides only surface heart rate — no power meter or (rear) radar.
   const hrOnly = sport === 'offroad';
   const { recording, paused, autoPaused, distanceKm, elapsedSec, lastFix, error, mode, start, stop,
@@ -204,34 +217,50 @@ export default function RideRecorder({ recorder, sensors, streaming, sport }) {
         <div style={s('display:flex;align-items:center;gap:8px')}>
           <Dot color={recording ? (stopped ? 'var(--warn)' : 'var(--bad)') : 'var(--text3)'} pulse={recording && !stopped} />
           <span style={s('font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--text2)')}>
-            {recording ? (autoPaused ? 'Auto-paused' : paused ? 'Paused' : 'Recording') : 'Record ride'}
+            {recording ? (autoPaused ? 'Auto-paused' : paused ? 'Paused' : 'Recording') : (motor ? 'Record session' : 'Record ride')}
           </span>
         </div>
         {!streaming && <span style={s('font-size:10px;color:var(--text3)')}>local · not streaming</span>}
       </div>
 
-      {/* BLE sensors — tap to pair / unpair. Off-road rides show HR only. */}
-      <div style={s('display:flex;gap:8px;margin-top:12px')}>
-        <SensorChip label="HR" kind="hr" status={sensors.status.hr} value={sensors.metrics.heartRate ?? '—'} connect={sensors.connect} disconnect={sensors.disconnect} />
-        {!hrOnly && <SensorChip label="Power" kind="power" status={sensors.status.power} value={sensors.metrics.powerW != null ? `${sensors.metrics.powerW}W` : '—'} connect={sensors.connect} disconnect={sensors.disconnect} />}
-        {!hrOnly && <SensorChip label="Radar" kind="radar" status={sensors.status.radar} value={radarLabel(radar)} connect={sensors.connect} disconnect={sensors.disconnect} />}
-      </div>
+      {/* Telemetry. Motorsport = Speed/RPM/G-Force readouts (GPS speed live; RPM/G-Force await a real
+          ECU/telemetry source). Endurance = BLE HR/Power/Radar (tap to pair / unpair). */}
+      {motor ? (
+        <div style={s('display:flex;gap:8px;margin-top:12px')}>
+          <ReadoutChip label="Speed" value={lastFix?.speedKph != null ? Math.round(lastFix.speedKph) : '—'} unit="kph" />
+          <ReadoutChip label="RPM" value="—" />
+          <ReadoutChip label="G-Force" value="—" />
+        </div>
+      ) : (
+        <div style={s('display:flex;gap:8px;margin-top:12px')}>
+          <SensorChip label="HR" kind="hr" status={sensors.status.hr} value={sensors.metrics.heartRate ?? '—'} connect={sensors.connect} disconnect={sensors.disconnect} />
+          {!hrOnly && <SensorChip label="Power" kind="power" status={sensors.status.power} value={sensors.metrics.powerW != null ? `${sensors.metrics.powerW}W` : '—'} connect={sensors.connect} disconnect={sensors.disconnect} />}
+          {!hrOnly && <SensorChip label="Radar" kind="radar" status={sensors.status.radar} value={radarLabel(radar)} connect={sensors.connect} disconnect={sensors.disconnect} />}
+        </div>
+      )}
 
-      {/* radar threat banner */}
-      {radar?.level > 0 && (
+      {/* radar threat banner (endurance only) */}
+      {!motor && radar?.level > 0 && (
         <div style={s(`margin-top:10px;border-radius:11px;padding:9px 12px;font-size:12px;font-weight:700;display:flex;align-items:center;gap:8px;color:${radar.level >= 2 ? '#fff' : '#1a1405'};background:${radar.level >= 2 ? 'var(--bad)' : 'var(--warn)'}`)}>
           🚗 Vehicle approaching{radar.closestM != null ? ` · ${radar.closestM} m` : ''}{radar.count > 1 ? ` · ${radar.count} behind` : ''}
         </div>
       )}
 
-      {recording && (
+      {recording && (motor ? (
+        <div style={s('display:flex;gap:0;margin-top:12px;border-top:1px solid var(--line);padding-top:12px')}>
+          <div style={s('flex:1')}><div className="mono" style={s('font-size:20px;font-weight:700')}>{lastFix?.speedKph != null ? Math.round(lastFix.speedKph) : '—'}<span style={s('font-size:11px;color:var(--text2)')}>kph</span></div><div style={s('font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.7px')}>Speed</div></div>
+          <div style={s('flex:1;border-left:1px solid var(--line);padding-left:12px')}><div className="mono" style={s('font-size:20px;font-weight:700')}>—</div><div style={s('font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.7px')}>RPM</div></div>
+          <div style={s('flex:1;border-left:1px solid var(--line);padding-left:12px')}><div className="mono" style={s('font-size:20px;font-weight:700')}>—</div><div style={s('font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.7px')}>G-Force</div></div>
+          <div style={s('flex:1;border-left:1px solid var(--line);padding-left:12px')}><div className="mono" style={s('font-size:20px;font-weight:700')}>{fmtDur(elapsedSec)}</div><div style={s('font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.7px')}>Time</div></div>
+        </div>
+      ) : (
         <div style={s('display:flex;gap:0;margin-top:12px;border-top:1px solid var(--line);padding-top:12px')}>
           <div style={s('flex:1')}><div className="mono" style={s('font-size:20px;font-weight:700')}>{distanceKm.toFixed(2)}<span style={s('font-size:11px;color:var(--text2)')}>km</span></div><div style={s('font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.7px')}>Distance</div></div>
           <div style={s('flex:1;border-left:1px solid var(--line);padding-left:12px')}><div className="mono" style={s('font-size:20px;font-weight:700')}>{fmtDur(elapsedSec)}</div><div style={s('font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.7px')}>Time</div></div>
           <div style={s('flex:1;border-left:1px solid var(--line);padding-left:12px')}><div className="mono" style={s('font-size:20px;font-weight:700')}>{lastFix?.speedKph != null ? lastFix.speedKph.toFixed(1) : '—'}<span style={s('font-size:11px;color:var(--text2)')}>kph</span></div><div style={s('font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.7px')}>Speed</div></div>
           <div style={s('flex:1;border-left:1px solid var(--line);padding-left:12px')}><div className="mono" style={s('font-size:20px;font-weight:700')}>{lastFix?.accuracy != null ? `±${Math.round(lastFix.accuracy)}` : '—'}<span style={s('font-size:11px;color:var(--text2)')}>m</span></div><div style={s('font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.7px')}>GPS</div></div>
         </div>
-      )}
+      ))}
 
       {/* honest status about background behaviour */}
       {recording && mode === 'web' && (
@@ -256,7 +285,7 @@ export default function RideRecorder({ recorder, sensors, streaming, sport }) {
         onClick={recording ? stop : start}
         style={s(`margin-top:14px;text-align:center;padding:13px;border-radius:13px;font-weight:700;font-size:14px;${recording ? 'background:var(--bg3);border:1px solid var(--line);color:var(--text)' : 'background:var(--accent);color:var(--accent-ink)'}`)}
       >
-        {recording ? 'Stop & save' : 'Start recording'}
+        {recording ? 'Stop & save' : (motor ? 'Start session' : 'Start recording')}
       </div>
     </div>
   );

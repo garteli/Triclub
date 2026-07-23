@@ -139,14 +139,19 @@ const SENS_HINT = {
 
 // Fall-detection arm card for the lobby. Toggles accelerometer monitoring for this ride, tunes the
 // impact sensitivity, and nudges the rider to set an emergency contact (for the auto-call).
-function FallDetectCard({ fall, actions }) {
+function FallDetectCard({ fall, actions, motor = false }) {
   const unsupported = fall.supported === false;
   const on = !!fall.armed;
+  const title = motor ? 'Incident detection' : 'Fall detection';
   const sub = unsupported
     ? 'Not available on this device or browser.'
     : on
-      ? 'Armed — we’ll check on you after a hard impact, then alert your squad.'
-      : 'Alert your squad automatically if you crash while riding.';
+      ? (motor
+        ? 'Armed — we’ll check on you after a hard impact, then alert your squad.'
+        : 'Armed — we’ll check on you after a hard impact, then alert your squad.')
+      : (motor
+        ? 'Alert your squad and call automatically on a hard crash or roll-over.'
+        : 'Alert your squad automatically if you crash while riding.');
   return (
     <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:14px;margin-top:14px')}>
       <div style={s('display:flex;align-items:center;gap:11px')}>
@@ -154,7 +159,7 @@ function FallDetectCard({ fall, actions }) {
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l9 4v6c0 5-3.8 8.5-9 10-5.2-1.5-9-5-9-10V6l9-4z" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
         </div>
         <div style={s('flex:1;min-width:0')}>
-          <div style={s('font-size:13.5px;font-weight:700')}>Fall detection</div>
+          <div style={s('font-size:13.5px;font-weight:700')}>{title}</div>
           <div style={s('font-size:11px;color:var(--text3);line-height:1.4')}>{sub}</div>
         </div>
         <div className={unsupported ? undefined : 'ctl'} onClick={unsupported ? undefined : () => fall.arm(!on)}
@@ -242,7 +247,7 @@ function Lobby({ vm, actions, live }) {
           <div style={s('font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:1.4px;font-weight:600;margin-bottom:9px')}>Activity type</div>
           <div style={s('display:flex;gap:6px;background:var(--bg2);border:1px solid var(--line);border-radius:13px;padding:5px')}>
             {(vm.family === 'motorsport'
-              ? [['road', 'Road'], ['offroad', 'Off-road'], ['touring', 'Touring']]
+              ? [['circuit', 'Circuit'], ['endurance', 'Endurance'], ['rally', 'Rally'], ['kart', 'Kart'], ['road', 'Road']]
               : [['bike', 'Bike'], ['run', 'Run'], ['trainer', 'Trainer'], ['treadmill', 'Treadmill'], ['driver', 'Driver']]
             ).map(([id, label]) => {
               const on = live.rideType.value === id;
@@ -259,24 +264,28 @@ function Lobby({ vm, actions, live }) {
       )}
 
       {/* shared recorder — GPS + BLE sensors, streams to the ride hub while active */}
-      <RideRecorder recorder={live?.recorder} sensors={live?.sensors} streaming={!!live?.pushTelemetry} sport={live?.rideType?.value} />
+      <RideRecorder recorder={live?.recorder} sensors={live?.sensors} streaming={!!live?.pushTelemetry} sport={live?.rideType?.value} family={vm.family} />
 
-      {/* fall detection — opt-in per ride. Watches the phone's accelerometer while riding; a hard
-          impact + stillness opens an "Are you OK?" countdown, then alerts the squad + calls your
-          emergency contact. Best-effort, works while the app is open. */}
-      {live?.fall && <FallDetectCard fall={live.fall} actions={actions} />}
+      {/* fall / incident detection — opt-in per ride. Watches the phone's accelerometer while riding;
+          a hard impact + stillness opens an "Are you OK?" countdown, then alerts the squad + calls
+          your emergency contact. Best-effort, works while the app is open. */}
+      {live?.fall && <FallDetectCard fall={live.fall} actions={actions} motor={vm.family === 'motorsport'} />}
 
-      {/* Bike & gear — connected BLE components (battery from the sensors, when they report it) */}
+      {/* Bike / Vehicle & gear — connected components (battery from the sensors, when they report it) */}
       <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:14px;margin-top:14px')}>
         <div style={s('display:flex;align-items:center;justify-content:space-between;margin-bottom:11px')}>
           <div style={s('display:flex;align-items:center;gap:8px')}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round"><circle cx="5.5" cy="17.5" r="3.5" /><circle cx="18.5" cy="17.5" r="3.5" /><path d="M15 17.5l-3-6.5H8.5m6.5 0l-2.5 6.5M9.5 6.5h3l2 4.5" /></svg>
-            <span style={s('font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--text2)')}>Bike & gear</span>
+            {vm.family === 'motorsport'
+              ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 11l1.5-4.5A2 2 0 0 1 8.4 5h7.2a2 2 0 0 1 1.9 1.5L19 11" /><path d="M3 11h18v4a1 1 0 0 1-1 1h-1a2 2 0 0 1-4 0H9a2 2 0 0 1-4 0H4a1 1 0 0 1-1-1z" /></svg>
+              : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round"><circle cx="5.5" cy="17.5" r="3.5" /><circle cx="18.5" cy="17.5" r="3.5" /><path d="M15 17.5l-3-6.5H8.5m6.5 0l-2.5 6.5M9.5 6.5h3l2 4.5" /></svg>}
+            <span style={s('font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--text2)')}>{vm.family === 'motorsport' ? 'Vehicle & gear' : 'Bike & gear'}</span>
           </div>
           <span style={s(`font-size:10px;font-weight:700;color:${gear.length ? 'var(--good)' : 'var(--text3)'}`)}>{gear.length} connected</span>
         </div>
         {gear.length === 0 ? (
-          <div style={s('font-size:12px;color:var(--text3);line-height:1.5')}>No components paired. Connect your HR strap, power meter or radar to see them here.</div>
+          <div style={s('font-size:12px;color:var(--text3);line-height:1.5')}>{vm.family === 'motorsport'
+            ? 'No components paired. Connect your ECU / OBD-II telemetry or lean-timing beacon to see them here.'
+            : 'No components paired. Connect your HR strap, power meter or radar to see them here.'}</div>
         ) : (
           <div style={s('display:flex;flex-direction:column;gap:10px')}>
             {gear.map((c) => (
