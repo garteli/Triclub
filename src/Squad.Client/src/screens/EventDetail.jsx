@@ -53,33 +53,6 @@ const navApps = (lat, lon) => [
   { key: 'amaps', label: 'Apple Maps', color: '#5a86ff', url: `https://maps.apple.com/?daddr=${lat},${lon}&dirflg=d` },
 ];
 
-// Build a minimal iCalendar (RFC 5545) for the event — DTSTART only (no fabricated duration), plus
-// the real title / place / notes — and trigger a download so the rider can add it to any calendar.
-const icsStamp = (d) => {
-  const p = (n) => String(n).padStart(2, '0');
-  return `${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}T${p(d.getUTCHours())}${p(d.getUTCMinutes())}${p(d.getUTCSeconds())}Z`;
-};
-const icsEscape = (t) => String(t || '').replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/[,;]/g, (m) => `\\${m}`);
-function downloadCalendar(ev) {
-  const start = new Date(ev.start);
-  if (Number.isNaN(start.getTime())) return;
-  const lines = [
-    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Squad//Event//EN', 'BEGIN:VEVENT',
-    `UID:squad-event-${ev.id}@squad`,
-    `DTSTAMP:${icsStamp(new Date())}`,
-    `DTSTART:${icsStamp(start)}`,
-    `SUMMARY:${icsEscape(ev.title || 'Event')}`,
-    ...(ev.courseName ? [`LOCATION:${icsEscape(ev.courseName)}`] : []),
-    ...(ev.notes ? [`DESCRIPTION:${icsEscape(ev.notes)}`] : []),
-    'END:VEVENT', 'END:VCALENDAR',
-  ];
-  const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = `${(ev.title || 'event').replace(/[^\w-]+/g, '-').slice(0, 40)}.ics`;
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
 const glass = 'background:rgba(0,0,0,.55);backdrop-filter:blur(6px);color:#fff;border:1px solid rgba(255,255,255,.14)';
 
 // Map overlay controls shared by the inline card and the fullscreen view: a basemap-layer cycle
@@ -306,6 +279,13 @@ export default function EventDetail({ vm, state, actions, getToken }) {
   // route/GPS file name (which is often just an auto-generated filename like "offroad-1234…").
   const openDirections = () => { if (start) setDirTarget({ lat: start[0], lon: start[1], title: startPlace || ev.title }); };
 
+  // Open the event's .ics served by the API (text/calendar). Opening a real URL is how iOS/Android
+  // hand it to the Calendar app — a client-side blob download is silently ignored on iPhone.
+  const addToCalendar = () => {
+    const url = `/api/squads/${squadId}/events/${ev.id}/calendar.ics`;
+    (actions.openLink || ((u) => { try { window.open(u, '_blank', 'noopener'); } catch { /* ignore */ } }))(url);
+  };
+
   // Share the event page. Prefer the native share sheet (mobile / supported browsers); otherwise —
   // and this is the common desktop-web case where navigator.share is absent — copy the details +
   // link to the clipboard and show a visible confirmation so the button never appears to do nothing.
@@ -470,7 +450,7 @@ export default function EventDetail({ vm, state, actions, getToken }) {
 
       {/* secondary actions — add to calendar · share */}
       <div style={s('display:flex;gap:9px;margin-top:9px')}>
-        <div className="ctl" onClick={() => downloadCalendar(ev)}
+        <div className="ctl" onClick={addToCalendar}
           style={s('flex:1;display:flex;align-items:center;justify-content:center;gap:7px;background:var(--bg2);border:1px solid var(--line);border-radius:13px;padding:11px;font-size:12.5px;font-weight:700')}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="17" rx="2.5" /><path d="M3 9h18M8 2v4M16 2v4" /></svg>Add to calendar
         </div>

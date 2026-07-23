@@ -33,6 +33,10 @@ public sealed record SquadEventView(
     // ViewSelect. Null until a viewer with the route resolves + persists it via SetStartPlaceAsync.
     string? StartPlace = null);
 
+/// <summary>The minimal fields for building an event's calendar (.ics) file: exactly what a
+/// published event already exposes on its shareable page (title, when, place, notes).</summary>
+public sealed record EventCalendarInfo(string Title, DateTimeOffset StartUtc, string? Notes, string? Place);
+
 /// <summary>One member's attendance on an event, for the coach's joins/check-ins roster:
 /// who joined, when, and whether (and when) they checked in.</summary>
 public sealed record SquadEventAttendee(
@@ -112,6 +116,9 @@ public interface ISquadEventStore
     /// when currently empty). Allowed for any caller who can see the event — it's derived public data.
     /// Returns whether this call stored the value.</summary>
     Task<bool> SetStartPlaceAsync(Guid squadId, Guid meId, Guid eventId, string place, CancellationToken ct);
+    /// <summary>Title/start/notes/place for building a PUBLISHED event's calendar (.ics) file. Needs no
+    /// auth — the same details the shareable event page shows. Null if not found or unpublished.</summary>
+    Task<EventCalendarInfo?> GetCalendarInfoAsync(Guid squadId, Guid eventId, CancellationToken ct);
     /// <summary>Delete an event if <paramref name="ownerId"/> owns its squad; false otherwise.</summary>
     Task<bool> DeleteAsync(Guid squadId, Guid ownerId, Guid eventId, CancellationToken ct);
     /// <summary>RSVP to an event. A member (or owner) of the event's squad joins instantly; a non-member's

@@ -22,6 +22,9 @@ public static class SquadEventEndpoints
         app.MapGet("/api/squads/{squadId:guid}/events/{eventId:guid}/participants", EventParticipants).RequireAuthorization();
         app.MapGet("/api/squads/{squadId:guid}/events/{eventId:guid}/route", EventRoute).RequireAuthorization();
         app.MapPost("/api/squads/{squadId:guid}/events/{eventId:guid}/startplace", SetStartPlace).RequireAuthorization();
+        // Anonymous on purpose: an .ics must be openable by plain navigation (no Authorization header),
+        // which is how iOS/Android hand it to the Calendar app. Exposes only a PUBLISHED event's details.
+        app.MapGet("/api/squads/{squadId:guid}/events/{eventId:guid}/calendar.ics", EventCalendar);
         app.MapDelete("/api/squads/{squadId:guid}/events/{eventId:guid}", DeleteEvent).RequireAuthorization();
         // Owner-only: pending event-join requests from non-members, per event and approve/decline.
         app.MapGet("/api/squads/{squadId:guid}/events/{eventId:guid}/requests", EventRequests).RequireAuthorization();
@@ -192,6 +195,36 @@ public static class SquadEventEndpoints
     }
 
     private sealed record StartPlaceRequest(string? Place);
+
+    // Serve a published event as an .ics the OS can open in Calendar. Delivered as text/calendar so
+    // iOS/Android recognise it and offer "Add to Calendar" — unlike a blob download, which iOS ignores.
+    private static async Task<IResult> EventCalendar(
+        Guid squadId, Guid eventId, ISquadEventStore events, CancellationToken ct)
+    {
+        var info = await events.GetCalendarInfoAsync(squadId, eventId, ct);
+        if (info is null) return Results.NotFound();
+        var bytes = System.Text.Encoding.UTF8.GetBytes(BuildIcs(eventId, info));
+        return Results.File(bytes, "text/calendar; charset=utf-8", "event.ics");
+    }
+
+    // Minimal RFC 5545 VEVENT — DTSTART only (no fabricated duration). CRLF line endings + escaping
+    // per spec. UTC stamps so any calendar places it correctly regardless of the viewer's zone.
+    private static string BuildIcs(Guid eventId, EventCalendarInfo e)
+    {
+        static string Esc(string? t) => (t ?? string.Empty)
+            .Replace("\\", "\\\\").Replace("\n", "\\n").Replace(";", "\\;").Replace(",", "\\,");
+        static string Stamp(DateTimeOffset d) => d.UtcDateTime.ToString("yyyyMMdd'T'HHmmss'Z'");
+        var sb = new System.Text.StringBuilder();
+        sb.Append("BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Domestique Hub//Event//EN\r\nBEGIN:VEVENT\r\n");
+        sb.Append($"UID:squad-event-{eventId}@domestiquehub\r\n");
+        sb.Append($"DTSTAMP:{Stamp(DateTimeOffset.UtcNow)}\r\n");
+        sb.Append($"DTSTART:{Stamp(e.StartUtc)}\r\n");
+        sb.Append($"SUMMARY:{Esc(e.Title)}\r\n");
+        if (!string.IsNullOrWhiteSpace(e.Place)) sb.Append($"LOCATION:{Esc(e.Place)}\r\n");
+        if (!string.IsNullOrWhiteSpace(e.Notes)) sb.Append($"DESCRIPTION:{Esc(e.Notes)}\r\n");
+        sb.Append("END:VEVENT\r\nEND:VCALENDAR\r\n");
+        return sb.ToString();
+    }
 
     // Resolve + validate the shared event fields (title/sport/start/route/notes). Returns a parsed
     // bundle, or an Error result to short-circuit the handler.
