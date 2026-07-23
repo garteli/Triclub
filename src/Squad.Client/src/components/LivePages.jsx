@@ -151,7 +151,7 @@ function PelotonField({ v }) {
 }
 
 // ---- a single field cell (metric / chart / map) with edit overlays ----
-function FieldCell({ f, editing, actions, index, indoor, mySport, climb }) {
+function FieldCell({ f, editing, actions, index, indoor, mySport, climb, mono }) {
   const stop = (e) => { if (e && e.stopPropagation) e.stopPropagation(); };
   // Long-press-to-edit is armed on every tile EXCEPT the map — holding on the map is a pan/
   // interaction gesture, not an intent to enter edit mode (enter edit from another tile instead).
@@ -223,8 +223,8 @@ function FieldCell({ f, editing, actions, index, indoor, mySport, climb }) {
           </svg>
         </>
       )}
-      {f.kind === 'elev' && <LiveElevationChart route={f.route} you={f.you} source={f.source} indoor={indoor} />}
-      {f.kind === 'climbpro' && <ClimbField climb={climb} indoor={indoor} />}
+      {f.kind === 'elev' && <LiveElevationChart route={f.route} you={f.you} source={f.source} indoor={indoor} mono={mono} />}
+      {f.kind === 'climbpro' && <ClimbField climb={climb} indoor={indoor} mono={mono} />}
       {f.kind === 'peloton' && <PelotonField v={f.v} />}
       {f.kind === 'map' && (
         <>
@@ -276,7 +276,7 @@ function seg(activeVal, val, label, onSet) {
   );
 }
 
-function EditPanel({ page, actions }) {
+function EditPanel({ page, actions, mono }) {
   const count = page.fields.length;
   return (
     <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:12px 13px;margin:10px 12px 0')}>
@@ -286,6 +286,8 @@ function EditPanel({ page, actions }) {
       <div style={s('display:flex;gap:6px')}>{[['grid', 'Grid'], ['hero', 'Hero']].map(([id, l]) => seg(page.layout, id, l, () => actions.setPageLayout(id)))}</div>
       <div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin:11px 0 7px')}>Side column</div>
       <div style={s('display:flex;gap:6px')}>{[['none', 'Off'], ['group', 'Column']].map(([id, l]) => seg(page.side || 'none', id, l, () => actions.setPageSide(id)))}</div>
+      <div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin:11px 0 7px')}>Colour</div>
+      <div style={s('display:flex;gap:6px')}>{[[false, 'Colour'], [true, 'Mono']].map(([id, l]) => seg(!!mono, id, l, () => actions.setMono(id)))}</div>
       <div style={s('display:flex;gap:8px;margin-top:12px')}>
         <div className="ctl" onClick={actions.addPage} style={s('flex:1;text-align:center;padding:9px;border-radius:10px;font-size:12px;font-weight:700;background:var(--bg3);border:1px dashed var(--line2);color:var(--text2)')}>+ Add page</div>
         <div className="ctl" onClick={actions.deletePage} style={s('width:46px;background:var(--bg3);border:1px solid var(--line);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--bad)')}>
@@ -339,7 +341,7 @@ function PickerSheet({ page, slot, actions, family }) {
 
 // ---- the unified full-screen rotating page system ----
 export default function LivePages({ tel, lp, uwb, blePeers, indoor = false, mySport, climb }) {
-  const { pages, pageIdx, editFields, picker, autoRotate, actions, family } = lp;
+  const { pages, pageIdx, editFields, picker, autoRotate, actions, family, mono } = lp;
   const page = pages[pageIdx];
   const side = page.side || 'none';
   const withSide = side !== 'none';
@@ -391,14 +393,15 @@ export default function LivePages({ tel, lp, uwb, blePeers, indoor = false, mySp
     }
     if (tok === 'climbpro') return { ...base, kind: 'climbpro' };
     if (tok === 'peloton') return { ...base, kind: 'peloton', v: { ...pelotonView(tel), uwb, blePeers } };
-    if (charts[tok]) { const c = charts[tok]; return { ...base, kind: 'chart', label: c.label, value: c.cur, unit: c.unit, color: c.color, pts: c.pts, area: c.area }; }
+    if (charts[tok]) { const c = charts[tok]; return { ...base, kind: 'chart', label: c.label, value: c.cur, unit: c.unit, color: mono ? '#cdd3db' : c.color, pts: c.pts, area: c.area }; }
     const m = metricCatalog[tok] || { label: tok, unit: '' };
     const val = mv[tok] || { v: '—' };
     const vs = hero ? big + 10 : big;
     // Per-metric accent (top bar + icon); value keeps its own semantic colour when it has one.
+    // Monochrome mode flattens both to greys.
     const accent = metricAccent(tok);
-    const barColor = accent || 'var(--text3)';
-    const color = val.color || accent || 'var(--text)';
+    const barColor = mono ? '#c9d0d9' : (accent || 'var(--text3)');
+    const color = mono ? '#dfe4ea' : (val.color || accent || 'var(--text)');
     // A small viz for the few metrics where we have real data to show it.
     let viz = null;
     const has = val.v != null && val.v !== '—';
@@ -443,7 +446,7 @@ export default function LivePages({ tel, lp, uwb, blePeers, indoor = false, mySp
       <div className="live-row" style={s('display:flex;gap:9px;padding:0 12px;touch-action:pan-y')} onPointerDown={onRowPointerDown} onPointerUp={onRowPointerUp}>
         {withSide && <GroupColumn tel={tel} />}
         <div style={s(gridStyle)}>
-          {fields.map((f, i) => <FieldCell key={i} f={f} index={i} editing={editFields} actions={actions} indoor={indoor} mySport={mySport} climb={climb} />)}
+          {fields.map((f, i) => <FieldCell key={i} f={f} index={i} editing={editFields} actions={actions} indoor={indoor} mySport={mySport} climb={climb} mono={mono} />)}
         </div>
       </div>
 
@@ -461,7 +464,7 @@ export default function LivePages({ tel, lp, uwb, blePeers, indoor = false, mySp
         </div>
       )}
 
-      {editFields && <EditPanel page={page} actions={actions} />}
+      {editFields && <EditPanel page={page} actions={actions} mono={mono} />}
 
       {/* Pager dock — edit-only. During a ride the page is changed by horizontal swipe (or
           Auto-rotate) and edit is entered by long-pressing a tile, so the dock stays out of

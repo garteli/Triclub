@@ -18,14 +18,14 @@ const fmtTime = (sec) => {
 };
 
 // One cell of the segmented field strip (divider on all but the last).
-function Cell({ lines, value, unit, hi, last }) {
+function Cell({ lines, value, unit, hi, last, hiColor }) {
   return (
     <div style={s(`flex:1;padding:11px 13px 12px;${last ? '' : 'border-right:1px solid var(--line)'}`)}>
       <div style={s('font-size:9px;font-weight:700;letter-spacing:.9px;color:var(--text3);text-transform:uppercase;height:22px;line-height:1.15')}>
         {lines[0]}{lines[1] && <br />}{lines[1]}
       </div>
       <div style={s('display:flex;align-items:baseline;gap:3px;margin-top:5px')}>
-        <span className="mono" style={s(`font-size:20px;font-weight:700;line-height:1;${hi ? 'color:var(--accent)' : ''}`)}>{value}</span>
+        <span className="mono" style={s(`font-size:20px;font-weight:700;line-height:1;${hi ? `color:${hiColor}` : ''}`)}>{value}</span>
         {unit && <span style={s('font-size:10px;color:var(--text2);font-weight:600')}>{unit}</span>}
       </div>
     </div>
@@ -33,8 +33,11 @@ function Cell({ lines, value, unit, hi, last }) {
 }
 
 // The climb view itself (header + profile + to-go strip). `onDismiss` adds the ✕ (card only).
-function ClimbView({ climb, onDismiss }) {
+// `mono` greys the accent chrome + the gradient bars.
+function ClimbView({ climb, onDismiss, mono = false }) {
   const { climbing, bars, linePath, posFrac, posTopPct, distToGoM, ascentToGoM, etaSec, gradeNow, distToStartM, topE } = climb;
+  const A = mono ? '#c9d0d9' : 'var(--accent)';                              // accent chrome colour
+  const monoBar = (h) => `rgba(255,255,255,${(0.28 + (parseFloat(h) / 100) * 0.55).toFixed(2)})`; // steeper = brighter
   const cat = climb.category ? (climb.category === 'HC' ? 'HC' : `Cat ${climb.category}`) : 'Climb';
   const dg = kmM(distToGoM); // dist-to-go while climbing; the whole climb length while approaching
   const cells = climbing
@@ -45,12 +48,12 @@ function ClimbView({ climb, onDismiss }) {
     <>
       {/* header: category + which climb + phase */}
       <div style={s('display:flex;align-items:center;gap:9px')}>
-        <span style={s('font-size:10px;font-weight:700;letter-spacing:.5px;color:#12140a;background:var(--accent);padding:3px 9px;border-radius:7px')}>{cat}</span>
+        <span style={s(`font-size:10px;font-weight:700;letter-spacing:.5px;color:#12140a;background:${A};padding:3px 9px;border-radius:7px`)}>{cat}</span>
         <span style={s('font-size:15px;font-weight:700;letter-spacing:.3px')}>CLIMB {climb.index + 1}/{climb.total}</span>
         <span style={s('flex:1')} />
         {climbing ? (
-          <span style={s('display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--accent)')}>
-            <span style={s('width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 25%,transparent)')} />On climb
+          <span style={s(`display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:${A}`)}>
+            <span style={s(`width:7px;height:7px;border-radius:50%;background:${A};box-shadow:0 0 0 3px color-mix(in srgb,${A} 25%,transparent)`)} />On climb
           </span>
         ) : (
           <span style={s('font-size:12.5px;color:var(--text3)')}>Starts in <span className="mono" style={s('color:var(--text2)')}>{fmtDist(distToStartM)}</span></span>
@@ -71,46 +74,47 @@ function ClimbView({ climb, onDismiss }) {
               <stop offset="0" stopColor="#4fe08b" /><stop offset=".45" stopColor="#ffc24d" /><stop offset=".7" stopColor="#ff5d3a" /><stop offset="1" stopColor="#ffd24d" />
             </linearGradient>
           </defs>
-          <path d={linePath} fill="none" stroke="url(#climbStroke)" strokeWidth="2.5" />
+          <path d={linePath} fill="none" stroke={mono ? '#cdd3db' : 'url(#climbStroke)'} strokeWidth="2.5" />
         </svg>
         <div style={s('position:absolute;inset:0;display:flex;align-items:flex-end;gap:1.5px;padding-top:34px')}>
           {bars.map((b, i) => {
             const dim = climbing && posFrac != null && (bars.length > 1 ? i / (bars.length - 1) : 0) < posFrac;
-            return <div key={i} style={s(`flex:1;height:${b.h}%;background:${b.color};border-radius:1px;opacity:${dim ? '.35' : '1'}`)} />;
+            return <div key={i} style={s(`flex:1;height:${b.h}%;background:${mono ? monoBar(b.h) : b.color};border-radius:1px;opacity:${dim ? '.35' : '1'}`)} />;
           })}
         </div>
         {climbing && (
           <>
             <div style={s(`position:absolute;top:-4px;bottom:0;left:${(posFrac * 100).toFixed(1)}%;width:2px;background:#fff;box-shadow:0 0 8px rgba(0,0,0,.6)`)} />
-            <div style={s(`position:absolute;left:${(posFrac * 100).toFixed(1)}%;top:${posTopPct}%;transform:translate(-50%,-50%);width:14px;height:14px;border-radius:50%;background:var(--accent);border:2.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.5)`)} />
+            <div style={s(`position:absolute;left:${(posFrac * 100).toFixed(1)}%;top:${posTopPct}%;transform:translate(-50%,-50%);width:14px;height:14px;border-radius:50%;background:${A};border:2.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.5)`)} />
           </>
         )}
       </div>
 
       {/* segmented to-go field strip */}
       <div style={s('display:flex;background:var(--bg3);border:1px solid var(--line);border-radius:14px;margin-top:14px;overflow:hidden')}>
-        {cells.map((c, i) => <Cell key={i} lines={c.l} value={c.v} unit={c.u} hi={c.hi} last={i === cells.length - 1} />)}
+        {cells.map((c, i) => <Cell key={i} lines={c.l} value={c.v} unit={c.u} hi={c.hi} hiColor={A} last={i === cells.length - 1} />)}
       </div>
     </>
   );
 }
 
 // Standalone card — auto-shown above the pages while a climb is near/underway. Dismissable.
-export default function ClimbPro({ climb }) {
+export default function ClimbPro({ climb, mono = false }) {
   const [dismissed, setDismissed] = useState(null); // id of a climb the user closed
   if (!climb || dismissed === climb.id) return null;
-  const border = climb.climbing ? 'color-mix(in srgb,var(--accent) 22%,transparent)' : 'var(--line)';
-  const glow = climb.climbing ? ';box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 10%,transparent)' : '';
+  const A = mono ? '#c9d0d9' : 'var(--accent)';
+  const border = climb.climbing ? `color-mix(in srgb,${A} 22%,transparent)` : 'var(--line)';
+  const glow = climb.climbing ? `;box-shadow:0 0 0 1px color-mix(in srgb,${A} 10%,transparent)` : '';
   return (
     <div style={s(`position:relative;margin:0 12px 8px;border-radius:20px;border:1px solid ${border};background:var(--bg2);padding:16px 16px 6px;color:var(--text);animation:floatUp .25s ease${glow}`)}>
-      <ClimbView climb={climb} onDismiss={() => setDismissed(climb.id)} />
+      <ClimbView climb={climb} onDismiss={() => setDismissed(climb.id)} mono={mono} />
     </div>
   );
 }
 
 // Selectable page tile — the same climb view, filling the field cell; an empty state until a
 // climb on the followed course is near/underway.
-export function ClimbField({ climb, indoor = false }) {
+export function ClimbField({ climb, indoor = false, mono = false }) {
   if (!climb) {
     return (
       <div style={s('flex:1;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:11px;text-align:center;padding:0 12px')}>
@@ -118,5 +122,5 @@ export function ClimbField({ climb, indoor = false }) {
       </div>
     );
   }
-  return <ClimbView climb={climb} />;
+  return <ClimbView climb={climb} mono={mono} />;
 }

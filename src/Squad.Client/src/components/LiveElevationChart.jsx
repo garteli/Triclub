@@ -15,9 +15,9 @@ const VW = 300;      // SVG x units (stretched to the tile width)
 const PAD_T = 12;    // % headroom above the peak
 const PAD_B = 6;     // % below the valley
 
-export default function LiveElevationChart({ route = [], you = null, source = 'route', indoor = false }) {
+export default function LiveElevationChart({ route = [], you = null, source = 'route', indoor = false, mono = false }) {
   const { elev, loading, failed } = useElevationProfile(route);
-  const color = COLOR;
+  const color = mono ? '#cdd3db' : COLOR;
   const pts = (route || []).filter((p) => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]));
 
   const header = (right) => (
