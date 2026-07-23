@@ -106,6 +106,41 @@ const MOTOR_HIDE_CATS = new Set(['Cadence', 'Power', 'Gears']);
 export const metricGroupsFor = (family) =>
   family === 'motorsport' ? metricGroups.filter(([cat]) => !MOTOR_HIDE_CATS.has(cat)) : metricGroups;
 
+// Per-metric accent (ride-computer "Live Data Fields" handoff) — the tile's top bar + icon colour,
+// and the value colour when the metric has no semantic colour of its own. Tokens not listed read
+// as "neutral" (grey accent, plain value) — timers, distances, gearing, leader, balance.
+const METRIC_ACCENTS = {
+  spd: '#35c7f0', avgspd: '#35c7f0', maxspd: '#35c7f0', movspd: '#35c7f0', vspd: '#35c7f0',
+  cad: '#17c9a0', avgcad: '#17c9a0', maxcad: '#17c9a0', lapcad: '#17c9a0',
+  hr: '#ff5064', avghr: '#ff5064', maxhr: '#ff5064', hrpct: '#ff5064', hrzone: '#ff5064', laphr: '#ff5064',
+  pwr: '#ff9e2c', avgpwr: '#ff9e2c', maxpwr: '#ff9e2c', pwr3s: '#ff9e2c', np: '#ff9e2c', work: '#ff9e2c',
+  pwrwkg: '#ff9e2c', iff: '#ff9e2c', tss: '#ff9e2c', pwrzone: '#ff9e2c',
+  elev: '#7fa0bd', gpselev: '#7fa0bd', maxelev: '#7fa0bd', grad: '#ff9e2c', elevgain: '#3fca7d', descent: '#ff7a5c',
+  climbnum: '#ff7a3c', climbcat: '#ff7a3c', climbstart: '#ff7a3c', climbdist: '#ff7a3c', climbascent: '#ff7a3c', climbtime: '#ff7a3c', climbgrade: '#ff7a3c',
+  heading: '#4d8dff', bearing: '#4d8dff', dist2dest: '#4d8dff', eta: '#4d8dff',
+  di2: '#3fca7d', battery: '#3fca7d',
+  kcal: '#ff8a3d', temp: '#e0a020', resp: '#35c7f0',
+  gap: '#9b7bff', leadgap: '#9b7bff', packpos: '#9b7bff', leadpct: '#9b7bff',
+};
+export const metricAccent = (tok) => METRIC_ACCENTS[tok] || null; // null → neutral
+
+// Icon key per metric — a category default with per-metric overrides (mirrors the handoff).
+const ICON_BY_CAT = { Timers: 'clock', Distance: 'route', Speed: 'gauge', Cadence: 'rotate', 'Heart Rate': 'heart', Power: 'bolt', Elevation: 'mountain', Climb: 'mountain', Navigation: 'compass', Gears: 'cog', Other: 'activity' };
+export function metricIcon(tok) {
+  const cat = metricCatalog[tok]?.cat;
+  if (tok === 'elevgain') return 'arrowUp';
+  if (tok === 'descent') return 'arrowDown';
+  if (tok === 'eta') return 'clock';
+  if (tok === 'gear' || tok === 'gearratio') return 'cog';
+  if (tok === 'di2' || tok === 'battery') return 'battery';
+  if (tok === 'kcal') return 'flame';
+  if (tok === 'temp') return 'thermometer';
+  if (tok === 'resp') return 'activity';
+  if (tok === 'dist2dest') return 'route';
+  if (['gap', 'leader', 'leadgap', 'packpos', 'leadpct'].includes(tok)) return 'users';
+  return ICON_BY_CAT[cat] || 'activity';
+}
+
 // Who's on the front, your gap to them, and your place in the pack. Order is by along-route
 // progress (distance-covered) — the reliable signal that needs no BLE/UWB direction, only that
 // riders are streaming. Prefers the server-designated leaderId, falling back to the furthest rider.
