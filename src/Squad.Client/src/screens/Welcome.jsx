@@ -111,7 +111,7 @@ export default function Welcome({ actions, inviteInfo }) {
         <OrDivider>{anySocial ? 'or with email' : 'sign in with email'}</OrDivider>
         <div className="ctl" onClick={() => actions.go('register')} style={s('background:var(--accent);color:var(--accent-ink);text-align:center;padding:15px;border-radius:14px;font-weight:700;font-size:15px;margin-top:4px')}>Create account</div>
         <div style={s('text-align:center;font-size:13px;color:var(--text2);margin-top:16px')}>Already have an account? <span className="ctl" onClick={() => actions.go('login')} style={s('color:var(--accent);font-weight:700')}>Log in</span></div>
-        <div style={s('text-align:center;font-size:10.5px;color:var(--text3);margin-top:14px;line-height:1.5')}>By continuing you agree to Domestique Team's Terms &amp; Privacy Policy.</div>
+        <div style={s('text-align:center;font-size:10.5px;color:var(--text3);margin-top:14px;line-height:1.5')}>By continuing you agree to Domestique Hub's Terms &amp; Privacy Policy.</div>
       </div>
     </div>
   );

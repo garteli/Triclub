@@ -42,7 +42,7 @@ export default function AppleHealthSync({ getToken, onDataChanged }) {
 
         {!available ? (
           <div style={s('font-size:11.5px;color:var(--text3);margin-top:12px;line-height:1.5')}>
-            Apple Health lives on your iPhone, so this works in the <b>Domestique Team iOS app</b> — not the web version. Install the app and open this screen there to sync.
+            Apple Health lives on your iPhone, so this works in the <b>Domestique Hub iOS app</b> — not the web version. Install the app and open this screen there to sync.
           </div>
         ) : (
           <>

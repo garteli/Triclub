@@ -197,14 +197,14 @@ function DashboardEN({ vm, go, openAthlete, openActivity, openEvent, getToken, o
 
       {/* squad status */}
       <div style={s('display:flex;justify-content:space-between;align-items:baseline;margin:22px 2px 12px')}>
-        <div style={s('font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:1.4px;font-weight:600')}>Domestique Team this week</div>
+        <div style={s('font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:1.4px;font-weight:600')}>Domestique Hub this week</div>
         <div className="ctl" onClick={() => go('lb')} style={s('font-size:11.5px;color:var(--accent);font-weight:600')}>Leaderboard →</div>
       </div>
       <SquadRail squad={vm.squad} onOpen={openAthlete} token={token} />
 
       {/* team feed — last 7 days of squad activity, with route maps + photos */}
       <div style={s('display:flex;justify-content:space-between;align-items:baseline;margin:20px 2px 12px')}>
-        <div style={s('font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:1.4px;font-weight:600')}>Domestique Team · last 7 days</div>
+        <div style={s('font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:1.4px;font-weight:600')}>Domestique Hub · last 7 days</div>
         <div className="ctl" onClick={() => go('activities')} style={s('font-size:11.5px;color:var(--accent);font-weight:600')}>See all →</div>
       </div>
       {recent.length === 0 ? (

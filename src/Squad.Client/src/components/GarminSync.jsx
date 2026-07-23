@@ -64,7 +64,7 @@ export default function GarminSync({ getToken, onDataChanged }) {
 
         {!available ? (
           <div style={s('font-size:11.5px;color:var(--text3);margin-top:12px;line-height:1.5')}>
-            Garmin sign-in runs on your phone, so this works in the <b>Domestique Team mobile app</b> — not the web version. Install the app and open this screen there to connect.
+            Garmin sign-in runs on your phone, so this works in the <b>Domestique Hub mobile app</b> — not the web version. Install the app and open this screen there to connect.
           </div>
         ) : mfaPending ? (
           // ---- 2-step verification: enter the code Garmin just sent ----

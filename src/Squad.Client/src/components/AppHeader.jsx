@@ -54,7 +54,7 @@ export default function AppHeader({ vm, actions, getToken, notifUnread = 0, titl
           style={s(`position:relative;min-width:0;display:flex;align-items:center;gap:5px;${rtl ? 'flex-direction:row-reverse' : ''}`)}
         >
           <div style={s(`min-width:0;${rtl ? 'text-align:right' : ''}`)}>
-            {!showBack && <div style={s('font-size:9.5px;color:var(--text3);text-transform:uppercase;letter-spacing:1.4px;font-weight:600')}>Domestique Team</div>}
+            {!showBack && <div style={s('font-size:9.5px;color:var(--text3);text-transform:uppercase;letter-spacing:1.4px;font-weight:600')}>Domestique Hub</div>}
             <div style={s('font-size:17px;font-weight:700;letter-spacing:-.4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>{title || vm.squadName || 'Your squad'}</div>
           </div>
           {canSwitch && (

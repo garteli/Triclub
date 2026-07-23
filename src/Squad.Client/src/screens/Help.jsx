@@ -5,7 +5,7 @@ import { Header, SectionLabel, Card, LinkRow } from '../components/SettingsUI.js
 const FAQ = [
   {
     q: 'How do I record a ride?',
-    a: 'Open the Ride tab and tap Start. On the web app recording runs while the screen is on; for background GPS and Bluetooth sensors, use the Domestique Team app on iOS or Android.',
+    a: 'Open the Ride tab and tap Start. On the web app recording runs while the screen is on; for background GPS and Bluetooth sensors, use the Domestique Hub app on iOS or Android.',
   },
   {
     q: 'Why don’t my sensors show up?',

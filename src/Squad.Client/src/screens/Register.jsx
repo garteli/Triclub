@@ -136,7 +136,7 @@ export default function Register({ actions, inviteInfo }) {
           <div style={s('font-size:13.5px;color:var(--text2);line-height:1.5;margin-top:8px;max-width:270px;margin-left:auto;margin-right:auto')}>Your {form.sport.toLowerCase()} profile is ready. Find a squad to train with, or jump straight in.</div>
           <div style={s('margin-top:28px;text-align:left')}>
             <div className="ctl" onClick={() => actions.go('discover')} style={s('background:var(--accent);color:var(--accent-ink);text-align:center;padding:15px;border-radius:14px;font-weight:700;font-size:15px')}>Find your squad</div>
-            <div className="ctl" onClick={() => actions.go('dash')} style={s('background:var(--bg2);border:1px solid var(--line);color:var(--text);text-align:center;padding:15px;border-radius:14px;font-weight:700;font-size:15px;margin-top:10px')}>Go to Domestique Team</div>
+            <div className="ctl" onClick={() => actions.go('dash')} style={s('background:var(--bg2);border:1px solid var(--line);color:var(--text);text-align:center;padding:15px;border-radius:14px;font-weight:700;font-size:15px;margin-top:10px')}>Go to Domestique Hub</div>
           </div>
         </div>
       )}

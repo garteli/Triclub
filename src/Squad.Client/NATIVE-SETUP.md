@@ -19,7 +19,7 @@ npx cap sync
 ```
 
 `capacitor.config.json` is already in this folder (appId `com.triclub.app`, appName
-`Domestique Team`, `webDir` points at the Vite output). The SPA is **bundled into the
+`Domestique Hub`, `webDir` points at the Vite output). The SPA is **bundled into the
 native shell** (no `server.url`), so it loads from `capacitor://localhost` and works
 offline-first. Because the app origin is then local, root-relative `/api` and `/hubs`
 requests are pointed at the deployed backend by `src/lib/apiBase.js` (`API_BASE`) — a
@@ -185,7 +185,7 @@ script reapplies it after every `npm ci`, so CI (`ios-testflight.yml`) carries i
 
 ```xml
 <key>NSHealthShareUsageDescription</key>
-<string>Domestique Team reads your resting heart rate, HRV, sleep, weight and VO₂max from Apple Health to show your training readiness.</string>
+<string>Domestique Hub reads your resting heart rate, HRV, sleep, weight and VO₂max from Apple Health to show your training readiness.</string>
 ```
 
 We request **read** scopes only — `weight`, `restingHeartRate`, `respiratoryRate`, `hrv`,

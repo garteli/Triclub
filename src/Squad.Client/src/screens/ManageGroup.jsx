@@ -150,7 +150,7 @@ export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged
   // line so it stays tappable. Kept short so it reads well in a message bubble.
   const inviteMessageFor = (url) => {
     const club = g.name || 'our group';
-    return `You're invited to join ${club} on Domestique Team 🚴‍♀️\n`
+    return `You're invited to join ${club} on Domestique Hub 🚴‍♀️\n`
       + `Train, ride and race together — sign up with my link and you're in the group automatically:\n`
       + `${url}`;
   };
@@ -167,7 +167,7 @@ export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged
       // Native share sheet if available; otherwise copy the full message to the clipboard.
       if (navigator.share) {
         try {
-          await navigator.share({ title: `Join ${g.name || 'our group'} on Domestique Team`, text: message });
+          await navigator.share({ title: `Join ${g.name || 'our group'} on Domestique Hub`, text: message });
           setInviteMsg(reset ? 'New link ready — shared.' : 'Invite shared.');
           return;
         } catch { /* user dismissed the sheet — fall through to clipboard */ }
