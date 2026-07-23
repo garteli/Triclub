@@ -46,8 +46,8 @@ export default function RouteBreakdown({ route, elev, loading }) {
   const X = (m) => (m / totalM) * W;
   const Y = (e) => H - BOT - ((e - minE) / eSpan) * (H - TOP - BOT);
 
-  // Ridge path per section (coloured), sliced from the shared samples.
-  const prof = elev.profile;
+  // Ridge path per section (coloured), sliced from the resampled profile the sections index into.
+  const prof = analysis.profile;
   const pathOf = (a, b) => prof.slice(a, b + 1).map((p, i) => `${i ? 'L' : 'M'}${X(p.dist).toFixed(1)} ${Y(p.e).toFixed(1)}`).join(' ');
   const ridge = prof.map((p, i) => `${i ? 'L' : 'M'}${X(p.dist).toFixed(1)} ${Y(p.e).toFixed(1)}`).join(' ');
   const areaD = `${ridge} L${W} ${H} L0 ${H} Z`;

@@ -16,13 +16,13 @@ export function useElevationProfile(points) {
 
   useEffect(() => {
     if (pts.length < 2) { setState({ elev: null, loading: false, failed: false }); return undefined; }
-    const ctrl = new AbortController();
+    let alive = true; // the shared terrain read (cached/deduped) isn't abortable — guard stale updates
     setState((s) => ({ ...s, loading: true, failed: false }));
     (async () => {
-      try { const elev = await buildElevationProfile(pts, ctrl.signal); setState({ elev, loading: false, failed: false }); }
-      catch (e) { if (e.name !== 'AbortError') setState({ elev: null, loading: false, failed: true }); }
+      try { const elev = await buildElevationProfile(pts); if (alive) setState({ elev, loading: false, failed: false }); }
+      catch (e) { if (alive && e.name !== 'AbortError') setState({ elev: null, loading: false, failed: true }); }
     })();
-    return () => ctrl.abort();
+    return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sig]);
 
