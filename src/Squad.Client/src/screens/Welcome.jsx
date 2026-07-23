@@ -64,7 +64,7 @@ export default function Welcome({ actions, inviteInfo }) {
       {/* hero */}
       <div style={s('flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center')}>
         <Logo size={78} />
-        <div style={s('font-size:30px;font-weight:700;letter-spacing:-.6px;margin-top:22px')}>Domestique<span style={s('color:var(--accent)')}> Team</span></div>
+        <div style={s('font-size:30px;font-weight:700;letter-spacing:-.6px;margin-top:22px')}>Domestique<span style={s('color:var(--accent)')}> Hub</span></div>
         <div style={s('font-size:14px;color:var(--text2);line-height:1.5;margin-top:8px;max-width:270px')}>Train together. Ride together. Your team's multi-sport &amp; motorsport season, in one app.</div>
 
         <div style={s('display:flex;gap:15px;margin-top:26px;flex-wrap:wrap;justify-content:center;max-width:320px')}>

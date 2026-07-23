@@ -21,7 +21,7 @@ export default function BootSplash({ hiding = false }) {
           <circle cx="49.5" cy="20.5" r="4.4" fill="#fff" />
         </svg>
       </div>
-      <div style={s('font-size:22px;font-weight:700;letter-spacing:-.4px;color:#eef2f6')}>Domestique<span style={s('color:#ff6a2c')}> Team</span></div>
+      <div style={s('font-size:22px;font-weight:700;letter-spacing:-.4px;color:#eef2f6')}>Domestique<span style={s('color:#ff6a2c')}> Hub</span></div>
     </div>
   );
 }
