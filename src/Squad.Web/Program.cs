@@ -115,7 +115,10 @@ var app = builder.Build();
 Action<Microsoft.AspNetCore.StaticFiles.StaticFileResponseContext> applyStaticCacheHeaders = ctx =>
 {
     var headers = ctx.Context.Response.Headers;
-    if (ctx.File.Name.Equals("index.html", StringComparison.OrdinalIgnoreCase))
+    // index.html names the current hashed bundles, and version.json is the deploy marker the app
+    // polls — neither may ever be cached, or a new deploy stays invisible.
+    if (ctx.File.Name.Equals("index.html", StringComparison.OrdinalIgnoreCase)
+        || ctx.File.Name.Equals("version.json", StringComparison.OrdinalIgnoreCase))
     {
         headers.CacheControl = "no-cache, no-store, must-revalidate";
         headers.Pragma = "no-cache";

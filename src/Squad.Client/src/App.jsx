@@ -42,6 +42,7 @@ import BootSplash from './components/BootSplash.jsx';
 import { CrashAlertOverlay, IncomingCrashBanner } from './components/CrashAlert.jsx';
 import AppHeader from './components/AppHeader.jsx';
 import SyncToast from './components/SyncToast.jsx';
+import UpdateBanner from './components/UpdateBanner.jsx';
 import Dashboard from './screens/Dashboard.jsx';
 import LiveRide from './screens/LiveRide.jsx';
 import Plan from './screens/Plan.jsx';
@@ -875,6 +876,7 @@ export default function App() {
           notif={notif}
           inviteInfo={inviteInfo}
           meId={session?.athleteId} />
+        <UpdateBanner />
       </Phone>
 
       {/* Fall detection: your own "Are you OK?" countdown, and a teammate's crash banner — both

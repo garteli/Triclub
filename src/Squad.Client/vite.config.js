@@ -1,10 +1,29 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { writeFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+
+// A per-build id (this build's timestamp). Baked into the bundle as __BUILD_ID__ and written to
+// wwwroot/version.json; the running app polls version.json and, when it differs, offers a refresh —
+// so an open web/native session picks up a new deploy instead of showing the stale bundle.
+const buildId = String(Date.now())
 
 // The React app builds straight into the ASP.NET Core host's wwwroot,
 // so `dotnet run` serves the compiled SPA with no extra copy step.
 export default defineConfig({
-  plugins: [react()],
+  define: { __BUILD_ID__: JSON.stringify(buildId) },
+  plugins: [
+    react(),
+    {
+      name: 'squad-version-json',
+      closeBundle() {
+        // Written after the bundle so emptyOutDir doesn't wipe it; ships alongside the same bundle.
+        try {
+          writeFileSync(fileURLToPath(new URL('../Squad.Web/wwwroot/version.json', import.meta.url)), JSON.stringify({ build: buildId }))
+        } catch { /* non-fatal */ }
+      },
+    },
+  ],
   build: {
     outDir: '../Squad.Web/wwwroot',
     emptyOutDir: true,
