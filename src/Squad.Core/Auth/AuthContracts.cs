@@ -199,24 +199,29 @@ public sealed record JoinRequestItem(
 
 // ----- Squad chat -----
 
-/// <summary>A squad chat message enriched with the sender's display fields.</summary>
+/// <summary>A squad chat message enriched with the sender's display fields. <paramref name="Deleted"/>
+/// marks a message the author retracted — its Body is blanked server-side.</summary>
 public sealed record ChatMessage(
     Guid Id, Guid SquadId, Guid AthleteId, string AthleteName, string Initials, string AvatarColor,
-    string Body, DateTimeOffset CreatedUtc);
+    string Body, DateTimeOffset CreatedUtc, bool Deleted = false);
 
 public interface IChatService
 {
     Task<IReadOnlyList<ChatMessage>> GetRecentAsync(Guid squadId, int take, CancellationToken ct);
     /// <summary>Persist a message and return it enriched with sender display fields.</summary>
     Task<ChatMessage?> PostAsync(Guid squadId, Guid athleteId, string body, CancellationToken ct);
+    /// <summary>Soft-delete a message the caller authored; returns the blanked row, or null if
+    /// it doesn't exist / isn't theirs / was already deleted.</summary>
+    Task<ChatMessage?> DeleteAsync(Guid id, Guid athleteId, CancellationToken ct);
 }
 
 // ----- Direct (1:1) messages -----
 
-/// <summary>A direct message between two athletes, enriched with the sender's display fields.</summary>
+/// <summary>A direct message between two athletes, enriched with the sender's display fields.
+/// <paramref name="Deleted"/> marks a message the sender retracted — its Body is blanked server-side.</summary>
 public sealed record DirectMessageItem(
     Guid Id, Guid SenderId, Guid RecipientId, string SenderName, string Initials, string AvatarColor,
-    string Body, DateTimeOffset CreatedUtc);
+    string Body, DateTimeOffset CreatedUtc, bool Deleted = false);
 
 public interface IDirectMessageService
 {
@@ -224,6 +229,9 @@ public interface IDirectMessageService
     Task<IReadOnlyList<DirectMessageItem>> GetThreadAsync(Guid me, Guid peer, int take, CancellationToken ct);
     /// <summary>Persist a direct message and return it enriched with sender display fields.</summary>
     Task<DirectMessageItem?> PostAsync(Guid sender, Guid recipient, string body, CancellationToken ct);
+    /// <summary>Soft-delete a message the caller sent; returns the blanked row, or null if it
+    /// doesn't exist / isn't theirs / was already deleted.</summary>
+    Task<DirectMessageItem?> DeleteAsync(Guid id, Guid senderId, CancellationToken ct);
 }
 
 // ----- Follow -----

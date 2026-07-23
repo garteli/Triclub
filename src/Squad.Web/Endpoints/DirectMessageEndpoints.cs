@@ -18,6 +18,7 @@ public static class DirectMessageEndpoints
         var g = app.MapGroup("/api/dm").RequireAuthorization();
         g.MapGet("/{peerId:guid}", GetThread);
         g.MapPost("/{peerId:guid}", Post);
+        g.MapDelete("/message/{id:guid}", Delete);
         return app;
     }
 
@@ -47,6 +48,20 @@ public static class DirectMessageEndpoints
         // Fan out to both participants' personal groups (sender included — the client dedupes by id).
         await hub.Clients.Groups(ChatHub.UserGroup(meId), ChatHub.UserGroup(peerId))
             .SendAsync("dmPosted", message, ct);
+        return Results.Ok(message);
+    }
+
+    private static async Task<IResult> Delete(
+        Guid id, HttpContext http, IDirectMessageService dm, IHubContext<ChatHub> hub, CancellationToken ct)
+    {
+        if (!TryMe(http, out var meId)) return Results.Unauthorized();
+
+        var message = await dm.DeleteAsync(id, meId, ct);
+        if (message is null) return Results.NotFound(); // not found, not theirs, or already deleted
+
+        // Fan out the blanked message to both participants so open clients show a "deleted" placeholder.
+        await hub.Clients.Groups(ChatHub.UserGroup(message.SenderId), ChatHub.UserGroup(message.RecipientId))
+            .SendAsync("dmDeleted", message, ct);
         return Results.Ok(message);
     }
 

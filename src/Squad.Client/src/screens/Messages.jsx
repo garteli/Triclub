@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { s } from '../lib/style.js';
 import { useSquadChat } from '../hooks/useSquadChat.js';
+import { useConfirm } from '../components/ConfirmModal.jsx';
 
 const time = (iso) => {
   const d = new Date(iso);
@@ -12,9 +13,17 @@ const time = (iso) => {
 // prototype thread (vm.chatThread) so the logged-out preview still renders.
 export default function Messages({ vm, actions, getToken, meId }) {
   const live = !!getToken && !!meId;
-  const { messages, status, send } = useSquadChat({ getToken, enabled: live });
+  const { messages, status, send, remove } = useSquadChat({ getToken, enabled: live });
+  const confirm = useConfirm();
   const [draft, setDraft] = useState('');
   const endRef = useRef(null);
+
+  const askDelete = (id) => confirm.open({
+    title: 'Delete message?',
+    body: 'This removes it for everyone in the squad. They’ll see “Message deleted” in its place.',
+    confirmLabel: 'Delete',
+    run: () => remove(id),
+  });
 
   useEffect(() => { endRef.current?.scrollIntoView({ block: 'end' }); }, [messages.length]);
 
@@ -28,6 +37,7 @@ export default function Messages({ vm, actions, getToken, meId }) {
   const bubbleFor = (mine) => mine
     ? 'background:var(--accent);color:var(--accent-ink);border-radius:15px 15px 4px 15px;padding:10px 13px;font-size:13px;line-height:1.4'
     : 'background:var(--bg2);border:1px solid var(--line);color:var(--text);border-radius:15px 15px 15px 4px;padding:10px 13px;font-size:13px;line-height:1.4';
+  const deletedBubble = 'background:var(--bg3);border:1px dashed var(--line);color:var(--text3);font-style:italic;border-radius:15px;padding:10px 13px;font-size:12.5px;line-height:1.4';
 
   return (
     <div style={s('padding:0;animation:floatUp .35s ease;display:flex;flex-direction:column;height:calc(100dvh - var(--app-header-h) - 108px)')}>
@@ -47,8 +57,13 @@ export default function Messages({ vm, actions, getToken, meId }) {
                 return (
                   <div key={m.id} style={s('display:flex;flex-direction:column;max-width:80%;' + (mine ? 'align-self:flex-end;align-items:flex-end' : 'align-self:flex-start;align-items:flex-start'))}>
                     {!mine && <span style={s('font-size:10px;color:var(--text3);margin:0 4px 3px;font-weight:600')}>{m.athleteName}</span>}
-                    <div style={s(bubbleFor(mine))}>{m.body}</div>
-                    <span style={s('font-size:9.5px;color:var(--text3);margin-top:3px;' + (mine ? 'text-align:right' : 'text-align:left'))}>{time(m.createdUtc)}</span>
+                    {m.deleted
+                      ? <div style={s(deletedBubble)}>Message deleted</div>
+                      : <div style={s(bubbleFor(mine))}>{m.body}</div>}
+                    <span style={s('display:flex;gap:8px;align-items:center;font-size:9.5px;color:var(--text3);margin-top:3px;' + (mine ? 'flex-direction:row-reverse' : ''))}>
+                      {time(m.createdUtc)}
+                      {mine && !m.deleted && <span className="ctl" onClick={() => askDelete(m.id)} style={s('color:var(--text3);cursor:pointer')}>Delete</span>}
+                    </span>
                   </div>
                 );
               })
@@ -77,6 +92,7 @@ export default function Messages({ vm, actions, getToken, meId }) {
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent-ink)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z" /></svg>
         </div>
       </div>
+      {confirm.node}
     </div>
   );
 }

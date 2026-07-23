@@ -16,6 +16,12 @@ export function useDirectChat({ getToken, peerId, meId, enabled = true, hubUrl =
     setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
   }, []);
 
+  // Mark a message deleted in place (soft delete): blank the body, flag it. The bubble
+  // stays in the thread rendered as a "message deleted" placeholder.
+  const markDeleted = useCallback((id) => {
+    setMessages((prev) => prev.map((x) => (x.id === id ? { ...x, body: '', deleted: true } : x)));
+  }, []);
+
   // A hub message belongs to this thread iff it's between me and this peer.
   const mine = useCallback(
     (m) => (m.senderId === meId && m.recipientId === peerId) || (m.senderId === peerId && m.recipientId === meId),
@@ -56,6 +62,7 @@ export function useDirectChat({ getToken, peerId, meId, enabled = true, hubUrl =
       .build();
 
     conn.on('dmPosted', (m) => { if (mineRef.current(m)) append(m); });
+    conn.on('dmDeleted', (m) => { if (mineRef.current(m)) markDeleted(m.id); });
     conn.onreconnecting(() => setStatus('connecting'));
     conn.onreconnected(() => setStatus('live'));
     conn.onclose(() => setStatus('offline'));
@@ -78,5 +85,17 @@ export function useDirectChat({ getToken, peerId, meId, enabled = true, hubUrl =
     if (res.ok) append(await res.json()); // instant echo even if the hub lags
   }, [apiUrl, getToken, append]);
 
-  return { messages, status, send };
+  // Retract one of my own messages. Optimistic: mark deleted locally, then DELETE; the hub
+  // echo (dmDeleted) reconciles the other participant.
+  const remove = useCallback(async (id) => {
+    if (!id) return;
+    markDeleted(id);
+    const token = getToken ? await getToken() : null;
+    await fetch(`/api/dm/message/${id}`, {
+      method: 'DELETE',
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
+  }, [getToken, markDeleted]);
+
+  return { messages, status, send, remove };
 }

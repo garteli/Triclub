@@ -26,3 +26,9 @@ CREATE TABLE dbo.DirectMessage (
 -- Thread history scan: newest-first within a conversation.
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_DirectMessage_Conv_Created' AND object_id = OBJECT_ID('dbo.DirectMessage'))
 CREATE INDEX IX_DirectMessage_Conv_Created ON dbo.DirectMessage (ConvKey, CreatedUtc);
+
+-- Soft delete: when set, the sender retracted the message. History still returns the row
+-- but the body is blanked server-side and the client shows a "message deleted" placeholder.
+-- Additive + idempotent.
+IF COL_LENGTH('dbo.DirectMessage', 'DeletedUtc') IS NULL
+ALTER TABLE dbo.DirectMessage ADD DeletedUtc DATETIMEOFFSET(0) NULL;

@@ -17,6 +17,7 @@ public static class ChatEndpoints
         var g = app.MapGroup("/api/messages").RequireAuthorization();
         g.MapGet("", GetHistory);
         g.MapPost("", Post);
+        g.MapDelete("/{id:guid}", Delete);
         return app;
     }
 
@@ -45,6 +46,19 @@ public static class ChatEndpoints
 
         // Fan out to the squad's chat group (senders included — the client dedupes by id).
         await hub.Clients.Group(ChatHub.ChatGroup(profile.SquadId)).SendAsync("messagePosted", message, ct);
+        return Results.Ok(message);
+    }
+
+    private static async Task<IResult> Delete(
+        Guid id, HttpContext http, IChatService chat, IHubContext<ChatHub> hub, CancellationToken ct)
+    {
+        if (!TryMe(http, out var athleteId)) return Results.Unauthorized();
+
+        var message = await chat.DeleteAsync(id, athleteId, ct);
+        if (message is null) return Results.NotFound(); // not found, not theirs, or already deleted
+
+        // Fan out the blanked message so open squad clients replace it with a "deleted" placeholder.
+        await hub.Clients.Group(ChatHub.ChatGroup(message.SquadId)).SendAsync("messageDeleted", message, ct);
         return Results.Ok(message);
     }
 
