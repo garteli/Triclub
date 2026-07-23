@@ -215,7 +215,7 @@ function EditPanel({ page, actions }) {
   return (
     <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:12px 13px;margin:10px 12px 0')}>
       <div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:7px')}>Fields</div>
-      <div style={s('display:flex;gap:6px')}>{[2, 3, 4, 6].map((n) => seg(count, n, String(n), () => actions.setPageCount(n)))}</div>
+      <div style={s('display:flex;gap:6px')}>{[1, 2, 3, 4, 6].map((n) => seg(count, n, String(n), () => actions.setPageCount(n)))}</div>
       <div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin:11px 0 7px')}>Arrangement</div>
       <div style={s('display:flex;gap:6px')}>{[['grid', 'Grid'], ['hero', 'Hero']].map(([id, l]) => seg(page.layout, id, l, () => actions.setPageLayout(id)))}</div>
       <div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin:11px 0 7px')}>Side column</div>
