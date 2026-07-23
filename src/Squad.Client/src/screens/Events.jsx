@@ -488,7 +488,7 @@ function EventCard({
               <span style={s('font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--accent);background:var(--accent-dim);padding:2px 6px;border-radius:5px')}>Today</span>
             )}
           </div>
-          <div dir="auto" style={s('font-size:15.5px;font-weight:700;line-height:1.2;margin-top:5px')}>{ev.title}</div>
+          <div dir="ltr" style={s('font-size:15.5px;font-weight:700;line-height:1.2;margin-top:5px;text-align:left')}>{ev.title}</div>
           <div style={s('display:flex;flex-wrap:wrap;gap:12px;font-size:11px;color:var(--text2);margin-top:7px')}>
             <span style={s('display:flex;align-items:center;gap:5px')}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
