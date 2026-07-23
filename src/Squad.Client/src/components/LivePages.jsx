@@ -1,11 +1,41 @@
 import { useRef } from 'react';
 import { s } from '../lib/style.js';
-import { metricCatalog, metricGroupsFor, liveMetricValues, liveChartsView, liveRadarView, spreadRiders, pelotonView } from '../lib/liveMetrics.js';
+import { metricCatalog, metricGroupsFor, liveMetricValues, liveChartsView, liveRadarView, spreadRiders, pelotonView, metricAccent, metricIcon } from '../lib/liveMetrics.js';
 import LiveMapGL from './LiveMapGL.jsx';
 import LiveElevationStrip from './LiveElevationStrip.jsx';
 import LiveElevationChart from './LiveElevationChart.jsx';
 import { ClimbField } from './ClimbPro.jsx';
 import { mergePeerRanges } from '../lib/ranging.js';
+
+// Tabler-style metric glyphs (from the Live Data Fields handoff). [type, innerSVG]; fill icons
+// paint with currentColor, stroke icons stroke it.
+const ICON_PATHS = {
+  clock: ['s', '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'],
+  route: ['s', '<circle cx="6" cy="19" r="3"/><circle cx="18" cy="5" r="3"/><path d="M9 19h6a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h6"/>'],
+  gauge: ['s', '<path d="M12 14l4-4M4.5 18a9 9 0 1 1 15 0z"/><circle cx="12" cy="14" r="1"/>'],
+  rotate: ['s', '<path d="M21 12a9 9 0 1 1-2.6-6.3"/><path d="M21 3v4h-4"/>'],
+  heart: ['f', '<path d="M12 21s-8-5.3-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 5.7-8 11-8 11z"/>'],
+  bolt: ['f', '<path d="M13 2L4 14h6l-1 8 9-12h-6z"/>'],
+  mountain: ['s', '<path d="M3 20l6-11 4 6 2-3 6 8z"/>'],
+  compass: ['s', '<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/>'],
+  activity: ['s', '<path d="M2 12h4l3 8 4-16 3 8h4"/>'],
+  users: ['s', '<circle cx="9" cy="8" r="3.2"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M17 5.5a3.2 3.2 0 0 1 0 6M18 20a6.5 6.5 0 0 0-3-5.4"/>'],
+  arrowUp: ['s', '<path d="M12 20V5M6 11l6-6 6 6"/>'],
+  arrowDown: ['s', '<path d="M12 4v15M6 13l6 6 6-6"/>'],
+  cog: ['s', '<circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/>'],
+  battery: ['s', '<rect x="2" y="7" width="17" height="10" rx="2.5"/><path d="M22 10v4"/>'],
+  flame: ['f', '<path d="M12 2s5 4 5 9a5 5 0 0 1-10 0c0-1.5.6-2.7 1.4-3.6C8.6 8.6 9 10 10 10c0-2.5 2-5 2-8z"/>'],
+  thermometer: ['s', '<path d="M14 14.8V5a2 2 0 0 0-4 0v9.8a4 4 0 1 0 4 0z"/>'],
+};
+function MetricIcon({ k, color, size = 15 }) {
+  const p = ICON_PATHS[k] || ICON_PATHS.activity;
+  const fill = p[0] === 'f';
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={fill ? color : 'none'} stroke={fill ? 'none' : color}
+      strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flex: 'none' }}
+      dangerouslySetInnerHTML={{ __html: p[1] }} />
+  );
+}
 
 // ---- Group side column: teammates front→back on a rail + rear-radar vehicle blip ----
 function GroupColumn({ tel }) {
@@ -140,11 +170,39 @@ function FieldCell({ f, editing, actions, index, indoor, mySport, climb }) {
     >
       {f.kind === 'metric' && (
         <>
-          <div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;font-weight:600')}>{f.label}</div>
-          <div style={s('display:flex;align-items:baseline;gap:4px;margin-top:auto;min-width:0')}>
+          {/* accent bar */}
+          <div style={s(`position:absolute;top:0;left:0;right:0;height:3px;background:${f.barColor};opacity:.9`)} />
+          {/* icon + label, centred */}
+          <div style={s('display:flex;align-items:center;justify-content:center;gap:6px;min-width:0')}>
+            <MetricIcon k={f.icon} color={f.barColor} />
+            <span style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1.1px;font-weight:700;line-height:1.2;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>{f.label}</span>
+          </div>
+          {/* value, centred */}
+          <div style={s('flex:1;display:flex;align-items:center;justify-content:center;gap:5px;min-width:0')}>
             <span className={'mono live-metric-val' + (f.hero ? ' hero' : '')} style={s(`--vf:${f.vf}px;--vfw:${f.vfw}cqw;color:${f.color}`)}>{f.value}</span>
             {f.unit && <span className="mono" style={s('font-size:12px;color:var(--text2);font-weight:600')}>{f.unit}</span>}
           </div>
+          {/* mini viz row (only where we have real data to show) */}
+          {f.viz && (
+            <div style={s('height:16px;display:flex;align-items:center;justify-content:center')}>
+              {f.viz.type === 'wedge' && (
+                <svg width="30" height="16" viewBox="0 0 30 16"><path d={`M1 15 L29 15 L29 ${f.viz.wedgeY} Z`} fill={f.barColor} opacity=".85" /></svg>
+              )}
+              {f.viz.type === 'dots' && (
+                <div style={s('display:flex;gap:4px')}>
+                  {Array.from({ length: f.viz.total }, (_, i) => (
+                    <span key={i} style={s(`width:7px;height:7px;border-radius:50%;background:${i < f.viz.n ? f.barColor : 'rgba(255,255,255,.16)'}`)} />
+                  ))}
+                </div>
+              )}
+              {f.viz.type === 'fill' && (
+                <div style={s(`width:40px;height:16px;border:1.5px solid ${f.barColor};border-radius:3px;padding:2px;position:relative`)}>
+                  <div style={s(`height:100%;width:${f.viz.pct}%;background:${f.barColor};border-radius:1px`)} />
+                  <div style={s(`position:absolute;right:-4px;top:4px;width:2.5px;height:6px;background:${f.barColor};border-radius:0 1px 1px 0`)} />
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
       {f.kind === 'chart' && (
@@ -337,14 +395,23 @@ export default function LivePages({ tel, lp, uwb, blePeers, indoor = false, mySp
     const m = metricCatalog[tok] || { label: tok, unit: '' };
     const val = mv[tok] || { v: '—' };
     const vs = hero ? big + 10 : big;
-    const color = val.color || (hero ? 'var(--accent)' : 'var(--text)');
+    // Per-metric accent (top bar + icon); value keeps its own semantic colour when it has one.
+    const accent = metricAccent(tok);
+    const barColor = accent || 'var(--text3)';
+    const color = val.color || accent || 'var(--text)';
+    // A small viz for the few metrics where we have real data to show it.
+    let viz = null;
+    const has = val.v != null && val.v !== '—';
+    if (tok === 'grad' && has) { const g = Math.abs(parseFloat(val.v)) || 0; viz = { type: 'wedge', wedgeY: Math.max(1, Math.min(15, 15 - g * 1.3)) }; }
+    else if (tok === 'packpos' && /^\d+\/\d+$/.test(String(val.v))) { const [n, total] = String(val.v).split('/').map(Number); viz = { type: 'dots', n, total: Math.min(total, 8) }; }
+    else if ((tok === 'battery' || tok === 'di2') && has) { const p = parseFloat(val.v); if (Number.isFinite(p)) viz = { type: 'fill', pct: Math.max(0, Math.min(100, p)) }; }
     // Character-aware sizing so a long value (e.g. a 7-char "2:51:45" timer) fills the tile
     // width without clipping: --vfw is the container-query width cap (shrinks with length),
     // and --vf (the px fallback for browsers without container queries) is reduced too.
     const chars = Math.max(1, String(val.v ?? '').length);
     const vfw = Math.min(hero ? 24 : 30, Math.round((hero ? 105 : 140) / chars));
     const vf = Math.min(vs, Math.round((hero ? 300 : 210) / chars));
-    return { ...base, kind: 'metric', hero, label: m.label, unit: m.unit, value: val.v, vf, vfw, color };
+    return { ...base, kind: 'metric', hero, label: m.label, unit: m.unit, value: val.v, vf, vfw, color, barColor, icon: metricIcon(tok), viz };
   });
 
   // Horizontal swipe to change pages (left → next, right → prev). Skipped while
