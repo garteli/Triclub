@@ -21,7 +21,7 @@ import { useHealthSync } from './hooks/useHealthSync.js';
 import { createSquad, joinSquad, activateSquad, getInvite, acceptInvite } from './lib/squads.js';
 import { captureInviteFromUrl, pendingInvite, clearInvite } from './lib/invite.js';
 import { captureEventFromUrl, pendingEventLink, clearEventLink } from './lib/eventLink.js';
-import { listCourses, getCourse, createCourse, deleteCourse } from './lib/courses.js';
+import { listCourses, getCourse, createCourse, deleteCourse, importCourseFromUrl } from './lib/courses.js';
 import { listSquadEvents, joinEvent, leaveEvent, checkInEvent } from './lib/events.js';
 import { recordPayment, markPaymentPaid, waivePayment } from './lib/payments.js';
 import { publishPlan, unpublishPlan, listMyPlans, removeMyPlan, listPlans, getPlan, savePlan, deletePlan, listLibrary, getLibraryTemplate, adoptTemplate } from './lib/plan.js';
@@ -711,6 +711,7 @@ export default function App() {
     setCourse: (course) => setSelectedCourse(course?.points?.length ? course : null),
     clear: () => setSelectedCourse(null),
     save: (name, points, distanceKm) => createCourse(session?.token, { name, points, distanceKm }),
+    importUrl: (url) => importCourseFromUrl(session?.token, url),
     remove: (id) => deleteCourse(session?.token, id),
     ridePath: () => recorder?.getPath?.(2000) || [],
     selected: selectedCourse,

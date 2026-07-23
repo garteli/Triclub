@@ -23,6 +23,7 @@ export default function CoursePicker({ courses, onClose, title = 'Course for thi
   const [busy, setBusy] = useState(false);
   const [naming, setNaming] = useState(null); // { source:'ride'|'gpx', points, name }
   const [drawing, setDrawing] = useState(false); // draw-on-map overlay open
+  const [importUrl, setImportUrl] = useState(null); // string when the import-from-link panel is open
   const gpxRef = useRef(null);
 
   const selectedId = courses?.selected?.id ?? null;
@@ -76,6 +77,21 @@ export default function CoursePicker({ courses, onClose, title = 'Course for thi
     finally { setBusy(false); }
   };
 
+  // Import a route from a pasted link (a GPX URL, or an off-road.io track page). The server fetches +
+  // parses it and returns the saved course; we reload the list and select it, same as GPX/draw.
+  const confirmImport = async () => {
+    const url = (importUrl || '').trim();
+    if (!url || busy) { if (!url) setError('Paste a route link first.'); return; }
+    setBusy(true); setError('');
+    try {
+      const created = await courses.importUrl(url);
+      setImportUrl(null);
+      await load();
+      if (created?.id) await courses.select(created.id); // follow the freshly-imported route
+    } catch (e) { setError(e?.message || 'Could not import that link.'); }
+    finally { setBusy(false); }
+  };
+
   // Save a course drawn on the map, then follow it (the CourseDraw overlay owns its own busy/error UI).
   const saveDrawn = async (name, points, km) => {
     const created = await courses.save(name, points, km);
@@ -123,6 +139,19 @@ export default function CoursePicker({ courses, onClose, title = 'Course for thi
                 <div className="ctl" onClick={confirmSave} style={s(`flex:1;text-align:center;padding:12px;border-radius:12px;font-weight:700;font-size:14px;background:var(--accent);color:var(--accent-ink);opacity:${busy ? 0.7 : 1}`)}>{busy ? 'Saving…' : 'Save course'}</div>
               </div>
             </div>
+          ) : importUrl !== null ? (
+            <div style={s('margin-top:16px')}>
+              <div style={s('font-size:12px;color:var(--text3);margin-bottom:7px')}>Paste a GPX link or an off-road.io track page URL</div>
+              <input value={importUrl} onChange={(e) => setImportUrl(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') confirmImport(); }}
+                autoFocus placeholder="https://off-road.io/track/… or a .gpx link" inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false}
+                style={s('width:100%;background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:14px;color:var(--text);outline:none;font-family:inherit')} />
+              <div style={s('font-size:11px;color:var(--text3);margin-top:8px;line-height:1.4')}>Tip: on an off-road.io track, tap “Download GPX” and paste that link for the most reliable import.</div>
+              {error && <div style={s('font-size:12px;color:var(--bad);font-weight:600;margin-top:10px')}>{error}</div>}
+              <div style={s('display:flex;gap:10px;margin-top:16px')}>
+                <div className="ctl" onClick={busy ? undefined : () => { setImportUrl(null); setError(''); }} style={s('flex:1;text-align:center;padding:12px;border-radius:12px;font-weight:700;font-size:14px;background:var(--bg3);border:1px solid var(--line);color:var(--text2)')}>Cancel</div>
+                <div className="ctl" onClick={confirmImport} style={s(`flex:1;text-align:center;padding:12px;border-radius:12px;font-weight:700;font-size:14px;background:var(--accent);color:var(--accent-ink);opacity:${busy ? 0.7 : 1}`)}>{busy ? 'Importing…' : 'Import route'}</div>
+              </div>
+            </div>
           ) : (
             <>
               {error && <div style={s('font-size:12px;color:var(--bad);font-weight:600;margin-top:12px')}>{error}</div>}
@@ -168,6 +197,11 @@ export default function CoursePicker({ courses, onClose, title = 'Course for thi
               <div className="ctl" onClick={() => { setError(''); setDrawing(true); }} style={s('display:flex;align-items:center;justify-content:center;gap:7px;background:var(--bg2);border:1px solid var(--line);color:var(--text);border-radius:13px;padding:12px;font-weight:700;font-size:13px;margin-top:10px')}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>Draw on map
               </div>
+              {courses?.importUrl && (
+                <div className="ctl" onClick={() => { setError(''); setImportUrl(''); }} style={s('display:flex;align-items:center;justify-content:center;gap:7px;background:var(--bg2);border:1px solid var(--line);color:var(--text);border-radius:13px;padding:12px;font-weight:700;font-size:13px;margin-top:10px')}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>Import from link
+                </div>
+              )}
             </>
           )}
         </div>

@@ -16,6 +16,7 @@ public static class CourseEndpoints
         app.MapGet("/api/courses", ListCourses).RequireAuthorization();
         app.MapGet("/api/courses/{id:guid}", GetCourse).RequireAuthorization();
         app.MapPost("/api/courses", CreateCourse).RequireAuthorization();
+        app.MapPost("/api/courses/import", ImportCourse).RequireAuthorization();
         app.MapDelete("/api/courses/{id:guid}", DeleteCourse).RequireAuthorization();
         return app;
     }
@@ -59,6 +60,35 @@ public static class CourseEndpoints
         return Results.Ok(new { id, name, distanceKm = req.DistanceKm, pointCount = clean.Length });
     }
 
+    /// <summary>Import a route from an external URL and save it as a course. The server fetches the
+    /// GPX (the browser can't — the hosts send no CORS headers), resolving off-road.io track-page
+    /// links to their download best-effort. Returns the created course, same shape as CreateCourse.</summary>
+    private static async Task<IResult> ImportCourse(
+        HttpContext http, CourseImportRequest req, IRouteImportService importer, ICourseStore courses, CancellationToken ct)
+    {
+        if (Me(http) is not { } me) return Results.Unauthorized();
+
+        var url = (req.Url ?? "").Trim();
+        if (url.Length == 0) return Results.BadRequest(new { error = "Paste a route link to import." });
+
+        var result = await importer.ImportAsync(url, ct);
+        if (!result.Ok || result.Route is null)
+            return Results.BadRequest(new { error = result.Error ?? "Couldn't import that route." });
+
+        var route = result.Route;
+        // The importer already validated/capped points; serialize as [[lat,lon],…].
+        var clean = route.Points.Select(p => new[] { p[0], p[1] }).ToArray();
+        if (clean.Length < 2) return Results.BadRequest(new { error = "That route had no usable track points." });
+
+        var name = string.IsNullOrWhiteSpace(route.Name) ? "Imported route" : route.Name.Trim();
+        if (name.Length > 120) name = name[..120];
+        var km = route.DistanceKm > 0 ? Math.Round(route.DistanceKm, 3) : (double?)null;
+
+        var json = JsonSerializer.Serialize(clean);
+        var id = await courses.CreateAsync(me, name, json, km, clean.Length, ct);
+        return Results.Ok(new { id, name, distanceKm = km, pointCount = clean.Length });
+    }
+
     private static async Task<IResult> DeleteCourse(HttpContext http, Guid id, ICourseStore courses, CancellationToken ct)
     {
         if (Me(http) is not { } me) return Results.Unauthorized();
@@ -74,4 +104,7 @@ public static class CourseEndpoints
 
     /// <summary>Body for saving a course: a name, the [lat,lon] points, and an optional distance.</summary>
     public sealed record CourseCreateRequest(string? Name, double[][]? Points, double? DistanceKm);
+
+    /// <summary>Body for importing a course from a link (GPX URL or an off-road.io track page).</summary>
+    public sealed record CourseImportRequest(string? Url);
 }

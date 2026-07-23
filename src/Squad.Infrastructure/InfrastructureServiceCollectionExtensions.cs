@@ -46,6 +46,11 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddHttpClient<IWeatherService, OpenMeteoWeatherService>(c =>
             c.Timeout = TimeSpan.FromSeconds(6));
 
+        // Route import (external GPX URL → course geometry). Server-side fetch bypasses CORS;
+        // a modest timeout keeps the import request snappy (it resolves + downloads a GPX).
+        services.AddHttpClient<IRouteImportService, GpxUrlRouteImportService>(c =>
+            c.Timeout = TimeSpan.FromSeconds(20));
+
         // Persistence (SQL Server).
         services.AddScoped<IActivityRepository>(_ => new SqlActivityRepository(sqlConnectionString));
         services.AddScoped<IRawActivityStore>(_ => new SqlRawActivityStore(sqlConnectionString));
