@@ -21,6 +21,7 @@ public static class SquadEventEndpoints
         app.MapGet("/api/squads/{squadId:guid}/events/{eventId:guid}/attendees", EventAttendees).RequireAuthorization();
         app.MapGet("/api/squads/{squadId:guid}/events/{eventId:guid}/participants", EventParticipants).RequireAuthorization();
         app.MapGet("/api/squads/{squadId:guid}/events/{eventId:guid}/route", EventRoute).RequireAuthorization();
+        app.MapPost("/api/squads/{squadId:guid}/events/{eventId:guid}/startplace", SetStartPlace).RequireAuthorization();
         app.MapDelete("/api/squads/{squadId:guid}/events/{eventId:guid}", DeleteEvent).RequireAuthorization();
         // Owner-only: pending event-join requests from non-members, per event and approve/decline.
         app.MapGet("/api/squads/{squadId:guid}/events/{eventId:guid}/requests", EventRequests).RequireAuthorization();
@@ -177,6 +178,20 @@ public static class SquadEventEndpoints
         using var doc = System.Text.Json.JsonDocument.Parse(json);
         return Results.Ok(new { points = doc.RootElement.Clone() });
     }
+
+    // Cache the reverse-geocoded start-point name the client resolved, so later loads reuse it.
+    private static async Task<IResult> SetStartPlace(
+        Guid squadId, Guid eventId, StartPlaceRequest req, HttpContext http, ISquadEventStore events, CancellationToken ct)
+    {
+        if (Me(http) is not { } me) return Results.Unauthorized();
+        var place = Trim(req?.Place);
+        if (string.IsNullOrEmpty(place)) return Results.BadRequest(new { error = "A place name is required." });
+        if (place.Length > 120) place = place[..120];
+        await events.SetStartPlaceAsync(squadId, me, eventId, place, ct);
+        return Results.Ok(new { place });
+    }
+
+    private sealed record StartPlaceRequest(string? Place);
 
     // Resolve + validate the shared event fields (title/sport/start/route/notes). Returns a parsed
     // bundle, or an Error result to short-circuit the handler.
@@ -392,6 +407,7 @@ public static class SquadEventEndpoints
         bannerUrl = e.BannerUrl,
         requestPending = e.RequestPending,  // caller has an unapproved join request
         member = e.Member,                  // caller is a member of the event's squad (joins instantly)
+        startPlace = e.StartPlace,          // cached reverse-geocoded name of the route's start
     };
 
     private static object ToDto(SquadEvent e) => new

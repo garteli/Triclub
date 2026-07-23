@@ -36,7 +36,8 @@ public sealed class SqlSquadEventStore(string connectionString) : ISquadEventSto
             CASE WHEN e.BannerBlob IS NOT NULL THEN '/api/images/squads/' + LOWER(CONVERT(varchar(36), e.SquadId)) + '/events/' + LOWER(CONVERT(varchar(36), e.Id)) + '/banner' END AS BannerUrl,
             CAST(CASE WHEN me.Status = 'pending' THEN 1 ELSE 0 END AS bit) AS RequestPending,
             CAST(CASE WHEN EXISTS (SELECT 1 FROM dbo.Membership mm WHERE mm.SquadId = e.SquadId AND mm.AthleteId = @meId)
-                      THEN 1 ELSE 0 END AS bit) AS Member
+                      THEN 1 ELSE 0 END AS bit) AS Member,
+            e.StartPlace
         FROM dbo.SquadEvent e
         LEFT JOIN dbo.SquadEventRsvp me ON me.EventId = e.Id AND me.AthleteId = @meId
         """;
@@ -271,6 +272,20 @@ public sealed class SqlSquadEventStore(string connectionString) : ISquadEventSto
             SELECT e.CoursePoints FROM dbo.SquadEvent e JOIN dbo.Squad s ON s.Id = e.SquadId
             WHERE e.Id = @eventId AND e.SquadId = @squadId AND (e.Published = 1 OR s.OwnerId = @meId);
             """, new { squadId, eventId, meId }, cancellationToken: ct));
+    }
+
+    public async Task<bool> SetStartPlaceAsync(Guid squadId, Guid meId, Guid eventId, string place, CancellationToken ct)
+    {
+        await using var conn = new SqlConnection(connectionString);
+        // First-writer-wins: only fill when empty, and only for an event the caller can see (published,
+        // or they own it). Derived public data, so any viewer may populate it — no owner guard.
+        var n = await conn.ExecuteAsync(new CommandDefinition("""
+            UPDATE e SET e.StartPlace = @place
+            FROM dbo.SquadEvent e JOIN dbo.Squad s ON s.Id = e.SquadId
+            WHERE e.Id = @eventId AND e.SquadId = @squadId AND e.StartPlace IS NULL
+              AND (e.Published = 1 OR s.OwnerId = @meId);
+            """, new { squadId, eventId, meId, place }, cancellationToken: ct));
+        return n > 0;
     }
 
     // Per-event branding blob name. `kind` is whitelisted to a fixed column — never user text in SQL.

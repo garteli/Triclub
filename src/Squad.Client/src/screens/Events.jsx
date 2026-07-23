@@ -6,10 +6,11 @@ import TileMap from '../components/TileMap.jsx';
 import { toPathD } from '../lib/tiles.js';
 import {
   listSquadEvents, deleteSquadEvent, publishEvent, unpublishEvent, listEventAttendees,
-  listEventParticipants, getEventRoute,
+  listEventParticipants, getEventRoute, setEventStartPlace,
   joinEvent, leaveEvent, checkInEvent, undoCheckInEvent,
   listEventRequests, approveEventRequest, declineEventRequest,
 } from '../lib/events.js';
+import { reverseGeocode } from '../lib/reverseGeocode.js';
 
 // The motorsport clubs' second tab (replaces Plan). Motorsport clubs run on scheduled
 // group rides rather than a training plan, so this shows the active club's sessions three ways:
@@ -149,8 +150,21 @@ export default function Events({ vm, actions, getToken, meId, onDataChanged }) {
       if (ev.courseId || ev.courseName || ev.courseKm) {
         setRoutes((r) => ({ ...r, [ev.id]: r[ev.id] ?? null }));
         (async () => {
-          try { const t = await getToken?.(); const rt = await getEventRoute(t, squadId, ev.id); setRoutes((r) => ({ ...r, [ev.id]: rt?.points?.length ? rt.points : null })); }
-          catch { setRoutes((r) => ({ ...r, [ev.id]: null })); }
+          try {
+            const t = await getToken?.();
+            const rt = await getEventRoute(t, squadId, ev.id);
+            const pts = rt?.points?.length ? rt.points : null;
+            setRoutes((r) => ({ ...r, [ev.id]: pts }));
+            // Name the start point once (reverse geocode) and cache it on the event, so the card can
+            // show it and future loads carry it without geocoding again.
+            if (pts && !ev.startPlace) {
+              const st = pts.find((p) => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]));
+              if (st) {
+                const name = await reverseGeocode(st[0], st[1]);
+                if (name) { patch(ev.id, { startPlace: name }); try { await setEventStartPlace(t, squadId, ev.id, name); } catch { /* best-effort cache */ } }
+              }
+            }
+          } catch { setRoutes((r) => ({ ...r, [ev.id]: null })); }
         })();
       }
     });
@@ -463,7 +477,9 @@ function EventCard({
   const chip = joined
     ? { bg: 'color-mix(in srgb,var(--accent) 16%,transparent)', border: 'color-mix(in srgb,var(--accent) 40%,transparent)', ink: 'var(--accent)' }
     : { bg: 'var(--bg3)', border: 'var(--line)', ink: 'var(--text)' };
-  const place = displayPlace(ev.courseName);
+  // Prefer the reverse-geocoded start-point name; fall back to a human course name (never a raw
+  // GPS/auto filename, which displayPlace filters out).
+  const place = ev.startPlace || displayPlace(ev.courseName);
   const start = route && route.length ? route.find((p) => Array.isArray(p) && Number.isFinite(p[0])) : null;
 
   const pill = 'flex:none;padding:8px 15px;border-radius:11px;font-size:12px;font-weight:700';

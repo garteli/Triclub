@@ -28,7 +28,10 @@ public sealed record SquadEventView(
     // Join gating: RequestPending = the caller has a pending (not-yet-approved) join request;
     // Member = the caller is a member (or owner) of the event's squad, so they join instantly
     // rather than requesting. Column order matches ViewSelect.
-    bool RequestPending = false, bool Member = false);
+    bool RequestPending = false, bool Member = false,
+    // Cached reverse-geocoded name of the route's start point (nearest town). Column order matches
+    // ViewSelect. Null until a viewer with the route resolves + persists it via SetStartPlaceAsync.
+    string? StartPlace = null);
 
 /// <summary>One member's attendance on an event, for the coach's joins/check-ins roster:
 /// who joined, when, and whether (and when) they checked in.</summary>
@@ -105,6 +108,10 @@ public interface ISquadEventStore
     /// event page — visible to anyone who can see the event, so a member needn't own the source course.
     /// Null if the event isn't visible to the caller or has no route.</summary>
     Task<string?> GetRouteAsync(Guid squadId, Guid meId, Guid eventId, CancellationToken ct);
+    /// <summary>Cache the reverse-geocoded name of the event's route start (first-writer-wins: only set
+    /// when currently empty). Allowed for any caller who can see the event — it's derived public data.
+    /// Returns whether this call stored the value.</summary>
+    Task<bool> SetStartPlaceAsync(Guid squadId, Guid meId, Guid eventId, string place, CancellationToken ct);
     /// <summary>Delete an event if <paramref name="ownerId"/> owns its squad; false otherwise.</summary>
     Task<bool> DeleteAsync(Guid squadId, Guid ownerId, Guid eventId, CancellationToken ct);
     /// <summary>RSVP to an event. A member (or owner) of the event's squad joins instantly; a non-member's
