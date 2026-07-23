@@ -253,9 +253,6 @@ export default function GroupProfile({ vm, actions, onJoinSquad, payments, meId,
       {a.approvedFree && (
         <div className="ctl" onClick={actions.freeJoin} style={s('background:var(--good);color:#04140b;text-align:center;padding:14px;border-radius:14px;font-weight:700;font-size:14px;margin-top:16px')}>Approved — join for free</div>
       )}
-      {a.paid && (
-        <div style={s('background:color-mix(in srgb,var(--good) 14%,var(--bg2));border:1px solid color-mix(in srgb,var(--good) 35%,transparent);border-radius:13px;padding:12px 14px;margin-top:16px;font-size:12.5px;color:var(--text2)')}><span style={s('color:var(--good);font-weight:700')}>Membership active.</span> Welcome to the squad — see you on the next ride.</div>
-      )}
     </div>
   );
 }
