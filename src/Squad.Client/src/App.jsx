@@ -20,6 +20,7 @@ import { useGarminSync } from './hooks/useGarminSync.js';
 import { useHealthSync } from './hooks/useHealthSync.js';
 import { createSquad, joinSquad, activateSquad, getInvite, acceptInvite } from './lib/squads.js';
 import { captureInviteFromUrl, pendingInvite, clearInvite } from './lib/invite.js';
+import { captureEventFromUrl, pendingEventLink, clearEventLink } from './lib/eventLink.js';
 import { listCourses, getCourse, createCourse, deleteCourse } from './lib/courses.js';
 import { listSquadEvents, joinEvent, leaveEvent, checkInEvent } from './lib/events.js';
 import { recordPayment, markPaymentPaid, waivePayment } from './lib/payments.js';
@@ -118,9 +119,10 @@ const RIDE_TYPES_BY_FAMILY = {
   motorsport: ['road', 'offroad', 'touring'],
 };
 
-// Stash any ?invite=TOKEN from the launch URL before the app renders, so it survives the
-// Welcome → Register → sign-in flow and can be redeemed once a session exists.
+// Stash any ?invite=TOKEN / ?event=… from the launch URL before the app renders, so they survive
+// the Welcome → Register → sign-in flow and can be redeemed once a session exists.
 captureInviteFromUrl();
+captureEventFromUrl();
 
 const screens = {
   dash: Dashboard, ride: LiveRide, plan: Plan, events: Events, eventeditor: EventEditor, eventdetail: EventDetail, plans: PlansList, planeditor: PlanEditor, planlibrary: PlanLibrary, lb: Leaderboard, clubrank: ClubRanking,
@@ -366,6 +368,28 @@ export default function App() {
         if (r?.squadId) setState((s) => ({ ...s, selGroup: r.squadId, screen: 'group' }));
       } catch {
         clearInvite(); // invalid/expired — fall through to the normal signed-in experience
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authed, session?.token]);
+
+  // A shared event link (?event=<squadId>.<eventId>): once signed in, fetch that squad's events,
+  // find the one shared, and drop the viewer straight onto its detail page. Redeemed once; fails
+  // silently if the viewer can't see it (not a member / event gone).
+  const eventLinkRef = useRef(false);
+  useEffect(() => {
+    if (!authed || eventLinkRef.current) return;
+    const link = pendingEventLink();
+    if (!link) return;
+    eventLinkRef.current = true;
+    (async () => {
+      try {
+        const list = await listSquadEvents(session.token, link.squadId);
+        const ev = (list || []).find((e) => String(e.id) === String(link.eventId));
+        clearEventLink();
+        if (ev) setState((s) => ({ ...s, selEvent: ev, screen: 'eventdetail' }));
+      } catch {
+        clearEventLink(); // can't see it — fall through to the normal signed-in experience
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
