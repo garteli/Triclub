@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { s } from '../lib/style.js';
+import { alarmBeep } from '../lib/alarmSound.js';
 
 // Live-ride fall-detection UI. Two pieces:
 //  • CrashAlertOverlay — YOUR device thinks you crashed. A full-screen "Are you OK?" countdown you
@@ -31,7 +32,9 @@ export function CrashAlertOverlay({ contact, location, manual = false, onAlert, 
     firedRef.current = true;
     try { onAlert?.(); } catch { /* ignore */ }
     setPhase('alerted');
-    if (phone) setTimeout(() => { try { window.location.href = `tel:${phone}`; } catch { /* blocked */ } }, 250);
+    // Dial SYNCHRONOUSLY so a user gesture (Get help now / Send SOS) actually opens the dialer on
+    // iOS. On pure countdown-expiry there's no gesture and iOS blocks it — the Call button covers that.
+    if (phone) { try { window.location.href = `tel:${phone}`; } catch { /* blocked */ } }
   };
 
   useEffect(() => {
@@ -40,6 +43,14 @@ export function CrashAlertOverlay({ contact, location, manual = false, onAlert, 
     const id = setTimeout(() => setLeft((n) => n - 1), 1000);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, left]);
+
+  // Audible + haptic warning each second of the countdown, escalating in the final 5 s. (Audio was
+  // unlocked when fall detection was armed — see lib/alarmSound.js.)
+  useEffect(() => {
+    if (phase !== 'countdown') return;
+    alarmBeep({ urgent: left <= 5 });
+    try { navigator.vibrate?.(left <= 5 ? [220] : 90); } catch { /* unsupported (iOS) */ }
   }, [phase, left]);
 
   return (
@@ -77,7 +88,8 @@ export function CrashAlertOverlay({ contact, location, manual = false, onAlert, 
             I’m OK
           </div>
           <div className="ctl" onClick={trigger}
-            style={s('margin-top:12px;font-size:13.5px;font-weight:700;color:rgba(255,255,255,.9);text-decoration:underline;text-underline-offset:3px')}>
+            style={s('margin-top:34px;width:100%;max-width:340px;padding:16px;border-radius:16px;background:rgba(0,0,0,.28);border:2px solid rgba(255,255,255,.7);color:#fff;font-weight:800;font-size:17px;letter-spacing:.3px;display:flex;align-items:center;justify-content:center;gap:9px')}>
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" /></svg>
             Get help now
           </div>
         </>

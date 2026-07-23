@@ -8,6 +8,7 @@ import { usePeerRanging } from './hooks/usePeerRanging.js';
 import { useUwbRanging } from './hooks/useUwbRanging.js';
 import { useRideTelemetry } from './hooks/useRideTelemetry.js';
 import { useFallDetection, FALL_IMPACT_MS2 } from './hooks/useFallDetection.js';
+import { unlockAlarm } from './lib/alarmSound.js';
 import { useLivePages } from './hooks/useLivePages.js';
 import { useWakeLock } from './hooks/useWakeLock.js';
 import { useSquadFeed } from './hooks/useSquadFeed.js';
@@ -780,6 +781,7 @@ export default function App() {
   // Arm toggle: on → request the (iOS) motion permission from this tap, arm only if granted.
   const armFall = useCallback(async (on) => {
     if (!on) { setFallArmed(false); return; }
+    unlockAlarm(); // this tap is our chance to unlock audio for the countdown alarm later (iOS)
     const ok = await fall.requestPermission();
     setFallArmed(ok);
   }, [fall]);
