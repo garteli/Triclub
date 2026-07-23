@@ -255,26 +255,33 @@ function CogBtn({ onClick, style }) {
 }
 
 // ---- a single field cell in the classic (grid / hero) layout, with edit overlays ----
+// Reorder is pointer-based (works on touch + mouse): in edit mode a drag picks the tile up and
+// dropping it over another tile (hit-tested via elementFromPoint) swaps their order.
 function FieldCell({ f, editing, actions, index, indoor, mySport, climb, mono }) {
   const stop = (e) => { if (e && e.stopPropagation) e.stopPropagation(); };
-  // Long-press-to-edit is armed on every tile EXCEPT the map — holding on the map is a pan/
-  // interaction gesture, not an intent to enter edit mode (enter edit from another tile instead).
-  const armLongPress = () => { if (!editing && f.kind !== 'map') actions.pressStart(); };
+  const onDown = (e) => {
+    if (!editing) { if (f.kind !== 'map') actions.pressStart(); return; }
+    e.preventDefault();                       // no text selection / native image drag
+    actions.onDragStart(index);
+    const drop = (ev) => {
+      const el = document.elementFromPoint(ev.clientX, ev.clientY);
+      const t = el && el.closest && el.closest('[data-fi]');
+      actions.onDropAt(t ? Number(t.getAttribute('data-fi')) : index); // drop-on-self = no-op, clears state
+    };
+    window.addEventListener('pointerup', drop, { once: true });
+  };
   return (
     <div
       className={'ctl' + (f.kind === 'metric' ? ' live-tile' : '')}
-      draggable={editing}
-      onDragStart={() => actions.onDragStart(index)}
-      onDragOver={(e) => e.preventDefault()}
-      onDrop={() => actions.onDropAt(index)}
-      onPointerDown={armLongPress}
+      data-fi={index}
+      onPointerDown={onDown}
       onPointerUp={actions.pressEnd}
       onPointerLeave={actions.pressEnd}
-      style={s(f.cellStyle)}
+      style={s(f.cellStyle + (editing ? 'touch-action:none;' : ''))}
     >
       <FieldBody f={f} editing={editing} indoor={indoor} mySport={mySport} climb={climb} mono={mono} />
       {editing && (
-        <div onClick={(e) => { stop(e); actions.setHero(index); }} style={s(`position:absolute;top:8px;left:8px;width:20px;height:20px;border-radius:6px;background:${f.starBg};display:flex;align-items:center;justify-content:center;z-index:3`)}>
+        <div onClick={(e) => { stop(e); actions.setHero(index); }} onPointerDown={(e) => e.stopPropagation()} style={s(`position:absolute;top:8px;left:8px;width:20px;height:20px;border-radius:6px;background:${f.starBg};display:flex;align-items:center;justify-content:center;z-index:3`)}>
           <svg width="11" height="11" viewBox="0 0 24 24" fill={f.starFill} stroke={f.starStroke} strokeWidth="2" strokeLinejoin="round"><path d="M12 3l2.6 6.3 6.8.5-5.2 4.4 1.6 6.6L12 17.8 6.2 21.3l1.6-6.6L2.6 9.8l6.8-.5z" /></svg>
         </div>
       )}
@@ -306,7 +313,7 @@ function FreeTile({ f, index, slot, editing, actions, indoor, mySport, climb, mo
       actions.resizeSlot(index, w, h);
     }
   };
-  const begin = (mode, e) => { stop(e); drag.current = { mode, sx: e.clientX, sy: e.clientY, x0: slot.x, y0: slot.y, w0: slot.w, h0: slot.h }; try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* no capture */ } };
+  const begin = (mode, e) => { stop(e); if (e.cancelable) e.preventDefault(); drag.current = { mode, sx: e.clientX, sy: e.clientY, x0: slot.x, y0: slot.y, w0: slot.w, h0: slot.h }; try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* no capture */ } };
   const end = (e) => { drag.current = null; try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* none */ } if (!editing) actions.pressEnd(); };
   const onBodyDown = (e) => { if (editing) begin('move', e); else if (f.kind !== 'map') actions.pressStart(); };
   const pos = `grid-column:${slot.x} / span ${slot.w};grid-row:${slot.y} / span ${slot.h};`;
@@ -440,6 +447,7 @@ export default function LivePages({ tel, lp, uwb, blePeers, indoor = false, mySp
     const cellStyle = 'position:relative;background:var(--bg2);border:1px solid ' +
       (editFields ? 'color-mix(in srgb,var(--accent) 55%,transparent)' : 'var(--line)') +
       ';border-radius:14px;padding:11px 12px;display:flex;flex-direction:column;overflow:hidden;' +
+      'user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;' +
       (editFields ? 'cursor:grab;' : '') + (hero ? 'grid-column:1/-1;' : '');
     const base = {
       cellStyle,
