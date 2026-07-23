@@ -211,6 +211,21 @@ public interface IChatService
     Task<ChatMessage?> PostAsync(Guid squadId, Guid athleteId, string body, CancellationToken ct);
 }
 
+// ----- Direct (1:1) messages -----
+
+/// <summary>A direct message between two athletes, enriched with the sender's display fields.</summary>
+public sealed record DirectMessageItem(
+    Guid Id, Guid SenderId, Guid RecipientId, string SenderName, string Initials, string AvatarColor,
+    string Body, DateTimeOffset CreatedUtc);
+
+public interface IDirectMessageService
+{
+    /// <summary>The conversation between <paramref name="me"/> and <paramref name="peer"/>, chronological.</summary>
+    Task<IReadOnlyList<DirectMessageItem>> GetThreadAsync(Guid me, Guid peer, int take, CancellationToken ct);
+    /// <summary>Persist a direct message and return it enriched with sender display fields.</summary>
+    Task<DirectMessageItem?> PostAsync(Guid sender, Guid recipient, string body, CancellationToken ct);
+}
+
 // ----- Follow -----
 
 public interface IFollowService

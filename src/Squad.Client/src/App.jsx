@@ -61,6 +61,7 @@ import RidePayment from './screens/RidePayment.jsx';
 import CoachLedger from './screens/CoachLedger.jsx';
 import JoinRequests from './screens/JoinRequests.jsx';
 import Messages from './screens/Messages.jsx';
+import DirectMessages from './screens/DirectMessages.jsx';
 import Settings from './screens/Settings.jsx';
 import Welcome from './screens/Welcome.jsx';
 import Register from './screens/Register.jsx';
@@ -127,7 +128,7 @@ captureEventFromUrl();
 const screens = {
   dash: Dashboard, ride: LiveRide, plan: Plan, events: Events, eventeditor: EventEditor, eventdetail: EventDetail, plans: PlansList, planeditor: PlanEditor, planlibrary: PlanLibrary, lb: Leaderboard, clubrank: ClubRanking,
   feed: Feed, seg: Segments, coach: Coach, profile: Profile,
-  discover: Discover, group: GroupProfile, manage: ManageGroup, recordpay: RidePayment, ledger: CoachLedger, requests: JoinRequests, chat: Messages,
+  discover: Discover, group: GroupProfile, manage: ManageGroup, recordpay: RidePayment, ledger: CoachLedger, requests: JoinRequests, chat: Messages, dm: DirectMessages,
   settings: Settings, welcome: Welcome, register: Register, login: Login, newgroup: CreateGroup,
   athlete: AthleteProfile, editprofile: EditProfile, notifs: Notifications, activities: Activities,
   upload: UploadActivity, sensors: Sensors,
@@ -176,6 +177,7 @@ const HEADER_META = {
   group: { title: (vm) => vm.selGroupData?.name || 'Group' },
   recordpay: { title: 'Record a payment' },
   chat: { title: 'Squad chat' },
+  dm: { title: 'Message' },
   feed: { title: 'Activity' },
   requests: { title: 'Join requests' },
   planeditor: { title: 'Plan editor' },

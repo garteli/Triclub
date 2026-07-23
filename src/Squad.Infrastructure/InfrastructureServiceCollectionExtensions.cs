@@ -62,6 +62,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<ICourseStore>(_ => new SqlCourseStore(sqlConnectionString));
         services.AddScoped<IPaymentService>(_ => new SqlPaymentService(sqlConnectionString, paymentsClubFeeBps));
         services.AddScoped<IChatService>(_ => new SqlChatService(sqlConnectionString));
+        services.AddScoped<IDirectMessageService>(_ => new SqlDirectMessageService(sqlConnectionString));
         services.AddScoped<IKudosService>(_ => new SqlKudosService(sqlConnectionString));
         services.AddScoped<ICommentService>(_ => new SqlCommentService(sqlConnectionString));
         services.AddScoped<IFollowService>(_ => new SqlFollowService(sqlConnectionString));
