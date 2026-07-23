@@ -48,8 +48,14 @@ const fmtDay = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'nume
 const monthName = (d) => d.toLocaleDateString('en-US', { month: 'long' });
 const isTodayIso = (iso) => { const d = new Date(iso); return !Number.isNaN(d.getTime()) && sameDay(d, new Date()); };
 
-// Google-Maps directions to a [lat,lon] start point — opened on tap of a card's map preview.
-const directionsUrl = (lat, lon) => `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`;
+// Turn-by-turn links to a [lat,lon] start point, one per navigation app. The rider picks
+// which app to open from the Directions action sheet; each is a universal/https link so the
+// OS hands it to the installed app (Waze / Google Maps / Apple Maps) or the web fallback.
+const navApps = (lat, lon) => [
+  { key: 'waze', label: 'Waze', color: '#33ccff', url: `https://waze.com/ul?ll=${lat}%2C${lon}&navigate=yes` },
+  { key: 'gmaps', label: 'Google Maps', color: '#34a853', url: `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}` },
+  { key: 'amaps', label: 'Apple Maps', color: '#5a86ff', url: `https://maps.apple.com/?daddr=${lat},${lon}&dirflg=d` },
+];
 
 const SportIcon = ({ sport, size = 18 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
@@ -80,6 +86,7 @@ export default function Events({ vm, actions, getToken, meId, onDataChanged }) {
   const [openId, setOpenId] = useState(null);       // event whose roster is expanded
   const [rosters, setRosters] = useState({});       // eventId → attendees[] (null = loading)
   const [confirmId, setConfirmId] = useState(null); // event pending delete-confirmation
+  const [dirTarget, setDirTarget] = useState(null); // { lat, lon, title } → Directions action sheet
 
   const load = useCallback(async () => {
     if (!squadId) { setItems([]); return; }
@@ -304,6 +311,7 @@ export default function Events({ vm, actions, getToken, meId, onDataChanged }) {
                           <UpcomingCard key={ev.id} ev={ev} isOwner={isOwner} busy={busyId === ev.id} token={token}
                             route={routes[ev.id]} participants={faces[ev.id]}
                             onOpen={() => actions.openEvent(ev)}
+                            onDirections={(lat, lon) => setDirTarget({ lat, lon, title: ev.title })}
                             onJoin={() => join(ev)} onLeave={() => leave(ev)} />
                         ))}
                       </div>
@@ -363,6 +371,40 @@ export default function Events({ vm, actions, getToken, meId, onDataChanged }) {
           </div>
         </>
       )}
+
+      {/* directions — pick which navigation app to open (Waze / Google Maps / Apple Maps) */}
+      {dirTarget && (
+        <DirectionsSheet target={dirTarget} onClose={() => setDirTarget(null)}
+          onPick={(url) => { (actions.openLink || ((u) => { try { window.open(u, '_blank', 'noopener'); } catch { /* ignore */ } }))(url); setDirTarget(null); }} />
+      )}
+    </>
+  );
+}
+
+// ── directions action sheet ─────────────────────────────────────────────────────────
+function DirectionsSheet({ target, onClose, onPick }) {
+  const apps = navApps(target.lat, target.lon);
+  return (
+    <>
+      <div className="ctl" onClick={onClose} style={s('position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50;animation:floatUp .2s ease')} />
+      <div className="scr" style={s('position:fixed;left:0;right:0;bottom:0;z-index:51;background:var(--bg);border-top:1px solid var(--line2);border-radius:22px 22px 0 0;padding:16px 16px calc(20px + env(safe-area-inset-bottom));animation:floatUp .22s ease')}>
+        <div style={s('width:38px;height:4px;border-radius:2px;background:var(--line2);margin:0 auto 14px')} />
+        <div style={s('font-size:15px;font-weight:700')}>Get directions</div>
+        {target.title && <div style={s('font-size:12px;color:var(--text2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>to {target.title}</div>}
+        <div style={s('display:flex;flex-direction:column;gap:8px;margin-top:14px')}>
+          {apps.map((a) => (
+            <div key={a.key} className="ctl" onClick={() => onPick(a.url)}
+              style={s('display:flex;align-items:center;gap:12px;padding:12px 13px;border-radius:13px;background:var(--bg2);border:1px solid var(--line)')}>
+              <div style={s(`width:34px;height:34px;flex:none;border-radius:10px;display:flex;align-items:center;justify-content:center;background:${a.color}`)}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 11l19-9-9 19-2-8-8-2z" /></svg>
+              </div>
+              <span style={s('flex:1;font-size:14px;font-weight:700')}>{a.label}</span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
+            </div>
+          ))}
+        </div>
+        <div className="ctl" onClick={onClose} style={s('text-align:center;margin-top:12px;padding:12px;border-radius:12px;font-size:13.5px;font-weight:700;background:var(--bg3);border:1px solid var(--line);color:var(--text2)')}>Cancel</div>
+      </div>
     </>
   );
 }
@@ -386,7 +428,7 @@ function PeriodNav({ nav, onPrev, onNext, onToday }) {
 }
 
 // ── the flagship upcoming card: date chip · type · title · when/where · map · who's going ──
-function UpcomingCard({ ev, isOwner, busy, token, route, participants, onOpen, onJoin, onLeave }) {
+function UpcomingCard({ ev, isOwner, busy, token, route, participants, onOpen, onDirections, onJoin, onLeave }) {
   const d = new Date(ev.start);
   const meta = sportMeta(ev.sport);
   const joined = !!ev.joined;
@@ -447,8 +489,10 @@ function UpcomingCard({ ev, isOwner, busy, token, route, participants, onOpen, o
             </div>
           )}
           {start && (
-            <a href={directionsUrl(start[0], start[1])} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
-              className="ctl" style={s('position:absolute;right:8px;bottom:8px;padding:5px 10px;border-radius:9px;background:rgba(20,23,29,.82);backdrop-filter:blur(6px);border:1px solid var(--line2);font-size:10px;font-weight:700;color:#fff;text-decoration:none')}>Directions</a>
+            <div className="ctl" onClick={(e) => { e.stopPropagation(); onDirections?.(start[0], start[1]); }}
+              style={s('position:absolute;right:8px;bottom:8px;display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:9px;background:rgba(20,23,29,.82);backdrop-filter:blur(6px);border:1px solid var(--line2);font-size:10px;font-weight:700;color:#fff')}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 11l19-9-9 19-2-8-8-2z" /></svg>Directions
+            </div>
           )}
         </div>
       )}
