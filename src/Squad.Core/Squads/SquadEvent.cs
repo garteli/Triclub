@@ -116,6 +116,12 @@ public interface ISquadEventStore
     /// when currently empty). Allowed for any caller who can see the event — it's derived public data.
     /// Returns whether this call stored the value.</summary>
     Task<bool> SetStartPlaceAsync(Guid squadId, Guid meId, Guid eventId, string place, CancellationToken ct);
+    /// <summary>The cached terrain elevation profile JSON for the route (or null). Visible to anyone who
+    /// can see the event, like the route geometry.</summary>
+    Task<string?> GetElevationAsync(Guid squadId, Guid meId, Guid eventId, CancellationToken ct);
+    /// <summary>Cache the terrain elevation profile JSON (first-writer-wins: only set when empty). Any
+    /// caller who can see the event may populate it — it's derived from the public route. Returns whether stored.</summary>
+    Task<bool> SetElevationAsync(Guid squadId, Guid meId, Guid eventId, string json, CancellationToken ct);
     /// <summary>Title/start/notes/place for building a PUBLISHED event's calendar (.ics) file. Needs no
     /// auth — the same details the shareable event page shows. Null if not found or unpublished.</summary>
     Task<EventCalendarInfo?> GetCalendarInfoAsync(Guid squadId, Guid eventId, CancellationToken ct);

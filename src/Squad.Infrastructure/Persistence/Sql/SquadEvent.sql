@@ -39,6 +39,11 @@ IF COL_LENGTH('dbo.SquadEvent', 'BannerBlob') IS NULL ALTER TABLE dbo.SquadEvent
 -- resolves it once and every later load reuses it instead of calling the geocoder again. Additive
 -- + idempotent; null until the first viewer with the route resolves and persists it.
 IF COL_LENGTH('dbo.SquadEvent', 'StartPlace') IS NULL ALTER TABLE dbo.SquadEvent ADD StartPlace NVARCHAR(120) NULL;
+
+-- Cached terrain elevation profile for the route ({profile:[{dist,e}],ascent,min,max} JSON). The
+-- client reads real terrain from a rate-limited free API (Open-Meteo); caching it once here means
+-- every later viewer reuses it instead of re-calling (and hitting the daily cap). Additive + idempotent.
+IF COL_LENGTH('dbo.SquadEvent', 'ElevationJson') IS NULL ALTER TABLE dbo.SquadEvent ADD ElevationJson NVARCHAR(MAX) NULL;
 GO
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_SquadEvent_Squad' AND object_id = OBJECT_ID('dbo.SquadEvent'))

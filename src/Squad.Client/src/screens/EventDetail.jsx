@@ -5,7 +5,7 @@ import RouteMapGL from '../components/RouteMapGL.jsx';
 import AuthedAvatar from '../components/AuthedAvatar.jsx';
 import AuthedImage from '../components/AuthedImage.jsx';
 import SportIcon from '../components/SportIcon.jsx';
-import { listEventParticipants, joinEvent, leaveEvent, getEventRoute, setEventStartPlace } from '../lib/events.js';
+import { listEventParticipants, joinEvent, leaveEvent, getEventRoute, setEventStartPlace, getEventElevation, setEventElevation } from '../lib/events.js';
 import { buildElevationProfile } from '../lib/elevation.js';
 import { BASEMAP_LABEL, nextBasemap, inIsrael } from '../lib/basemaps.js';
 import { getRouteStyle, setRouteStyle as persistRouteStyle } from '../lib/routeStyle.js';
@@ -183,19 +183,30 @@ export default function EventDetail({ vm, state, actions, getToken }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ev?.id]);
 
-  // Read the real terrain elevation once we have a drawable route.
+  // The terrain elevation profile: prefer the copy cached on the event (server-side), so we don't
+  // re-hit the rate-limited elevation API on every view. Only when there's no cached profile do we
+  // read the terrain, then persist it back so the next viewer reuses it.
   useEffect(() => {
     const pts = (route || []).filter((p) => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]));
     if (pts.length < 2) { setElev(null); setElevLoading(false); return undefined; }
     const ctrl = new AbortController();
     setElevLoading(true);
     (async () => {
-      try { setElev(await buildElevationProfile(pts, ctrl.signal)); }
-      catch (e) { if (e.name !== 'AbortError') setElev(null); }
+      const t = await getToken?.();
+      try {
+        const cached = await getEventElevation(t, squadId, ev.id).catch(() => null);
+        if (cached?.elevation?.profile?.length) { setElev(cached.elevation); setElevLoading(false); return; }
+      } catch { /* fall through to compute */ }
+      try {
+        const profile = await buildElevationProfile(pts, ctrl.signal);
+        setElev(profile);
+        if (profile?.profile?.length) { try { await setEventElevation(t, squadId, ev.id, profile); } catch { /* best-effort cache */ } }
+      } catch (e) { if (e.name !== 'AbortError') setElev(null); }
       finally { setElevLoading(false); }
     })();
     return () => ctrl.abort();
-  }, [route]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route, squadId, ev.id]);
 
   // Name the route's start point for the meeting-point card. Prefer the value already cached on the
   // event (DB); only when it's absent do we reverse-geocode the start coordinate — then persist it so

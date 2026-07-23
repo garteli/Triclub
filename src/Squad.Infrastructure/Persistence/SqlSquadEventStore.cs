@@ -288,6 +288,29 @@ public sealed class SqlSquadEventStore(string connectionString) : ISquadEventSto
         return n > 0;
     }
 
+    public async Task<string?> GetElevationAsync(Guid squadId, Guid meId, Guid eventId, CancellationToken ct)
+    {
+        await using var conn = new SqlConnection(connectionString);
+        // Same visibility gate as the route geometry.
+        return await conn.ExecuteScalarAsync<string?>(new CommandDefinition("""
+            SELECT e.ElevationJson FROM dbo.SquadEvent e JOIN dbo.Squad s ON s.Id = e.SquadId
+            WHERE e.Id = @eventId AND e.SquadId = @squadId AND (e.Published = 1 OR s.OwnerId = @meId);
+            """, new { squadId, eventId, meId }, cancellationToken: ct));
+    }
+
+    public async Task<bool> SetElevationAsync(Guid squadId, Guid meId, Guid eventId, string json, CancellationToken ct)
+    {
+        await using var conn = new SqlConnection(connectionString);
+        // First-writer-wins; any viewer who can see the event may populate it (derived from the public route).
+        var n = await conn.ExecuteAsync(new CommandDefinition("""
+            UPDATE e SET e.ElevationJson = @json
+            FROM dbo.SquadEvent e JOIN dbo.Squad s ON s.Id = e.SquadId
+            WHERE e.Id = @eventId AND e.SquadId = @squadId AND e.ElevationJson IS NULL
+              AND (e.Published = 1 OR s.OwnerId = @meId);
+            """, new { squadId, eventId, meId, json }, cancellationToken: ct));
+        return n > 0;
+    }
+
     public async Task<EventCalendarInfo?> GetCalendarInfoAsync(Guid squadId, Guid eventId, CancellationToken ct)
     {
         await using var conn = new SqlConnection(connectionString);
