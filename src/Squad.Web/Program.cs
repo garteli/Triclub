@@ -140,6 +140,7 @@ app.MapAthletes();         // GET /api/athletes/{id} (+ follow/unfollow)
 app.MapNotifications();     // GET /api/notifications (+ /read)
 app.MapPlan();             // GET /api/plan
 app.MapChat();             // GET/POST /api/messages
+app.MapDirectMessages();   // GET/POST /api/dm/{peerId} (1:1 direct messages)
 app.MapAdmin();            // GET/DELETE /api/admin/* (sysadmin-only: users + clubs)
 app.MapSquadHub();         // /hubs/squad
 app.MapChatHub();          // /hubs/chat
