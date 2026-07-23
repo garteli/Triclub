@@ -53,6 +53,36 @@ const navApps = (lat, lon) => [
   { key: 'amaps', label: 'Apple Maps', color: '#5a86ff', url: `https://maps.apple.com/?daddr=${lat},${lon}&dirflg=d` },
 ];
 
+// iOS treats a hosted https .ics as a *subscription* feed ("Add Subscription Calendar") rather than
+// importing the single event — so on iOS we hand it the calendar inline as a data: URI instead, which
+// it imports as one event. Elsewhere the hosted URL opens/downloads fine.
+const isIOS = () => {
+  try {
+    const ua = navigator.userAgent || '';
+    return /iP(hone|ad|od)/i.test(ua) || (/Mac/i.test(ua) && navigator.maxTouchPoints > 1);
+  } catch { return false; }
+};
+const icsStamp = (d) => {
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}T${p(d.getUTCHours())}${p(d.getUTCMinutes())}${p(d.getUTCSeconds())}Z`;
+};
+const icsEscape = (t) => String(t || '').replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/[,;]/g, (m) => `\\${m}`);
+// Minimal single-event VEVENT (DTSTART only — no fabricated duration). `place` is the real start-point
+// name (never a GPS filename).
+const buildEventIcs = (ev, place) => {
+  const start = new Date(ev.start);
+  return [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Domestique Hub//Event//EN', 'BEGIN:VEVENT',
+    `UID:squad-event-${ev.id}@domestiquehub`,
+    `DTSTAMP:${icsStamp(new Date())}`,
+    `DTSTART:${icsStamp(start)}`,
+    `SUMMARY:${icsEscape(ev.title || 'Event')}`,
+    ...(place ? [`LOCATION:${icsEscape(place)}`] : []),
+    ...(ev.notes ? [`DESCRIPTION:${icsEscape(ev.notes)}`] : []),
+    'END:VEVENT', 'END:VCALENDAR',
+  ].join('\r\n');
+};
+
 const glass = 'background:rgba(0,0,0,.55);backdrop-filter:blur(6px);color:#fff;border:1px solid rgba(255,255,255,.14)';
 
 // Map overlay controls shared by the inline card and the fullscreen view: a basemap-layer cycle
@@ -279,9 +309,15 @@ export default function EventDetail({ vm, state, actions, getToken }) {
   // route/GPS file name (which is often just an auto-generated filename like "offroad-1234…").
   const openDirections = () => { if (start) setDirTarget({ lat: start[0], lon: start[1], title: startPlace || ev.title }); };
 
-  // Open the event's .ics served by the API (text/calendar). Opening a real URL is how iOS/Android
-  // hand it to the Calendar app — a client-side blob download is silently ignored on iPhone.
+  // Add the event to the device calendar. On iOS a hosted .ics URL prompts to *subscribe*, so we hand
+  // Calendar the event inline (data: URI) to import it as one event. Elsewhere, opening the served
+  // text/calendar URL adds/downloads it as expected.
   const addToCalendar = () => {
+    if (isIOS()) {
+      const ics = buildEventIcs(ev, startPlace || '');
+      window.location.href = `data:text/calendar;charset=utf-8,${encodeURIComponent(ics)}`;
+      return;
+    }
     const url = `/api/squads/${squadId}/events/${ev.id}/calendar.ics`;
     (actions.openLink || ((u) => { try { window.open(u, '_blank', 'noopener'); } catch { /* ignore */ } }))(url);
   };
