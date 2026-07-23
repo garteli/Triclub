@@ -162,8 +162,8 @@ function FieldCell({ f, editing, actions, index, indoor, mySport }) {
       {f.kind === 'peloton' && <PelotonField v={f.v} />}
       {f.kind === 'map' && (
         <>
-          {/* When following a course, reserve a strip at the bottom for its elevation profile. */}
-          {(() => { const EH = f.course.length >= 2 ? 60 : 0; return (
+          {/* "Route map + elevation" reserves a strip at the bottom for the course's elevation profile. */}
+          {(() => { const EH = f.showElev && f.course.length >= 2 ? 60 : 0; return (
           <>
           <div style={s(`position:absolute;top:0;left:0;right:0;bottom:${EH}px`)}>
             {f.pts.length ? (
@@ -246,7 +246,7 @@ function PickerSheet({ page, slot, actions, family }) {
   const motor = family === 'motorsport';
   // Motorsport has no power meter — drop the power chart (metricGroupsFor hides the rest).
   const charts = [['chart:spd', 'Speed chart', 'graph'], ['chart:hr', 'HR chart', 'graph'], ...(motor ? [] : [['chart:power', 'Power chart', 'graph']]), ['elev:track', 'Elevation chart', 'graph']];
-  const maps = [['map', 'Route map', 'map'], ['elev:route', 'Route elevation', 'chart']];
+  const maps = [['map', 'Route map', 'map'], ['map+elev', 'Route map + elevation', 'map'], ['elev:route', 'Route elevation', 'chart']];
   const group = [['peloton', 'Peloton spread', '2D']];
   const section = (title, rows) => (
     <>
@@ -299,7 +299,7 @@ export default function LivePages({ tel, lp, uwb, blePeers, indoor = false, mySp
       starFill: hero ? 'var(--accent-ink)' : 'none',
       starStroke: hero ? 'var(--accent-ink)' : 'var(--text2)',
     };
-    if (tok === 'map') {
+    if (tok === 'map' || tok === 'map+elev') {
       // Real rider positions from the hub (those with a GPS fix). Empty → "Waiting for GPS".
       const riders = (tel?.riders || []).filter((r) => r.lat != null && r.lon != null);
       // Your recorded breadcrumb + the selected course route (each [lat,lon]).
@@ -312,7 +312,7 @@ export default function LivePages({ tel, lp, uwb, blePeers, indoor = false, mySp
       // Your position for the elevation "you are here" marker: your rider fix, else the breadcrumb tail.
       const youR = riders.find((r) => r.you);
       const you = youR ? [youR.lat, youR.lon] : (path.length ? path[path.length - 1] : null);
-      return { ...base, kind: 'map', label: 'Route', riders, path, course, pts, you, packFused: !!tel?.packFused, packGap };
+      return { ...base, kind: 'map', label: 'Route', showElev: tok === 'map+elev', riders, path, course, pts, you, packFused: !!tel?.packFused, packGap };
     }
     if (tok === 'elev:track' || tok === 'elev:route') {
       const isRoute = tok === 'elev:route';
