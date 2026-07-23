@@ -2,9 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { s } from '../lib/style.js';
 import { Back } from './wizard.jsx';
 import AuthedImage from '../components/AuthedImage.jsx';
-import { listCourses, createCourse, deleteCourse, importCourseFromUrl } from '../lib/courses.js';
+import { listCourses, createCourse, deleteCourse, importCourseFromUrl, getCourse } from '../lib/courses.js';
 import CoursePicker from '../components/CoursePicker.jsx';
+import RouteMapGL from '../components/RouteMapGL.jsx';
 import SportIcon from '../components/SportIcon.jsx';
+import { BASEMAP_LABEL, nextBasemap, inIsrael } from '../lib/basemaps.js';
+import { getRouteStyle } from '../lib/routeStyle.js';
+import { getMapView, setMapStyle as persistMapStyle } from '../lib/mapView.js';
 import { createSquadEvent, updateSquadEvent, uploadEventImage, deleteEventImage, toOffsetIso, toLocalInput } from '../lib/events.js';
 import { downscaleToJpeg } from '../lib/photos.js';
 import { dataUrlToBlob } from '../lib/avatar.js';
@@ -32,6 +36,8 @@ const defaultWhen = () => {
 };
 
 const inputStyle = 'background:var(--bg3);border:1px solid var(--line);border-radius:11px;padding:11px 12px;font-size:13px;color:var(--text);outline:none;font-family:inherit;width:100%';
+// Glass chrome for map overlay controls (matches the event page + full map).
+const glass = 'background:rgba(20,23,29,.82);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.14);color:#fff';
 
 export default function EventEditor({ vm, state, actions, getToken, onDataChanged }) {
   const squadId = vm.activeClubId;
@@ -57,6 +63,14 @@ export default function EventEditor({ vm, state, actions, getToken, onDataChange
   const [picker, setPicker] = useState(false);  // route picker sheet open
   const [busy, setBusy] = useState('');         // '', 'publish', 'draft', 'save'
   const [error, setError] = useState('');
+
+  // Selected route's geometry, previewed on a map right in the editor (with a tap-to-expand
+  // fullscreen). Fetched whenever the picked course changes; the coach owns the course so
+  // getCourse resolves. rstyle = the app-wide route colour/width; mapStyle = shared basemap layer.
+  const [routePts, setRoutePts] = useState(null); // [[lat,lon],…] | null
+  const [mapFull, setMapFull] = useState(false);  // fullscreen route map overlay
+  const [mapStyle, setMapStyle] = useState(() => getMapView().style);
+  const rstyle = useMemo(() => getRouteStyle(), []);
 
   useEffect(() => {
     let ok = true;
@@ -89,6 +103,26 @@ export default function EventEditor({ vm, state, actions, getToken, onDataChange
     },
     selected: selectedCourse || (courseId ? { id: courseId } : null),
   }), [getToken, selectedCourse, courseId]);
+
+  // Load the picked course's points for the preview map (the coach owns it → getCourse resolves).
+  useEffect(() => {
+    if (!courseId) { setRoutePts(null); return undefined; }
+    let ok = true;
+    (async () => {
+      try { const c = await getCourse(await getToken?.(), courseId); if (ok) setRoutePts(c?.points?.length > 1 ? c.points : null); }
+      catch { if (ok) setRoutePts(null); }
+    })();
+    return () => { ok = false; };
+  }, [courseId, getToken]);
+
+  const hasRoute = routePts && routePts.length > 1;
+  const routeStart = useMemo(
+    () => (routePts || []).find((p) => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1])) || null, [routePts]);
+  // Off-road basemap only makes sense over Israel (blank tiles elsewhere); fall back otherwise.
+  const israel = useMemo(() => (routeStart ? inIsrael(routeStart[0], routeStart[1]) : true), [routeStart]);
+  const cycleLayer = () => setMapStyle((st) => nextBasemap(st, israel));
+  useEffect(() => { if (!israel && mapStyle === 'offroad') setMapStyle('voyager'); }, [israel, mapStyle]);
+  useEffect(() => { persistMapStyle(mapStyle); }, [mapStyle]);
 
   // ── per-event branding (edit mode only — needs a saved event id to attach images to) ──
   const bannerInput = useRef(null);
@@ -189,6 +223,21 @@ export default function EventEditor({ vm, state, actions, getToken, onDataChange
             </span>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={s('flex:none')}><path d="M9 18l6-6-6-6" /></svg>
           </div>
+
+          {/* selected route previewed on a map — tap ⤢ to expand fullscreen */}
+          {hasRoute && (
+            <div style={s('position:relative;margin-top:10px;border-radius:16px;overflow:hidden;border:1px solid var(--line);height:190px')}>
+              <RouteMapGL route={routePts} styleName={mapStyle} routeColor={rstyle.color} routeWidth={rstyle.width} arrowColor={rstyle.arrowColor} />
+              <div style={s('position:absolute;top:10px;right:10px;z-index:5;display:flex;flex-direction:column;gap:8px')}>
+                <div className="ctl" onClick={() => setMapFull(true)} aria-label="Expand map"
+                  style={s(`width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;line-height:1;${glass}`)}>⤢</div>
+                <div className="ctl" onClick={cycleLayer} title={`Map: ${BASEMAP_LABEL[mapStyle] || mapStyle}`}
+                  style={s(`width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;${glass}`)}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2" /><polyline points="2 17 12 22 22 17" /><polyline points="2 12 12 17 22 12" /></svg>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <div>
@@ -249,6 +298,21 @@ export default function EventEditor({ vm, state, actions, getToken, onDataChange
 
       {picker && (
         <CoursePicker courses={courseOps} onClose={() => setPicker(false)} title="Route for this event" allowSaveRide={false} />
+      )}
+
+      {/* fullscreen route map — covers the whole screen */}
+      {mapFull && hasRoute && (
+        <div style={s('position:fixed;inset:0;z-index:300;background:var(--bg)')}>
+          <RouteMapGL route={routePts} styleName={mapStyle} routeColor={rstyle.color} routeWidth={rstyle.width} arrowColor={rstyle.arrowColor} fitPadding={70} />
+          <div style={s('position:absolute;top:16px;right:16px;z-index:5;display:flex;flex-direction:column;gap:8px')}>
+            <div className="ctl" onClick={() => setMapFull(false)} aria-label="Close map"
+              style={s(`width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;line-height:1;${glass}`)}>✕</div>
+            <div className="ctl" onClick={cycleLayer} title={`Map: ${BASEMAP_LABEL[mapStyle] || mapStyle}`}
+              style={s(`width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;${glass}`)}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2" /><polyline points="2 17 12 22 22 17" /><polyline points="2 12 12 17 22 12" /></svg>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

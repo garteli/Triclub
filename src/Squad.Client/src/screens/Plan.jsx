@@ -244,14 +244,9 @@ export default function Plan({ vm, state, actions, planMine, live, meId, getToke
   const owner = vm.activeSquad?.owner;
   const isClubCoach = !!meId && !!owner && String(owner).toLowerCase() === String(meId).toLowerCase();
   // Motorsport clubs run on scheduled group rides, not a structured training plan — so the
-  // plan-management buttons (My plans, Coach mode) are hidden for them.
+  // plan-management buttons (My plans, coach tools) are hidden for them. Coach plan management
+  // now lives on its own page, reached from the coach bottom-nav tab (not a toggle here).
   const isMotor = vm.family === 'motorsport';
-  // Leave any stale coach view when the active club is one this athlete doesn't coach, or a
-  // motorsport club (no plans there).
-  useEffect(() => { if ((!isClubCoach || isMotor) && state.coachView) actions.toggleCoach(); }, [isClubCoach, isMotor, state.coachView, actions]);
-  const coachToggleStyle = state.coachView
-    ? 'background:var(--accent);color:var(--accent-ink)'
-    : 'background:var(--bg3);color:var(--text2);border:1px solid var(--line)';
 
   // Group sessions the coach scheduled are shown as sessions in the plan — unified with the
   // workouts, so a week with only a group ride no longer reads as "No sessions planned".
@@ -354,21 +349,8 @@ export default function Plan({ vm, state, actions, planMine, live, meId, getToke
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" /></svg>My plans
               </div>
             )}
-            {isClubCoach && !isMotor && (
-              <div className="ctl" onClick={actions.toggleCoach} style={s(`${coachToggleStyle};border-radius:11px;padding:8px 11px;font-size:11.5px;font-weight:700;display:flex;align-items:center;gap:6px`)}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>Coach
-              </div>
-            )}
           </div>
         </div>
-
-        {state.coachView && !isMotor && (
-          <div className="ctl" onClick={() => actions.go('plans')} style={s('background:var(--accent-dim);border:1px solid color-mix(in srgb,var(--accent) 40%,transparent);border-radius:14px;padding:11px 13px;margin-bottom:14px;display:flex;gap:9px;align-items:center')}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round"><path d="M12 2a10 10 0 1 0 10 10" /><path d="M22 4L12 14l-3-3" /></svg>
-            <div style={s('flex:1;font-size:12px;color:var(--text2);line-height:1.4')}><span style={s('color:var(--text);font-weight:600')}>Coach mode.</span> Manage your training plans and publish them to the squad.</div>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.2" strokeLinecap="round"><path d="M9 6l6 6-6 6" /></svg>
-          </div>
-        )}
 
         <div style={s('display:flex;gap:6px;background:var(--bg2);border:1px solid var(--line);border-radius:13px;padding:4px;margin-bottom:10px')}>
           <div className="ctl" onClick={() => actions.setPlanView('week')} style={s(seg(week))}>Week</div>

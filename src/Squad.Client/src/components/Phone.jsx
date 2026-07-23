@@ -8,7 +8,7 @@ const CHROMELESS = new Set(['welcome', 'register', 'login', 'newgroup']);
 // The app viewport. `.phone` (see theme.css) carries the design tokens and fills
 // the screen (full-width on phones, a centered column on desktop). The real device
 // draws its own status bar, so we only reserve safe-area space at the top.
-export default function Phone({ theme, accent, lang, dir, screen, go, recording, header, family, children }) {
+export default function Phone({ theme, accent, lang, dir, screen, go, recording, header, family, isCoach, children }) {
   const hideNav = CHROMELESS.has(screen);
   const scrollRef = useRef(null);
 
@@ -32,7 +32,7 @@ export default function Phone({ theme, accent, lang, dir, screen, go, recording,
         </div>
       </div>
 
-      {!hideNav && <BottomNav screen={screen} lang={lang} go={go} recording={recording} family={family} />}
+      {!hideNav && <BottomNav screen={screen} lang={lang} go={go} recording={recording} family={family} isCoach={isCoach} />}
     </div>
   );
 }
