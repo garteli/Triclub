@@ -11,6 +11,7 @@ import { routeKm } from '../lib/courses.js';
 import { BASEMAP_LABEL, nextBasemap, inIsrael } from '../lib/basemaps.js';
 import { getRouteStyle, setRouteStyle as persistRouteStyle } from '../lib/routeStyle.js';
 import { getMapView, setMapStyle as persistMapStyle } from '../lib/mapView.js';
+import { eventShareUrl } from '../lib/eventLink.js';
 import RouteStylePanel from '../components/RouteStylePanel.jsx';
 
 // The member-facing event page: an identity block, a large map of the route, terrain-derived ride
@@ -78,12 +79,16 @@ function downloadCalendar(ev) {
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
-async function shareEvent(ev) {
+// Share the event page: the event's name + when + notes, and a link that opens this event
+// (?event=<squadId>.<eventId>). Uses the event's name — never the underlying route/GPS file name.
+async function shareEvent(ev, squadId) {
   const when = fmtDateLine(ev.start);
-  const text = `${ev.title || 'Event'} · ${when.date}${when.time ? ` · ${when.time}` : ''}${ev.courseName ? ` · ${ev.courseName}` : ''}`;
+  const title = ev.title || 'Event';
+  const url = eventShareUrl(squadId || ev.squadId, ev.id);
+  const text = [title, [when.date, when.time].filter(Boolean).join(' · '), ev.notes || ''].filter(Boolean).join('\n');
   try {
-    if (navigator.share) { await navigator.share({ title: ev.title || 'Event', text }); return; }
-    if (navigator.clipboard) await navigator.clipboard.writeText(text);
+    if (navigator.share) { await navigator.share({ title, text, url: url || undefined }); return; }
+    if (navigator.clipboard) await navigator.clipboard.writeText(url ? `${text}\n${url}` : text);
   } catch { /* user dismissed the share sheet — ignore */ }
 }
 
@@ -279,8 +284,9 @@ export default function EventDetail({ vm, state, actions, getToken }) {
   };
 
   const hasRoute = route && route.length > 1;
-  const place = ev.courseName || '';
-  const openDirections = () => { if (start) setDirTarget({ lat: start[0], lon: start[1], title: place || ev.title }); };
+  // The meeting point + directions are labelled with the event's name, not the underlying
+  // route/GPS file name (which is often just an auto-generated filename like "offroad-1234…").
+  const openDirections = () => { if (start) setDirTarget({ lat: start[0], lon: start[1], title: ev.title }); };
 
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
@@ -288,7 +294,7 @@ export default function EventDetail({ vm, state, actions, getToken }) {
       <div style={s('display:flex;align-items:center;gap:12px;margin:6px 0 4px')}>
         <Back onClick={() => actions.back?.()} />
         <div style={s('flex:1;font-size:20px;font-weight:700;letter-spacing:-.4px')}>Event</div>
-        <div className="ctl" onClick={() => shareEvent(ev)} aria-label="Share event"
+        <div className="ctl" onClick={() => shareEvent(ev, squadId)} aria-label="Share event"
           style={s('width:36px;height:36px;flex:none;border-radius:11px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--text2)')}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4" /></svg>
         </div>
@@ -366,7 +372,7 @@ export default function EventDetail({ vm, state, actions, getToken }) {
             <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="var(--good)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
           </div>
           <div style={s('flex:1;min-width:0')}>
-            <div style={s('font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>Start{place ? ` · ${place}` : ' point'}</div>
+            <div dir="auto" style={s('font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>Start · {ev.title}</div>
             <div style={s('font-size:11px;color:var(--text2);margin-top:1px')}>Directions to the meeting point</div>
           </div>
           <div style={s('flex:none;padding:6px 11px;border-radius:9px;background:var(--bg3);border:1px solid var(--line);font-size:11px;font-weight:700;color:var(--accent)')}>Directions</div>
@@ -419,7 +425,7 @@ export default function EventDetail({ vm, state, actions, getToken }) {
           style={s('flex:1;display:flex;align-items:center;justify-content:center;gap:7px;background:var(--bg2);border:1px solid var(--line);border-radius:13px;padding:11px;font-size:12.5px;font-weight:700')}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="17" rx="2.5" /><path d="M3 9h18M8 2v4M16 2v4" /></svg>Add to calendar
         </div>
-        <div className="ctl" onClick={() => shareEvent(ev)}
+        <div className="ctl" onClick={() => shareEvent(ev, squadId)}
           style={s('flex:1;display:flex;align-items:center;justify-content:center;gap:7px;background:var(--bg2);border:1px solid var(--line);border-radius:13px;padding:11px;font-size:12.5px;font-weight:700')}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8" /><path d="M16 6l-4-4-4 4M12 2v13" /></svg>Share
         </div>
