@@ -87,7 +87,7 @@ import AdminGroupDetail from './screens/AdminGroupDetail.jsx';
 const initialState = {
   screen: 'dash', theme: 'dark', lang: 'en', accent: 'orange',
   dashVar: 'a', rideVar: 'a', rideState: 'lobby',
-  planView: 'week', planWeekOffset: 0, planMonthOffset: 0, lbTab: 'load', showWorkout: false, workoutKey: 'bike', coachView: false,
+  planView: 'week', planWeekOffset: 0, planMonthOffset: 0, lbTab: 'load', showWorkout: false, workoutKey: 'bike',
   // discover / group / join-request / chat flow
   selGroup: 'galilee', selApplicant: null, joinState: {}, reqStatus: {},
   // profiles
@@ -332,6 +332,11 @@ export default function App() {
     [state, t, liveFeed, liveLeaderboard, liveActivities, profile, liveSquads, livePlan, livePlanSummary, livePlanMonth, authed, squadId, session?.athleteId],
   );
 
+  // The active club's coach == its owner (every coach action is gated on owner == caller). Drives
+  // the coach-only bottom-nav tab (training-plan management), hidden for non-coaches + motorsport.
+  const isClubCoach = !!session?.athleteId && !!vm.activeSquad?.owner
+    && String(vm.activeSquad.owner).toLowerCase() === String(session.athleteId).toLowerCase();
+
   // After joining/creating a squad the athlete's active SquadId changes server-side;
   // refresh the session so the feed/leaderboard/activities follow to the new squad.
   const refreshSession = useCallback(async () => {
@@ -574,7 +579,6 @@ export default function App() {
       const weeks = Math.round((mondayOf(new Date(y, m - 1, d)) - mondayOf(new Date())) / 6048e5);
       return { ...s, planView: 'week', planWeekOffset: weeks };
     }),
-    toggleCoach: () => setState((s) => ({ ...s, coachView: !s.coachView })),
     // Accepts either a discipline key (legacy) or the full plan row; the row carries any
     // coach-attached course through to the workout sheet's "Start now".
     openWorkout: (rowOrKey) => patch(typeof rowOrKey === 'string'
@@ -801,7 +805,7 @@ export default function App() {
       {/* Dev-only prototype harness (screen switcher / theme toggles); never shipped. */}
       {import.meta.env.DEV && <ControlDock state={state} actions={actions} />}
       <Phone theme={state.theme} accent={state.accent} lang={state.lang} dir={dir} screen={state.screen} go={actions.go}
-        header={appHeader} family={vm.family}
+        header={appHeader} family={vm.family} isCoach={isClubCoach}
         recording={recorder.recording}>
         <Screen key={state.screen === 'planeditor' ? `pe-${selectedPlan?.id || 'new'}` : state.screen}
           vm={vm} state={state} actions={actions} live={live} tick={t} livePages={livePages}

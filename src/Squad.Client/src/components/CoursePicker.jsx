@@ -141,9 +141,9 @@ export default function CoursePicker({ courses, onClose, title = 'Course for thi
             </div>
           ) : importUrl !== null ? (
             <div style={s('margin-top:16px')}>
-              <div style={s('font-size:12px;color:var(--text3);margin-bottom:7px')}>Paste a GPX link or an off-road.io track page URL</div>
+              <div style={s('font-size:12px;color:var(--text3);margin-bottom:7px')}>Paste a GPX url or a map url</div>
               <input value={importUrl} onChange={(e) => setImportUrl(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') confirmImport(); }}
-                autoFocus placeholder="https://off-road.io/track/… or a .gpx link" inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false}
+                autoFocus placeholder="GPX url or map url" inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false}
                 style={s('width:100%;background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:14px;color:var(--text);outline:none;font-family:inherit')} />
               <div style={s('font-size:11px;color:var(--text3);margin-top:8px;line-height:1.4')}>Tip: on an off-road.io track, tap “Download GPX” and paste that link for the most reliable import.</div>
               {error && <div style={s('font-size:12px;color:var(--bad);font-weight:600;margin-top:10px')}>{error}</div>}
