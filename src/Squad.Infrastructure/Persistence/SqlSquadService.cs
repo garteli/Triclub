@@ -85,6 +85,14 @@ public sealed class SqlSquadService(string connectionString) : ISquadService
         await tx.CommitAsync(ct);
     }
 
+    public async Task<bool> IsMemberAsync(Guid squadId, Guid athleteId, CancellationToken ct)
+    {
+        await using var conn = new SqlConnection(connectionString);
+        return await conn.ExecuteScalarAsync<int>(new CommandDefinition(
+            "SELECT CASE WHEN EXISTS (SELECT 1 FROM dbo.Membership WHERE SquadId=@squadId AND AthleteId=@athleteId) THEN 1 ELSE 0 END;",
+            new { squadId, athleteId }, cancellationToken: ct)) == 1;
+    }
+
     public async Task<bool> SetActiveSquadAsync(Guid squadId, Guid athleteId, CancellationToken ct)
     {
         // Only switch to a squad the athlete is actually a member of — guards against
