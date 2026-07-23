@@ -1,7 +1,8 @@
 import { s } from '../lib/style.js';
 import { progressMeters, elevAt } from '../lib/elevation.js';
-import { getRouteStyle } from '../lib/routeStyle.js';
 import { useElevationProfile } from '../hooks/useElevationProfile.js';
+
+const COLOR = '#ff7a3c'; // elevation accent (ride-computer handoff)
 
 // Full-tile elevation profile for the live pages. Two sources, same chart:
 //  • source="route" — the course you're following; the marker projects your GPS fix onto it.
@@ -16,13 +17,16 @@ const PAD_B = 6;     // % below the valley
 
 export default function LiveElevationChart({ route = [], you = null, source = 'route', indoor = false }) {
   const { elev, loading, failed } = useElevationProfile(route);
-  const color = getRouteStyle().color || 'var(--accent)';
+  const color = COLOR;
   const pts = (route || []).filter((p) => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]));
 
   const header = (right) => (
-    <div style={s('display:flex;justify-content:space-between;align-items:baseline')}>
-      <div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;font-weight:600')}>
-        {source === 'route' ? 'Route elevation' : 'Elevation'}
+    <div style={s('display:flex;align-items:flex-start;justify-content:space-between;gap:6px')}>
+      <div style={s('display:flex;align-items:center;gap:6px;min-width:0')}>
+        <span style={s(`width:8px;height:8px;border-radius:2px;background:${color};flex:none`)} />
+        <span style={s('font-size:9.5px;color:var(--text3);text-transform:uppercase;letter-spacing:1.1px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>
+          {source === 'route' ? 'Route elevation' : 'Elevation'}
+        </span>
       </div>
       {right}
     </div>
@@ -62,17 +66,17 @@ export default function LiveElevationChart({ route = [], you = null, source = 'r
   return (
     <>
       {header(
-        <div className="mono" style={s(`font-size:15px;font-weight:700;color:${color}`)}>
-          {loading && !elev ? '…' : elev ? ascent : failed ? '—' : ''}
-          {elev && <span style={s('font-size:9px;color:var(--text2)')}> ↑m</span>}
+        <div style={s('display:flex;align-items:baseline;gap:3px;flex:none')}>
+          <span className="mono" style={s(`font-size:20px;font-weight:700;line-height:.9;color:${color};letter-spacing:-.5px`)}>{loading && !elev ? '…' : elev ? ascent : failed ? '—' : ''}</span>
+          {elev && <span style={s('font-size:10px;font-weight:600;color:var(--text2)')}>↑m</span>}
         </div>,
       )}
       <div style={s('position:relative;flex:1;min-height:36px;margin-top:6px')}>
         {line ? (
           <>
             <svg viewBox={`0 0 ${VW} 100`} preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }}>
-              <path d={area} fill={color} opacity="0.15" />
-              <path d={line} fill="none" stroke={color} strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+              <path d={area} fill={color} opacity="0.2" />
+              <path d={line} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
             </svg>
             {marker && (
               <>
