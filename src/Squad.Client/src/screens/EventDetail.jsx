@@ -79,19 +79,6 @@ function downloadCalendar(ev) {
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
-// Share the event page: the event's name + when + notes, and a link that opens this event
-// (?event=<squadId>.<eventId>). Uses the event's name — never the underlying route/GPS file name.
-async function shareEvent(ev, squadId) {
-  const when = fmtDateLine(ev.start);
-  const title = ev.title || 'Event';
-  const url = eventShareUrl(squadId || ev.squadId, ev.id);
-  const text = [title, [when.date, when.time].filter(Boolean).join(' · '), ev.notes || ''].filter(Boolean).join('\n');
-  try {
-    if (navigator.share) { await navigator.share({ title, text, url: url || undefined }); return; }
-    if (navigator.clipboard) await navigator.clipboard.writeText(url ? `${text}\n${url}` : text);
-  } catch { /* user dismissed the share sheet — ignore */ }
-}
-
 const glass = 'background:rgba(0,0,0,.55);backdrop-filter:blur(6px);color:#fff;border:1px solid rgba(255,255,255,.14)';
 
 // Map overlay controls shared by the inline card and the fullscreen view: a basemap-layer cycle
@@ -203,6 +190,7 @@ export default function EventDetail({ vm, state, actions, getToken }) {
   const [rstyle, setRstyle] = useState(getRouteStyle);  // per-user route colour + width (shared)
   const [styleOpen, setStyleOpen] = useState(false);    // route-style picker open
   const [dirTarget, setDirTarget] = useState(null);     // { lat, lon, title } → Directions action sheet
+  const [shareMsg, setShareMsg] = useState('');         // transient confirmation after a share/copy
   // terrain-derived elevation for the stat tile + elevation card (read once per route)
   const [elev, setElev] = useState(null);
   const [elevLoading, setElevLoading] = useState(false);
@@ -288,13 +276,32 @@ export default function EventDetail({ vm, state, actions, getToken }) {
   // route/GPS file name (which is often just an auto-generated filename like "offroad-1234…").
   const openDirections = () => { if (start) setDirTarget({ lat: start[0], lon: start[1], title: ev.title }); };
 
+  // Share the event page. Prefer the native share sheet (mobile / supported browsers); otherwise —
+  // and this is the common desktop-web case where navigator.share is absent — copy the details +
+  // link to the clipboard and show a visible confirmation so the button never appears to do nothing.
+  const doShare = async () => {
+    const when = fmtDateLine(ev.start);
+    const title = ev.title || 'Event';
+    const url = eventShareUrl(squadId, ev.id);
+    const text = [title, [when.date, when.time].filter(Boolean).join(' · '), ev.notes || ''].filter(Boolean).join('\n');
+    const payload = url ? `${text}\n${url}` : text;
+    if (navigator.share) {
+      try { await navigator.share({ title, text, url: url || undefined }); return; }
+      catch (e) { if (e?.name === 'AbortError') return; /* dismissed — done */ }
+      // any other error (unsupported payload, permission) → fall through to clipboard
+    }
+    try { await navigator.clipboard.writeText(payload); setShareMsg('✓ Link copied'); }
+    catch { setShareMsg('Copy failed — long-press the link'); }
+    setTimeout(() => setShareMsg(''), 2200);
+  };
+
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
       {/* header — back · title · share */}
       <div style={s('display:flex;align-items:center;gap:12px;margin:6px 0 4px')}>
         <Back onClick={() => actions.back?.()} />
         <div style={s('flex:1;font-size:20px;font-weight:700;letter-spacing:-.4px')}>Event</div>
-        <div className="ctl" onClick={() => shareEvent(ev, squadId)} aria-label="Share event"
+        <div className="ctl" onClick={doShare} aria-label="Share event"
           style={s('width:36px;height:36px;flex:none;border-radius:11px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--text2)')}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4" /></svg>
         </div>
@@ -425,7 +432,7 @@ export default function EventDetail({ vm, state, actions, getToken }) {
           style={s('flex:1;display:flex;align-items:center;justify-content:center;gap:7px;background:var(--bg2);border:1px solid var(--line);border-radius:13px;padding:11px;font-size:12.5px;font-weight:700')}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="17" rx="2.5" /><path d="M3 9h18M8 2v4M16 2v4" /></svg>Add to calendar
         </div>
-        <div className="ctl" onClick={() => shareEvent(ev, squadId)}
+        <div className="ctl" onClick={doShare}
           style={s('flex:1;display:flex;align-items:center;justify-content:center;gap:7px;background:var(--bg2);border:1px solid var(--line);border-radius:13px;padding:11px;font-size:12.5px;font-weight:700')}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8" /><path d="M16 6l-4-4-4 4M12 2v13" /></svg>Share
         </div>
@@ -472,6 +479,11 @@ export default function EventDetail({ vm, state, actions, getToken }) {
       {dirTarget && (
         <DirectionsSheet target={dirTarget} onClose={() => setDirTarget(null)}
           onPick={(url) => { (actions.openLink || ((u) => { try { window.open(u, '_blank', 'noopener'); } catch { /* ignore */ } }))(url); setDirTarget(null); }} />
+      )}
+
+      {/* share confirmation — shown when the native share sheet isn't available and we copy instead */}
+      {shareMsg && (
+        <div style={s('position:fixed;left:50%;bottom:96px;transform:translateX(-50%);z-index:400;background:var(--bg3);border:1px solid var(--line2);color:var(--text);font-size:12.5px;font-weight:700;padding:9px 15px;border-radius:12px;box-shadow:0 12px 30px -10px rgba(0,0,0,.6);animation:floatUp .2s ease')}>{shareMsg}</div>
       )}
     </div>
   );
