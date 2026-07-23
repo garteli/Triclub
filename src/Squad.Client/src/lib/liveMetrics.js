@@ -2,6 +2,8 @@
 // REAL `telemetry` object (built by useRideTelemetry from the GPS recorder + BLE
 // sensors + hub riders). A field with no source shows "—" rather than a fake number.
 
+import { gradeColor } from './climbs.js';
+
 const DASH = '—';
 const f1 = (v) => (v == null ? DASH : v.toFixed(1));
 const r0 = (v) => (v == null ? DASH : String(Math.round(v)));
@@ -65,6 +67,14 @@ export const metricCatalog = {
   grad: { label: 'Gradient', unit: '%', cat: 'Elevation' },
   elevgain: { label: 'Total Ascent', unit: 'm', cat: 'Elevation' },
   descent: { label: 'Total Descent', unit: 'm', cat: 'Elevation' },
+  // Climb (ClimbPro) — live once a climb on the followed course is near/underway; "—" otherwise.
+  climbnum: { label: 'Climb', unit: '', cat: 'Climb' },
+  climbcat: { label: 'Climb Category', unit: '', cat: 'Climb' },
+  climbstart: { label: 'Dist to Climb', unit: 'm', cat: 'Climb' },
+  climbdist: { label: 'Climb Dist to Go', unit: 'm', cat: 'Climb' },
+  climbascent: { label: 'Climb Ascent to Go', unit: 'm', cat: 'Climb' },
+  climbtime: { label: 'Climb Time to Go', unit: '', cat: 'Climb' },
+  climbgrade: { label: 'Climb Gradient', unit: '%', cat: 'Climb' },
   // Navigation
   heading: { label: 'Heading', unit: '°', cat: 'Navigation' },
   bearing: { label: 'Bearing', unit: '°', cat: 'Navigation' },
@@ -87,7 +97,7 @@ export const metricCatalog = {
 };
 
 // Category order for the field picker (mirrors the Garmin data-field grouping).
-export const metricGroups = ['Timers', 'Distance', 'Speed', 'Cadence', 'Heart Rate', 'Power', 'Elevation', 'Navigation', 'Gears', 'Other']
+export const metricGroups = ['Timers', 'Distance', 'Speed', 'Cadence', 'Heart Rate', 'Power', 'Elevation', 'Climb', 'Navigation', 'Gears', 'Other']
   .map((cat) => [cat, Object.keys(metricCatalog).filter((tok) => metricCatalog[tok].cat === cat)]);
 
 // The field picker filtered to a discipline family. Motorsport rides have no power meter,
@@ -115,12 +125,33 @@ function packVals(tel) {
   };
 }
 
+// Climb (ClimbPro) field values from the shared useClimb() state — live when a climb is near/on,
+// "—" otherwise. Kept here so the "Climb" data fields and the ClimbPro card read one source.
+function climbVals(climb) {
+  if (!climb) return {
+    climbnum: { v: DASH }, climbcat: { v: DASH }, climbstart: { v: DASH },
+    climbdist: { v: DASH }, climbascent: { v: DASH }, climbtime: { v: DASH }, climbgrade: { v: DASH },
+  };
+  const catLabel = climb.category ? (climb.category === 'HC' ? 'HC' : `Cat ${climb.category}`) : 'Climb';
+  return {
+    climbnum: { v: `${climb.index + 1}/${climb.total}`, color: 'var(--accent)' },
+    climbcat: { v: catLabel, color: climb.accent },
+    climbstart: { v: r0(climb.climbing ? 0 : climb.distToStartM) },
+    climbdist: { v: r0(climb.distToGoM) },
+    climbascent: { v: r0(climb.ascentToGoM), color: climb.accent },
+    climbtime: { v: mmss(Math.round(climb.etaSec)) },
+    climbgrade: { v: f1(climb.gradeNow), color: gradeColor(climb.gradeNow) },
+  };
+}
+
 // Instant metric values keyed by token — { v, color? }. Fields backed by a real
-// telemetry source resolve to a live number; everything else stays "—".
-export function liveMetricValues(tel) {
+// telemetry source resolve to a live number; everything else stays "—". `climb` is the
+// optional useClimb() state that backs the "Climb" fields.
+export function liveMetricValues(tel, climb) {
   const hr = tel?.hr;
   const hrCol = hr == null ? undefined : (hr > 168 ? 'var(--bad)' : hr > 158 ? 'var(--warn)' : 'var(--good)');
   return {
+    ...climbVals(climb),
     // Timers
     time: { v: mmss(tel?.elapsed) }, tod: { v: tel?.clock ?? DASH },
     movingtime: { v: DASH }, laptime: { v: DASH }, lastlaptime: { v: DASH },
