@@ -26,6 +26,9 @@ public static class SquadEndpoints
         g.MapGet("/{id:guid}/members", Members);
         g.MapPost("/{id:guid}/members", AddMember);
         g.MapDelete("/{id:guid}/members/{athleteId:guid}", RemoveMember);
+        // Owner sets a member's role (coach/member) and transfers ownership to a coach.
+        g.MapPost("/{id:guid}/members/{athleteId:guid}/role", SetRole);
+        g.MapPost("/{id:guid}/transfer/{athleteId:guid}", TransferOwnership);
         // Invite links: owner mints a shareable link; the invitee looks it up (anonymous, before
         // sign-up) and accepts it (authorized) to auto-join.
         g.MapPost("/{id:guid}/invite", CreateInvite);
@@ -163,6 +166,32 @@ public static class SquadEndpoints
         return await squads.RemoveMemberAsync(id, athleteId, me, ct)
             ? Results.Ok(new { status = "removed" })
             : Results.NotFound(new { error = "Couldn't remove that member (not a member, the owner, or you don't manage this squad)." });
+    }
+
+    private static async Task<IResult> SetRole(Guid id, Guid athleteId, SetRoleRequest body, HttpContext http, ISquadService squads, CancellationToken ct)
+    {
+        if (Me(http) is not { } me) return Results.Unauthorized();
+        return await squads.SetMemberRoleAsync(id, athleteId, body?.Role ?? "", me, ct) switch
+        {
+            SetRoleOutcome.Ok => Results.Ok(new { status = "ok" }),
+            SetRoleOutcome.InvalidRole => Results.BadRequest(new { error = "Role must be coach or member." }),
+            SetRoleOutcome.CannotChangeOwner => Results.Json(new { error = "The owner's role can't be changed. Transfer ownership instead." }, statusCode: 409),
+            SetRoleOutcome.NotAMember => Results.NotFound(new { error = "That athlete isn't a member of this group." }),
+            _ => Results.NotFound(new { error = "Squad not found, or you don't manage it." }),
+        };
+    }
+
+    private static async Task<IResult> TransferOwnership(Guid id, Guid athleteId, HttpContext http, ISquadService squads, CancellationToken ct)
+    {
+        if (Me(http) is not { } me) return Results.Unauthorized();
+        return await squads.TransferOwnershipAsync(id, athleteId, me, ct) switch
+        {
+            TransferOwnershipOutcome.Ok => Results.Ok(new { status = "transferred" }),
+            TransferOwnershipOutcome.SameAsOwner => Results.BadRequest(new { error = "You already own this group." }),
+            TransferOwnershipOutcome.TargetNotMember => Results.NotFound(new { error = "That athlete isn't a member of this group." }),
+            TransferOwnershipOutcome.TargetNotCoach => Results.Json(new { error = "You can only transfer ownership to a coach. Make them a coach first." }, statusCode: 409),
+            _ => Results.NotFound(new { error = "Squad not found, or you don't manage it." }),
+        };
     }
 
     // ----- invite links -------------------------------------------------------

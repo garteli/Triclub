@@ -183,6 +183,7 @@ export default function EventDetail({ vm, state, actions, getToken }) {
   const [route, setRoute] = useState(null);   // [[lat,lon],…] | null
   const [people, setPeople] = useState(null); // null = loading
   const [joined, setJoined] = useState(!!ev?.joined);
+  const [requested, setRequested] = useState(!!ev?.requestPending); // pending, not-yet-approved request
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [mapFull, setMapFull] = useState(false); // fullscreen route map overlay
@@ -260,12 +261,21 @@ export default function EventDetail({ vm, state, actions, getToken }) {
     );
   }
 
+  // A member of the event's squad joins instantly; a non-member's join becomes a request the coach
+  // approves. `ev.member` is the server's verdict (null on older payloads → treat as member).
+  const requestOnly = ev?.member === false;
+
   const toggleJoin = async () => {
     setBusy(true); setErr('');
     try {
       const t = await getToken?.();
-      if (joined) { await leaveEvent(t, ev.id); setJoined(false); }
-      else { await joinEvent(t, ev.id); setJoined(true); }
+      if (joined || requested) {
+        // Withdraw an RSVP or a pending request (leave clears either).
+        await leaveEvent(t, ev.id); setJoined(false); setRequested(false);
+      } else {
+        const r = await joinEvent(t, ev.id);
+        if (r?.requested) setRequested(true); else setJoined(true);
+      }
       setPeople(await loadPeople(t));
     } catch (e) { setErr(e?.message || 'Could not update your RSVP.'); }
     finally { setBusy(false); }
@@ -405,7 +415,7 @@ export default function EventDetail({ vm, state, actions, getToken }) {
         </>
       )}
 
-      {/* RSVP status — going card, or the join CTA */}
+      {/* RSVP status — going card, pending-request card, or the join / request CTA */}
       {joined ? (
         <div style={s('display:flex;align-items:center;gap:11px;background:color-mix(in srgb,var(--good) 10%,var(--bg2));border:1px solid color-mix(in srgb,var(--good) 30%,transparent);border-radius:15px;padding:12px 14px;margin-top:16px')}>
           <div style={s('width:32px;height:32px;flex:none;border-radius:10px;background:color-mix(in srgb,var(--good) 20%,transparent);display:flex;align-items:center;justify-content:center')}>
@@ -418,10 +428,22 @@ export default function EventDetail({ vm, state, actions, getToken }) {
           <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : toggleJoin}
             style={s(`flex:none;padding:8px 14px;border-radius:11px;background:var(--bg3);border:1px solid var(--line);font-size:12px;font-weight:700;color:var(--text2);opacity:${busy ? 0.6 : 1}`)}>{busy ? '…' : 'Leave'}</div>
         </div>
+      ) : requested ? (
+        <div style={s('display:flex;align-items:center;gap:11px;background:color-mix(in srgb,var(--accent) 10%,var(--bg2));border:1px solid color-mix(in srgb,var(--accent) 30%,transparent);border-radius:15px;padding:12px 14px;margin-top:16px')}>
+          <div style={s('width:32px;height:32px;flex:none;border-radius:10px;background:color-mix(in srgb,var(--accent) 20%,transparent);display:flex;align-items:center;justify-content:center')}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+          </div>
+          <div style={s('flex:1;min-width:0')}>
+            <div style={s('font-size:13.5px;font-weight:700;color:var(--accent)')}>Request sent</div>
+            <div style={s('font-size:11px;color:var(--text2)')}>Waiting for the organizer to approve</div>
+          </div>
+          <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : toggleJoin}
+            style={s(`flex:none;padding:8px 14px;border-radius:11px;background:var(--bg3);border:1px solid var(--line);font-size:12px;font-weight:700;color:var(--text2);opacity:${busy ? 0.6 : 1}`)}>{busy ? '…' : 'Cancel'}</div>
+        </div>
       ) : (
         <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : toggleJoin}
           style={s(`text-align:center;padding:14px;border-radius:14px;font-weight:700;font-size:14px;margin-top:16px;background:var(--accent);color:var(--accent-ink);opacity:${busy ? 0.7 : 1}`)}>
-          {busy ? '…' : 'Join event'}
+          {busy ? '…' : requestOnly ? 'Request to join' : 'Join event'}
         </div>
       )}
       {err && <div style={s('color:var(--bad);font-size:12px;text-align:center;margin-top:8px')}>{err}</div>}

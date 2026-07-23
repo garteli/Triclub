@@ -270,6 +270,58 @@ public sealed class SqlSquadService(string connectionString) : ISquadService
         return true;
     }
 
+    public async Task<SetRoleOutcome> SetMemberRoleAsync(Guid squadId, Guid athleteId, string role, Guid ownerId, CancellationToken ct)
+    {
+        // Only coach ↔ member here; ownership moves via TransferOwnershipAsync (there's exactly one owner).
+        var target = role?.Trim().ToLowerInvariant();
+        if (target is not ("coach" or "member")) return SetRoleOutcome.InvalidRole;
+
+        await using var conn = new SqlConnection(connectionString);
+        await conn.OpenAsync(ct);
+        if (!await OwnsSquad(conn, squadId, ownerId, ct)) return SetRoleOutcome.NotOwner;
+        if (athleteId == ownerId) return SetRoleOutcome.CannotChangeOwner;
+
+        // Never touch the owner row (belt-and-braces alongside the athleteId==ownerId guard above).
+        var updated = await conn.ExecuteAsync(new CommandDefinition(
+            "UPDATE dbo.Membership SET Role = @target WHERE SquadId = @squadId AND AthleteId = @athleteId AND Role <> 'owner';",
+            new { squadId, athleteId, target }, cancellationToken: ct));
+        return updated > 0 ? SetRoleOutcome.Ok : SetRoleOutcome.NotAMember;
+    }
+
+    public async Task<TransferOwnershipOutcome> TransferOwnershipAsync(Guid squadId, Guid newOwnerId, Guid ownerId, CancellationToken ct)
+    {
+        if (newOwnerId == ownerId) return TransferOwnershipOutcome.SameAsOwner;
+
+        await using var conn = new SqlConnection(connectionString);
+        await conn.OpenAsync(ct);
+        if (!await OwnsSquad(conn, squadId, ownerId, ct)) return TransferOwnershipOutcome.NotOwner;
+
+        // The new owner must already be a coach of this squad (you hand the group to a coach).
+        var role = await conn.QuerySingleOrDefaultAsync<string?>(new CommandDefinition(
+            "SELECT Role FROM dbo.Membership WHERE SquadId = @squadId AND AthleteId = @newOwnerId;",
+            new { squadId, newOwnerId }, cancellationToken: ct));
+        if (role is null) return TransferOwnershipOutcome.TargetNotMember;
+        if (!string.Equals(role, "coach", StringComparison.OrdinalIgnoreCase)) return TransferOwnershipOutcome.TargetNotCoach;
+
+        await using var tx = (SqlTransaction)await conn.BeginTransactionAsync(ct);
+        // Single source of truth for "who owns it" is dbo.Squad.OwnerId; the guard on OwnerId keeps a
+        // concurrent transfer from double-applying. Membership roles are kept in sync: exactly one owner.
+        var moved = await conn.ExecuteAsync(new CommandDefinition(
+            "UPDATE dbo.Squad SET OwnerId = @newOwnerId WHERE Id = @squadId AND OwnerId = @ownerId;",
+            new { squadId, newOwnerId, ownerId }, tx, cancellationToken: ct));
+        if (moved == 0) { await tx.RollbackAsync(ct); return TransferOwnershipOutcome.NotOwner; }
+
+        await conn.ExecuteAsync(new CommandDefinition(
+            "UPDATE dbo.Membership SET Role = 'owner' WHERE SquadId = @squadId AND AthleteId = @newOwnerId;",
+            new { squadId, newOwnerId }, tx, cancellationToken: ct));
+        await conn.ExecuteAsync(new CommandDefinition(
+            "UPDATE dbo.Membership SET Role = 'coach' WHERE SquadId = @squadId AND AthleteId = @ownerId;",
+            new { squadId, ownerId }, tx, cancellationToken: ct));
+
+        await tx.CommitAsync(ct);
+        return TransferOwnershipOutcome.Ok;
+    }
+
     // ----- invite links -------------------------------------------------------
 
     public async Task<string?> CreateInviteAsync(Guid squadId, Guid ownerId, bool reset, CancellationToken ct)
