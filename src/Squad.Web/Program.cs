@@ -109,9 +109,26 @@ if (!string.IsNullOrWhiteSpace(appleClientId))
 
 var app = builder.Build();
 
-// Serve the compiled React SPA from wwwroot.
+// Serve the compiled React SPA from wwwroot. Cache strategy avoids the "reload still shows old
+// HTML" trap: index.html must NEVER be cached (it names the current hashed bundles), while the
+// content-hashed assets under /assets can cache forever (a new build = a new filename).
+Action<Microsoft.AspNetCore.StaticFiles.StaticFileResponseContext> applyStaticCacheHeaders = ctx =>
+{
+    var headers = ctx.Context.Response.Headers;
+    if (ctx.File.Name.Equals("index.html", StringComparison.OrdinalIgnoreCase))
+    {
+        headers.CacheControl = "no-cache, no-store, must-revalidate";
+        headers.Pragma = "no-cache";
+        headers.Expires = "0";
+    }
+    else if (ctx.Context.Request.Path.StartsWithSegments("/assets"))
+    {
+        headers.CacheControl = "public, max-age=31536000, immutable";
+    }
+};
+
 app.UseDefaultFiles();
-app.UseStaticFiles();
+app.UseStaticFiles(new Microsoft.AspNetCore.Builder.StaticFileOptions { OnPrepareResponse = applyStaticCacheHeaders });
 
 app.UseCors(NativeCors);
 
@@ -155,7 +172,8 @@ app.MapGet("/.well-known/apple-developer-domain-association.txt", (IConfiguratio
     return string.IsNullOrWhiteSpace(body) ? Results.NotFound() : Results.Text(body, "text/plain");
 });
 
-// SPA fallback for client-side routes.
-app.MapFallbackToFile("index.html");
+// SPA fallback for client-side routes — same no-cache headers so a deep-link reload also
+// revalidates index.html (MapFallbackToFile uses its own static-file pipeline, not the one above).
+app.MapFallbackToFile("index.html", new Microsoft.AspNetCore.Builder.StaticFileOptions { OnPrepareResponse = applyStaticCacheHeaders });
 
 app.Run();
