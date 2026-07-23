@@ -448,9 +448,9 @@ export default function App() {
     remove: async (planId) => { const r = await removeMyPlan(session?.token, planId); setRefreshSignal((n) => n + 1); return r; },
   }), [session?.token]);
 
-  // Pull-to-refresh: re-pull every live surface (feed snapshot, leaderboard,
-  // activities, squads, profile) by bumping the shared signal, and hold the
-  // spinner briefly so the gesture reads as doing work even on a fast network.
+  // Shared refresh: re-pull every live surface (feed snapshot, leaderboard,
+  // activities, squads, profile) by bumping the shared signal, holding briefly
+  // so the header sync reads as doing work even on a fast network.
   const onRefresh = useCallback(async () => {
     setRefreshSignal((n) => n + 1);
     await new Promise((resolve) => setTimeout(resolve, 650));
@@ -774,7 +774,7 @@ export default function App() {
       {import.meta.env.DEV && <ControlDock state={state} actions={actions} />}
       <Phone theme={state.theme} accent={state.accent} lang={state.lang} dir={dir} screen={state.screen} go={actions.go}
         header={appHeader} family={vm.family}
-        onRefresh={authed ? onRefresh : undefined} recording={recorder.recording}>
+        recording={recorder.recording}>
         <Screen key={state.screen === 'planeditor' ? `pe-${selectedPlan?.id || 'new'}` : state.screen}
           vm={vm} state={state} actions={actions} live={live} tick={t} livePages={livePages}
           getToken={getToken} onDataChanged={() => setRefreshSignal((n) => n + 1)}
