@@ -459,7 +459,7 @@ function UpcomingCard({ ev, isOwner, busy, token, route, participants, onOpen, o
               <span style={s('font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--warn);background:color-mix(in srgb,var(--warn) 15%,transparent);padding:2px 6px;border-radius:5px')}>Draft</span>
             )}
           </div>
-          <div dir="auto" style={s('font-size:15.5px;font-weight:700;line-height:1.2;margin-top:5px')}>{ev.title}</div>
+          <div dir="ltr" style={s('font-size:15.5px;font-weight:700;line-height:1.2;margin-top:5px;text-align:left')}>{ev.title}</div>
           <div style={s('display:flex;flex-wrap:wrap;gap:12px;font-size:11px;color:var(--text2);margin-top:7px')}>
             <span style={s('display:flex;align-items:center;gap:5px')}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
@@ -574,7 +574,7 @@ function MonthRow({ ev, onOpen }) {
       </div>
       <div style={s('width:1px;align-self:stretch;background:var(--line)')} />
       <div style={s('flex:1;min-width:0')}>
-        <div dir="auto" style={s('font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>{ev.title}</div>
+        <div dir="ltr" style={s('font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left')}>{ev.title}</div>
         <div style={s('font-size:10.5px;color:var(--text2);margin-top:2px')}>{fmtTime(ev.start)} · {meta.label}</div>
       </div>
       <span style={s(`width:8px;height:8px;border-radius:50%;background:${meta.color};flex:none`)} />

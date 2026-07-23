@@ -12,6 +12,7 @@ import { BASEMAP_LABEL, nextBasemap, inIsrael } from '../lib/basemaps.js';
 import { getRouteStyle, setRouteStyle as persistRouteStyle } from '../lib/routeStyle.js';
 import { getMapView, setMapStyle as persistMapStyle } from '../lib/mapView.js';
 import { eventShareUrl } from '../lib/eventLink.js';
+import { reverseGeocode } from '../lib/reverseGeocode.js';
 import RouteStylePanel from '../components/RouteStylePanel.jsx';
 
 // The member-facing event page: an identity block, a large map of the route, terrain-derived ride
@@ -191,6 +192,7 @@ export default function EventDetail({ vm, state, actions, getToken }) {
   const [styleOpen, setStyleOpen] = useState(false);    // route-style picker open
   const [dirTarget, setDirTarget] = useState(null);     // { lat, lon, title } → Directions action sheet
   const [shareMsg, setShareMsg] = useState('');         // transient confirmation after a share/copy
+  const [startPlace, setStartPlace] = useState(null);   // reverse-geocoded name of the route's start
   // terrain-derived elevation for the stat tile + elevation card (read once per route)
   const [elev, setElev] = useState(null);
   const [elevLoading, setElevLoading] = useState(false);
@@ -251,6 +253,16 @@ export default function EventDetail({ vm, state, actions, getToken }) {
     return () => ctrl.abort();
   }, [route]);
 
+  // Name the route's start point from its coordinates (reverse geocoding) for the meeting-point
+  // card — the nearest town/locality, real data, resolved once per start point.
+  useEffect(() => {
+    if (!start) { setStartPlace(null); return undefined; }
+    const ctrl = new AbortController();
+    setStartPlace(null);
+    reverseGeocode(start[0], start[1], ctrl.signal).then((n) => setStartPlace(n || null)).catch(() => {});
+    return () => ctrl.abort();
+  }, [start]);
+
   if (!ev) {
     return (
       <div style={s('padding:20px')}>
@@ -274,7 +286,7 @@ export default function EventDetail({ vm, state, actions, getToken }) {
   const hasRoute = route && route.length > 1;
   // The meeting point + directions are labelled with the event's name, not the underlying
   // route/GPS file name (which is often just an auto-generated filename like "offroad-1234…").
-  const openDirections = () => { if (start) setDirTarget({ lat: start[0], lon: start[1], title: ev.title }); };
+  const openDirections = () => { if (start) setDirTarget({ lat: start[0], lon: start[1], title: startPlace || ev.title }); };
 
   // Share the event page. Prefer the native share sheet (mobile / supported browsers); otherwise —
   // and this is the common desktop-web case where navigator.share is absent — copy the details +
@@ -326,7 +338,7 @@ export default function EventDetail({ vm, state, actions, getToken }) {
             <span style={s(`width:5px;height:5px;border-radius:50%;background:${meta.color}`)} />
             <span style={s(`font-size:8.5px;font-weight:700;letter-spacing:.9px;text-transform:uppercase;color:${meta.color}`)}>{meta.label}</span>
           </div>
-          <div dir="auto" style={s('font-size:22px;font-weight:700;letter-spacing:-.3px;line-height:1.2;margin-top:4px;overflow-wrap:anywhere')}>{ev.title}</div>
+          <div dir="ltr" style={s('font-size:22px;font-weight:700;letter-spacing:-.3px;line-height:1.2;margin-top:4px;overflow-wrap:anywhere;text-align:left')}>{ev.title}</div>
         </div>
       </div>
 
@@ -379,7 +391,7 @@ export default function EventDetail({ vm, state, actions, getToken }) {
             <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="var(--good)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
           </div>
           <div style={s('flex:1;min-width:0')}>
-            <div style={s('font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>Start point</div>
+            <div style={s('font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>{startPlace ? `Start · ${startPlace}` : 'Start point'}</div>
             <div style={s('font-size:11px;color:var(--text2);margin-top:1px')}>Directions to the meeting point</div>
           </div>
           <div style={s('flex:none;padding:6px 11px;border-radius:9px;background:var(--bg3);border:1px solid var(--line);font-size:11px;font-weight:700;color:var(--accent)')}>Directions</div>
