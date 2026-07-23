@@ -62,19 +62,36 @@ async function fetchElevations(samples, signal) {
 // — real source elevation, no terrain API, no rate limit. Null when the route has no usable elevation.
 export function profileFromRoute(points) {
   const pts = (points || []).filter((p) => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]));
-  const withEle = pts.filter((p) => Number.isFinite(p[2]));
+  if (pts.length < 2) return null;
+
+  // Off-road GPX exports pepper the track with ele=0 "no data" sentinels and the occasional wild
+  // spike. Treating those as real makes the profile stab to the baseline on every bad point (and
+  // inflates total ascent). Treat exact 0 as missing when the route clearly has real elevation, and
+  // reject physically-impossible single-point jumps; carry the last good value through the gaps.
+  const rawEle = pts.map((p) => (Number.isFinite(p[2]) ? p[2] : null));
+  const hasReal = rawEle.some((e) => e != null && e !== 0);
+  const cleanEle = rawEle.map((e) => (e == null || (hasReal && e === 0) ? null : e));
+  const usable = cleanEle.filter((e) => e != null).length;
   // Need elevation on most points to trust it (a stray value isn't a profile).
-  if (withEle.length < 2 || withEle.length < pts.length * 0.5) return null;
-  const profile = [{ dist: 0, e: Number.isFinite(pts[0][2]) ? pts[0][2] : withEle[0][2] }];
+  if (usable < 2 || usable < pts.length * 0.5) return null;
+
+  const profile = [];
   let dist = 0;
-  for (let i = 1; i < pts.length; i++) {
-    dist += haversineMeters({ lat: pts[i - 1][0], lon: pts[i - 1][1] }, { lat: pts[i][0], lon: pts[i][1] });
-    const e = Number.isFinite(pts[i][2]) ? pts[i][2] : profile[profile.length - 1].e; // carry last if a point lacks ele
+  let last = cleanEle.find((e) => e != null); // seed with the first real value
+  for (let i = 0; i < pts.length; i++) {
+    const seg = i > 0 ? haversineMeters({ lat: pts[i - 1][0], lon: pts[i - 1][1] }, { lat: pts[i][0], lon: pts[i][1] }) : 0;
+    dist += seg;
+    let e = cleanEle[i];
+    // Missing, or a jump too steep to be terrain (> ~50% grade, min 40 m between points) → carry last.
+    if (e == null || (last != null && Math.abs(e - last) > Math.max(40, 0.5 * seg))) e = last;
+    last = e;
     profile.push({ dist, e });
   }
-  if (dist <= 0) return null;
+  if (dist <= 0 || profile.length < 2) return null;
+
+  // Total ascent with a small dead-band so residual jitter doesn't accumulate into a fake total.
   let ascent = 0;
-  for (let i = 1; i < profile.length; i++) { const d = profile[i].e - profile[i - 1].e; if (d > 0) ascent += d; }
+  for (let i = 1; i < profile.length; i++) { const d = profile[i].e - profile[i - 1].e; if (d > 1) ascent += d; }
   const es = profile.map((p) => p.e);
   return { profile, ascent: Math.round(ascent), min: Math.min(...es), max: Math.max(...es) };
 }
