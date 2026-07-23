@@ -53,4 +53,8 @@
 
     <!-- Peer ranging: advertise this phone's GUID for pack positioning (SquadPeerBeacon) -->
     <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+
+    <!-- Add a club event to the device calendar (Add to calendar) -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <uses-permission android:name="android.permission.WRITE_CALENDAR" />
 </manifest>

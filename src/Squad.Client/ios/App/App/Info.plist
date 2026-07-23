@@ -51,6 +51,10 @@
 	<string>Domestique Hub uses your location to show your position to teammates during a live ride.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Domestique Hub lets you choose a profile photo from your library.</string>
+	<key>NSCalendarsWriteOnlyAccessUsageDescription</key>
+	<string>Domestique Hub adds a club event to your calendar when you tap Add to calendar.</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>Domestique Hub adds a club event to your calendar when you tap Add to calendar.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>
