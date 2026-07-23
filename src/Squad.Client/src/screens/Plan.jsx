@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { s, html } from '../lib/style.js';
+import { s } from '../lib/style.js';
 import EmptyState from '../components/EmptyState.jsx';
 import SportIcon from '../components/SportIcon.jsx';
 import AuthedImage from '../components/AuthedImage.jsx';
@@ -12,6 +12,24 @@ const fmtRange = (a, b) => {
   const f = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
   return a && b ? `${f(a)} – ${f(b)}` : '';
 };
+
+// Local calendar-day key ('yyyy-MM-dd') — matches the server plan rows' `iso` (see usePlan.mapRow)
+// and groups the day strip / agenda by real dates.
+const isoOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+// Hebrew/Arabic titles (e.g. an event named "רכיבת שבת") render right-to-left per item.
+const RTL_RE = /[֐-ࣿ]/;
+const isRtl = (t) => RTL_RE.test(t || '');
+const cap = (t) => (t ? t[0].toUpperCase() + t.slice(1) : t);
+// mapRow builds a session title as "Discipline · Title"; the card shows the discipline as a
+// coloured chip, so strip that prefix off the headline to avoid repeating it.
+const stripDisc = (t) => (t && t.includes(' · ') ? t.slice(t.indexOf(' · ') + 3) : t);
+const SPORT_NAME = { 1: 'Swim', 2: 'Bike', 3: 'Run' };
+const SPORT_COLOR = { 1: 'var(--swim)', 2: 'var(--bike)', 3: 'var(--run)' };
+const FULL_DOW = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+const ClockIcon = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>;
+const UsersIcon = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.9" /></svg>;
+const CheckIcon = ({ size = 11 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>;
 
 // A sheet listing the plans currently on the athlete's calendar, each removable (their copy only).
 function MyPlansSheet({ planMine, onClose }) {
@@ -200,6 +218,26 @@ export default function Plan({ vm, state, actions, planMine, live, meId, getToke
   const upcomingEvents = useMemo(() => (events || []).slice().sort(byStart), [events]);
   const evToken = getToken?.();
 
+  // ---- week UI model: a 7-day load strip + an agenda grouped by real calendar day ----
+  const todayIso = isoOf(new Date());
+  const weekDays = useMemo(() => {
+    const out = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + i);
+      const iso = isoOf(d);
+      const workouts = (vm.plan || []).filter((p) => p.iso === iso && p.status !== 'rest');
+      const rest = (vm.plan || []).some((p) => p.iso === iso && p.status === 'rest');
+      const evs = (weekEvents || []).filter((e) => isoOf(new Date(e.start)) === iso);
+      // Training load is a property of structured workouts; event-only days read as 0 on the strip.
+      const load = workouts.reduce((n, p) => n + (parseInt(p.load, 10) || 0), 0);
+      out.push({ d, iso, workouts, evs, rest, load, isToday: iso === todayIso });
+    }
+    return out;
+  }, [weekStart, vm.plan, weekEvents, todayIso]);
+  const maxLoad = Math.max(1, ...weekDays.map((x) => x.load));
+  const restDays = weekDays.filter((x) => x.rest).map((x) => FULL_DOW[x.d.getDay()]);
+  const hasCards = weekDays.some((x) => x.workouts.length || x.evs.length);
+
   const toggleJoin = async (ev) => {
     setEvBusyId(ev.id);
     try { const t = await getToken?.(); if (ev.joined) await leaveEvent(t, ev.id); else await joinEvent(t, ev.id); await loadEvents(); }
@@ -228,6 +266,69 @@ export default function Plan({ vm, state, actions, planMine, live, meId, getToke
             ? 'flex:none;font-size:11px;font-weight:700;color:var(--text3);padding:7px 11px;border-radius:9px;border:1px solid var(--line)'
             : 'flex:none;font-size:11px;font-weight:700;color:var(--accent-ink);background:var(--accent);padding:7px 13px;border-radius:9px')}>
           {busy ? '…' : ev.joined ? 'Going' : 'Join'}
+        </div>
+      </div>
+    );
+  };
+
+  // ---- agenda cards (week view) — a coloured discipline spine, a kind chip and a trailing action ----
+  const doneBtn = 'flex:none;display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:11px;background:color-mix(in srgb,var(--good) 15%,transparent);border:1px solid color-mix(in srgb,var(--good) 36%,transparent);color:var(--good)';
+  const startBtn = 'flex:none;padding:10px 15px;border-radius:11px;background:var(--accent);color:var(--accent-ink);font-size:12.5px;font-weight:700';
+  const ghostBtn = 'flex:none;padding:10px 15px;border-radius:11px;background:var(--bg3);border:1px solid var(--line);color:var(--text);font-size:12.5px;font-weight:700';
+  const joinedBtn = 'flex:none;display:flex;align-items:center;gap:5px;padding:10px 14px;border-radius:11px;background:color-mix(in srgb,var(--good) 15%,transparent);border:1px solid color-mix(in srgb,var(--good) 36%,transparent);color:var(--good);font-size:12.5px;font-weight:700';
+
+  const renderWorkoutCard = (p) => {
+    const done = p.status === 'done';
+    const isToday = p.status === 'today';
+    const rt = isRtl(p.title);
+    return (
+      <div key={p.id || p.iso || p.day} className="ctl" onClick={() => actions.openWorkout(p)}
+        style={s(`background:var(--bg2);border:1px solid ${isToday ? 'color-mix(in srgb,var(--accent) 30%,transparent)' : 'var(--line)'};border-radius:16px;overflow:hidden`)}>
+        <div style={s('display:flex;align-items:stretch')}>
+          <div style={s(`width:4px;flex:none;background:${p.color}`)} />
+          <div style={s('flex:1;padding:13px 14px;min-width:0')}>
+            <div style={s('display:flex;align-items:center;gap:8px')}>
+              <span style={s(`font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:${p.color}`)}>{cap(p.disc)}</span>
+              {done && <span style={s('display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:700;color:var(--good)')}><CheckIcon />DONE</span>}
+            </div>
+            <div dir={rt ? 'rtl' : 'ltr'} style={s(`font-size:15px;font-weight:700;margin-top:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${rt ? 'text-align:right' : ''}`)}>{stripDisc(p.title)}</div>
+            <div style={s('display:flex;flex-wrap:wrap;gap:12px;font-size:11px;color:var(--text2);margin-top:6px')}>
+              <span style={s('display:flex;align-items:center;gap:5px')}><ClockIcon />{p.dur}{p.sub ? ` · ${p.sub}` : ''}</span>
+            </div>
+          </div>
+          <div style={s('display:flex;align-items:center;padding:0 13px 0 4px')}>
+            <div className="ctl" onClick={(e) => { e.stopPropagation(); actions.openWorkout(p); }} style={s(done ? doneBtn : isToday ? startBtn : ghostBtn)}>
+              {done ? <CheckIcon size={15} /> : isToday ? 'Start' : 'View'}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderEventCard = (ev) => {
+    const d = new Date(ev.start);
+    const busy = evBusyId === ev.id;
+    const rt = isRtl(ev.title);
+    const col = SPORT_COLOR[ev.sport] || 'var(--accent)';
+    return (
+      <div key={`ev-${ev.id}`} className="ctl" onClick={() => actions.openEvent(ev)}
+        style={s(`background:var(--bg2);border:1px solid ${ev.joined ? 'color-mix(in srgb,var(--good) 28%,var(--line))' : 'var(--line)'};border-radius:16px;overflow:hidden`)}>
+        <div style={s('display:flex;align-items:stretch')}>
+          <div style={s(`width:4px;flex:none;background:${col}`)} />
+          <div style={s('flex:1;padding:13px 14px;min-width:0')}>
+            <span style={s(`font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:${col}`)}>Event · {SPORT_NAME[ev.sport] || 'Session'}</span>
+            <div dir={rt ? 'rtl' : 'ltr'} style={s(`font-size:15px;font-weight:700;margin-top:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${rt ? 'text-align:right' : ''}`)}>{ev.title}</div>
+            <div style={s('display:flex;flex-wrap:wrap;gap:12px;font-size:11px;color:var(--text2);margin-top:6px')}>
+              <span style={s('display:flex;align-items:center;gap:5px')}><ClockIcon />{Number.isNaN(d.getTime()) ? '—' : d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}{ev.courseName ? ` · ${ev.courseName}` : ''}</span>
+              <span style={s('display:flex;align-items:center;gap:5px')}><UsersIcon />{ev.joinCount || 0} going</span>
+            </div>
+          </div>
+          <div style={s('display:flex;align-items:center;padding:0 13px 0 4px')}>
+            <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : (e) => { e.stopPropagation(); toggleJoin(ev); }} style={s(ev.joined ? joinedBtn : ghostBtn)}>
+              {busy ? '…' : ev.joined ? <><CheckIcon />Joined</> : 'Join'}
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -287,29 +388,77 @@ export default function Plan({ vm, state, actions, planMine, live, meId, getToke
 
         {week ? (
           <>
-            {(() => { const sm = vm.planSummary || { planned: '0:00', load: '0', done: 0, total: 0 }; return (
-            <div style={s('display:flex;justify-content:space-between;margin-bottom:14px;background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:12px 8px')}>
-              <div style={s('flex:1;text-align:center;border-right:1px solid var(--line)')}><div className="mono" style={s('font-size:18px;font-weight:700')}>{sm.planned}</div><div style={s('font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.7px')}>Planned</div></div>
-              <div style={s('flex:1;text-align:center;border-right:1px solid var(--line)')}><div className="mono" style={s('font-size:18px;font-weight:700;color:var(--accent)')}>{sm.load}</div><div style={s('font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.7px')}>Load</div></div>
-              <div style={s('flex:1;text-align:center')}><div className="mono" style={s('font-size:18px;font-weight:700')}>{sm.done}<span style={s('font-size:11px;color:var(--text2)')}>/{sm.total}</span></div><div style={s('font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.7px')}>Done</div></div>
+            {/* 7-day load strip — bar height is each day's training load, normalised to the week */}
+            <div style={s('display:flex;gap:5px;margin-bottom:14px')}>
+              {weekDays.map((x) => {
+                const pct = x.load ? Math.max(20, Math.round((x.load / maxLoad) * 100)) : 0;
+                const fill = x.load === 0 ? 'transparent'
+                  : x.isToday ? 'var(--accent)'
+                  : pct >= 70 ? 'color-mix(in srgb,var(--accent) 60%,var(--text3))'
+                  : 'var(--text2)';
+                return (
+                  <div key={x.iso} style={s(`flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;padding:8px 0 7px;border-radius:12px;background:${x.isToday ? 'var(--accent-dim)' : 'var(--bg2)'};border:1px solid ${x.isToday ? 'color-mix(in srgb,var(--accent) 40%,transparent)' : 'var(--line)'}`)}>
+                    <span style={s(`font-size:9px;font-weight:700;letter-spacing:.5px;color:${x.isToday ? 'var(--accent)' : 'var(--text3)'}`)}>{x.d.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 3).toUpperCase()}</span>
+                    <span className="mono" style={s(`font-size:13px;font-weight:700;color:${x.isToday ? 'var(--accent)' : 'var(--text)'}`)}>{x.d.getDate()}</span>
+                    <div style={s('width:16px;height:30px;border-radius:5px;background:var(--bg);display:flex;flex-direction:column-reverse;overflow:hidden')}>
+                      <div style={s(`height:${pct}%;background:${fill};border-radius:5px`)} />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            ); })()}
-            {vm.plan.length === 0 && weekEvents.length === 0 && (
-              <EmptyState icon="📅" title="No sessions planned" sub="Your coach's workouts and group rides for this week show up here." />
-            )}
-            <div style={s('display:flex;flex-direction:column;gap:9px')}>
-              {vm.plan.map((p) => (
-                <div key={p.day} className="ctl" onClick={() => actions.openWorkout(p)} style={s(`background:var(--bg2);border:1px solid ${p.rowBorder};border-radius:16px;padding:12px 13px;display:flex;gap:12px;align-items:center`)}>
-                  <div style={s('flex:none;width:38px;text-align:center')}><div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600')}>{p.day}</div><div className="mono" style={s('font-size:17px;font-weight:700')}>{p.date}</div></div>
-                  <div style={s('width:1px;height:34px;background:var(--line)')} />
-                  <div style={s(`width:36px;height:36px;border-radius:11px;background:color-mix(in srgb,${p.color} 16%,transparent);color:${p.color};flex:none;display:flex;align-items:center;justify-content:center`)} dangerouslySetInnerHTML={html(p.iconHtml)} />
-                  <div style={s('flex:1;min-width:0')}><div style={s('font-size:14px;font-weight:600')}>{p.title}</div><div style={s('font-size:11.5px;color:var(--text2)')}>{p.sub}</div></div>
-                  <div style={s('text-align:right;flex:none')}><span style={s(`font-size:9.5px;font-weight:700;padding:3px 7px;border-radius:6px;color:${p.badgeC};background:${p.badgeBg}`)}>{p.badgeT}</span><div className="mono" style={s('font-size:11px;color:var(--text3);margin-top:5px')}>{p.dur} · {p.load}</div></div>
+
+            {/* weekly summary — a completion ring plus planned time and load */}
+            {(() => {
+              const sm = vm.planSummary || { planned: '0:00', load: '0', done: 0, total: 0 };
+              const C = 2 * Math.PI * 27;
+              const on = sm.total > 0 ? C * (sm.done / sm.total) : 0;
+              return (
+                <div style={s('display:flex;align-items:center;gap:14px;background:var(--bg2);border:1px solid var(--line);border-radius:18px;padding:15px 16px;margin-bottom:18px')}>
+                  <div style={s('position:relative;width:62px;height:62px;flex:none')}>
+                    <svg width="62" height="62" viewBox="0 0 62 62" style={s('transform:rotate(-90deg)')}>
+                      <circle cx="31" cy="31" r="27" fill="none" stroke="var(--bg4)" strokeWidth="6" />
+                      <circle cx="31" cy="31" r="27" fill="none" stroke="var(--accent)" strokeWidth="6" strokeLinecap="round" strokeDasharray={`${on.toFixed(1)} ${(C - on).toFixed(1)}`} />
+                    </svg>
+                    <div style={s('position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center')}>
+                      <span className="mono" style={s('font-size:16px;font-weight:700')}>{sm.done}</span>
+                      <span style={s('font-size:8px;color:var(--text3);margin-top:-2px')}>/ {sm.total}</span>
+                    </div>
+                  </div>
+                  <div style={s('flex:1;display:flex;gap:16px')}>
+                    <div><div className="mono" style={s('font-size:18px;font-weight:700')}>{sm.planned}</div><div style={s('font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-top:2px')}>Planned</div></div>
+                    <div style={s('width:1px;background:var(--line)')} />
+                    <div><div className="mono" style={s('font-size:18px;font-weight:700;color:var(--accent)')}>{sm.load}</div><div style={s('font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-top:2px')}>Load</div></div>
+                  </div>
                 </div>
-              ))}
-              {/* group rides sit in the same session list — with a Join action */}
-              {weekEvents.map(renderEvent)}
-            </div>
+              );
+            })()}
+
+            {!hasCards ? (
+              <EmptyState icon="📅" title="No sessions planned" sub="Your coach's workouts and group rides for this week show up here." />
+            ) : (
+              <div style={s('display:flex;flex-direction:column;gap:16px')}>
+                {weekDays.filter((x) => x.workouts.length || x.evs.length).map((x) => (
+                  <div key={x.iso}>
+                    <div style={s('display:flex;align-items:center;gap:9px;margin:0 2px 10px')}>
+                      <span style={s(`font-size:11px;color:${x.isToday ? 'var(--accent)' : 'var(--text3)'};text-transform:uppercase;letter-spacing:1.4px;font-weight:700`)}>{x.d.toLocaleDateString('en-US', { weekday: 'short' })} · {x.d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                      <span style={s('flex:1;height:1px;background:var(--line)')} />
+                      {x.isToday && <span style={s('font-size:8.5px;font-weight:700;color:var(--accent);background:var(--accent-dim);padding:3px 8px;border-radius:6px;letter-spacing:.6px')}>TODAY</span>}
+                    </div>
+                    <div style={s('display:flex;flex-direction:column;gap:9px')}>
+                      {x.workouts.map(renderWorkoutCard)}
+                      {x.evs.map(renderEventCard)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {restDays.length > 0 && (
+              <div style={s('text-align:center;padding:16px 0 2px;font-size:11.5px;color:var(--text3)')}>
+                {restDays.join(' & ')} {restDays.length > 1 ? 'are rest days' : 'is a rest day'} · recover well
+              </div>
+            )}
           </>
         ) : (
           <>
