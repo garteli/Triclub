@@ -19,7 +19,7 @@ npx cap sync
 ```
 
 `capacitor.config.json` is already in this folder (appId `com.triclub.app`, appName
-`Domestique Team`). The native shell loads the live web app via **`server.url`
+`Domestique Hub`). The native shell loads the live web app via **`server.url`
 (`https://www.domestiquehub.com`)** — the same host that serves the API — so the app
 origin is that domain and root-relative `/api` and `/hubs` requests are same-origin.
 The Capacitor bridge and all native plugins (background geolocation, BLE, HealthKit,
@@ -194,7 +194,7 @@ script reapplies it after every `npm ci`, so CI (`ios-testflight.yml`) carries i
 
 ```xml
 <key>NSHealthShareUsageDescription</key>
-<string>Domestique Team reads your resting heart rate, HRV, sleep, weight and VO₂max from Apple Health to show your training readiness.</string>
+<string>Domestique Hub reads your resting heart rate, HRV, sleep, weight and VO₂max from Apple Health to show your training readiness.</string>
 ```
 
 We request **read** scopes only — `weight`, `restingHeartRate`, `respiratoryRate`, `hrv`,

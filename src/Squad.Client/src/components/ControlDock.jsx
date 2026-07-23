@@ -9,7 +9,7 @@ const menuBase = 'padding:7px 10px;border-radius:9px;font-size:12px;font-weight:
 
 const screenMenuDef = [
   ['welcome', 'Welcome · sign-up'], ['register', 'Register athlete'], ['newgroup', 'Register a group'],
-  ['dash', 'Domestique Team Dashboard'], ['ride', 'Live Group Ride'], ['plan', 'Plan / Calendar'], ['plans', 'Plans list · coach'], ['planeditor', 'Plan Editor · coach'],
+  ['dash', 'Domestique Hub Dashboard'], ['ride', 'Live Group Ride'], ['plan', 'Plan / Calendar'], ['plans', 'Plans list · coach'], ['planeditor', 'Plan Editor · coach'],
   ['discover', 'Discover Groups'], ['group', 'Group Profile'], ['recordpay', 'Record payment · rider'], ['ledger', 'Ride payments · coach'], ['requests', 'Join Requests · coach'], ['chat', 'Messages'],
   ['activities', 'Activities'], ['feed', 'Activity detail'],
   ['lb', 'Leaderboard'], ['seg', 'Segments'], ['coach', 'AI Coach'], ['profile', 'Profile'],
@@ -38,7 +38,7 @@ export default function ControlDock({ state, actions }) {
       <div style={s('display:flex;align-items:center;gap:9px')}>
         <div style={s('width:30px;height:30px;border-radius:9px;background:#d6ff3f;display:flex;align-items:center;justify-content:center;font-weight:700;color:#141a05;font-size:15px')}>S</div>
         <div>
-          <div style={s('font-weight:700;color:#fff;font-size:15px;letter-spacing:-.3px')}>Domestique Team</div>
+          <div style={s('font-weight:700;color:#fff;font-size:15px;letter-spacing:-.3px')}>Domestique Hub</div>
           <div style={s('color:#5f6976;font-size:10.5px;text-transform:uppercase;letter-spacing:1.5px')}>prototype</div>
         </div>
       </div>
@@ -105,7 +105,7 @@ export default function ControlDock({ state, actions }) {
         <div style={s('color:#8b93a0;font-size:10.5px;margin-bottom:4px')}>Dashboard</div>
         <div style={s('display:flex;gap:6px;margin-bottom:10px')}>
           <div className="ctl" onClick={() => actions.setDashVar('a')} style={s(dockSeg(dashVar === 'a'))}>A · Feed</div>
-          <div className="ctl" onClick={() => actions.setDashVar('b')} style={s(dockSeg(dashVar === 'b'))}>B · Domestique Team</div>
+          <div className="ctl" onClick={() => actions.setDashVar('b')} style={s(dockSeg(dashVar === 'b'))}>B · Domestique Hub</div>
         </div>
         <div style={s('color:#8b93a0;font-size:10.5px;margin-bottom:4px')}>Live Ride</div>
         <div style={s('display:flex;gap:6px')}>

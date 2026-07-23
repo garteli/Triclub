@@ -118,7 +118,7 @@ app.UseCors(NativeCors);
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapGet("/api/health", () => Results.Ok(new { status = "ok", app = "Domestique Team" }));
+app.MapGet("/api/health", () => Results.Ok(new { status = "ok", app = "Domestique Hub" }));
 
 app.MapAuth();             // POST /api/auth/{register,login,google,apple}  GET /api/auth/{config,me}
 app.MapProfile();          // GET/PUT /api/profile

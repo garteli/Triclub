@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>Domestique Team</string>
+	<string>Domestique Hub</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -34,23 +34,23 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>Domestique Team connects to your heart-rate strap, power meter, and radar.</string>
+	<string>Domestique Hub connects to your heart-rate strap, power meter, and radar.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Domestique Team uses your camera to take a profile photo.</string>
+	<string>Domestique Hub uses your camera to take a profile photo.</string>
 	<key>NSNearbyInteractionUsageDescription</key>
-	<string>Domestique Team uses Ultra-Wideband to show the precise distance and direction to teammates during a live ride.</string>
+	<string>Domestique Hub uses Ultra-Wideband to show the precise distance and direction to teammates during a live ride.</string>
 		<key>NSNearbyInteractionAllowOnceUsageDescription</key>
-		<string>Domestique Team uses Ultra-Wideband to show the precise distance and direction to teammates during a live ride.</string>
+		<string>Domestique Hub uses Ultra-Wideband to show the precise distance and direction to teammates during a live ride.</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>Domestique Team reads your workouts from Apple Health to add them to your training log and squad feed.</string>
+	<string>Domestique Hub reads your workouts from Apple Health to add them to your training log and squad feed.</string>
 	<key>NSHealthUpdateUsageDescription</key>
-	<string>Domestique Team writes completed workouts back to Apple Health so your activity rings and history stay in sync.</string>
+	<string>Domestique Hub writes completed workouts back to Apple Health so your activity rings and history stay in sync.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Domestique Team keeps recording your ride when the screen is off so your squad can see you.</string>
+	<string>Domestique Hub keeps recording your ride when the screen is off so your squad can see you.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Domestique Team uses your location to show your position to teammates during a live ride.</string>
+	<string>Domestique Hub uses your location to show your position to teammates during a live ride.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Domestique Team lets you choose a profile photo from your library.</string>
+	<string>Domestique Hub lets you choose a profile photo from your library.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>
