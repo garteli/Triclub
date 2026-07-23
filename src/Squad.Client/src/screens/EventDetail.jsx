@@ -529,12 +529,15 @@ export default function EventDetail({ vm, state, actions, getToken }) {
       {mapFull && hasRoute && (
         <div style={s('position:fixed;inset:0;z-index:300;background:var(--bg)')}>
           <RouteMapGL route={route} styleName={mapStyle} routeColor={rstyle.color} routeWidth={rstyle.width} arrowColor={rstyle.arrowColor} fitPadding={70} />
-          <div style={s('position:absolute;top:16px;right:16px;z-index:5;display:flex;flex-direction:column;gap:8px')}>
+          {/* Offset the control column by the top safe-area inset — a flat 16px lands the Close ✕
+              under the notch / status bar on devices with an inset, where it can't be tapped
+              (same trap CourseDraw's header and FullMap's safeTop() avoid). */}
+          <div style={s('position:absolute;top:calc(16px + env(safe-area-inset-top));right:16px;z-index:5;display:flex;flex-direction:column;gap:8px')}>
             <div className="ctl" onClick={() => setMapFull(false)} aria-label="Close map"
               style={s(`width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;line-height:1;${glass}`)}>✕</div>
             <MapStyleControls mapStyle={mapStyle} cycleLayer={cycleLayer} styleOpen={styleOpen} setStyleOpen={setStyleOpen} />
           </div>
-          {styleOpen && <RouteStylePanel rstyle={rstyle} applyRstyle={applyRstyle} onClose={() => setStyleOpen(false)} pos="position:absolute;top:16px;right:64px;z-index:6" />}
+          {styleOpen && <RouteStylePanel rstyle={rstyle} applyRstyle={applyRstyle} onClose={() => setStyleOpen(false)} pos="position:absolute;top:calc(16px + env(safe-area-inset-top));right:64px;z-index:6" />}
         </div>
       )}
 
