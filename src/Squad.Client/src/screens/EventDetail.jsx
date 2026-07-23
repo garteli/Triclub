@@ -6,7 +6,7 @@ import AuthedAvatar from '../components/AuthedAvatar.jsx';
 import AuthedImage from '../components/AuthedImage.jsx';
 import SportIcon from '../components/SportIcon.jsx';
 import { listEventParticipants, joinEvent, leaveEvent, getEventRoute, setEventStartPlace, getEventElevation, setEventElevation, computeEventElevation } from '../lib/events.js';
-import { buildElevationProfile } from '../lib/elevation.js';
+import { buildElevationProfile, profileFromRoute } from '../lib/elevation.js';
 import { BASEMAP_LABEL, nextBasemap, inIsrael } from '../lib/basemaps.js';
 import { getRouteStyle, setRouteStyle as persistRouteStyle } from '../lib/routeStyle.js';
 import { getMapView, setMapStyle as persistMapStyle } from '../lib/mapView.js';
@@ -189,6 +189,10 @@ export default function EventDetail({ vm, state, actions, getToken }) {
   useEffect(() => {
     const pts = (route || []).filter((p) => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]));
     if (pts.length < 2) { setElev(null); setElevLoading(false); return undefined; }
+    // Best source: the route's own per-point elevation (e.g. an imported off-road.io GPX) — accurate
+    // and needs no terrain API at all.
+    const embedded = profileFromRoute(route);
+    if (embedded) { setElev(embedded); setElevLoading(false); return undefined; }
     const ctrl = new AbortController();
     setElevLoading(true);
     (async () => {
