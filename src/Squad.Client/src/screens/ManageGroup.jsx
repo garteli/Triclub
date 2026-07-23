@@ -3,12 +3,13 @@ import { s } from '../lib/style.js';
 import { Back, Title, Sub, FieldLabel, Field, TextArea, Chips, PrimaryBtn } from './wizard.jsx';
 import AuthedImage from '../components/AuthedImage.jsx';
 import GroupTargets from '../components/GroupTargets.jsx';
+import { useConfirm } from '../components/ConfirmModal.jsx';
 import { useJoinRequests } from '../hooks/useJoinRequests.js';
 import { downscaleToJpeg } from '../lib/photos.js';
 import { dataUrlToBlob } from '../lib/avatar.js';
 import { bustAuthedImage } from '../lib/authedImage.js';
 import {
-  updateSquad, listMembers, addMember, removeMember, setMemberRole, transferOwnership,
+  updateSquad, listMembers, removeMember, setMemberRole, transferOwnership,
   uploadSquadImage, deleteSquadImage, createInvite,
 } from '../lib/squads.js';
 import { API_BASE } from '../lib/apiBase.js';
@@ -34,8 +35,9 @@ const RoleChip = ({ onClick, accent, good, children }) => {
   );
 };
 
-// Owner-only management for a squad: branding (logo + banner), details & pricing,
-// and the member roster (add by email / remove). Everything is gated server-side too.
+// Owner-only management for a squad: branding (logo + banner), details & pricing, and the member
+// roster (roles / remove / ownership transfer, each behind a confirmation modal). Members join via
+// join requests or the invite link — there is no add-by-email. Everything is gated server-side too.
 export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged }) {
   const g = vm.selGroupData || {};
   const isOwner = !!meId && !!g.owner && String(g.owner).toLowerCase() === String(meId).toLowerCase();
@@ -69,11 +71,9 @@ export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged
 
   // roster
   const [members, setMembers] = useState(null);
-  const [email, setEmail] = useState('');
   const [memberMsg, setMemberMsg] = useState('');
   const [memberErr, setMemberErr] = useState('');
-  const [roleBusy, setRoleBusy] = useState(null);     // athleteId whose role is being changed
-  const [confirmOwner, setConfirmOwner] = useState(null); // coach we're about to hand the group to
+  const roleConfirm = useConfirm();   // modal confirmations for remove / role changes / ownership transfer
 
   // invite link (friends who sign up with it auto-join this group)
   const [inviteUrl, setInviteUrl] = useState('');
@@ -156,20 +156,6 @@ export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged
     finally { setBusy(false); }
   };
 
-  const doAdd = async () => {
-    const addr = email.trim();
-    if (!addr) return;
-    setMemberErr(''); setMemberMsg('');
-    try {
-      const t = await getToken?.();
-      const r = await addMember(t, g.id, addr);
-      setEmail('');
-      setMemberMsg(r?.status === 'alreadymember' ? `${addr} is already a member.` : `Added ${addr}.`);
-      await loadMembers();
-      onDataChanged?.();
-    } catch (ex) { setMemberErr(ex.message || 'Could not add that athlete.'); }
-  };
-
   // Public web origin for the shareable link: same-origin on web, the deployed backend
   // (which also serves the web SPA) on native — never the capacitor:// app origin.
   const inviteLinkFor = (token) => `${API_BASE || window.location.origin}/?invite=${token}`;
@@ -212,42 +198,36 @@ export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged
     catch { setInviteMsg('Select the link above to copy it.'); }
   };
 
-  const doRemove = async (m) => {
-    setMemberErr(''); setMemberMsg('');
-    try {
-      const t = await getToken?.();
-      await removeMember(t, g.id, m.athleteId);
-      await loadMembers();
-      onDataChanged?.();
-    } catch (ex) { setMemberErr(ex.message || 'Could not remove.'); }
-  };
+  // All roster mutations run through a confirmation modal (useConfirm handles busy/errors and
+  // closes on success). Each `run` throws on failure so the modal surfaces the message.
+  const reloadRoster = async () => { await loadMembers(); onDataChanged?.(); };
+
+  const askRemove = (m) => roleConfirm.open({
+    title: 'Remove from group',
+    body: <>Remove <b style={s('color:var(--text)')}>{m.name}</b> from {g.name || 'this group'}? They’ll lose access to the group{m.role === 'coach' ? ' and their coach role' : ''}.</>,
+    confirmLabel: 'Remove',
+    run: async () => { await removeMember(await getToken?.(), g.id, m.athleteId); await reloadRoster(); },
+  });
 
   // Promote a member to coach / demote a coach back to member.
-  const doSetRole = async (m, role) => {
-    setMemberErr(''); setMemberMsg(''); setRoleBusy(m.athleteId);
-    try {
-      const t = await getToken?.();
-      await setMemberRole(t, g.id, m.athleteId, role);
-      setMemberMsg(role === 'coach' ? `${m.name} is now a coach.` : `${m.name} is no longer a coach.`);
-      await loadMembers();
-      onDataChanged?.();
-    } catch (ex) { setMemberErr(ex.message || 'Could not update role.'); }
-    finally { setRoleBusy(null); }
-  };
+  const askSetRole = (m, role) => roleConfirm.open({
+    title: role === 'coach' ? 'Make coach' : 'Remove coach',
+    body: role === 'coach'
+      ? <>Make <b style={s('color:var(--text)')}>{m.name}</b> a coach of {g.name || 'this group'}?</>
+      : <>Remove <b style={s('color:var(--text)')}>{m.name}</b> as a coach? They’ll stay a member of the group.</>,
+    confirmLabel: role === 'coach' ? 'Make coach' : 'Remove coach',
+    run: async () => { await setMemberRole(await getToken?.(), g.id, m.athleteId, role); await reloadRoster(); },
+  });
 
   // Hand the group to a coach: they become the sole owner and this owner is demoted to coach.
-  const doTransfer = async (m) => {
-    setMemberErr(''); setMemberMsg(''); setRoleBusy(m.athleteId);
-    try {
-      const t = await getToken?.();
-      await transferOwnership(t, g.id, m.athleteId);
-      setConfirmOwner(null);
-      setMemberMsg(`${m.name} is now the owner. You're now a coach.`);
-      await loadMembers();
-      onDataChanged?.();   // refreshes g.owner → this screen goes read-only for the former owner
-    } catch (ex) { setMemberErr(ex.message || 'Could not transfer ownership.'); }
-    finally { setRoleBusy(null); }
-  };
+  // Guarded by a type-the-group-name gate, since it's irreversible for the current owner.
+  const askMakeOwner = (m) => roleConfirm.open({
+    title: 'Transfer ownership',
+    body: <>Make <b style={s('color:var(--text)')}>{m.name}</b> the owner of {g.name || 'this group'}? You’ll become a coach and lose group-management control. This can only be undone by the new owner.</>,
+    requireText: g.name || '',
+    confirmLabel: 'Transfer ownership',
+    run: async () => { await transferOwnership(await getToken?.(), g.id, m.athleteId); await reloadRoster(); },
+  });
 
   const bannerUrl = g.bannerUrl ? `${g.bannerUrl}` : null;
   const logoUrl = g.logoUrl ? `${g.logoUrl}` : null;
@@ -342,22 +322,17 @@ export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged
 
       {/* ---- members ---- */}
       <FieldLabel>Members{members ? ` · ${members.length}` : ''}</FieldLabel>
-      <div style={s('display:flex;gap:8px')}>
-        <input value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && doAdd()}
-          placeholder="Add by email…" type="email"
-          style={s('flex:1;background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:14px;color:var(--text);outline:none;font-family:inherit')} />
-        <div className="ctl" onClick={doAdd} style={s('background:var(--accent);color:var(--accent-ink);font-size:13px;font-weight:700;padding:12px 16px;border-radius:12px;flex:none')}>Add</div>
-      </div>
       {memberErr && <div style={s('color:var(--bad);font-size:12px;margin-top:8px')}>{memberErr}</div>}
       {memberMsg && !memberErr && <div style={s('color:var(--good);font-size:12px;margin-top:8px')}>{memberMsg}</div>}
 
       <div style={s('display:flex;flex-direction:column;gap:8px;margin-top:12px')}>
         {members === null && <div style={s('color:var(--text3);font-size:12.5px;text-align:center;padding:12px')}>Loading roster…</div>}
         {members?.map((m) => {
-          const isOwnerRow = m.role === 'owner';
-          const isCoach = m.role === 'coach';
-          const busyRow = roleBusy === m.athleteId;
-          const confirming = confirmOwner === m.athleteId;
+          // The owner is defined by the squad's OwnerId (g.owner), not by Membership.Role — some
+          // squads were seeded with the owner carrying a 'coach' role, so trusting m.role here would
+          // wrongly offer "Make owner"/"Remove coach" on the owner's own card (and the removal 409s).
+          const isOwnerRow = !!g.owner && String(m.athleteId).toLowerCase() === String(g.owner).toLowerCase();
+          const isCoach = !isOwnerRow && m.role === 'coach';
           const roleLabel = isOwnerRow ? 'Owner' : isCoach ? 'Coach' : 'Member';
           const roleColor = isOwnerRow ? 'var(--accent)' : isCoach ? 'var(--good)' : 'var(--text3)';
           return (
@@ -371,31 +346,20 @@ export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged
                 {isOwnerRow && <span style={s('font-size:10.5px;color:var(--text3);font-weight:600')}>You</span>}
               </div>
 
-              {/* role actions — the owner row is fixed (transfer ownership to demote it) */}
+              {/* role actions — each opens a confirmation modal. The owner row is fixed
+                  (transfer ownership from a coach's card to change who's in charge). */}
               {!isOwnerRow && (
-                confirming ? (
-                  <div style={s('margin-top:10px')}>
-                    <div style={s('font-size:11.5px;color:var(--text2);line-height:1.45;margin-bottom:8px')}>
-                      Make <b style={s('color:var(--text)')}>{m.name}</b> the owner? You’ll become a coach and lose group-management control. This can only be undone by the new owner.
-                    </div>
-                    <div style={s('display:flex;gap:8px')}>
-                      <div className="ctl" onClick={() => setConfirmOwner(null)} style={s('flex:1;text-align:center;font-size:12px;font-weight:700;color:var(--text2);background:var(--bg3);border:1px solid var(--line);padding:9px;border-radius:10px')}>Cancel</div>
-                      <div className={busyRow ? undefined : 'ctl'} onClick={busyRow ? undefined : () => doTransfer(m)} style={s(`flex:1;text-align:center;font-size:12px;font-weight:700;color:var(--accent-ink);background:var(--accent);padding:9px;border-radius:10px;opacity:${busyRow ? 0.6 : 1}`)}>{busyRow ? '…' : 'Yes, transfer'}</div>
-                    </div>
-                  </div>
-                ) : (
-                  <div style={s('display:flex;flex-wrap:wrap;gap:7px;margin-top:10px')}>
-                    {isCoach ? (
-                      <>
-                        <RoleChip onClick={busyRow ? undefined : () => setConfirmOwner(m.athleteId)} accent>Make owner</RoleChip>
-                        <RoleChip onClick={busyRow ? undefined : () => doSetRole(m, 'member')}>Remove coach</RoleChip>
-                      </>
-                    ) : (
-                      <RoleChip onClick={busyRow ? undefined : () => doSetRole(m, 'coach')} good>Make coach</RoleChip>
-                    )}
-                    <div className={busyRow ? undefined : 'ctl'} onClick={busyRow ? undefined : () => doRemove(m)} style={s(`font-size:11.5px;font-weight:700;color:var(--bad);background:color-mix(in srgb,var(--bad) 12%,transparent);border:1px solid color-mix(in srgb,var(--bad) 30%,transparent);padding:7px 12px;border-radius:10px;margin-left:auto;opacity:${busyRow ? 0.6 : 1}`)}>Remove</div>
-                  </div>
-                )
+                <div style={s('display:flex;flex-wrap:wrap;gap:7px;margin-top:10px')}>
+                  {isCoach ? (
+                    <>
+                      <RoleChip onClick={() => askMakeOwner(m)} accent>Make owner</RoleChip>
+                      <RoleChip onClick={() => askSetRole(m, 'member')}>Remove coach</RoleChip>
+                    </>
+                  ) : (
+                    <RoleChip onClick={() => askSetRole(m, 'coach')} good>Make coach</RoleChip>
+                  )}
+                  <div className="ctl" onClick={() => askRemove(m)} style={s('font-size:11.5px;font-weight:700;color:var(--bad);background:color-mix(in srgb,var(--bad) 12%,transparent);border:1px solid color-mix(in srgb,var(--bad) 30%,transparent);padding:7px 12px;border-radius:10px;margin-left:auto')}>Remove</div>
+                </div>
               )}
             </div>
           );
@@ -428,6 +392,9 @@ export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged
 
       {/* ---- group targets (coach sets club races from an event link) ---- */}
       <div style={s('margin-top:22px')}><GroupTargets squadId={g.id} getToken={getToken} mode="manage" /></div>
+
+      {/* confirmation modal for remove / role changes / ownership transfer */}
+      {roleConfirm.node}
     </div>
   );
 }
