@@ -1,8 +1,69 @@
 import { useRef } from 'react';
 import { s } from '../lib/style.js';
-import { metricCatalog, metricGroupsFor, liveMetricValues, liveChartsView, liveRadarView, spreadRiders, pelotonView } from '../lib/liveMetrics.js';
+import { metricCatalog, metricGroupsFor, liveMetricValues, liveChartsView, liveRadarView, spreadRiders, pelotonView, climbView } from '../lib/liveMetrics.js';
 import LiveMapGL from './LiveMapGL.jsx';
+import { useRouteAnalysis } from '../hooks/useRouteAnalysis.js';
 import { mergePeerRanges } from '../lib/ranging.js';
+
+// ---- ClimbPro field: the climb you're on (or the next ahead), from the route analysis ----
+function ClimbField({ v }) {
+  const msg = (t) => <div style={s('flex:1;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--text3);font-size:11px;padding:0 16px')}>{t}</div>;
+  if (!v || v.empty) return msg('Pick a course for this ride to see the climb ahead.');
+  if (v.none) return msg(v.done ? 'Last climb done — enjoy the run-in.' : 'No rated climbs on this route.');
+  const stat = (label, val, unit, color, last) => (
+    <div style={s(`flex:1;padding:9px 11px 10px;${last ? '' : 'border-right:1px solid var(--line)'}`)}>
+      <div style={s('font-size:9px;font-weight:700;letter-spacing:.9px;color:var(--text3);text-transform:uppercase')}>{label}</div>
+      <div style={s('display:flex;align-items:baseline;gap:3px;margin-top:5px')}>
+        <span className="mono" style={s(`font-size:19px;font-weight:700;line-height:1;${color ? `color:${color}` : ''}`)}>{val}</span>
+        {unit && <span style={s('font-size:10px;color:var(--text2);font-weight:600')}>{unit}</span>}
+      </div>
+    </div>
+  );
+  return (
+    <div style={s('flex:1;display:flex;flex-direction:column;min-height:0')}>
+      <div style={s('display:flex;align-items:center;gap:9px')}>
+        <span className="mono" style={s(`font-size:10px;font-weight:700;letter-spacing:.5px;color:${v.catInk};background:${v.catColor};padding:3px 9px;border-radius:7px`)}>Cat {v.cat}</span>
+        <span style={s('font-size:14px;font-weight:700;letter-spacing:.3px')}>CLIMB {v.climbIdx}/{v.climbCount}</span>
+        <span style={s('flex:1')} />
+        {v.onClimb
+          ? <span style={s('display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;color:var(--accent)')}><span style={s('width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 25%,transparent)')} />On climb</span>
+          : <span style={s('font-size:12px;color:var(--text3)')}>Starts in <span className="mono" style={s('color:var(--text2)')}>{v.startsInTxt}</span></span>}
+      </div>
+      <div style={s('position:relative;flex:1;min-height:78px;margin-top:12px')}>
+        <div className="mono" style={s('position:absolute;top:-2px;right:2px;font-size:10px;color:var(--text3)')}>{v.topElevTxt} m</div>
+        <svg viewBox="0 0 400 104" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }}>
+          <path d={v.ridge} fill="none" stroke="rgba(255,255,255,.55)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+        </svg>
+        <div style={s('position:absolute;inset:0;display:flex;align-items:flex-end;gap:1.5px;padding-top:34px')}>
+          {v.bars.map((b, i) => <div key={i} style={s(`flex:1;height:${b.h}%;background:${b.c};border-radius:1px;opacity:${b.o}`)} />)}
+        </div>
+        {v.onClimb && (
+          <>
+            <div style={s(`position:absolute;top:-4px;bottom:0;left:${v.markerPct}%;width:2px;background:#fff;box-shadow:0 0 8px rgba(0,0,0,.6)`)} />
+            <div style={s(`position:absolute;left:${v.markerPct}%;top:56%;transform:translate(-50%,-50%);width:13px;height:13px;border-radius:50%;background:var(--accent);border:2.5px solid #fff`)} />
+          </>
+        )}
+      </div>
+      <div style={s('display:flex;background:var(--bg3);border:1px solid var(--line);border-radius:12px;margin-top:12px;overflow:hidden;flex:none')}>
+        {v.onClimb ? (
+          <>
+            {stat('Dist to go', v.distToGoTxt, 'km', 'var(--accent)')}
+            {stat('Ascent to go', v.ascentToGoTxt, 'm', 'var(--accent)')}
+            {stat('Est. time', v.estToGoTxt, '')}
+            {stat('Gradient', v.gradientNowTxt, '%', 'var(--accent)', true)}
+          </>
+        ) : (
+          <>
+            {stat('Climb length', v.lengthTxt, 'km')}
+            {stat('Ascent', v.ascentTxt, 'm', 'var(--accent)')}
+            {stat('Est. time', v.estUpcomingTxt, '')}
+            {stat('Avg grade', v.avgGradTxt, '%', 'var(--accent)', true)}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // ---- Group side column: teammates front→back on a rail + rear-radar vehicle blip ----
 function GroupColumn({ tel }) {
@@ -157,6 +218,7 @@ function FieldCell({ f, editing, actions, index, indoor, mySport }) {
         </>
       )}
       {f.kind === 'peloton' && <PelotonField v={f.v} />}
+      {f.kind === 'climb' && <ClimbField v={f.v} />}
       {f.kind === 'map' && (
         <>
           <div style={s('position:absolute;inset:0')}>
@@ -239,6 +301,7 @@ function PickerSheet({ page, slot, actions, family }) {
   const charts = [['chart:spd', 'Speed chart', 'graph'], ['chart:hr', 'HR chart', 'graph'], ...(motor ? [] : [['chart:power', 'Power chart', 'graph']])];
   const maps = [['map', 'Route map', 'map']];
   const group = [['peloton', 'Peloton spread', '2D']];
+  const nav = [['climb', 'Climb (ClimbPro)', '▲']];
   const section = (title, rows) => (
     <>
       <div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:7px')}>{title}</div>
@@ -254,6 +317,7 @@ function PickerSheet({ page, slot, actions, family }) {
         <div style={s('width:40px;height:4px;border-radius:3px;background:var(--line2);margin:0 auto 14px')} />
         <div style={s('font-size:17px;font-weight:700;letter-spacing:-.3px;margin-bottom:12px')}>Choose a field</div>
         {section('Charts', charts)}
+        {section('Navigation', nav)}
         {section('Group', group)}
         {section('Map', maps)}
         {metricGroupsFor(family).map(([cat, toks]) => section(cat, toks.map((id) => [id, metricCatalog[id].label, metricCatalog[id].unit])))}
@@ -277,6 +341,8 @@ export default function LivePages({ tel, lp, uwb, blePeers, indoor = false, mySp
 
   const mv = liveMetricValues(tel);
   const charts = liveChartsView(tel);
+  // Terrain analysis of the selected course → the ClimbPro field (read once per course).
+  const routeAnalysis = useRouteAnalysis(tel?.course);
 
   const fields = page.fields.map((tok, i) => {
     const hero = i === heroIdx;
@@ -303,6 +369,7 @@ export default function LivePages({ tel, lp, uwb, blePeers, indoor = false, mySp
       return { ...base, kind: 'map', label: 'Route', riders, path, course, pts, packFused: !!tel?.packFused, packGap };
     }
     if (tok === 'peloton') return { ...base, kind: 'peloton', v: { ...pelotonView(tel), uwb, blePeers } };
+    if (tok === 'climb') return { ...base, kind: 'climb', v: climbView(routeAnalysis, tel) };
     if (charts[tok]) { const c = charts[tok]; return { ...base, kind: 'chart', label: c.label, value: c.cur, unit: c.unit, color: c.color, pts: c.pts, area: c.area }; }
     const m = metricCatalog[tok] || { label: tok, unit: '' };
     const val = mv[tok] || { v: '—' };

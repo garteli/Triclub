@@ -2,6 +2,8 @@
 // REAL `telemetry` object (built by useRideTelemetry from the GPS recorder + BLE
 // sensors + hub riders). A field with no source shows "—" rather than a fake number.
 
+import { gradientBand, catStyle } from './routeProfile.js';
+
 const DASH = '—';
 const f1 = (v) => (v == null ? DASH : v.toFixed(1));
 const r0 = (v) => (v == null ? DASH : String(Math.round(v)));
@@ -284,3 +286,67 @@ export function gearComponentsFromSensors(sensors) {
 }
 // Back-compat export (empty until sensors are paired).
 export const gearComponents = [];
+
+// ── ClimbPro field: the climb you're on (or the next one ahead) from the route analysis ──────────
+// Given the analysed course (sections + sample profile from useRouteAnalysis) and live telemetry
+// (dist covered + gradient), work out the featured climb and everything the field shows: a gradient-
+// banded bar profile with your position, and the stats (length/ascent/avg for an upcoming climb;
+// distance/ascent-to-go/gradient once you're on it). Real data only — "—" where a source is missing.
+const eleAtM = (profile, m) => {
+  for (let i = 0; i < profile.length - 1; i++) {
+    const a = profile[i], b = profile[i + 1];
+    if (m <= b.dist || i === profile.length - 2) {
+      const t = (m - a.dist) / ((b.dist - a.dist) || 1);
+      return a.e + (b.e - a.e) * Math.max(0, Math.min(1, t));
+    }
+  }
+  return profile[0].e;
+};
+
+export function climbView(analysis, tel) {
+  if (!analysis?.sections?.length || !analysis.profile?.length) return { empty: true };
+  const profile = analysis.profile;
+  const totalM = analysis.totalKm * 1000;
+  const posM = Math.max(0, Math.min(totalM, (parseFloat(tel?.dist) || 0) * 1000));
+  const climbs = analysis.sections.filter((sec) => sec.kind === 'climb');
+  if (!climbs.length) return { empty: false, none: true };
+
+  const curSec = analysis.sections.find((sec) => posM >= sec.startM && posM < sec.endM);
+  const onClimb = !!(curSec && curSec.kind === 'climb');
+  const feat = onClimb ? curSec : climbs.find((c) => c.endM > posM);
+  if (!feat) return { empty: false, none: true, done: true }; // past the last climb
+
+  const cs = catStyle(feat.cat);
+  const N = 40, a0 = feat.startM, len = feat.lenM;
+  const segE = []; for (let k = 0; k <= N; k++) segE.push(eleAtM(profile, a0 + (len * k) / N));
+  const smin = Math.min(...segE), smax = Math.max(...segE), sspan = Math.max(1, smax - smin);
+  const bars = [];
+  for (let c = 0; c < N; c++) {
+    const ma = a0 + (len * c) / N, mb = a0 + (len * (c + 1)) / N;
+    const g = (eleAtM(profile, mb) - eleAtM(profile, ma)) / ((mb - ma) || 1) * 100;
+    bars.push({ h: Math.max(14, Math.min(100, 20 + Math.max(0, g) / 12 * 80)).toFixed(1), c: gradientBand(g).color, o: onClimb && mb <= posM ? '.35' : '1' });
+  }
+  const W = 400, H = 104;
+  const ridge = segE.map((e, i) => `${i ? 'L' : 'M'}${((i / N) * W).toFixed(1)} ${(H - 6 - ((e - smin) / sspan) * (H - 20)).toFixed(1)}`).join(' ');
+
+  const spd = parseFloat(tel?.spd) || 0;
+  const est = (m) => (spd > 0 ? mmss(Math.round(m / 1000 / spd * 3600)) : DASH);
+  const eleNow = eleAtM(profile, posM), eleTop = eleAtM(profile, feat.endM);
+  const startsInM = onClimb ? 0 : Math.max(0, Math.round(feat.startM - posM));
+
+  return {
+    empty: false, onClimb,
+    cat: feat.cat || '—', catColor: cs.color, catInk: cs.ink,
+    climbIdx: climbs.indexOf(feat) + 1, climbCount: climbs.length,
+    startsInTxt: startsInM >= 1000 ? `${(startsInM / 1000).toFixed(1)} km` : `${startsInM} m`,
+    bars, ridge, markerPct: onClimb ? Math.max(0, Math.min(100, (posM - feat.startM) / feat.lenM * 100)) : 0,
+    topElevTxt: String(Math.round(eleTop)),
+    // upcoming stats
+    lengthTxt: (feat.lenM / 1000).toFixed(1), ascentTxt: String(feat.gainM),
+    avgGradTxt: feat.avgGradPct.toFixed(1), estUpcomingTxt: est(feat.lenM),
+    // on-climb stats
+    distToGoTxt: Math.max(0, (feat.endM - posM) / 1000).toFixed(1),
+    ascentToGoTxt: String(Math.max(0, Math.round(eleTop - eleNow))), estToGoTxt: est(feat.endM - posM),
+    gradientNowTxt: f1(tel?.grade),
+  };
+}
