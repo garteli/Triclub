@@ -2,9 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { s } from '../lib/style.js';
 import EmptyState from '../components/EmptyState.jsx';
 import { EventCard, DirectionsSheet } from '../components/EventCard.jsx';
+import { ConfirmModal } from '../components/ConfirmModal.jsx';
 import {
   listSquadEvents, joinEvent, leaveEvent, checkInEvent, undoCheckInEvent,
   getEventRoute, listEventParticipants, setEventStartPlace,
+  publishEvent, unpublishEvent, deleteSquadEvent,
+  listEventAttendees, listEventRequests, approveEventRequest, declineEventRequest,
 } from '../lib/events.js';
 import { reverseGeocode } from '../lib/reverseGeocode.js';
 
@@ -31,11 +34,16 @@ const CheckIcon = ({ size = 11 }) => <svg width={size} height={size} viewBox="0 
 // A group event on the Plan page renders with the same rich card as the Events screen. This
 // self-contained wrapper owns the same lazy enrichment (route + who's-going) and the member
 // RSVP/check-in actions, so a single <EventCard> is all the Plan agenda has to drop in.
-function PlanEventCard({ ev, squadId, getToken, onOpen, onDirections }) {
+function PlanEventCard({ ev, squadId, getToken, isOwner, actions, onChanged, onOpen, onDirections }) {
   const [item, setItem] = useState(ev);
   const [route, setRoute] = useState(undefined);        // undefined = not fetched, null = none, [...] = points
   const [participants, setParticipants] = useState(null);
   const [busy, setBusy] = useState(false);
+  // coach-only state (owner of the active club): roster/requests + a delete confirmation
+  const [rosterOpen, setRosterOpen] = useState(false);
+  const [roster, setRoster] = useState(undefined);      // undefined = not loaded, null = loading, [...] = attendees
+  const [requests, setRequests] = useState([]);
+  const [confirming, setConfirming] = useState(false);
   const token = getToken?.();
   useEffect(() => { setItem(ev); }, [ev]);
 
@@ -83,10 +91,65 @@ function PlanEventCard({ ev, squadId, getToken, onOpen, onDirections }) {
   const checkin = () => act(checkInEvent, (e) => ({ checkedIn: true, checkedInCount: (e.checkedInCount || 0) + 1 }));
   const undoCheckin = () => act(undoCheckInEvent, (e) => ({ checkedIn: false, checkedInCount: Math.max(0, (e.checkedInCount || 1) - 1) }));
 
+  // ── coach actions (owner only) — the same set the Events page offers ──────────────────────
+  const togglePublish = async () => {
+    setBusy(true);
+    try {
+      const t = await getToken?.();
+      if (item.published) { await unpublishEvent(t, squadId, item.id); setItem((x) => ({ ...x, published: false })); }
+      else { await publishEvent(t, squadId, item.id); setItem((x) => ({ ...x, published: true })); }
+      onChanged?.();
+    } catch { /* ignore */ } finally { setBusy(false); }
+  };
+  const toggleRoster = async () => {
+    if (rosterOpen) { setRosterOpen(false); return; }
+    setRosterOpen(true);
+    if (roster === undefined) {
+      setRoster(null);
+      try {
+        const t = await getToken?.();
+        const [a, pending] = await Promise.all([
+          listEventAttendees(t, squadId, item.id),
+          listEventRequests(t, squadId, item.id).catch(() => []),
+        ]);
+        setRoster(a); setRequests(pending || []);
+      } catch { setRoster([]); }
+    }
+  };
+  const decideReq = async (athleteId, approve) => {
+    setRequests((r) => r.filter((x) => x.athleteId !== athleteId)); // optimistic
+    try {
+      const t = await getToken?.();
+      if (approve) {
+        await approveEventRequest(t, squadId, item.id, athleteId);
+        setRoster(await listEventAttendees(t, squadId, item.id));
+        setItem((x) => ({ ...x, joinCount: (x.joinCount || 0) + 1 }));
+      } else {
+        await declineEventRequest(t, squadId, item.id, athleteId);
+      }
+    } catch { /* ignore */ }
+  };
+  const doDelete = async () => {
+    setBusy(true);
+    try { const t = await getToken?.(); await deleteSquadEvent(t, squadId, item.id); setConfirming(false); onChanged?.(); }
+    catch { setConfirming(false); } finally { setBusy(false); }
+  };
+
   return (
-    <EventCard ev={item} isOwner={false} busy={busy} token={token} route={route} participants={participants}
-      onOpen={onOpen} onDirections={onDirections}
-      onJoin={join} onLeave={leave} onCheckIn={checkin} onUndoCheckIn={undoCheckin} />
+    <>
+      <EventCard ev={item} isOwner={isOwner} busy={busy} token={token} route={route} participants={participants}
+        rosterOpen={rosterOpen} roster={roster} requests={requests}
+        onOpen={onOpen} onDirections={onDirections}
+        onJoin={join} onLeave={leave} onCheckIn={checkin} onUndoCheckIn={undoCheckin}
+        onApproveReq={(aid) => decideReq(aid, true)} onDeclineReq={(aid) => decideReq(aid, false)}
+        onEdit={() => actions?.editEvent?.(item)} onPublish={togglePublish} onDelete={() => setConfirming(true)} onRoster={toggleRoster} />
+      {confirming && (
+        <ConfirmModal title="Delete this event?"
+          body={<><span style={s('color:var(--text);font-weight:600')}>{item.title || 'Untitled event'}</span> will be permanently deleted, along with everyone’s joins and check-ins. This can’t be undone.</>}
+          confirmLabel={busy ? 'Deleting…' : 'Delete'} busy={busy}
+          onCancel={() => setConfirming(false)} onConfirm={doDelete} />
+      )}
+    </>
   );
 }
 
@@ -296,6 +359,7 @@ export default function Plan({ vm, state, actions, planMine, live, meId, getToke
   const openLink = actions.openLink || ((u) => { try { window.open(u, '_blank', 'noopener'); } catch { /* ignore */ } });
   const renderEventCard = (ev) => (
     <PlanEventCard key={`ev-${ev.id}`} ev={ev} squadId={vm.activeClubId} getToken={getToken}
+      isOwner={isClubCoach} actions={actions} onChanged={loadEvents}
       onOpen={() => actions.openEvent(ev)} onDirections={(lat, lon) => onDirections(lat, lon, ev.title)} />
   );
 
