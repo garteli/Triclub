@@ -53,15 +53,8 @@ const navApps = (lat, lon) => [
   { key: 'amaps', label: 'Apple Maps', color: '#5a86ff', url: `https://maps.apple.com/?daddr=${lat},${lon}&dirflg=d` },
 ];
 
-// iOS treats a hosted https .ics as a *subscription* feed ("Add Subscription Calendar") rather than
-// importing the single event — so on iOS we hand it the calendar inline as a data: URI instead, which
-// it imports as one event. Elsewhere the hosted URL opens/downloads fine.
-const isIOS = () => {
-  try {
-    const ua = navigator.userAgent || '';
-    return /iP(hone|ad|od)/i.test(ua) || (/Mac/i.test(ua) && navigator.maxTouchPoints > 1);
-  } catch { return false; }
-};
+// A hosted https .ics makes iOS offer to *subscribe*; sharing the .ics file (below) lets it import
+// the single event instead. These build that file.
 const icsStamp = (d) => {
   const p = (n) => String(n).padStart(2, '0');
   return `${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}T${p(d.getUTCHours())}${p(d.getUTCMinutes())}${p(d.getUTCSeconds())}Z`;
@@ -309,15 +302,20 @@ export default function EventDetail({ vm, state, actions, getToken }) {
   // route/GPS file name (which is often just an auto-generated filename like "offroad-1234…").
   const openDirections = () => { if (start) setDirTarget({ lat: start[0], lon: start[1], title: startPlace || ev.title }); };
 
-  // Add the event to the device calendar. On iOS a hosted .ics URL prompts to *subscribe*, so we hand
-  // Calendar the event inline (data: URI) to import it as one event. Elsewhere, opening the served
-  // text/calendar URL adds/downloads it as expected.
-  const addToCalendar = () => {
-    if (isIOS()) {
-      const ics = buildEventIcs(ev, startPlace || '');
-      window.location.href = `data:text/calendar;charset=utf-8,${encodeURIComponent(ics)}`;
-      return;
-    }
+  // Add the event to the device calendar. The reliable path on iPhone is the native share sheet with
+  // the .ics file — iOS shows the event and offers Calendar (a hosted https .ics only offers to
+  // *subscribe*, and a data: URI does nothing in the in-app WebView). Falls back to the served
+  // text/calendar URL where file-sharing isn't available (most desktop browsers).
+  const addToCalendar = async () => {
+    const ics = buildEventIcs(ev, startPlace || '');
+    const fname = `${(ev.title || 'event').replace(/[^\w-]+/g, '-').slice(0, 40) || 'event'}.ics`;
+    try {
+      const file = new File([ics], fname, { type: 'text/calendar' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: ev.title || 'Event' });
+        return;
+      }
+    } catch (e) { if (e?.name === 'AbortError') return; /* dismissed — else fall through */ }
     const url = `/api/squads/${squadId}/events/${ev.id}/calendar.ics`;
     (actions.openLink || ((u) => { try { window.open(u, '_blank', 'noopener'); } catch { /* ignore */ } }))(url);
   };
