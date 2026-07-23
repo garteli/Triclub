@@ -1,33 +1,68 @@
 import { s } from '../lib/style.js';
 import { useJoinRequests } from '../hooks/useJoinRequests.js';
 
-// Real coach view: pending join requests across the caller's squads, approve/decline inline.
+// Real coach view: pending join requests across the caller's squads, approve/decline inline. Two kinds:
+// group-join requests (into the whole squad) and event-join requests (a non-member into one session).
 function LiveRequests({ getToken, actions }) {
-  const { items, approve, decline } = useJoinRequests({ getToken, enabled: !!getToken });
+  const { items, eventItems, approve, decline, approveEvent, declineEvent } = useJoinRequests({ getToken, enabled: !!getToken });
+  const total = items.length + eventItems.length;
   return (
     <>
       {/* title now in the global app header; keep the pending count */}
       <div style={s('display:flex;align-items:center;justify-content:flex-end')}>
-        <div style={s('background:var(--accent);color:var(--accent-ink);font-size:12px;font-weight:700;padding:4px 10px;border-radius:9px')}><span className="mono">{items.length}</span> pending</div>
+        <div style={s('background:var(--accent);color:var(--accent-ink);font-size:12px;font-weight:700;padding:4px 10px;border-radius:9px')}><span className="mono">{total}</span> pending</div>
       </div>
-      {items.length === 0 ? (
-        <div style={s('font-size:12.5px;color:var(--text3);background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:22px;text-align:center;margin-top:16px')}>No pending requests. When athletes apply to your squads, they'll appear here.</div>
+      {total === 0 ? (
+        <div style={s('font-size:12.5px;color:var(--text3);background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:22px;text-align:center;margin-top:16px')}>No pending requests. When athletes apply to your squads or sessions, they'll appear here.</div>
       ) : (
-        <div style={s('display:flex;flex-direction:column;gap:11px;margin-top:16px')}>
-          {items.map((a) => (
-            <div key={a.squadId + a.athleteId} style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:13px 14px')}>
-              <div style={s('display:flex;gap:12px;align-items:center')}>
-                <div className="ctl" onClick={() => actions.openAthlete(a.athleteId)} style={s(`width:44px;height:44px;border-radius:13px;background:${a.color};flex:none;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#0c0e11`)}>{a.initials}</div>
-                <div style={s('flex:1;min-width:0')}><div style={s('font-size:14.5px;font-weight:700')}>{a.name}</div><div style={s('font-size:11px;color:var(--text3)')}>applied {a.when} · {a.squadName}</div></div>
-                <div style={s('text-align:right')}><div className="mono" style={s('font-size:14px;font-weight:700')}>{a.ftp}<span style={s('font-size:9px;color:var(--text2)')}>w</span></div><div style={s('font-size:8.5px;color:var(--text3);text-transform:uppercase')}>FTP · {a.weekly}</div></div>
+        <>
+          {/* group-join requests */}
+          {items.length > 0 && (
+            <>
+              <div style={s('font-size:10.5px;color:var(--text3);text-transform:uppercase;letter-spacing:1.4px;font-weight:700;margin:18px 2px 0')}>Squad requests</div>
+              <div style={s('display:flex;flex-direction:column;gap:11px;margin-top:12px')}>
+                {items.map((a) => (
+                  <div key={a.squadId + a.athleteId} style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:13px 14px')}>
+                    <div style={s('display:flex;gap:12px;align-items:center')}>
+                      <div className="ctl" onClick={() => actions.openAthlete(a.athleteId)} style={s(`width:44px;height:44px;border-radius:13px;background:${a.color};flex:none;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#0c0e11`)}>{a.initials}</div>
+                      <div style={s('flex:1;min-width:0')}><div style={s('font-size:14.5px;font-weight:700')}>{a.name}</div><div style={s('font-size:11px;color:var(--text3)')}>applied {a.when} · {a.squadName}</div></div>
+                      <div style={s('text-align:right')}><div className="mono" style={s('font-size:14px;font-weight:700')}>{a.ftp}<span style={s('font-size:9px;color:var(--text2)')}>w</span></div><div style={s('font-size:8.5px;color:var(--text3);text-transform:uppercase')}>FTP · {a.weekly}</div></div>
+                    </div>
+                    <div style={s('display:flex;gap:9px;margin-top:12px')}>
+                      <div className="ctl" onClick={() => decline(a.squadId, a.athleteId)} style={s('flex:1;background:color-mix(in srgb,var(--bad) 14%,var(--bg2));border:1px solid color-mix(in srgb,var(--bad) 35%,transparent);color:var(--bad);text-align:center;padding:11px;border-radius:12px;font-weight:700;font-size:13px')}>Decline</div>
+                      <div className="ctl" onClick={() => approve(a.squadId, a.athleteId)} style={s('flex:1;background:var(--good);color:#04140b;text-align:center;padding:11px;border-radius:12px;font-weight:700;font-size:13px')}>Approve</div>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div style={s('display:flex;gap:9px;margin-top:12px')}>
-                <div className="ctl" onClick={() => decline(a.squadId, a.athleteId)} style={s('flex:1;background:color-mix(in srgb,var(--bad) 14%,var(--bg2));border:1px solid color-mix(in srgb,var(--bad) 35%,transparent);color:var(--bad);text-align:center;padding:11px;border-radius:12px;font-weight:700;font-size:13px')}>Decline</div>
-                <div className="ctl" onClick={() => approve(a.squadId, a.athleteId)} style={s('flex:1;background:var(--good);color:#04140b;text-align:center;padding:11px;border-radius:12px;font-weight:700;font-size:13px')}>Approve</div>
+            </>
+          )}
+
+          {/* event-join requests from non-members */}
+          {eventItems.length > 0 && (
+            <>
+              <div style={s('font-size:10.5px;color:var(--text3);text-transform:uppercase;letter-spacing:1.4px;font-weight:700;margin:20px 2px 0')}>Event requests</div>
+              <div style={s('display:flex;flex-direction:column;gap:11px;margin-top:12px')}>
+                {eventItems.map((a) => (
+                  <div key={a.eventId + a.athleteId} style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:13px 14px')}>
+                    <div style={s('display:flex;gap:12px;align-items:center')}>
+                      <div className="ctl" onClick={() => actions.openAthlete(a.athleteId)} style={s(`width:44px;height:44px;border-radius:13px;background:${a.color};flex:none;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#0c0e11`)}>{a.initials}</div>
+                      <div style={s('flex:1;min-width:0')}>
+                        <div style={s('font-size:14.5px;font-weight:700')}>{a.name}</div>
+                        <div style={s('font-size:11px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>wants to join · {a.eventTitle}{a.eventWhen ? ` · ${a.eventWhen}` : ''}</div>
+                      </div>
+                      <span style={s('flex:none;font-size:8.5px;font-weight:700;color:var(--accent);background:color-mix(in srgb,var(--accent) 15%,transparent);padding:3px 8px;border-radius:6px;text-transform:uppercase')}>Non-member</span>
+                    </div>
+                    <div style={s('display:flex;gap:9px;margin-top:12px')}>
+                      <div className="ctl" onClick={() => declineEvent(a.squadId, a.eventId, a.athleteId)} style={s('flex:1;background:color-mix(in srgb,var(--bad) 14%,var(--bg2));border:1px solid color-mix(in srgb,var(--bad) 35%,transparent);color:var(--bad);text-align:center;padding:11px;border-radius:12px;font-weight:700;font-size:13px')}>Decline</div>
+                      <div className="ctl" onClick={() => approveEvent(a.squadId, a.eventId, a.athleteId)} style={s('flex:1;background:var(--good);color:#04140b;text-align:center;padding:11px;border-radius:12px;font-weight:700;font-size:13px')}>Approve</div>
+                    </div>
+                  </div>
+                ))}
               </div>
-            </div>
-          ))}
-        </div>
+            </>
+          )}
+        </>
       )}
     </>
   );

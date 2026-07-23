@@ -23,15 +23,20 @@ public sealed class SqlSquadEventStore(string connectionString) : ISquadEventSto
             e.Id, e.SquadId, e.Title, e.Sport,
             CAST(e.StartUtc AS datetimeoffset(0)) AS StartUtc,
             e.CourseId, e.CourseName, e.CourseKm, e.Notes,
-            (SELECT COUNT(1) FROM dbo.SquadEventRsvp r WHERE r.EventId = e.Id) AS JoinCount,
+            -- Counts + the caller's Joined flag reflect confirmed ('going') RSVPs only; a pending
+            -- (not-yet-approved) request is surfaced separately via RequestPending below.
+            (SELECT COUNT(1) FROM dbo.SquadEventRsvp r WHERE r.EventId = e.Id AND r.Status = 'going') AS JoinCount,
             (SELECT COUNT(1) FROM dbo.SquadEventRsvp r WHERE r.EventId = e.Id AND r.CheckedInUtc IS NOT NULL) AS CheckedInCount,
-            CAST(CASE WHEN me.EventId IS NULL THEN 0 ELSE 1 END AS bit) AS Joined,
+            CAST(CASE WHEN me.Status = 'going' THEN 1 ELSE 0 END AS bit) AS Joined,
             CAST(me.CheckedInUtc AS datetimeoffset(0)) AS CheckedInUtc,
             e.Published,
             (SELECT TOP 1 a.Id FROM dbo.Activity a
              WHERE a.EventId = e.Id AND a.AthleteId = @meId ORDER BY a.StartUtc DESC) AS MyActivityId,
             CASE WHEN e.LogoBlob   IS NOT NULL THEN '/api/images/squads/' + LOWER(CONVERT(varchar(36), e.SquadId)) + '/events/' + LOWER(CONVERT(varchar(36), e.Id)) + '/logo'   END AS LogoUrl,
-            CASE WHEN e.BannerBlob IS NOT NULL THEN '/api/images/squads/' + LOWER(CONVERT(varchar(36), e.SquadId)) + '/events/' + LOWER(CONVERT(varchar(36), e.Id)) + '/banner' END AS BannerUrl
+            CASE WHEN e.BannerBlob IS NOT NULL THEN '/api/images/squads/' + LOWER(CONVERT(varchar(36), e.SquadId)) + '/events/' + LOWER(CONVERT(varchar(36), e.Id)) + '/banner' END AS BannerUrl,
+            CAST(CASE WHEN me.Status = 'pending' THEN 1 ELSE 0 END AS bit) AS RequestPending,
+            CAST(CASE WHEN EXISTS (SELECT 1 FROM dbo.Membership mm WHERE mm.SquadId = e.SquadId AND mm.AthleteId = @meId)
+                      THEN 1 ELSE 0 END AS bit) AS Member
         FROM dbo.SquadEvent e
         LEFT JOIN dbo.SquadEventRsvp me ON me.EventId = e.Id AND me.AthleteId = @meId
         """;
@@ -53,10 +58,10 @@ public sealed class SqlSquadEventStore(string connectionString) : ISquadEventSto
     public async Task<IReadOnlyList<SquadEventView>> ListForMemberAsync(Guid meId, CancellationToken ct)
     {
         await using var conn = new SqlConnection(connectionString);
-        // Only published events the caller has joined (INNER via the RSVP row), soonest first.
+        // Only published events the caller has actually joined ('going' — not a pending request), soonest first.
         var rows = await conn.QueryAsync<SquadEventView>(new CommandDefinition($"""
             {ViewSelect}
-            WHERE me.EventId IS NOT NULL AND e.Published = 1 AND e.StartUtc >= DATEADD(day, -1, SYSDATETIMEOFFSET())
+            WHERE me.Status = 'going' AND e.Published = 1 AND e.StartUtc >= DATEADD(day, -1, SYSDATETIMEOFFSET())
             ORDER BY e.StartUtc ASC;
             """, new { meId }, cancellationToken: ct));
         return rows.ToList();
@@ -132,7 +137,8 @@ public sealed class SqlSquadEventStore(string connectionString) : ISquadEventSto
     {
         await using var conn = new SqlConnection(connectionString);
         if (!await IsOwnerAsync(squadId, ownerId, ct)) return null;
-        // Confirm the event belongs to this squad, then list its RSVPs (checked-in first, then by join time).
+        // Confirm the event belongs to this squad, then list its confirmed ('going') RSVPs
+        // (checked-in first, then by join time). Pending requests are listed separately.
         var rows = await conn.QueryAsync<SquadEventAttendee>(new CommandDefinition("""
             SELECT a.Id AS AthleteId, a.DisplayName AS Name, a.Initials, a.AvatarColor,
                    CAST(r.JoinedUtc AS datetimeoffset(0)) AS JoinedUtc,
@@ -142,10 +148,91 @@ public sealed class SqlSquadEventStore(string connectionString) : ISquadEventSto
             FROM dbo.SquadEventRsvp r
             JOIN dbo.SquadEvent e ON e.Id = r.EventId AND e.SquadId = @squadId
             JOIN dbo.Athlete a ON a.Id = r.AthleteId
-            WHERE r.EventId = @eventId
+            WHERE r.EventId = @eventId AND r.Status = 'going'
             ORDER BY CASE WHEN r.CheckedInUtc IS NULL THEN 1 ELSE 0 END, r.JoinedUtc;
             """, new { squadId, eventId }, cancellationToken: ct));
         return rows.ToList();
+    }
+
+    public async Task<IReadOnlyList<SquadEventAttendee>?> ListPendingForEventAsync(Guid squadId, Guid ownerId, Guid eventId, CancellationToken ct)
+    {
+        await using var conn = new SqlConnection(connectionString);
+        if (!await IsOwnerAsync(squadId, ownerId, ct)) return null;
+        // The non-members awaiting the coach's decision on this event, oldest request first.
+        var rows = await conn.QueryAsync<SquadEventAttendee>(new CommandDefinition("""
+            SELECT a.Id AS AthleteId, a.DisplayName AS Name, a.Initials, a.AvatarColor,
+                   CAST(r.JoinedUtc AS datetimeoffset(0)) AS JoinedUtc,
+                   CAST(r.CheckedInUtc AS datetimeoffset(0)) AS CheckedInUtc,
+                   CASE WHEN a.AvatarBlob IS NOT NULL
+                        THEN '/api/images/avatars/' + LOWER(CONVERT(varchar(36), a.Id)) END AS AvatarUrl
+            FROM dbo.SquadEventRsvp r
+            JOIN dbo.SquadEvent e ON e.Id = r.EventId AND e.SquadId = @squadId
+            JOIN dbo.Athlete a ON a.Id = r.AthleteId
+            WHERE r.EventId = @eventId AND r.Status = 'pending'
+            ORDER BY r.JoinedUtc;
+            """, new { squadId, eventId }, cancellationToken: ct));
+        return rows.ToList();
+    }
+
+    public async Task<IReadOnlyList<EventJoinRequestItem>> ListPendingEventRequestsForOwnerAsync(Guid ownerId, CancellationToken ct)
+    {
+        await using var conn = new SqlConnection(connectionString);
+        // Every pending event-join request across the squads this athlete owns — the coach's unified inbox.
+        var rows = await conn.QueryAsync<EventJoinRequestItem>(new CommandDefinition("""
+            SELECT e.SquadId, e.Id AS EventId, e.Title AS EventTitle,
+                   CAST(e.StartUtc AS datetimeoffset(0)) AS StartUtc,
+                   a.Id AS AthleteId, a.DisplayName AS AthleteName, a.Initials, a.AvatarColor,
+                   CASE WHEN a.AvatarBlob IS NOT NULL
+                        THEN '/api/images/avatars/' + LOWER(CONVERT(varchar(36), a.Id)) END AS AvatarUrl,
+                   CAST(r.JoinedUtc AS datetimeoffset(0)) AS RequestedUtc
+            FROM dbo.SquadEventRsvp r
+            JOIN dbo.SquadEvent e ON e.Id = r.EventId
+            JOIN dbo.Squad s ON s.Id = e.SquadId
+            JOIN dbo.Athlete a ON a.Id = r.AthleteId
+            WHERE r.Status = 'pending' AND s.OwnerId = @ownerId
+            ORDER BY r.JoinedUtc;
+            """, new { ownerId }, cancellationToken: ct));
+        return rows.ToList();
+    }
+
+    public async Task<string?> ApproveEventRequestAsync(Guid squadId, Guid ownerId, Guid eventId, Guid athleteId, CancellationToken ct)
+    {
+        await using var conn = new SqlConnection(connectionString);
+        // Read the event title for a matching pending+owned request first (non-null only when one
+        // exists), then flip that request to 'going'.
+        return await conn.ExecuteScalarAsync<string?>(new CommandDefinition("""
+            DECLARE @title NVARCHAR(160) = (
+                SELECT e.Title FROM dbo.SquadEventRsvp r
+                JOIN dbo.SquadEvent e ON e.Id = r.EventId AND e.SquadId = @squadId
+                JOIN dbo.Squad s ON s.Id = e.SquadId
+                WHERE r.EventId = @eventId AND r.AthleteId = @athleteId AND r.Status = 'pending' AND s.OwnerId = @ownerId);
+            UPDATE r SET r.Status = 'going', r.JoinedUtc = SYSDATETIMEOFFSET()
+            FROM dbo.SquadEventRsvp r
+            JOIN dbo.SquadEvent e ON e.Id = r.EventId AND e.SquadId = @squadId
+            JOIN dbo.Squad s ON s.Id = e.SquadId
+            WHERE r.EventId = @eventId AND r.AthleteId = @athleteId AND r.Status = 'pending' AND s.OwnerId = @ownerId;
+            SELECT @title;
+            """, new { squadId, ownerId, eventId, athleteId }, cancellationToken: ct));
+    }
+
+    public async Task<string?> DeclineEventRequestAsync(Guid squadId, Guid ownerId, Guid eventId, Guid athleteId, CancellationToken ct)
+    {
+        await using var conn = new SqlConnection(connectionString);
+        // Read the event title for a matching pending+owned request first (non-null only when one
+        // exists), then remove the request so the athlete may ask again.
+        return await conn.ExecuteScalarAsync<string?>(new CommandDefinition("""
+            DECLARE @title NVARCHAR(160) = (
+                SELECT e.Title FROM dbo.SquadEventRsvp r
+                JOIN dbo.SquadEvent e ON e.Id = r.EventId AND e.SquadId = @squadId
+                JOIN dbo.Squad s ON s.Id = e.SquadId
+                WHERE r.EventId = @eventId AND r.AthleteId = @athleteId AND r.Status = 'pending' AND s.OwnerId = @ownerId);
+            DELETE r
+            FROM dbo.SquadEventRsvp r
+            JOIN dbo.SquadEvent e ON e.Id = r.EventId AND e.SquadId = @squadId
+            JOIN dbo.Squad s ON s.Id = e.SquadId
+            WHERE r.EventId = @eventId AND r.AthleteId = @athleteId AND r.Status = 'pending' AND s.OwnerId = @ownerId;
+            SELECT @title;
+            """, new { squadId, ownerId, eventId, athleteId }, cancellationToken: ct));
     }
 
     public async Task<IReadOnlyList<SquadEventAttendee>?> ListParticipantsAsync(Guid squadId, Guid meId, Guid eventId, CancellationToken ct)
@@ -220,22 +307,45 @@ public sealed class SqlSquadEventStore(string connectionString) : ISquadEventSto
         return removed > 0;
     }
 
-    public async Task<bool> JoinAsync(Guid eventId, Guid meId, CancellationToken ct)
+    public async Task<EventJoinResult> JoinAsync(Guid eventId, Guid meId, CancellationToken ct)
     {
         await using var conn = new SqlConnection(connectionString);
-        // Idempotent join: insert an RSVP only when the event exists and the member hasn't joined yet.
-        var added = await conn.ExecuteAsync(new CommandDefinition("""
-            INSERT INTO dbo.SquadEventRsvp (EventId, AthleteId, JoinedUtc)
-            SELECT @eventId, @meId, SYSDATETIMEOFFSET()
-            WHERE EXISTS (SELECT 1 FROM dbo.SquadEvent WHERE Id = @eventId)
-              AND NOT EXISTS (SELECT 1 FROM dbo.SquadEventRsvp WHERE EventId = @eventId AND AthleteId = @meId);
+
+        // Resolve the event's squad/owner/title and whether the caller is already an RSVP + a squad member.
+        // A member (or the owner) joins instantly ('going'); a non-member's join is a pending request.
+        var ctx = await conn.QuerySingleOrDefaultAsync<JoinContext>(new CommandDefinition("""
+            SELECT e.SquadId, s.OwnerId, e.Title,
+                   (SELECT r.Status FROM dbo.SquadEventRsvp r WHERE r.EventId = e.Id AND r.AthleteId = @meId) AS ExistingStatus,
+                   CAST(CASE WHEN s.OwnerId = @meId
+                              OR EXISTS (SELECT 1 FROM dbo.Membership mm WHERE mm.SquadId = e.SquadId AND mm.AthleteId = @meId)
+                             THEN 1 ELSE 0 END AS bit) AS IsMember
+            FROM dbo.SquadEvent e
+            JOIN dbo.Squad s ON s.Id = e.SquadId
+            WHERE e.Id = @eventId;
             """, new { eventId, meId }, cancellationToken: ct));
-        // Already-joined counts as success (idempotent) as long as the event exists.
-        if (added > 0) return true;
-        return await conn.ExecuteScalarAsync<int>(new CommandDefinition(
-            "SELECT COUNT(1) FROM dbo.SquadEventRsvp WHERE EventId = @eventId AND AthleteId = @meId;",
-            new { eventId, meId }, cancellationToken: ct)) > 0;
+
+        if (ctx is null) return new EventJoinResult(EventJoinOutcome.NotFound, Guid.Empty, Guid.Empty, "");
+
+        // Already have an RSVP — idempotent (report joined-vs-requested from the existing row).
+        if (ctx.ExistingStatus is not null)
+        {
+            var outcome = ctx.ExistingStatus == "pending" ? EventJoinOutcome.AlreadyRequested : EventJoinOutcome.AlreadyJoined;
+            return new EventJoinResult(outcome, ctx.SquadId, ctx.OwnerId, ctx.Title);
+        }
+
+        var status = ctx.IsMember ? "going" : "pending";
+        await conn.ExecuteAsync(new CommandDefinition("""
+            INSERT INTO dbo.SquadEventRsvp (EventId, AthleteId, JoinedUtc, Status)
+            SELECT @eventId, @meId, SYSDATETIMEOFFSET(), @status
+            WHERE NOT EXISTS (SELECT 1 FROM dbo.SquadEventRsvp WHERE EventId = @eventId AND AthleteId = @meId);
+            """, new { eventId, meId, status }, cancellationToken: ct));
+
+        return new EventJoinResult(
+            ctx.IsMember ? EventJoinOutcome.Joined : EventJoinOutcome.Requested,
+            ctx.SquadId, ctx.OwnerId, ctx.Title);
     }
+
+    private sealed record JoinContext(Guid SquadId, Guid OwnerId, string Title, string? ExistingStatus, bool IsMember);
 
     public async Task<bool> LeaveAsync(Guid eventId, Guid meId, CancellationToken ct)
     {
@@ -255,7 +365,7 @@ public sealed class SqlSquadEventStore(string connectionString) : ISquadEventSto
         var probe = await conn.QuerySingleOrDefaultAsync<CheckInProbe>(new CommandDefinition("""
             SELECT
                 CAST(CASE WHEN e.Id IS NULL THEN 0 ELSE 1 END AS bit) AS EventExists,
-                CAST(CASE WHEN r.EventId IS NULL THEN 0 ELSE 1 END AS bit) AS Joined,
+                CAST(CASE WHEN r.Status = 'going' THEN 1 ELSE 0 END AS bit) AS Joined,
                 CAST(CASE WHEN r.CheckedInUtc IS NULL THEN 0 ELSE 1 END AS bit) AS AlreadyCheckedIn,
                 CAST(CASE WHEN CAST(SWITCHOFFSET(SYSDATETIMEOFFSET(), DATEPART(TZOFFSET, e.StartUtc)) AS date)
                              = CAST(e.StartUtc AS date) THEN 1 ELSE 0 END AS bit) AS IsToday

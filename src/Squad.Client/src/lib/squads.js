@@ -32,6 +32,9 @@ export const updateSquad = (token, id, body) => req(`/api/squads/${id}`, { metho
 export const listMembers = (token, id) => req(`/api/squads/${id}/members`, { token });
 export const addMember = (token, id, email) => req(`/api/squads/${id}/members`, { method: 'POST', token, body: { email } });
 export const removeMember = (token, id, athleteId) => req(`/api/squads/${id}/members/${athleteId}`, { method: 'DELETE', token });
+// Owner promotes/demotes a member's role ('coach' | 'member'), and transfers ownership to a coach.
+export const setMemberRole = (token, id, athleteId, role) => req(`/api/squads/${id}/members/${athleteId}/role`, { method: 'POST', token, body: { role } });
+export const transferOwnership = (token, id, athleteId) => req(`/api/squads/${id}/transfer/${athleteId}`, { method: 'POST', token });
 
 // Invite links: owner mints a shareable link (reset=true rotates it → { token }); anyone can look
 // up an invite before signing up ({ token, squadId, squadName, discipline, color, memberCount, logoUrl });

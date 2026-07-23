@@ -24,7 +24,11 @@ public sealed record SquadEventView(
     // the client show "you rode this" and open the ride. Column order matches ViewSelect.
     Guid? MyActivityId = null,
     // Optional per-event branding — proxy paths (null when unset). Column order matches ViewSelect.
-    string? LogoUrl = null, string? BannerUrl = null);
+    string? LogoUrl = null, string? BannerUrl = null,
+    // Join gating: RequestPending = the caller has a pending (not-yet-approved) join request;
+    // Member = the caller is a member (or owner) of the event's squad, so they join instantly
+    // rather than requesting. Column order matches ViewSelect.
+    bool RequestPending = false, bool Member = false);
 
 /// <summary>One member's attendance on an event, for the coach's joins/check-ins roster:
 /// who joined, when, and whether (and when) they checked in.</summary>
@@ -35,6 +39,22 @@ public sealed record SquadEventAttendee(
 /// <summary>Why a check-in was (or wasn't) accepted. <see cref="Ok"/> covers a fresh check-in and a
 /// repeat of one already recorded (idempotent).</summary>
 public enum CheckInOutcome { Ok, NotFound, NotJoined, NotToday }
+
+/// <summary>Outcome of an event join. A member (or owner) of the event's squad joins instantly
+/// (<see cref="Joined"/>); a non-member's join is a pending request the coach approves
+/// (<see cref="Requested"/>). The Already* variants make the call idempotent.</summary>
+public enum EventJoinOutcome { Joined, Requested, AlreadyJoined, AlreadyRequested, NotFound }
+
+/// <summary>Result of <see cref="ISquadEventStore.JoinAsync"/> — the outcome plus the event's squad,
+/// owner and title, so the caller can notify the coach of a new request without a second query.</summary>
+public sealed record EventJoinResult(EventJoinOutcome Outcome, Guid SquadId, Guid OwnerId, string Title);
+
+/// <summary>A pending event-join request from a non-member, for the coach's cross-squad inbox:
+/// which event (squad + title + start) and who's asking.</summary>
+public sealed record EventJoinRequestItem(
+    Guid SquadId, Guid EventId, string EventTitle, DateTimeOffset StartUtc,
+    Guid AthleteId, string AthleteName, string Initials, string AvatarColor, string? AvatarUrl,
+    DateTimeOffset RequestedUtc);
 
 /// <summary>Outcome of a publish/unpublish call. <see cref="PublishedNow"/> flags the
 /// unpublished→published transition — the only case that should fan out notifications.</summary>
@@ -64,8 +84,20 @@ public interface ISquadEventStore
     /// Returns whether this call flipped a previously-unpublished event to published (so the caller can
     /// fan out notifications only on a genuine publish transition).</summary>
     Task<SetPublishedResult> SetPublishedAsync(Guid squadId, Guid ownerId, Guid eventId, bool published, CancellationToken ct);
-    /// <summary>The full join/check-in roster for an event — owner-only; null if the caller isn't the owner.</summary>
+    /// <summary>The full join/check-in roster for an event (the confirmed 'going' attendees) — owner-only;
+    /// null if the caller isn't the owner.</summary>
     Task<IReadOnlyList<SquadEventAttendee>?> ListAttendeesAsync(Guid squadId, Guid ownerId, Guid eventId, CancellationToken ct);
+    /// <summary>Pending join requests for one event (non-members awaiting the coach's decision) — owner-only;
+    /// null if the caller isn't the owner. Feeds the per-event roster's "Requests" section.</summary>
+    Task<IReadOnlyList<SquadEventAttendee>?> ListPendingForEventAsync(Guid squadId, Guid ownerId, Guid eventId, CancellationToken ct);
+    /// <summary>The owner's pending event-join requests across every squad they own — the unified inbox.</summary>
+    Task<IReadOnlyList<EventJoinRequestItem>> ListPendingEventRequestsForOwnerAsync(Guid ownerId, CancellationToken ct);
+    /// <summary>Approve a pending event-join request (owner-only): flips the RSVP to 'going'. Returns the
+    /// event title on success (for notifying the requester); null if not owner or no pending request.</summary>
+    Task<string?> ApproveEventRequestAsync(Guid squadId, Guid ownerId, Guid eventId, Guid athleteId, CancellationToken ct);
+    /// <summary>Decline a pending event-join request (owner-only): removes the pending RSVP so the athlete
+    /// may request again later. Returns the event title on success; null if not owner or no pending request.</summary>
+    Task<string?> DeclineEventRequestAsync(Guid squadId, Guid ownerId, Guid eventId, Guid athleteId, CancellationToken ct);
     /// <summary>The event's participant roster for the member-facing event page — any signed-in athlete
     /// may see a published event's roster (owner also sees drafts). Null if not visible to the caller.</summary>
     Task<IReadOnlyList<SquadEventAttendee>?> ListParticipantsAsync(Guid squadId, Guid meId, Guid eventId, CancellationToken ct);
@@ -75,7 +107,10 @@ public interface ISquadEventStore
     Task<string?> GetRouteAsync(Guid squadId, Guid meId, Guid eventId, CancellationToken ct);
     /// <summary>Delete an event if <paramref name="ownerId"/> owns its squad; false otherwise.</summary>
     Task<bool> DeleteAsync(Guid squadId, Guid ownerId, Guid eventId, CancellationToken ct);
-    Task<bool> JoinAsync(Guid eventId, Guid meId, CancellationToken ct);
+    /// <summary>RSVP to an event. A member (or owner) of the event's squad joins instantly; a non-member's
+    /// join becomes a pending request the coach approves. The result carries the event's squad/owner/title
+    /// so the caller can notify the coach of a new request.</summary>
+    Task<EventJoinResult> JoinAsync(Guid eventId, Guid meId, CancellationToken ct);
     Task<bool> LeaveAsync(Guid eventId, Guid meId, CancellationToken ct);
     /// <summary>Mark attendance. Only allowed on the calendar day of the event (in its own offset),
     /// and only for a member who has already joined.</summary>

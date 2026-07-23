@@ -8,6 +8,7 @@ import {
   listSquadEvents, deleteSquadEvent, publishEvent, unpublishEvent, listEventAttendees,
   listEventParticipants, getEventRoute,
   joinEvent, leaveEvent, checkInEvent, undoCheckInEvent,
+  listEventRequests, approveEventRequest, declineEventRequest,
 } from '../lib/events.js';
 
 // The motorsport clubs' second tab (replaces Plan). Motorsport clubs run on scheduled
@@ -80,6 +81,7 @@ export default function Events({ vm, actions, getToken, meId, onDataChanged }) {
   // coach-only per-event UI state
   const [openId, setOpenId] = useState(null);       // event whose roster is expanded
   const [rosters, setRosters] = useState({});       // eventId → attendees[] (null = loading)
+  const [reqs, setReqs] = useState({});             // eventId → pending join requests[] (non-members)
   const [confirmId, setConfirmId] = useState(null); // event pending delete-confirmation
   const [dirTarget, setDirTarget] = useState(null); // { lat, lon, title } → Directions action sheet
 
@@ -241,9 +243,33 @@ export default function Events({ vm, actions, getToken, meId, onDataChanged }) {
     setOpenId(ev.id);
     if (rosters[ev.id] === undefined) {
       setRosters((r) => ({ ...r, [ev.id]: null }));
-      try { const t = await getToken?.(); const a = await listEventAttendees(t, squadId, ev.id); setRosters((r) => ({ ...r, [ev.id]: a })); }
-      catch { setRosters((r) => ({ ...r, [ev.id]: [] })); }
+      try {
+        const t = await getToken?.();
+        // Fetch the confirmed roster and any pending (non-member) requests together.
+        const [a, pending] = await Promise.all([
+          listEventAttendees(t, squadId, ev.id),
+          listEventRequests(t, squadId, ev.id).catch(() => []),
+        ]);
+        setRosters((r) => ({ ...r, [ev.id]: a }));
+        setReqs((r) => ({ ...r, [ev.id]: pending || [] }));
+      } catch { setRosters((r) => ({ ...r, [ev.id]: [] })); }
     }
+  };
+
+  // Coach approves/declines a non-member's request to join this event, then refreshes the roster + counts.
+  const decideReq = async (ev, athleteId, approve) => {
+    setReqs((r) => ({ ...r, [ev.id]: (r[ev.id] || []).filter((x) => x.athleteId !== athleteId) })); // optimistic
+    try {
+      const t = await getToken?.();
+      if (approve) {
+        await approveEventRequest(t, squadId, ev.id, athleteId);
+        const a = await listEventAttendees(t, squadId, ev.id);
+        setRosters((r) => ({ ...r, [ev.id]: a }));
+        patch(ev.id, { joinCount: (ev.joinCount || 0) + 1 });
+      } else {
+        await declineEventRequest(t, squadId, ev.id, athleteId);
+      }
+    } catch (e) { setError(e?.message || 'Could not update that request.'); }
   };
 
   const pendingEvent = confirmId ? (items || []).find((x) => x.id === confirmId) : null;
@@ -254,9 +280,11 @@ export default function Events({ vm, actions, getToken, meId, onDataChanged }) {
   const renderCard = (ev) => (
     <EventCard key={ev.id} ev={ev} isOwner={isOwner} busy={busyId === ev.id} token={token}
       route={routes[ev.id]} participants={faces[ev.id]} rosterOpen={openId === ev.id} roster={rosters[ev.id]}
+      requests={reqs[ev.id]}
       onOpen={() => actions.openEvent(ev)}
       onDirections={(lat, lon) => setDirTarget({ lat, lon, title: ev.title })}
       onJoin={() => join(ev)} onLeave={() => leave(ev)} onCheckIn={() => checkin(ev)} onUndoCheckIn={() => undoCheckin(ev)}
+      onApproveReq={(aid) => decideReq(ev, aid, true)} onDeclineReq={(aid) => decideReq(ev, aid, false)}
       onEdit={() => actions.editEvent(ev)} onPublish={() => togglePublish(ev)} onDelete={() => setConfirmId(ev.id)} onRoster={() => toggleRoster(ev)} />
   );
 
@@ -424,8 +452,9 @@ function PeriodNav({ nav, onPrev, onNext, onToday }) {
 //    date chip · type · title · when/where · route-map preview, then a who's-going + RSVP
 //    footer for members, or a roster + edit/publish/delete block for the coach (squad owner). ──
 function EventCard({
-  ev, isOwner, busy, token, route, participants, rosterOpen, roster,
-  onOpen, onDirections, onJoin, onLeave, onCheckIn, onUndoCheckIn, onEdit, onPublish, onDelete, onRoster,
+  ev, isOwner, busy, token, route, participants, rosterOpen, roster, requests,
+  onOpen, onDirections, onJoin, onLeave, onCheckIn, onUndoCheckIn, onApproveReq, onDeclineReq,
+  onEdit, onPublish, onDelete, onRoster,
 }) {
   const d = new Date(ev.start);
   const meta = sportMeta(ev.sport);
@@ -506,13 +535,34 @@ function EventCard({
             <span style={s('flex:1;font-size:12px;color:var(--text2);font-weight:600')}>
               <span className="mono" style={s('color:var(--text)')}>{ev.joinCount || 0}</span> joined · <span className="mono" style={s('color:var(--good)')}>{ev.checkedInCount || 0}</span> checked in
             </span>
+            {requests && requests.length > 0 && (
+              <span style={s('flex:none;font-size:10.5px;font-weight:700;color:var(--accent-ink);background:var(--accent);padding:2px 8px;border-radius:7px')}>{requests.length} request{requests.length > 1 ? 's' : ''}</span>
+            )}
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={s(`transform:rotate(${rosterOpen ? 180 : 0}deg);transition:transform .15s`)}><path d="M6 9l6 6 6-6" /></svg>
           </div>
 
           {rosterOpen && (
             <div style={s('margin-top:8px;display:flex;flex-direction:column;gap:6px')}>
+              {/* pending requests from non-members — approve or decline */}
+              {requests && requests.length > 0 && (
+                <>
+                  <div style={s('font-size:10px;color:var(--accent);text-transform:uppercase;letter-spacing:1.2px;font-weight:700;padding:2px 2px')}>Requests to join</div>
+                  {requests.map((a) => (
+                    <div key={a.athleteId} style={s('display:flex;align-items:center;gap:10px;padding:7px 9px;background:color-mix(in srgb,var(--accent) 8%,var(--bg3));border:1px solid color-mix(in srgb,var(--accent) 22%,transparent);border-radius:10px')}>
+                      <AuthedAvatar avatarUrl={a.avatarUrl} token={token} initials={a.initials} color={a.avatarColor} size={28} radius={9} fontSize={11} />
+                      <div style={s('flex:1;min-width:0')}>
+                        <div style={s('font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>{a.name}</div>
+                        <div style={s('font-size:9.5px;color:var(--text3)')}>not a member · wants to join</div>
+                      </div>
+                      <div className="ctl" onClick={() => onDeclineReq(a.athleteId)} style={s('flex:none;padding:6px 10px;border-radius:9px;font-size:11px;font-weight:700;background:color-mix(in srgb,var(--bad) 14%,var(--bg3));border:1px solid color-mix(in srgb,var(--bad) 32%,transparent);color:var(--bad)')}>Decline</div>
+                      <div className="ctl" onClick={() => onApproveReq(a.athleteId)} style={s('flex:none;padding:6px 12px;border-radius:9px;font-size:11px;font-weight:700;background:var(--good);color:#04140b')}>Approve</div>
+                    </div>
+                  ))}
+                  {roster && roster.length > 0 && <div style={s('height:2px')} />}
+                </>
+              )}
               {roster === null && <div style={s('font-size:11.5px;color:var(--text3);padding:6px 2px')}>Loading roster…</div>}
-              {roster && roster.length === 0 && <div style={s('font-size:11.5px;color:var(--text3);padding:6px 2px')}>Nobody has joined yet.</div>}
+              {roster && roster.length === 0 && (!requests || requests.length === 0) && <div style={s('font-size:11.5px;color:var(--text3);padding:6px 2px')}>Nobody has joined yet.</div>}
               {roster && roster.map((a) => (
                 <div key={a.athleteId} style={s('display:flex;align-items:center;gap:10px;padding:7px 9px;background:var(--bg3);border-radius:10px')}>
                   <AuthedAvatar avatarUrl={a.avatarUrl} token={token} initials={a.initials} color={a.avatarColor} size={28} radius={9} fontSize={11} />

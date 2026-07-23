@@ -71,6 +71,8 @@ export async function uploadEventImage(token, squadId, eventId, kind, blob) {
 export const deleteEventImage = (token, squadId, eventId, kind) => req(`/api/squads/${squadId}/events/${eventId}/${kind}`, { method: 'DELETE', token });
 export const deleteSquadEvent = (token, squadId, eventId) => req(`/api/squads/${squadId}/events/${eventId}`, { method: 'DELETE', token });
 
+// Join an event. A member (or owner) of the event's squad joins instantly → { joined: true }; a
+// non-member's join is a request the coach must approve → { requested: true }. 404 → gone.
 export const joinEvent = (token, eventId) => req(`/api/events/${eventId}/join`, { method: 'POST', token });
 export const leaveEvent = (token, eventId) => req(`/api/events/${eventId}/leave`, { method: 'POST', token });
 export const checkInEvent = (token, eventId) => req(`/api/events/${eventId}/checkin`, { method: 'POST', token });
@@ -78,3 +80,11 @@ export const undoCheckInEvent = (token, eventId) => req(`/api/events/${eventId}/
 
 // The caller's joined upcoming events across every squad, soonest first.
 export const listMyEvents = (token) => req('/api/events/mine', { token });
+
+// ── Event join requests (non-members ask; the coach approves/declines) ──
+// Owner-only pending requests for one event → [{ athleteId, name, initials, avatarColor, avatarUrl, requestedUtc }]
+export const listEventRequests = (token, squadId, eventId) => req(`/api/squads/${squadId}/events/${eventId}/requests`, { token });
+export const approveEventRequest = (token, squadId, eventId, athleteId) => req(`/api/squads/${squadId}/events/${eventId}/requests/${athleteId}/approve`, { method: 'POST', token });
+export const declineEventRequest = (token, squadId, eventId, athleteId) => req(`/api/squads/${squadId}/events/${eventId}/requests/${athleteId}/decline`, { method: 'POST', token });
+// The owner's cross-squad pending event-request inbox → [{ squadId, eventId, eventTitle, start, athleteId, athleteName, initials, avatarColor, avatarUrl, requestedUtc }]
+export const listMyEventRequests = (token) => req('/api/events/requests', { token });

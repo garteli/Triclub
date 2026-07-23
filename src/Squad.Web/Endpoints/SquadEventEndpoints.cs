@@ -22,6 +22,12 @@ public static class SquadEventEndpoints
         app.MapGet("/api/squads/{squadId:guid}/events/{eventId:guid}/participants", EventParticipants).RequireAuthorization();
         app.MapGet("/api/squads/{squadId:guid}/events/{eventId:guid}/route", EventRoute).RequireAuthorization();
         app.MapDelete("/api/squads/{squadId:guid}/events/{eventId:guid}", DeleteEvent).RequireAuthorization();
+        // Owner-only: pending event-join requests from non-members, per event and approve/decline.
+        app.MapGet("/api/squads/{squadId:guid}/events/{eventId:guid}/requests", EventRequests).RequireAuthorization();
+        app.MapPost("/api/squads/{squadId:guid}/events/{eventId:guid}/requests/{athleteId:guid}/approve", ApproveEventRequest).RequireAuthorization();
+        app.MapPost("/api/squads/{squadId:guid}/events/{eventId:guid}/requests/{athleteId:guid}/decline", DeclineEventRequest).RequireAuthorization();
+        // The owner's cross-squad pending event-request inbox (the unified requests screen).
+        app.MapGet("/api/events/requests", MyEventRequests).RequireAuthorization();
         // Member-scoped RSVP + check-in, plus the caller's own joined-events list.
         app.MapPost("/api/events/{eventId:guid}/join", JoinEvent).RequireAuthorization();
         app.MapPost("/api/events/{eventId:guid}/leave", LeaveEvent).RequireAuthorization();
@@ -240,11 +246,100 @@ public static class SquadEventEndpoints
             : Results.Json(new { error = "Only the group manager can remove sessions." }, statusCode: 403);
     }
 
-    private static async Task<IResult> JoinEvent(Guid eventId, HttpContext http, ISquadEventStore events, CancellationToken ct)
+    private static async Task<IResult> JoinEvent(
+        Guid eventId, HttpContext http, ISquadEventStore events,
+        INotificationService notes, IAthleteDirectory directory, CancellationToken ct)
     {
         if (Me(http) is not { } me) return Results.Unauthorized();
-        var ok = await events.JoinAsync(eventId, me, ct);
-        return ok ? Results.Ok(new { joined = true }) : Results.NotFound(new { error = "That session no longer exists." });
+        var result = await events.JoinAsync(eventId, me, ct);
+        switch (result.Outcome)
+        {
+            case EventJoinOutcome.NotFound:
+                return Results.NotFound(new { error = "That session no longer exists." });
+            case EventJoinOutcome.Requested:
+                // Notify the coach that a non-member has asked to join this event (best-effort).
+                try
+                {
+                    var asker = (await directory.GetAsync(me, ct))?.Name ?? "Someone";
+                    if (result.OwnerId != me)
+                        await notes.AddAsync(result.OwnerId, "request", me, asker, $"asked to join \"{result.Title}\"", ct);
+                }
+                catch (Exception) { /* the request is saved; the notification is best-effort */ }
+                return Results.Ok(new { requested = true });
+            case EventJoinOutcome.AlreadyRequested:
+                return Results.Ok(new { requested = true });
+            default: // Joined / AlreadyJoined
+                return Results.Ok(new { joined = true });
+        }
+    }
+
+    private static async Task<IResult> EventRequests(
+        Guid squadId, Guid eventId, HttpContext http, ISquadEventStore events, CancellationToken ct)
+    {
+        if (Me(http) is not { } me) return Results.Unauthorized();
+        var list = await events.ListPendingForEventAsync(squadId, me, eventId, ct);
+        return list is null
+            ? Results.Json(new { error = "Only the group manager can review requests." }, statusCode: 403)
+            : Results.Ok(list.Select(a => new
+            {
+                athleteId = a.AthleteId,
+                name = a.Name,
+                initials = a.Initials,
+                avatarColor = a.AvatarColor,
+                avatarUrl = a.AvatarUrl,
+                requestedUtc = a.JoinedUtc,
+            }));
+    }
+
+    private static async Task<IResult> MyEventRequests(HttpContext http, ISquadEventStore events, CancellationToken ct)
+    {
+        if (Me(http) is not { } me) return Results.Unauthorized();
+        var list = await events.ListPendingEventRequestsForOwnerAsync(me, ct);
+        return Results.Ok(list.Select(r => new
+        {
+            squadId = r.SquadId,
+            eventId = r.EventId,
+            eventTitle = r.EventTitle,
+            start = r.StartUtc,
+            athleteId = r.AthleteId,
+            athleteName = r.AthleteName,
+            initials = r.Initials,
+            avatarColor = r.AvatarColor,
+            avatarUrl = r.AvatarUrl,
+            requestedUtc = r.RequestedUtc,
+        }));
+    }
+
+    private static async Task<IResult> ApproveEventRequest(
+        Guid squadId, Guid eventId, Guid athleteId, HttpContext http,
+        ISquadEventStore events, INotificationService notes, IAthleteDirectory directory, CancellationToken ct)
+    {
+        if (Me(http) is not { } me) return Results.Unauthorized();
+        var title = await events.ApproveEventRequestAsync(squadId, me, eventId, athleteId, ct);
+        if (title is null) return Results.NotFound(new { error = "No pending request, or you don't manage this group." });
+        try
+        {
+            var coach = (await directory.GetAsync(me, ct))?.Name ?? "Your coach";
+            await notes.AddAsync(athleteId, "approved", me, coach, $"approved you to join \"{title}\"", ct);
+        }
+        catch (Exception) { /* the approval is saved; the notification is best-effort */ }
+        return Results.Ok(new { status = "approved" });
+    }
+
+    private static async Task<IResult> DeclineEventRequest(
+        Guid squadId, Guid eventId, Guid athleteId, HttpContext http,
+        ISquadEventStore events, INotificationService notes, IAthleteDirectory directory, CancellationToken ct)
+    {
+        if (Me(http) is not { } me) return Results.Unauthorized();
+        var title = await events.DeclineEventRequestAsync(squadId, me, eventId, athleteId, ct);
+        if (title is null) return Results.NotFound(new { error = "No pending request, or you don't manage this group." });
+        try
+        {
+            var coach = (await directory.GetAsync(me, ct))?.Name ?? "Your coach";
+            await notes.AddAsync(athleteId, "declined", me, coach, $"declined your request to join \"{title}\"", ct);
+        }
+        catch (Exception) { /* the decline is saved; the notification is best-effort */ }
+        return Results.Ok(new { status = "declined" });
     }
 
     private static async Task<IResult> LeaveEvent(Guid eventId, HttpContext http, ISquadEventStore events, CancellationToken ct)
@@ -295,6 +390,8 @@ public static class SquadEventEndpoints
         myActivityId = e.MyActivityId,      // the caller's recorded ride for this event, if any
         logoUrl = e.LogoUrl,
         bannerUrl = e.BannerUrl,
+        requestPending = e.RequestPending,  // caller has an unapproved join request
+        member = e.Member,                  // caller is a member of the event's squad (joins instantly)
     };
 
     private static object ToDto(SquadEvent e) => new
