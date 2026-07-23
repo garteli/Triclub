@@ -69,6 +69,26 @@ const smooth = (arr, k) => arr.map((_, i) => {
   return s / c;
 });
 
+// Resample a profile to evenly-spaced samples (metres apart), interpolating elevation. A raw/dense
+// input (e.g. an off-road GPX with points every few metres, or a noisy terrain read) would otherwise
+// spawn hundreds of ~metre-long "sections" with absurd gradients; a fixed grid bounds the work and
+// smooths the noise before anything is measured.
+function resampleEven(raw, stepM) {
+  const totalM = raw[raw.length - 1].dist;
+  if (!(totalM > 0)) return raw;
+  const out = [];
+  let j = 0;
+  for (let dist = 0; dist < totalM; dist += stepM) {
+    while (j < raw.length - 1 && raw[j + 1].dist < dist) j += 1;
+    const a = raw[j];
+    const b = raw[Math.min(j + 1, raw.length - 1)];
+    const f = b.dist > a.dist ? (dist - a.dist) / (b.dist - a.dist) : 0;
+    out.push({ dist, e: a.e + (b.e - a.e) * f });
+  }
+  out.push({ dist: totalM, e: raw[raw.length - 1].e });
+  return out;
+}
+
 // Steepest ~200 m ramp inside a sample window [a,b) → gradient %.
 const maxRamp = (d, e, a, b) => {
   let mx = 0;
@@ -84,8 +104,14 @@ const maxRamp = (d, e, a, b) => {
 export function analyzeProfile(profile) {
   const raw = (profile || []).filter((p) => Number.isFinite(p?.dist) && Number.isFinite(p?.e));
   if (raw.length < 4) return null;
-  const d = raw.map((p) => p.dist);
-  const e = smooth(raw.map((p) => p.e), 2);
+  // Resample to an even grid (≥120 m spacing, ≤~500 samples) so section detection is driven by real
+  // terrain, not raw point density — then smooth. Without this a dense GPX yields hundreds of
+  // metre-long "climbs" at impossible gradients (e.g. +581%) and a wildly inflated total ascent.
+  const totalLen = raw[raw.length - 1].dist || 1;
+  const step = Math.max(120, totalLen / 500);
+  const grid = resampleEven(raw, step);
+  const d = grid.map((p) => p.dist);
+  const e = smooth(grid.map((p) => p.e), 2);
   const totalM = d[d.length - 1] || 1;
   const span = Math.max(1, Math.max(...e) - Math.min(...e));
   const MIN_LEN = Math.max(250, totalM * 0.03);   // ignore sections shorter than this…
@@ -108,7 +134,7 @@ export function analyzeProfile(profile) {
   // (long, so not weak); a short steep wall is a real climb (high prominence, so not weak).
   const weak = (x) => x.lenM < MIN_LEN && Math.abs(x.gainM) < MIN_PROM;
   let guard = 0;
-  while (secs.length > 1 && guard++ < 800) {
+  while (secs.length > 1 && guard++ < 4000) {
     let idx = -1, best = Infinity;
     for (let i = 0; i < secs.length; i++) { if (weak(secs[i]) && Math.abs(secs[i].gainM) < best) { best = Math.abs(secs[i].gainM); idx = i; } }
     if (idx < 0) break;
@@ -144,6 +170,9 @@ export function analyzeProfile(profile) {
     minE: Math.round(Math.min(...e)), maxE: Math.round(Math.max(...e)),
     startE: Math.round(e[0]), finishE: Math.round(e[e.length - 1]),
     maxGradPct: climbs.reduce((a, x) => Math.max(a, x.maxGradPct), 0),
+    // The resampled+smoothed profile the section aIdx/bIdx index into — the drawer must use THIS
+    // (not the raw input) so the ridge segments and summit chips line up with the sections.
+    profile: d.map((dist, i) => ({ dist, e: e[i] })),
     sections,
   };
 }

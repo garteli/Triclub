@@ -27,16 +27,32 @@ export function sampleAlong(pts, N) {
 
 // Terrain elevations (metres[]) for a set of {lat,lon} samples, aligned to the samples.
 // Chunked to ≤100 coordinates per request (Open-Meteo's per-call limit) so a dense route
-// still resolves in a few calls.
+// still resolves in a few calls. Each chunk retries a couple of times with backoff so a transient
+// hiccup / brief rate-limit doesn't blank the whole profile ("unavailable").
+async function fetchChunk(lat, lon, signal) {
+  let lastErr;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt) await new Promise((r) => setTimeout(r, 400 * attempt));
+    try {
+      const res = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lat}&longitude=${lon}`, { signal });
+      if (res.ok) return (await res.json()).elevation || [];
+      lastErr = new Error(`elevation ${res.status}`);
+      if (res.status === 400 || res.status === 404) break; // client error — don't retry
+    } catch (e) {
+      if (e.name === 'AbortError') throw e;
+      lastErr = e;
+    }
+  }
+  throw lastErr || new Error('elevation');
+}
+
 async function fetchElevations(samples, signal) {
   const out = [];
   for (let i = 0; i < samples.length; i += 100) {
     const batch = samples.slice(i, i + 100);
     const lat = batch.map((s) => s.lat.toFixed(5)).join(',');
     const lon = batch.map((s) => s.lon.toFixed(5)).join(',');
-    const res = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lat}&longitude=${lon}`, { signal });
-    if (!res.ok) throw new Error('elevation');
-    out.push(...((await res.json()).elevation || []));
+    out.push(...(await fetchChunk(lat, lon, signal)));
   }
   return out;
 }
@@ -63,21 +79,51 @@ export function profileFromRoute(points) {
   return { profile, ascent: Math.round(ascent), min: Math.min(...es), max: Math.max(...es) };
 }
 
+// Coarse route signature (~100 m endpoints + bucketed length) → dedupe/cache identical reads. The
+// live map's elevation strip AND chart both request the followed course; the event page requests it
+// too. Without this each fires its own Open-Meteo calls, multiplying load and rate-limit risk.
+function routeSig(pts) {
+  if (pts.length < 2) return '';
+  const c = (p) => `${p[0].toFixed(3)},${p[1].toFixed(3)}`;
+  return `${Math.floor(pts.length / 5)}|${c(pts[0])}|${c(pts[pts.length - 1])}`;
+}
+const profileCache = new Map(); // sig → resolved profile object
+const profileInflight = new Map(); // sig → in-flight Promise
+
 // Build the elevation profile for a route: samples along it, reads the terrain, and returns
 // { profile:[{dist,e}], ascent, min, max } — or null if it can't be built. Pass an AbortSignal.
+// Deduped/cached by a coarse route signature so repeat requests for the same route (strip + chart +
+// event page) share one terrain read. The shared read isn't tied to any one caller's AbortSignal —
+// a caller that unmounts simply ignores the (still-cached) result.
 export async function buildElevationProfile(pts, signal) {
-  const samples = sampleAlong(pts, Math.min(90, Math.max(12, (pts?.length || 0) * 2)));
-  if (samples.length < 2) return null;
-  const els = await fetchElevations(samples, signal);
-  if (els.length !== samples.length) throw new Error('mismatch');
-  let ascent = 0;
-  for (let i = 1; i < els.length; i++) { const d = els[i] - els[i - 1]; if (d > 0) ascent += d; }
-  return {
-    profile: samples.map((sm, i) => ({ dist: sm.dist, e: els[i] })),
-    ascent: Math.round(ascent),
-    min: Math.min(...els),
-    max: Math.max(...els),
-  };
+  const clean = (pts || []).filter((p) => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]));
+  const sig = routeSig(clean);
+  if (sig && profileCache.has(sig)) return profileCache.get(sig);
+  if (sig && profileInflight.has(sig)) return profileInflight.get(sig);
+
+  const work = (async () => {
+    const samples = sampleAlong(clean, Math.min(90, Math.max(12, clean.length * 2)));
+    if (samples.length < 2) return null;
+    const els = await fetchElevations(samples); // no caller signal — shared read runs to completion
+    if (els.length !== samples.length) throw new Error('mismatch');
+    let ascent = 0;
+    for (let i = 1; i < els.length; i++) { const d = els[i] - els[i - 1]; if (d > 0) ascent += d; }
+    return {
+      profile: samples.map((sm, i) => ({ dist: sm.dist, e: els[i] })),
+      ascent: Math.round(ascent),
+      min: Math.min(...els),
+      max: Math.max(...els),
+    };
+  })();
+
+  if (sig) profileInflight.set(sig, work);
+  try {
+    const result = await work;
+    if (sig && result) { profileCache.set(sig, result); if (profileCache.size > 40) profileCache.delete(profileCache.keys().next().value); }
+    return result;
+  } finally {
+    if (sig) profileInflight.delete(sig);
+  }
 }
 
 // Denser terrain profile for climb detection: samples the route at ~fixed spacing (capped so the
