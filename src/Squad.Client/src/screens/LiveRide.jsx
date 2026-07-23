@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { s } from '../lib/style.js';
 import RideRecorder from '../components/RideRecorder.jsx';
 import LivePages from '../components/LivePages.jsx';
+import ClimbPro from '../components/ClimbPro.jsx';
 import UwbReadout from '../components/UwbReadout.jsx';
 import CoursePicker from '../components/CoursePicker.jsx';
 import { gearComponentsFromSensors } from '../lib/liveMetrics.js';
@@ -271,6 +272,9 @@ function Active({ actions, live }) {
 
       {/* precise UWB distance/direction to teammates (native + U1 devices; hidden otherwise) */}
       <UwbReadout uwb={live?.uwb} riders={live?.riders} blePeers={live?.peerRanging?.peers} />
+
+      {/* ClimbPro — auto-appears when a climb on the followed course is near/underway */}
+      <ClimbPro tel={tel} indoor={!!live?.rideType?.indoor} />
 
       <LivePages tel={tel} lp={live?.livePages} uwb={live?.uwb} blePeers={live?.peerRanging?.peers} indoor={!!live?.rideType?.indoor} mySport={live?.rideType?.value} />
     </div>
