@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { s, html } from '../lib/style.js';
+import { s } from '../lib/style.js';
 import EmptyState from '../components/EmptyState.jsx';
-import AuthedImage from '../components/AuthedImage.jsx';
 import AuthedAvatar from '../components/AuthedAvatar.jsx';
 import TileMap from '../components/TileMap.jsx';
 import { toPathD } from '../lib/tiles.js';
@@ -35,11 +34,6 @@ const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); r
 const addMonths = (d, n) => { const x = new Date(d); x.setDate(1); x.setMonth(x.getMonth() + n); return x; };
 const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 
-const fmtWhen = (iso) => {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return `${d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
-};
 const fmtTime = (iso) => {
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
@@ -56,11 +50,6 @@ const navApps = (lat, lon) => [
   { key: 'gmaps', label: 'Google Maps', color: '#34a853', url: `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}` },
   { key: 'amaps', label: 'Apple Maps', color: '#5a86ff', url: `https://maps.apple.com/?daddr=${lat},${lon}&dirflg=d` },
 ];
-
-const SportIcon = ({ sport, size = 18 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-    strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={html(sportMeta(sport).icon)} />
-);
 
 const seg = (active) =>
   active
@@ -130,8 +119,9 @@ export default function Events({ vm, actions, getToken, meId, onDataChanged }) {
       .map((g) => ({ ...g, count: `${g.events.length} event${g.events.length === 1 ? '' : 's'}` }));
   }, [upcoming]);
 
-  // Lazily fetch each upcoming event's route (for the map preview + directions) and its
-  // participants (for the "who's going" faces) — real data only, fetched once per event.
+  // Lazily fetch each event's route (for the map preview + directions) and its participants
+  // (for the "who's going" faces) — real data only, fetched once per event and shared by every
+  // view so the Upcoming / Week / Month cards all look identical.
   const fetchFaces = useCallback(async (ev) => {
     setFaces((f) => (f[ev.id] === undefined ? { ...f, [ev.id]: null } : f));
     try { const t = await getToken?.(); const p = await listEventParticipants(t, squadId, ev.id); setFaces((f) => ({ ...f, [ev.id]: p || [] })); }
@@ -140,8 +130,8 @@ export default function Events({ vm, actions, getToken, meId, onDataChanged }) {
 
   const seen = useRef(new Set());
   useEffect(() => {
-    if (view !== 'upcoming' || !squadId) return;
-    upcoming.forEach((ev) => {
+    if (!squadId || !items) return;
+    items.forEach((ev) => {
       if (seen.current.has(ev.id)) return;
       seen.current.add(ev.id);
       // faces: only worth a call when someone has joined
@@ -156,7 +146,7 @@ export default function Events({ vm, actions, getToken, meId, onDataChanged }) {
         })();
       }
     });
-  }, [view, squadId, upcoming, getToken, fetchFaces]);
+  }, [squadId, items, getToken, fetchFaces]);
 
   // ── the current period's window + label (Week / Month views) ─────────────────────
   const week = view === 'week';
@@ -254,6 +244,16 @@ export default function Events({ vm, actions, getToken, meId, onDataChanged }) {
   const deleting = busyId === confirmId;
   const token = getToken?.();
 
+  // One card, wired identically for every view (Upcoming / Week / Month) so they all match.
+  const renderCard = (ev) => (
+    <EventCard key={ev.id} ev={ev} isOwner={isOwner} busy={busyId === ev.id} token={token}
+      route={routes[ev.id]} participants={faces[ev.id]} rosterOpen={openId === ev.id} roster={rosters[ev.id]}
+      onOpen={() => actions.openEvent(ev)}
+      onDirections={(lat, lon) => setDirTarget({ lat, lon, title: ev.title })}
+      onJoin={() => join(ev)} onLeave={() => leave(ev)} onCheckIn={() => checkin(ev)} onUndoCheckIn={() => undoCheckin(ev)}
+      onEdit={() => actions.editEvent(ev)} onPublish={() => togglePublish(ev)} onDelete={() => setConfirmId(ev.id)} onRoster={() => toggleRoster(ev)} />
+  );
+
   return (
     <>
       <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
@@ -307,13 +307,7 @@ export default function Events({ vm, actions, getToken, meId, onDataChanged }) {
                         <span className="mono" style={s('font-size:10.5px;color:var(--text3)')}>{g.count}</span>
                       </div>
                       <div style={s('display:flex;flex-direction:column;gap:10px')}>
-                        {g.events.map((ev) => (
-                          <UpcomingCard key={ev.id} ev={ev} isOwner={isOwner} busy={busyId === ev.id} token={token}
-                            route={routes[ev.id]} participants={faces[ev.id]}
-                            onOpen={() => actions.openEvent(ev)}
-                            onDirections={(lat, lon) => setDirTarget({ lat, lon, title: ev.title })}
-                            onJoin={() => join(ev)} onLeave={() => leave(ev)} />
-                        ))}
+                        {g.events.map(renderCard)}
                       </div>
                     </div>
                   ))}
@@ -326,14 +320,7 @@ export default function Events({ vm, actions, getToken, meId, onDataChanged }) {
                   <WeekEmpty isOwner={isOwner} next={upcoming[0]} onUpcoming={() => setView('upcoming')} />
                 ) : (
                   <div style={s('display:flex;flex-direction:column;gap:10px')}>
-                    {weekItems.map((ev) => (isOwner ? (
-                      <CoachCard key={ev.id} ev={ev} busy={busyId === ev.id} open={openId === ev.id} roster={rosters[ev.id]} token={token}
-                        onOpen={() => actions.openEvent(ev)}
-                        onEdit={() => actions.editEvent(ev)} onPublish={() => togglePublish(ev)} onDelete={() => setConfirmId(ev.id)} onRoster={() => toggleRoster(ev)} />
-                    ) : (
-                      <MemberCard key={ev.id} ev={ev} busy={busyId === ev.id} token={token} onOpen={() => actions.openEvent(ev)}
-                        onJoin={() => join(ev)} onLeave={() => leave(ev)} onCheckIn={() => checkin(ev)} onUndoCheckIn={() => undoCheckin(ev)} />
-                    )))}
+                    {weekItems.map(renderCard)}
                   </div>
                 )}
               </>
@@ -345,8 +332,8 @@ export default function Events({ vm, actions, getToken, meId, onDataChanged }) {
                 {monthList.length === 0 ? (
                   <div style={s('font-size:12.5px;color:var(--text3);padding:14px;border:1px dashed var(--line2);border-radius:14px;text-align:center')}>No events in {monthName(anchor)}.</div>
                 ) : (
-                  <div style={s('display:flex;flex-direction:column;gap:9px')}>
-                    {monthList.map((ev) => <MonthRow key={ev.id} ev={ev} onOpen={() => actions.openEvent(ev)} />)}
+                  <div style={s('display:flex;flex-direction:column;gap:10px')}>
+                    {monthList.map(renderCard)}
                   </div>
                 )}
               </>
@@ -427,20 +414,24 @@ function PeriodNav({ nav, onPrev, onNext, onToday }) {
   );
 }
 
-// ── the flagship upcoming card: date chip · type · title · when/where · map · who's going ──
-function UpcomingCard({ ev, isOwner, busy, token, route, participants, onOpen, onDirections, onJoin, onLeave }) {
+// ── the shared event card, used by every view (Upcoming / Week / Month) so they all match:
+//    date chip · type · title · when/where · route-map preview, then a who's-going + RSVP
+//    footer for members, or a roster + edit/publish/delete block for the coach (squad owner). ──
+function EventCard({
+  ev, isOwner, busy, token, route, participants, rosterOpen, roster,
+  onOpen, onDirections, onJoin, onLeave, onCheckIn, onUndoCheckIn, onEdit, onPublish, onDelete, onRoster,
+}) {
   const d = new Date(ev.start);
   const meta = sportMeta(ev.sport);
   const joined = !!ev.joined;
+  const today = isTodayIso(ev.start);
   const chip = joined
     ? { bg: 'color-mix(in srgb,var(--accent) 16%,transparent)', border: 'color-mix(in srgb,var(--accent) 40%,transparent)', ink: 'var(--accent)' }
     : { bg: 'var(--bg3)', border: 'var(--line)', ink: 'var(--text)' };
   const place = ev.courseName || '';
   const start = route && route.length ? route.find((p) => Array.isArray(p) && Number.isFinite(p[0])) : null;
 
-  const rsvpStyle = joined
-    ? 'flex:none;padding:8px 15px;border-radius:11px;background:color-mix(in srgb,var(--good) 16%,transparent);border:1px solid color-mix(in srgb,var(--good) 40%,transparent);font-size:12px;font-weight:700;color:var(--good)'
-    : 'flex:none;padding:8px 15px;border-radius:11px;background:var(--accent);color:var(--accent-ink);font-size:12px;font-weight:700';
+  const pill = 'flex:none;padding:8px 15px;border-radius:11px;font-size:12px;font-weight:700';
 
   return (
     <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:17px;padding:13px 14px')}>
@@ -452,11 +443,14 @@ function UpcomingCard({ ev, isOwner, busy, token, route, participants, onOpen, o
           <div style={s('font-size:8.5px;color:var(--text3);margin-top:3px')}>{d.toLocaleDateString('en-US', { weekday: 'short' })}</div>
         </div>
         <div style={s('flex:1;min-width:0')}>
-          <div style={s('display:flex;align-items:center;gap:7px')}>
+          <div style={s('display:flex;align-items:center;gap:7px;flex-wrap:wrap')}>
             <span style={s(`width:7px;height:7px;border-radius:50%;background:${meta.color};flex:none`)} />
             <span style={s(`font-size:9.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:${meta.color}`)}>{meta.label}</span>
             {isOwner && !ev.published && (
               <span style={s('font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--warn);background:color-mix(in srgb,var(--warn) 15%,transparent);padding:2px 6px;border-radius:5px')}>Draft</span>
+            )}
+            {today && (
+              <span style={s('font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--accent);background:var(--accent-dim);padding:2px 6px;border-radius:5px')}>Today</span>
             )}
           </div>
           <div dir="auto" style={s('font-size:15.5px;font-weight:700;line-height:1.2;margin-top:5px')}>{ev.title}</div>
@@ -497,21 +491,85 @@ function UpcomingCard({ ev, isOwner, busy, token, route, participants, onOpen, o
         </div>
       )}
 
-      {/* who's going + RSVP */}
-      <div style={s('display:flex;align-items:center;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)')}>
-        {Array.isArray(participants) && participants.length > 0 && (
-          <div style={s('display:flex;align-items:center')}>
-            {participants.slice(0, 3).map((p, i) => (
-              <AuthedAvatar key={p.athleteId} avatarUrl={p.avatarUrl} token={token} initials={p.initials} color={p.avatarColor}
-                size={23} radius={12} fontSize={8.5} style={`border:2px solid var(--bg2)${i ? ';margin-left:-7px' : ''}`} />
-            ))}
+      {isOwner ? (
+        <>
+          {/* joins / check-ins summary — tap to expand the roster */}
+          <div className="ctl" onClick={onRoster}
+            style={s('display:flex;align-items:center;gap:8px;margin-top:12px;padding:9px 11px;background:var(--bg3);border:1px solid var(--line);border-radius:11px')}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+            <span style={s('flex:1;font-size:12px;color:var(--text2);font-weight:600')}>
+              <span className="mono" style={s('color:var(--text)')}>{ev.joinCount || 0}</span> joined · <span className="mono" style={s('color:var(--good)')}>{ev.checkedInCount || 0}</span> checked in
+            </span>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={s(`transform:rotate(${rosterOpen ? 180 : 0}deg);transition:transform .15s`)}><path d="M6 9l6 6 6-6" /></svg>
           </div>
-        )}
-        <span style={s('font-size:10.5px;color:var(--text3);flex:1')}>{(ev.joinCount || 0) > 0 ? `${ev.joinCount} going` : 'Be the first to RSVP'}</span>
-        <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : (joined ? onLeave : onJoin)} style={s(`${rsvpStyle};opacity:${busy ? 0.6 : 1}`)}>
-          {busy ? '…' : joined ? 'Going ✓' : 'RSVP'}
+
+          {rosterOpen && (
+            <div style={s('margin-top:8px;display:flex;flex-direction:column;gap:6px')}>
+              {roster === null && <div style={s('font-size:11.5px;color:var(--text3);padding:6px 2px')}>Loading roster…</div>}
+              {roster && roster.length === 0 && <div style={s('font-size:11.5px;color:var(--text3);padding:6px 2px')}>Nobody has joined yet.</div>}
+              {roster && roster.map((a) => (
+                <div key={a.athleteId} style={s('display:flex;align-items:center;gap:10px;padding:7px 9px;background:var(--bg3);border-radius:10px')}>
+                  <AuthedAvatar avatarUrl={a.avatarUrl} token={token} initials={a.initials} color={a.avatarColor} size={28} radius={9} fontSize={11} />
+                  <div style={s('flex:1;min-width:0')}>
+                    <div style={s('font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>{a.name}</div>
+                  </div>
+                  {a.checkedInUtc
+                    ? <span style={s('flex:none;display:flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:var(--good)')}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
+                        {fmtTime(a.checkedInUtc)}
+                      </span>
+                    : <span style={s('flex:none;font-size:10.5px;font-weight:600;color:var(--text3)')}>Joined</span>}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* coach actions */}
+          <div style={s('display:flex;gap:7px;margin-top:10px')}>
+            <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : onEdit}
+              style={s('flex:1;text-align:center;padding:9px;border-radius:10px;font-size:12px;font-weight:700;background:var(--bg3);border:1px solid var(--line);color:var(--text)')}>Edit</div>
+            <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : onPublish}
+              style={s(`flex:1;text-align:center;padding:9px;border-radius:10px;font-size:12px;font-weight:700;${ev.published ? 'background:var(--bg3);border:1px solid var(--line);color:var(--text2)' : 'background:var(--accent-dim);border:1px solid color-mix(in srgb,var(--accent) 40%,transparent);color:var(--accent)'}`)}>
+              {ev.published ? 'Unpublish' : 'Publish'}
+            </div>
+            <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : onDelete}
+              style={s('width:40px;flex:none;display:flex;align-items:center;justify-content:center;padding:9px;border-radius:10px;background:color-mix(in srgb,var(--bad) 12%,var(--bg3));border:1px solid color-mix(in srgb,var(--bad) 30%,transparent);color:var(--bad)')}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6" /></svg>
+            </div>
+          </div>
+        </>
+      ) : (
+        /* who's going + RSVP / check-in */
+        <div style={s('display:flex;align-items:center;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)')}>
+          {Array.isArray(participants) && participants.length > 0 && (
+            <div style={s('display:flex;align-items:center')}>
+              {participants.slice(0, 3).map((p, i) => (
+                <AuthedAvatar key={p.athleteId} avatarUrl={p.avatarUrl} token={token} initials={p.initials} color={p.avatarColor}
+                  size={23} radius={12} fontSize={8.5} style={`border:2px solid var(--bg2)${i ? ';margin-left:-7px' : ''}`} />
+              ))}
+            </div>
+          )}
+          <span style={s('font-size:10.5px;color:var(--text3);flex:1')}>{(ev.joinCount || 0) > 0 ? `${ev.joinCount} going` : 'Be the first to RSVP'}</span>
+          {ev.checkedIn ? (
+            <div style={s('flex:none;display:flex;align-items:center;gap:8px')}>
+              <span style={s('display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:var(--good)')}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>Checked in
+              </span>
+              <span className={busy ? undefined : 'ctl'} onClick={busy ? undefined : onUndoCheckIn} style={s(`font-size:11px;font-weight:600;color:var(--text3);opacity:${busy ? 0.6 : 1}`)}>{busy ? '…' : 'Undo'}</span>
+            </div>
+          ) : !joined ? (
+            <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : onJoin} style={s(`${pill};background:var(--accent);color:var(--accent-ink);opacity:${busy ? 0.6 : 1}`)}>{busy ? '…' : 'RSVP'}</div>
+          ) : today ? (
+            <div style={s('flex:none;display:flex;align-items:center;gap:8px')}>
+              <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : onCheckIn} style={s(`${pill};background:var(--good);color:#04140b;opacity:${busy ? 0.6 : 1}`)}>{busy ? '…' : 'Check in'}</div>
+              <span className={busy ? undefined : 'ctl'} onClick={busy ? undefined : onLeave} style={s('font-size:11px;font-weight:600;color:var(--text3)')}>Leave</span>
+            </div>
+          ) : (
+            <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : onLeave}
+              style={s(`${pill};background:color-mix(in srgb,var(--good) 16%,transparent);border:1px solid color-mix(in srgb,var(--good) 40%,transparent);color:var(--good);opacity:${busy ? 0.6 : 1}`)}>{busy ? '…' : 'Going ✓'}</div>
+          )}
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -562,134 +620,3 @@ function MonthGrid({ cells, onOpenWeek }) {
   );
 }
 
-// ── this-month list row ─────────────────────────────────────────────────────────────
-function MonthRow({ ev, onOpen }) {
-  const d = new Date(ev.start);
-  const meta = sportMeta(ev.sport);
-  return (
-    <div className="ctl" onClick={onOpen} style={s('background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:11px 13px;display:flex;align-items:center;gap:12px')}>
-      <div style={s('width:40px;flex:none;text-align:center')}>
-        <div className="mono" style={s('font-size:8.5px;font-weight:700;color:var(--text3);text-transform:uppercase')}>{d.toLocaleDateString('en-US', { month: 'short' })}</div>
-        <div className="mono" style={s('font-size:18px;font-weight:700;line-height:1')}>{d.getDate()}</div>
-      </div>
-      <div style={s('width:1px;align-self:stretch;background:var(--line)')} />
-      <div style={s('flex:1;min-width:0')}>
-        <div dir="auto" style={s('font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>{ev.title}</div>
-        <div style={s('font-size:10.5px;color:var(--text2);margin-top:2px')}>{fmtTime(ev.start)} · {meta.label}</div>
-      </div>
-      <span style={s(`width:8px;height:8px;border-radius:50%;background:${meta.color};flex:none`)} />
-    </div>
-  );
-}
-
-// ── member browse card (join / check in / undo) — Week view ─────────────────────────
-function MemberCard({ ev, busy, token, onOpen, onJoin, onLeave, onCheckIn, onUndoCheckIn }) {
-  const today = isTodayIso(ev.start);
-  return (
-    <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:13px 14px;display:flex;align-items:center;gap:11px')}>
-      <div style={s('width:38px;height:38px;border-radius:11px;flex:none;display:flex;align-items:center;justify-content:center;background:var(--accent-dim);color:var(--accent);overflow:hidden')}>
-        {ev.logoUrl ? <AuthedImage url={ev.logoUrl} token={token} style="width:100%;height:100%;object-fit:cover" /> : <SportIcon sport={ev.sport} />}
-      </div>
-      <div className={onOpen ? 'ctl' : undefined} onClick={onOpen ? () => onOpen(ev) : undefined} style={s('flex:1;min-width:0')}>
-        <div style={s('font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>{ev.title}</div>
-        <div style={s('font-size:11.5px;color:var(--text3);margin-top:2px')}>
-          {fmtWhen(ev.start)}{ev.courseName ? ` · ${ev.courseName}` : ''}{today ? <span style={s('color:var(--accent);font-weight:700')}>{'  ·  Today'}</span> : null}
-        </div>
-        <div style={s('font-size:10.5px;color:var(--text3);margin-top:3px')}>{ev.joinCount || 0} going{onOpen ? ' · Details ›' : ''}</div>
-      </div>
-
-      {ev.checkedIn ? (
-        <div style={s('flex:none;display:flex;align-items:center;gap:7px')}>
-          <div style={s('display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:var(--good)')}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>Checked in
-          </div>
-          <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : onUndoCheckIn} style={s(`font-size:11px;font-weight:600;color:var(--text3);opacity:${busy ? 0.6 : 1}`)}>{busy ? '…' : 'Undo'}</div>
-        </div>
-      ) : !ev.joined ? (
-        <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : onJoin}
-          style={s(`flex:none;padding:9px 14px;border-radius:10px;font-weight:700;font-size:12px;background:var(--accent);color:var(--accent-ink);opacity:${busy ? 0.6 : 1}`)}>{busy ? '…' : 'Join'}</div>
-      ) : (
-        <div style={s('flex:none;display:flex;align-items:center;gap:7px')}>
-          {today ? (
-            <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : onCheckIn}
-              style={s(`padding:9px 14px;border-radius:10px;font-weight:700;font-size:12px;background:var(--good);color:#04140b;opacity:${busy ? 0.6 : 1}`)}>{busy ? '…' : 'Check in'}</div>
-          ) : (
-            <span style={s('font-size:11px;font-weight:700;color:var(--good)')}>Joined</span>
-          )}
-          <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : onLeave} style={s('font-size:11px;font-weight:600;color:var(--text3)')}>Leave</div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── coach manager card (edit / publish / delete + roster) — Week view ───────────────
-function CoachCard({ ev, busy, open, roster, token, onOpen, onEdit, onPublish, onDelete, onRoster }) {
-  return (
-    <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:13px 14px')}>
-      <div style={s('display:flex;align-items:center;gap:11px')}>
-        <div style={s('width:38px;height:38px;border-radius:11px;flex:none;display:flex;align-items:center;justify-content:center;background:var(--accent-dim);color:var(--accent);overflow:hidden')}>
-          {ev.logoUrl ? <AuthedImage url={ev.logoUrl} token={token} style="width:100%;height:100%;object-fit:cover" /> : <SportIcon sport={ev.sport} />}
-        </div>
-        <div className={onOpen ? 'ctl' : undefined} onClick={onOpen ? () => onOpen(ev) : undefined} style={s('flex:1;min-width:0')}>
-          <div style={s('display:flex;align-items:center;gap:7px')}>
-            <span style={s('font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>{ev.title}</span>
-            <span style={s(ev.published
-              ? 'font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--good);background:color-mix(in srgb,var(--good) 15%,transparent);padding:2px 6px;border-radius:5px'
-              : 'font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--warn);background:color-mix(in srgb,var(--warn) 15%,transparent);padding:2px 6px;border-radius:5px')}>
-              {ev.published ? 'Published' : 'Draft'}
-            </span>
-          </div>
-          <div style={s('font-size:11.5px;color:var(--text3);margin-top:2px')}>
-            {fmtWhen(ev.start)}{ev.courseName ? ` · ${ev.courseName}` : ''}{isTodayIso(ev.start) ? <span style={s('color:var(--accent);font-weight:700')}>{'  ·  Today'}</span> : null}
-          </div>
-        </div>
-      </div>
-
-      {/* joins / check-ins summary — tap to expand the roster */}
-      <div className="ctl" onClick={onRoster}
-        style={s('display:flex;align-items:center;gap:8px;margin-top:10px;padding:9px 11px;background:var(--bg3);border:1px solid var(--line);border-radius:11px')}>
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>
-        <span style={s('flex:1;font-size:12px;color:var(--text2);font-weight:600')}>
-          <span className="mono" style={s('color:var(--text)')}>{ev.joinCount || 0}</span> joined · <span className="mono" style={s('color:var(--good)')}>{ev.checkedInCount || 0}</span> checked in
-        </span>
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={s(`transform:rotate(${open ? 180 : 0}deg);transition:transform .15s`)}><path d="M6 9l6 6 6-6" /></svg>
-      </div>
-
-      {open && (
-        <div style={s('margin-top:8px;display:flex;flex-direction:column;gap:6px')}>
-          {roster === null && <div style={s('font-size:11.5px;color:var(--text3);padding:6px 2px')}>Loading roster…</div>}
-          {roster && roster.length === 0 && <div style={s('font-size:11.5px;color:var(--text3);padding:6px 2px')}>Nobody has joined yet.</div>}
-          {roster && roster.map((a) => (
-            <div key={a.athleteId} style={s('display:flex;align-items:center;gap:10px;padding:7px 9px;background:var(--bg3);border-radius:10px')}>
-              <div style={s(`width:28px;height:28px;border-radius:9px;flex:none;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#0c0e11;background:${a.avatarColor || 'var(--accent)'}`)}>{a.initials}</div>
-              <div style={s('flex:1;min-width:0')}>
-                <div style={s('font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>{a.name}</div>
-              </div>
-              {a.checkedIn
-                ? <span style={s('flex:none;display:flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:var(--good)')}>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>
-                    {fmtTime(a.checkedInUtc)}
-                  </span>
-                : <span style={s('flex:none;font-size:10.5px;font-weight:600;color:var(--text3)')}>Joined</span>}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* coach actions */}
-      <div style={s('display:flex;gap:7px;margin-top:10px')}>
-        <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : onEdit}
-          style={s('flex:1;text-align:center;padding:9px;border-radius:10px;font-size:12px;font-weight:700;background:var(--bg3);border:1px solid var(--line);color:var(--text)')}>Edit</div>
-        <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : onPublish}
-          style={s(`flex:1;text-align:center;padding:9px;border-radius:10px;font-size:12px;font-weight:700;${ev.published ? 'background:var(--bg3);border:1px solid var(--line);color:var(--text2)' : 'background:var(--accent-dim);border:1px solid color-mix(in srgb,var(--accent) 40%,transparent);color:var(--accent)'}`)}>
-          {ev.published ? 'Unpublish' : 'Publish'}
-        </div>
-        <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : onDelete}
-          style={s('width:40px;flex:none;display:flex;align-items:center;justify-content:center;padding:9px;border-radius:10px;background:color-mix(in srgb,var(--bad) 12%,var(--bg3));border:1px solid color-mix(in srgb,var(--bad) 30%,transparent);color:var(--bad)')}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6" /></svg>
-        </div>
-      </div>
-    </div>
-  );
-}
