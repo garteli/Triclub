@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { s } from '../lib/style.js';
 import { BASEMAP_LABEL, baseSource, applyBasemap, nextBasemap, inIsrael } from '../lib/basemaps.js';
-import { getRouteStyle, setRouteStyle as persistRouteStyle, ROUTE_COLORS, ARROW_COLORS, ROUTE_WIDTHS } from '../lib/routeStyle.js';
+import { getRouteStyle, setRouteStyle as persistRouteStyle } from '../lib/routeStyle.js';
 import { addRouteArrows, styleArrows } from '../lib/mapArrows.js';
 import { setMapView } from '../lib/mapView.js';
 import AuthedAvatar from './AuthedAvatar.jsx';
+import RouteStylePanel from './RouteStylePanel.jsx';
 
 // Full-screen 3D route map (MapLibre GL): our CARTO basemap draped over free AWS terrain
 // DEM tiles, with a 2D/3D pitch toggle, compass, basemap layers, replay, and an athlete
@@ -165,38 +166,15 @@ export default function FullMap({ route, style: initialStyle = 'voyager', is3D: 
             <svg width="20" height="20" viewBox="0 0 24 24" style={{ transform: `rotate(${-bearing}deg)` }}><path d="M12 3l3.2 8H8.8z" fill="var(--bad)" /><path d="M12 21l-3.2-8h6.4z" fill="#fff" /></svg>
           </div>
           {/* route style (colour + width) */}
-          <div className="ctl" onClick={() => setStyleOpen((o) => !o)} title="Route colour & width" style={s(`width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;${glass}${styleOpen ? ';border-color:rgba(255,255,255,.4)' : ''}`)}>
+          <div className="ctl" onPointerDown={(e) => e.stopPropagation()} onClick={() => setStyleOpen((o) => !o)} title="Route colour & width" style={s(`width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;${glass}${styleOpen ? ';border-color:rgba(255,255,255,.4)' : ''}`)}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 18l7-7" /><circle cx="15.5" cy="8.5" r="1.5" fill="currentColor" stroke="none" /><path d="M12 3l3 3-8 8-3 1 1-3z" /><path d="M17 5l2-2 2 2-2 2z" /></svg>
           </div>
         </div>
 
         {/* route-style picker panel (anchored left of the control column) */}
         {styleOpen && (
-          <div style={{ ...s(`position:absolute;right:66px;z-index:1200;width:186px;border-radius:14px;padding:12px;${glass}`), top: safeTop(64) }}>
-            <div style={s('font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:rgba(255,255,255,.6);margin-bottom:8px')}>Route colour</div>
-            <div style={s('display:flex;flex-wrap:wrap;gap:8px')}>
-              {ROUTE_COLORS.map((c) => (
-                <div key={c} className="ctl" onClick={() => applyRstyle({ ...rstyle, color: c })} title={c}
-                  style={s(`width:26px;height:26px;border-radius:50%;background:${c};cursor:pointer;box-shadow:0 0 0 ${rstyle.color === c ? '2.5px #fff' : '1px rgba(255,255,255,.25)'}`)} />
-              ))}
-            </div>
-            <div style={s('font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:rgba(255,255,255,.6);margin:12px 0 8px')}>Arrow colour</div>
-            <div style={s('display:flex;flex-wrap:wrap;gap:8px')}>
-              {ARROW_COLORS.map((c) => (
-                <div key={c} className="ctl" onClick={() => applyRstyle({ ...rstyle, arrowColor: c })} title={c}
-                  style={s(`width:26px;height:26px;border-radius:50%;background:${c};cursor:pointer;box-shadow:0 0 0 ${rstyle.arrowColor === c ? '2.5px var(--accent)' : '1px rgba(255,255,255,.25)'}`)} />
-              ))}
-            </div>
-            <div style={s('font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:rgba(255,255,255,.6);margin:12px 0 8px')}>Width</div>
-            <div style={s('display:flex;gap:8px')}>
-              {ROUTE_WIDTHS.map(({ label, w }) => (
-                <div key={w} className="ctl" onClick={() => applyRstyle({ ...rstyle, width: w })}
-                  style={s(`flex:1;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;gap:7px;font-size:12px;font-weight:700;cursor:pointer;background:${rstyle.width === w ? 'rgba(255,255,255,.18)' : 'rgba(255,255,255,.06)'};border:1px solid ${rstyle.width === w ? 'rgba(255,255,255,.45)' : 'rgba(255,255,255,.14)'}`)}>
-                  <span style={s(`width:20px;height:${w}px;border-radius:${w}px;background:${rstyle.color}`)} />{label}
-                </div>
-              ))}
-            </div>
-          </div>
+          <RouteStylePanel rstyle={rstyle} applyRstyle={applyRstyle} onClose={() => setStyleOpen(false)}
+            variant="glass" pos="position:absolute;right:66px;z-index:1200" posStyle={{ top: safeTop(64) }} />
         )}
         {/* play (route replay · 4×) */}
         {validPts(route).length > 1 && (
