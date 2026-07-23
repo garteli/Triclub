@@ -1,5 +1,5 @@
 import {
-  members, statusColor, ringColor, feed, planWeek, workoutDefs, discIcon,
+  members, statusColor, feed, planWeek, workoutDefs, discIcon,
   leaderboardData, coachInsights, activitySplits, hrZones, laps as lapsData,
   powerCurve as powerCurveData, achievements, segmentRows, segEfforts, pbs,
   nearbyGroups as nearbyGroupsData, applicants as applicantsData, chatThread as chatThreadData,
@@ -45,19 +45,26 @@ export function buildViewModel(state, t, opts = {}) {
           const pct = Math.min(100, Math.round(((r.load || 0) / maxLoad) * 100));
           return {
             id: r.athleteId, name: r.you ? 'You' : r.name, initials: r.initials, color: r.color,
-            avatarUrl: r.avatarUrl ?? null,
+            avatarUrl: r.avatarUrl ?? null, you: !!r.you,
             pct, status: pct >= 85 ? 'crushing' : pct >= 45 ? 'ontrack' : 'behind',
           };
         });
       })()
     : members;
-  const squad = squadSource.map((m) => ({
-    ...m,
-    dash: `${Math.round((m.pct / 100) * 138.2)} 138.2`,
-    pctLabel: m.pct + '%',
-    statusColor: statusColor(m.status),
-    ringColor: ringColor(m.status),
-  }));
+  // Home "Hub this week" rail: ranked by weekly-load share so #1/#2/#3 medals are
+  // meaningful, ring fills warm→cool by that share (design tiers), the top three carry
+  // medal colours, and "you" is highlighted. Sort is stable-safe (rail order == rank).
+  const rankMedal = { 1: '#ffcf4d', 2: '#c9d2dc', 3: '#e08a5a' };
+  const squad = squadSource
+    .map((m) => ({
+      ...m,
+      dash: `${Math.round((m.pct / 100) * 138.2)} 138.2`,
+      pctLabel: m.pct + '%',
+      statusColor: statusColor(m.status),
+      ringColor: m.pct >= 50 ? 'var(--good)' : m.pct >= 30 ? 'var(--accent)' : 'var(--behind)',
+    }))
+    .sort((a, b) => b.pct - a.pct)
+    .map((m, i) => ({ ...m, rank: i + 1, medalColor: rankMedal[i + 1] || null }));
   const squadOnTrack = squadSource.filter((m) => m.status !== 'behind').length;
   const squadTotal = squadSource.length;
 

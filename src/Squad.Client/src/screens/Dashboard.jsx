@@ -120,7 +120,15 @@ function SquadRail({ squad, rtl, onOpen, token }) {
   return (
     <div className="hscroll" style={s(`display:flex;gap:11px;overflow-x:auto;padding:2px 18px 6px;margin:0 -18px;${rtl ? 'flex-direction:row-reverse' : ''}`)}>
       {squad.map((m) => (
-        <div key={m.id} className="ctl" onClick={() => onOpen?.(m.id)} style={s('flex:none;width:78px;background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:12px 8px;text-align:center')}>
+        <div
+          key={m.id}
+          className="ctl"
+          onClick={() => onOpen?.(m.id)}
+          style={s(`position:relative;flex:none;width:82px;background:var(--bg2);border:1px solid ${m.you ? 'color-mix(in srgb,var(--accent) 34%,transparent)' : 'var(--line)'};border-radius:17px;padding:13px 8px;text-align:center`)}
+        >
+          {m.medalColor && (
+            <div className="mono" style={s(`position:absolute;top:8px;${rtl ? 'right:9px' : 'left:9px'};font-size:10px;font-weight:700;color:${m.medalColor}`)}>#{m.rank}</div>
+          )}
           <div style={s('position:relative;width:52px;height:52px;margin:0 auto')}>
             <svg width="52" height="52" viewBox="0 0 52 52" style={{ transform: 'rotate(-90deg)' }}>
               <circle cx="26" cy="26" r="22" fill="none" stroke="var(--bg4)" strokeWidth="4" />
@@ -129,10 +137,9 @@ function SquadRail({ squad, rtl, onOpen, token }) {
             <div style={s('position:absolute;inset:5px')}>
               <AuthedAvatar avatarUrl={m.avatarUrl} token={token} initials={rtl ? m.he : m.initials} color={m.color} size={42} radius={21} fontSize={rtl ? 13 : 14} />
             </div>
-            <div style={s(`position:absolute;bottom:2px;right:2px;width:12px;height:12px;border-radius:50%;background:${m.statusColor};border:2px solid var(--bg2)`)} />
           </div>
-          <div style={s('font-size:11.5px;font-weight:600;margin-top:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>{rtl ? m.nameHe : m.name}</div>
-          <div className="mono" style={s('font-size:10.5px;color:var(--text3)')}>{m.pctLabel}</div>
+          <div style={s('font-size:11.5px;font-weight:600;margin-top:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>{rtl ? m.nameHe : m.name}</div>
+          <div className="mono" style={s(`font-size:11px;font-weight:700;margin-top:1px;color:${m.you ? 'var(--accent)' : 'var(--text3)'}`)}>{m.pctLabel}</div>
         </div>
       ))}
     </div>
