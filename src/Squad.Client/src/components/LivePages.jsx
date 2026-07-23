@@ -272,7 +272,7 @@ function PickerSheet({ page, slot, actions, family }) {
 }
 
 // ---- the unified full-screen rotating page system ----
-export default function LivePages({ tel, lp, uwb, blePeers, indoor = false, mySport }) {
+export default function LivePages({ tel, lp, uwb, blePeers, indoor = false, mySport, climb }) {
   const { pages, pageIdx, editFields, picker, autoRotate, actions, family } = lp;
   const page = pages[pageIdx];
   const side = page.side || 'none';
@@ -284,7 +284,7 @@ export default function LivePages({ tel, lp, uwb, blePeers, indoor = false, mySp
     : (count <= 2 ? 54 : count <= 3 ? 46 : count <= 4 ? 40 : count <= 6 ? 34 : 28);
   const heroIdx = page.layout === 'hero' ? (page.heroIndex == null ? 0 : page.heroIndex) : -1;
 
-  const mv = liveMetricValues(tel);
+  const mv = liveMetricValues(tel, climb);
   const charts = liveChartsView(tel);
 
   const fields = page.fields.map((tok, i) => {

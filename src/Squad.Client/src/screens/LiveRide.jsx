@@ -3,6 +3,7 @@ import { s } from '../lib/style.js';
 import RideRecorder from '../components/RideRecorder.jsx';
 import LivePages from '../components/LivePages.jsx';
 import ClimbPro from '../components/ClimbPro.jsx';
+import { useClimb } from '../hooks/useClimb.js';
 import UwbReadout from '../components/UwbReadout.jsx';
 import CoursePicker from '../components/CoursePicker.jsx';
 import { gearComponentsFromSensors } from '../lib/liveMetrics.js';
@@ -253,6 +254,8 @@ function Active({ actions, live }) {
   const dist = tel?.dist ?? (you ? parseFloat(you.dist) : null);
   const recording = !!live?.recorder?.recording;
   const editing = !!live?.livePages?.editFields;
+  // One climb analysis shared by the ClimbPro card and the individual "Climb" data fields.
+  const climb = useClimb(tel, { indoor: !!live?.rideType?.indoor });
 
   return (
     <div className={'live-active' + (editing ? ' editing' : '')}>
@@ -274,9 +277,9 @@ function Active({ actions, live }) {
       <UwbReadout uwb={live?.uwb} riders={live?.riders} blePeers={live?.peerRanging?.peers} />
 
       {/* ClimbPro — auto-appears when a climb on the followed course is near/underway */}
-      <ClimbPro tel={tel} indoor={!!live?.rideType?.indoor} />
+      <ClimbPro climb={climb} />
 
-      <LivePages tel={tel} lp={live?.livePages} uwb={live?.uwb} blePeers={live?.peerRanging?.peers} indoor={!!live?.rideType?.indoor} mySport={live?.rideType?.value} />
+      <LivePages tel={tel} lp={live?.livePages} uwb={live?.uwb} blePeers={live?.peerRanging?.peers} indoor={!!live?.rideType?.indoor} mySport={live?.rideType?.value} climb={climb} />
     </div>
   );
 }
