@@ -3,11 +3,13 @@ import { s } from '../lib/style.js';
 import { Back, Title, Sub, FieldLabel, Field, TextArea, Chips, PrimaryBtn } from './wizard.jsx';
 import AuthedImage from '../components/AuthedImage.jsx';
 import GroupTargets from '../components/GroupTargets.jsx';
+import { useJoinRequests } from '../hooks/useJoinRequests.js';
 import { downscaleToJpeg } from '../lib/photos.js';
 import { dataUrlToBlob } from '../lib/avatar.js';
 import { bustAuthedImage } from '../lib/authedImage.js';
 import {
-  updateSquad, listMembers, addMember, removeMember, uploadSquadImage, deleteSquadImage, createInvite,
+  updateSquad, listMembers, addMember, removeMember, setMemberRole, transferOwnership,
+  uploadSquadImage, deleteSquadImage, createInvite,
 } from '../lib/squads.js';
 import { API_BASE } from '../lib/apiBase.js';
 import { DISCIPLINES, familyOf, disciplinesInFamily } from '../lib/disciplines.js';
@@ -20,6 +22,17 @@ const Avatar = ({ m, token }) => (
     ? <AuthedImage url={m.avatarUrl} token={token} style="width:38px;height:38px;border-radius:11px;flex:none" />
     : <div style={s(`width:38px;height:38px;border-radius:11px;flex:none;background:${m.avatarColor};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#0c0e11`)}>{m.initials}</div>
 );
+
+// A small roster action chip. `accent` (transfer) and `good` (promote) tint it; default is neutral.
+const RoleChip = ({ onClick, accent, good, children }) => {
+  const tint = accent ? 'var(--accent)' : good ? 'var(--good)' : 'var(--text2)';
+  return (
+    <div className={onClick ? 'ctl' : undefined} onClick={onClick}
+      style={s(`font-size:11.5px;font-weight:700;color:${tint};background:color-mix(in srgb,${tint} 12%,transparent);border:1px solid color-mix(in srgb,${tint} 30%,transparent);padding:7px 12px;border-radius:10px;${onClick ? '' : 'opacity:.6'}`)}>
+      {children}
+    </div>
+  );
+};
 
 // Owner-only management for a squad: branding (logo + banner), details & pricing,
 // and the member roster (add by email / remove). Everything is gated server-side too.
@@ -59,11 +72,26 @@ export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged
   const [email, setEmail] = useState('');
   const [memberMsg, setMemberMsg] = useState('');
   const [memberErr, setMemberErr] = useState('');
+  const [roleBusy, setRoleBusy] = useState(null);     // athleteId whose role is being changed
+  const [confirmOwner, setConfirmOwner] = useState(null); // coach we're about to hand the group to
 
   // invite link (friends who sign up with it auto-join this group)
   const [inviteUrl, setInviteUrl] = useState('');
   const [inviteBusy, setInviteBusy] = useState(false);
   const [inviteMsg, setInviteMsg] = useState('');
+
+  // Pending join requests across the owner's squads; we show the ones for THIS group here.
+  const { items: allRequests, approve: approveReq, decline: declineReq } = useJoinRequests({ getToken, enabled: isOwner });
+  const groupRequests = (allRequests || []).filter((r) => String(r.squadId) === String(g.id));
+  const onApproveReq = async (r) => {
+    setMemberErr(''); setMemberMsg('');
+    try { await approveReq(r.squadId, r.athleteId); setMemberMsg(`Approved ${r.name}.`); await loadMembers(); onDataChanged?.(); }
+    catch (ex) { setMemberErr(ex.message || 'Could not approve.'); }
+  };
+  const onDeclineReq = async (r) => {
+    setMemberErr(''); setMemberMsg('');
+    try { await declineReq(r.squadId, r.athleteId); } catch (ex) { setMemberErr(ex.message || 'Could not decline.'); }
+  };
 
   const loadMembers = useCallback(async () => {
     try {
@@ -194,6 +222,33 @@ export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged
     } catch (ex) { setMemberErr(ex.message || 'Could not remove.'); }
   };
 
+  // Promote a member to coach / demote a coach back to member.
+  const doSetRole = async (m, role) => {
+    setMemberErr(''); setMemberMsg(''); setRoleBusy(m.athleteId);
+    try {
+      const t = await getToken?.();
+      await setMemberRole(t, g.id, m.athleteId, role);
+      setMemberMsg(role === 'coach' ? `${m.name} is now a coach.` : `${m.name} is no longer a coach.`);
+      await loadMembers();
+      onDataChanged?.();
+    } catch (ex) { setMemberErr(ex.message || 'Could not update role.'); }
+    finally { setRoleBusy(null); }
+  };
+
+  // Hand the group to a coach: they become the sole owner and this owner is demoted to coach.
+  const doTransfer = async (m) => {
+    setMemberErr(''); setMemberMsg(''); setRoleBusy(m.athleteId);
+    try {
+      const t = await getToken?.();
+      await transferOwnership(t, g.id, m.athleteId);
+      setConfirmOwner(null);
+      setMemberMsg(`${m.name} is now the owner. You're now a coach.`);
+      await loadMembers();
+      onDataChanged?.();   // refreshes g.owner → this screen goes read-only for the former owner
+    } catch (ex) { setMemberErr(ex.message || 'Could not transfer ownership.'); }
+    finally { setRoleBusy(null); }
+  };
+
   const bannerUrl = g.bannerUrl ? `${g.bannerUrl}` : null;
   const logoUrl = g.logoUrl ? `${g.logoUrl}` : null;
 
@@ -261,6 +316,30 @@ export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged
       {saved && !err && <div style={s('color:var(--good);font-size:12.5px;margin-top:12px;text-align:center')}>Saved. Changes are live for members.</div>}
       <PrimaryBtn onClick={busy ? undefined : save} disabled={busy}>{busy ? 'Saving…' : 'Save changes'}</PrimaryBtn>
 
+      {/* ---- pending join requests (athletes who asked to join this group) ---- */}
+      {groupRequests.length > 0 && (
+        <>
+          <FieldLabel>Join requests · {groupRequests.length}</FieldLabel>
+          <div style={s('display:flex;flex-direction:column;gap:8px')}>
+            {groupRequests.map((r) => (
+              <div key={r.athleteId} style={s('background:var(--bg2);border:1px solid color-mix(in srgb,var(--accent) 22%,var(--line));border-radius:13px;padding:10px 12px')}>
+                <div style={s('display:flex;align-items:center;gap:11px')}>
+                  <div style={s(`width:38px;height:38px;border-radius:11px;flex:none;background:${r.color};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#0c0e11`)}>{r.initials}</div>
+                  <div style={s('flex:1;min-width:0')}>
+                    <div style={s('font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>{r.name}</div>
+                    <div style={s('font-size:10.5px;color:var(--text3)')}>asked to join · {r.when}</div>
+                  </div>
+                </div>
+                <div style={s('display:flex;gap:8px;margin-top:10px')}>
+                  <div className="ctl" onClick={() => onDeclineReq(r)} style={s('flex:1;text-align:center;font-size:12px;font-weight:700;color:var(--bad);background:color-mix(in srgb,var(--bad) 12%,transparent);border:1px solid color-mix(in srgb,var(--bad) 30%,transparent);padding:9px;border-radius:10px')}>Decline</div>
+                  <div className="ctl" onClick={() => onApproveReq(r)} style={s('flex:1;text-align:center;font-size:12px;font-weight:700;color:#04140b;background:var(--good);padding:9px;border-radius:10px')}>Approve</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
       {/* ---- members ---- */}
       <FieldLabel>Members{members ? ` · ${members.length}` : ''}</FieldLabel>
       <div style={s('display:flex;gap:8px')}>
@@ -274,18 +353,53 @@ export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged
 
       <div style={s('display:flex;flex-direction:column;gap:8px;margin-top:12px')}>
         {members === null && <div style={s('color:var(--text3);font-size:12.5px;text-align:center;padding:12px')}>Loading roster…</div>}
-        {members?.map((m) => (
-          <div key={m.athleteId} style={s('display:flex;align-items:center;gap:11px;background:var(--bg2);border:1px solid var(--line);border-radius:13px;padding:10px 12px')}>
-            <Avatar m={m} token={token} />
-            <div style={s('flex:1;min-width:0')}>
-              <div style={s('font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>{m.name}</div>
-              <div style={s('font-size:10.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.6px')}>{m.role}</div>
+        {members?.map((m) => {
+          const isOwnerRow = m.role === 'owner';
+          const isCoach = m.role === 'coach';
+          const busyRow = roleBusy === m.athleteId;
+          const confirming = confirmOwner === m.athleteId;
+          const roleLabel = isOwnerRow ? 'Owner' : isCoach ? 'Coach' : 'Member';
+          const roleColor = isOwnerRow ? 'var(--accent)' : isCoach ? 'var(--good)' : 'var(--text3)';
+          return (
+            <div key={m.athleteId} style={s('background:var(--bg2);border:1px solid var(--line);border-radius:13px;padding:10px 12px')}>
+              <div style={s('display:flex;align-items:center;gap:11px')}>
+                <Avatar m={m} token={token} />
+                <div style={s('flex:1;min-width:0')}>
+                  <div style={s('font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>{m.name}</div>
+                  <div style={s(`font-size:10.5px;color:${roleColor};text-transform:uppercase;letter-spacing:.6px;font-weight:700`)}>{roleLabel}</div>
+                </div>
+                {isOwnerRow && <span style={s('font-size:10.5px;color:var(--text3);font-weight:600')}>You</span>}
+              </div>
+
+              {/* role actions — the owner row is fixed (transfer ownership to demote it) */}
+              {!isOwnerRow && (
+                confirming ? (
+                  <div style={s('margin-top:10px')}>
+                    <div style={s('font-size:11.5px;color:var(--text2);line-height:1.45;margin-bottom:8px')}>
+                      Make <b style={s('color:var(--text)')}>{m.name}</b> the owner? You’ll become a coach and lose group-management control. This can only be undone by the new owner.
+                    </div>
+                    <div style={s('display:flex;gap:8px')}>
+                      <div className="ctl" onClick={() => setConfirmOwner(null)} style={s('flex:1;text-align:center;font-size:12px;font-weight:700;color:var(--text2);background:var(--bg3);border:1px solid var(--line);padding:9px;border-radius:10px')}>Cancel</div>
+                      <div className={busyRow ? undefined : 'ctl'} onClick={busyRow ? undefined : () => doTransfer(m)} style={s(`flex:1;text-align:center;font-size:12px;font-weight:700;color:var(--accent-ink);background:var(--accent);padding:9px;border-radius:10px;opacity:${busyRow ? 0.6 : 1}`)}>{busyRow ? '…' : 'Yes, transfer'}</div>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={s('display:flex;flex-wrap:wrap;gap:7px;margin-top:10px')}>
+                    {isCoach ? (
+                      <>
+                        <RoleChip onClick={busyRow ? undefined : () => setConfirmOwner(m.athleteId)} accent>Make owner</RoleChip>
+                        <RoleChip onClick={busyRow ? undefined : () => doSetRole(m, 'member')}>Remove coach</RoleChip>
+                      </>
+                    ) : (
+                      <RoleChip onClick={busyRow ? undefined : () => doSetRole(m, 'coach')} good>Make coach</RoleChip>
+                    )}
+                    <div className={busyRow ? undefined : 'ctl'} onClick={busyRow ? undefined : () => doRemove(m)} style={s(`font-size:11.5px;font-weight:700;color:var(--bad);background:color-mix(in srgb,var(--bad) 12%,transparent);border:1px solid color-mix(in srgb,var(--bad) 30%,transparent);padding:7px 12px;border-radius:10px;margin-left:auto;opacity:${busyRow ? 0.6 : 1}`)}>Remove</div>
+                  </div>
+                )
+              )}
             </div>
-            {m.role === 'owner'
-              ? <span style={s('font-size:10.5px;color:var(--text3);font-weight:600')}>You</span>
-              : <div className="ctl" onClick={() => doRemove(m)} style={s('font-size:11.5px;font-weight:700;color:var(--bad);background:color-mix(in srgb,var(--bad) 12%,transparent);border:1px solid color-mix(in srgb,var(--bad) 30%,transparent);padding:7px 12px;border-radius:10px')}>Remove</div>}
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* ---- invite link (friends who sign up with it auto-join this group) ---- */}

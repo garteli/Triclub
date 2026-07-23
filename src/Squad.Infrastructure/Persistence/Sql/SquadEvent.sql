@@ -55,3 +55,15 @@ END;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_SquadEventRsvp_Athlete' AND object_id = OBJECT_ID('dbo.SquadEventRsvp'))
     CREATE INDEX IX_SquadEventRsvp_Athlete ON dbo.SquadEventRsvp (AthleteId);
+GO
+
+-- Join gating for non-members. A group member (or the owner) joins an event instantly ('going');
+-- a NON-member's join is a request the coach approves ('pending' → 'going') or declines (row deleted).
+-- Additive + idempotent; existing rows default to 'going' (they were all members joining directly).
+IF COL_LENGTH('dbo.SquadEventRsvp', 'Status') IS NULL
+    ALTER TABLE dbo.SquadEventRsvp ADD Status NVARCHAR(12) NOT NULL CONSTRAINT DF_SquadEventRsvp_Status DEFAULT 'going';  -- going | pending
+GO
+
+-- Coach's inbox scan: pending requests by event.
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_SquadEventRsvp_Event_Status' AND object_id = OBJECT_ID('dbo.SquadEventRsvp'))
+    CREATE INDEX IX_SquadEventRsvp_Event_Status ON dbo.SquadEventRsvp (EventId, Status);

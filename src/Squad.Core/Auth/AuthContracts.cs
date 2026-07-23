@@ -103,6 +103,17 @@ public sealed record SquadMember(
 /// <summary>Result of an owner adding a member by email.</summary>
 public enum AddMemberOutcome { Added, AlreadyMember, AthleteNotFound, NotOwner }
 
+/// <summary>Result of the owner changing a member's role (promote to coach / demote to member).
+/// The owner's own role can't be changed here (see <see cref="ISquadService.TransferOwnershipAsync"/>).</summary>
+public enum SetRoleOutcome { Ok, NotOwner, NotAMember, CannotChangeOwner, InvalidRole }
+
+/// <summary>Body for the owner's "set member role" call. Role is "coach" | "member".</summary>
+public sealed record SetRoleRequest(string Role);
+
+/// <summary>Result of transferring squad ownership to another coach. Ownership moves to the target,
+/// the previous owner is demoted to coach, and there is still exactly one owner.</summary>
+public enum TransferOwnershipOutcome { Ok, NotOwner, TargetNotMember, TargetNotCoach, SameAsOwner }
+
 /// <summary>Body for the owner's "add member by email" call.</summary>
 public sealed record AddMemberRequest(string Email);
 
@@ -153,6 +164,13 @@ public interface ISquadService
     Task<AddMemberOutcome> AddMemberByEmailAsync(Guid squadId, string email, Guid ownerId, CancellationToken ct);
     /// <summary>Owner removes a member. Returns false if not owner, or the target is the owner / not a member.</summary>
     Task<bool> RemoveMemberAsync(Guid squadId, Guid athleteId, Guid ownerId, CancellationToken ct);
+    /// <summary>Owner promotes a member to coach or demotes a coach back to member. The owner's own role
+    /// can't be changed (use <see cref="TransferOwnershipAsync"/> to hand over the group). Role is
+    /// "coach" | "member".</summary>
+    Task<SetRoleOutcome> SetMemberRoleAsync(Guid squadId, Guid athleteId, string role, Guid ownerId, CancellationToken ct);
+    /// <summary>Transfer ownership to another coach: the target becomes the sole owner and the previous
+    /// owner is demoted to coach (never removed). The target must already be a coach of the squad.</summary>
+    Task<TransferOwnershipOutcome> TransferOwnershipAsync(Guid squadId, Guid newOwnerId, Guid ownerId, CancellationToken ct);
 
     // ----- invite links (coach invites friends to join their group) -----------
 
