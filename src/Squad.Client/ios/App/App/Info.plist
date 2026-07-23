@@ -1,1 +1,83 @@
-["UIInterfaceOrientationPortrait","UIInterfaceOrientationPortraitUpsideDown"]
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>Domestique Hub</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.85703052598-ncbmmqmqdv4rjqdrpk6fpvj8375oh609</string>
+			</array>
+		</dict>
+	</array>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Domestique Hub connects to your heart-rate strap, power meter, and radar.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Domestique Hub uses your camera to take a profile photo.</string>
+	<key>NSNearbyInteractionUsageDescription</key>
+	<string>Domestique Hub uses Ultra-Wideband to show the precise distance and direction to teammates during a live ride.</string>
+		<key>NSNearbyInteractionAllowOnceUsageDescription</key>
+		<string>Domestique Hub uses Ultra-Wideband to show the precise distance and direction to teammates during a live ride.</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Domestique Hub reads your workouts from Apple Health to add them to your training log and squad feed.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Domestique Hub writes completed workouts back to Apple Health so your activity rings and history stay in sync.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Domestique Hub keeps recording your ride when the screen is off so your squad can see you.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Domestique Hub uses your location to show your position to teammates during a live ride.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Domestique Hub lets you choose a profile photo from your library.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+		<string>bluetooth-central</string>
+	</array>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+	<key>UIMainStoryboardFile</key>
+	<string>Main</string>
+	<key>UIRequiredDeviceCapabilities</key>
+	<array>
+		<string>arm64</string>
+	</array>
+	<!-- Portrait-only design: opt out of iPad multitasking so we don't have to declare
+	     landscape orientations (Apple ITMS-90474). Keeps the app full-screen portrait on iPad. -->
+	<key>UIRequiresFullScreen</key>
+	<true/>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+	</array>
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<true/>
+</dict>
+</plist>
