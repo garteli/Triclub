@@ -336,12 +336,6 @@ function Active({ actions, live }) {
         <div style={s('display:flex;align-items:center;gap:9px')}>
           <Back onClick={actions.backToLobby} />
           <div style={s('display:flex;align-items:center;gap:6px')}><span style={s(`width:8px;height:8px;border-radius:50%;background:${recording ? 'var(--bad)' : 'var(--text3)'};${recording ? 'animation:pulseDot 1.1s infinite' : ''}`)} /><span style={s(`font-size:11px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:${recording ? 'var(--bad)' : 'var(--text3)'}`)}>{recording ? 'Live' : 'Idle'}</span></div>
-          {live?.sos && (
-            <div className="ctl" onClick={live.sos} aria-label="Send emergency SOS"
-              style={s('display:flex;align-items:center;gap:5px;padding:6px 11px;border-radius:10px;font-size:11px;font-weight:800;letter-spacing:.8px;background:color-mix(in srgb,var(--bad) 16%,var(--bg2));border:1px solid color-mix(in srgb,var(--bad) 45%,transparent);color:var(--bad)')}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l9 4v6c0 5-3.8 8.5-9 10-5.2-1.5-9-5-9-10V6l9-4z" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>SOS
-            </div>
-          )}
         </div>
         <div style={s('text-align:center')}><div className="mono" style={s('font-size:22px;font-weight:700;line-height:1')}>{mmss(tel?.elapsed)}</div><div style={s('font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px')}>Elapsed</div></div>
         <div style={s('text-align:right')}><div className="mono" style={s('font-size:16px;font-weight:700;color:var(--accent)')}>{dist != null ? dist.toFixed(1) : '—'}<span style={s('font-size:10px;color:var(--text2)')}>km</span></div><div style={s('font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1px')}>Your dist</div></div>
