@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { baseSource, applyBasemap } from '../lib/basemaps.js';
+import { addRouteArrows, styleArrows } from '../lib/mapArrows.js';
 
 // Reusable interactive MapLibre route map — shared basemap set (+ optional 3D terrain drape),
 // the route line and start/end markers, pan/pinch-zoom/rotate. Lazy-loads MapLibre so it
@@ -15,13 +16,13 @@ const buildStyle = (style) => ({
   layers: [{ id: 'base', type: 'raster', source: 'base' }],
 });
 
-export default function RouteMapGL({ route, styleName = 'voyager', pitch = 0, terrain = false, interactive = true, fitPadding = 40, routeColor = '#ff6a2c', routeWidth = 4, onError, onReady }) {
+export default function RouteMapGL({ route, styleName = 'voyager', pitch = 0, terrain = false, interactive = true, fitPadding = 40, routeColor = '#ff6a2c', routeWidth = 4, arrowColor = null, onError, onReady }) {
   const elRef = useRef(null);
   const mapRef = useRef(null);
   const readyRef = useRef(false);
   // Keep the latest style available inside the (route-keyed) map-build effect without re-creating.
-  const styleRef = useRef({ routeColor, routeWidth });
-  styleRef.current = { routeColor, routeWidth };
+  const styleRef = useRef({ routeColor, routeWidth, arrowColor });
+  styleRef.current = { routeColor, routeWidth, arrowColor };
 
   useEffect(() => {
     let map, cancelled = false;
@@ -45,6 +46,8 @@ export default function RouteMapGL({ route, styleName = 'voyager', pitch = 0, te
           if (pts.length > 1) {
             map.addSource('route', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: pts.map(([la, lo]) => [lo, la]) } } });
             map.addLayer({ id: 'route', type: 'line', source: 'route', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': styleRef.current.routeColor, 'line-width': styleRef.current.routeWidth } });
+            // Optional direction-of-travel chevrons along the route (opt-in via arrowColor).
+            if (styleRef.current.arrowColor) addRouteArrows(map, 'route', 'route-arrows', { color: styleRef.current.arrowColor, width: styleRef.current.routeWidth });
             map.addSource('ends', { type: 'geojson', data: { type: 'FeatureCollection', features: [
               { type: 'Feature', properties: { c: '#4fe08b' }, geometry: { type: 'Point', coordinates: [pts[0][1], pts[0][0]] } },
               { type: 'Feature', properties: { c: '#ff5d5d' }, geometry: { type: 'Point', coordinates: [pts[pts.length - 1][1], pts[pts.length - 1][0]] } },
@@ -66,13 +69,21 @@ export default function RouteMapGL({ route, styleName = 'voyager', pitch = 0, te
   // React to control changes without re-creating the map. Rebuild the base (via applyBasemap) so
   // maxzoom + attribution track the layer — the route line stays above it.
   useEffect(() => { const m = mapRef.current; if (m && m.getSource && m.getSource('base')) applyBasemap(m, styleName); }, [styleName]);
-  // Apply route colour/width live to the existing line (no map re-create).
+  // Apply route colour/width + arrow colour live to the existing line (no map re-create).
   useEffect(() => {
     const m = mapRef.current;
     if (!m || !m.getLayer || !m.getLayer('route')) return;
     m.setPaintProperty('route', 'line-color', routeColor);
     m.setPaintProperty('route', 'line-width', routeWidth);
-  }, [routeColor, routeWidth]);
+    if (arrowColor) {
+      // Add the arrow layer on first enable; always (re)apply the colour/width so the shared
+      // arrow image tracks the current selection.
+      if (!m.getLayer('route-arrows')) addRouteArrows(m, 'route', 'route-arrows', { color: arrowColor, width: routeWidth });
+      styleArrows(m, ['route-arrows'], { color: arrowColor, width: routeWidth });
+    } else if (m.getLayer('route-arrows')) {
+      m.removeLayer('route-arrows');
+    }
+  }, [routeColor, routeWidth, arrowColor]);
   useEffect(() => {
     const m = mapRef.current;
     if (!m || !readyRef.current) return;

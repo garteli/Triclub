@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { s } from '../lib/style.js';
 import { BASEMAP_LABEL, nextBasemap, inIsrael } from '../lib/basemaps.js';
 import { getMapView, setMapView } from '../lib/mapView.js';
+import { getRouteStyle } from '../lib/routeStyle.js';
 import RouteMapGL from './RouteMapGL.jsx';
 import FullMap from './FullMap.jsx';
 
@@ -29,6 +30,9 @@ export default function ActivityHero({ a, route, frames, hasMap, status, token, 
   const cycleStyle = () => setMapStyle((st) => nextBasemap(st, israel));
   // Persist the last layer + view so reopening any activity map restores them.
   useEffect(() => { setMapView({ style: mapStyle, is3D }); }, [mapStyle, is3D]);
+  // Honor the per-user route colour/width (shared with every other map). Read on open; the
+  // full-screen map carries the picker and persists changes.
+  const rstyle = getRouteStyle();
 
   // Replay: glide a head marker along the route at a fixed 4×.
   const togglePlay = () => {
@@ -141,6 +145,7 @@ export default function ActivityHero({ a, route, frames, hasMap, status, token, 
   return (
     <div style={s(box)}>
       <RouteMapGL route={route} styleName={mapStyle} pitch={is3D ? 55 : 0} terrain={is3D}
+        routeColor={rstyle.color} routeWidth={rstyle.width}
         fitPadding={{ top: 62, bottom: 66, left: 30, right: 30 }}
         onReady={(m, gl) => { mapRef.current = m; glRef.current = gl; }} />
       {controls}

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { s } from '../lib/style.js';
 import { BASEMAP_LABEL, baseSource, applyBasemap, nextBasemap, inIsrael } from '../lib/basemaps.js';
 import { getRouteStyle, setRouteStyle as persistRouteStyle, ROUTE_COLORS, ARROW_COLORS, ROUTE_WIDTHS } from '../lib/routeStyle.js';
+import { getMapView, setMapStyle as persistMapStyle } from '../lib/mapView.js';
 import { addRouteArrows, styleArrows } from '../lib/mapArrows.js';
 
 // Interactive live-ride map tile: a real MapLibre basemap you can pinch-zoom, pan and rotate,
@@ -82,8 +83,8 @@ export default function LiveMapGL({ pts, course, path, riders, mySport, interact
   const markerSigRef = useRef('');     // last rider signature, so we only rebuild on real change
   const [follow, setFollow] = useState(false); // false = north-up (free pan), true = follow heading
   const [failed, setFailed] = useState(false);
-  const [basemap, setBasemap] = useState('voyager'); // cycle Voyager → Light → Satellite → Terrain → Off-road
-  const basemapRef = useRef('voyager');
+  const [basemap, setBasemap] = useState(() => getMapView().style); // shared basemap layer (persisted across all maps)
+  const basemapRef = useRef(getMapView().style);
   const [rstyle, setRstyle] = useState(getRouteStyle); // per-user route colour + width (path + arrows)
   const [styleOpen, setStyleOpen] = useState(false);
   const rstyleRef = useRef(rstyle);
@@ -275,11 +276,15 @@ export default function LiveMapGL({ pts, course, path, riders, mySport, interact
   }, [follow]);
 
   // Swap the basemap when cycled — kept beneath the course line so route/riders stay on top.
+  // Persist the layer so every map in the app opens on the same basemap.
   useEffect(() => {
     basemapRef.current = basemap;
     const map = mapRef.current;
     if (map && readyRef.current) applyBasemap(map, basemap);
+    persistMapStyle(basemap);
   }, [basemap]);
+  // Fall back to a global basemap if a stored Off-road layer isn't valid for this ride's location.
+  useEffect(() => { if (!israel && basemap === 'offroad') setBasemap('voyager'); }, [israel, basemap]);
 
   // Apply the per-user route colour/width live to the course + breadcrumb lines AND the arrows.
   useEffect(() => {

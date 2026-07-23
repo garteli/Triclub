@@ -16,3 +16,9 @@ export function getMapView() {
 export function setMapView(view) {
   try { localStorage.setItem(KEY, JSON.stringify({ style: view.style, is3D: !!view.is3D })); } catch { /* ignore */ }
 }
+
+// Persist just the basemap layer, keeping the stored 2D/3D preference — for maps that only pick a
+// layer (event route map, live-ride map) and shouldn't clobber the activity map's 3D choice.
+export function setMapStyle(style) {
+  setMapView({ ...getMapView(), style });
+}
