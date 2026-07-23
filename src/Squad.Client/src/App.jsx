@@ -108,11 +108,13 @@ const RIDE_TYPES = {
   run: { label: 'Run', fitSport: FitSport.running, indoor: false },
   trainer: { label: 'Trainer', fitSport: FitSport.cycling, indoor: true },
   treadmill: { label: 'Treadmill', fitSport: FitSport.running, indoor: true },
-  // Motorsport clubs record a motorcycle ride — road / off-road / touring (all outdoor GPS;
-  // FIT has no motorcycling sport in our encoder, so they record as cycling).
+  // Motorsport clubs record a vehicle session — circuit / endurance / rally / kart / road (all
+  // outdoor GPS; FIT has no motorsport sport in our encoder, so they record as cycling).
+  circuit: { label: 'Circuit', fitSport: FitSport.cycling, indoor: false },
+  endurance: { label: 'Endurance', fitSport: FitSport.cycling, indoor: false },
+  rally: { label: 'Rally', fitSport: FitSport.cycling, indoor: false },
+  kart: { label: 'Kart', fitSport: FitSport.cycling, indoor: false },
   road: { label: 'Road', fitSport: FitSport.cycling, indoor: false },
-  offroad: { label: 'Off-road', fitSport: FitSport.cycling, indoor: false },
-  touring: { label: 'Touring', fitSport: FitSport.cycling, indoor: false },
   // Escort vehicle — GPS, but shown as a car on the map, kept out of the peloton/leader stats,
   // and NOT saved as an activity (escorting isn't a workout). Offered in both families.
   driver: { label: 'Driver', fitSport: FitSport.cycling, indoor: false, driver: true },
@@ -121,7 +123,7 @@ const RIDE_TYPES = {
 // Which activity types each discipline family offers on the live ride, in display order.
 const RIDE_TYPES_BY_FAMILY = {
   endurance: ['bike', 'run', 'trainer', 'treadmill', 'driver'],
-  motorsport: ['road', 'offroad', 'touring'],
+  motorsport: ['circuit', 'endurance', 'rally', 'kart', 'road'],
 };
 
 // Stash any ?invite=TOKEN / ?event=… from the launch URL before the app renders, so they survive
