@@ -17,7 +17,7 @@ function eventIsToday(iso) {
 
 // The "today" hero for a motorsport club: a group ride scheduled for today (from the club's
 // events), mirroring the endurance plan card so a coach's just-added ride actually shows here.
-function TodayEventCard({ ev, onOpen, token, rtl = false }) {
+function TodayEventCard({ ev, onOpen, token, rtl = false, label = null }) {
   const d = new Date(ev.start);
   const time = Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString(rtl ? 'he-IL' : 'en-US', { hour: 'numeric', minute: '2-digit' });
   const sub = [time, ev.courseName, ev.courseKm ? `${ev.courseKm.toFixed(1)} km` : null].filter(Boolean).join(' · ');
@@ -40,7 +40,7 @@ function TodayEventCard({ ev, onOpen, token, rtl = false }) {
               {sub && <div style={s('font-size:13px;color:var(--text2)')}>{sub}</div>}
             </div>
           </div>
-          <div style={s('background:var(--accent);color:var(--accent-ink);font-size:10px;font-weight:700;padding:4px 8px;border-radius:7px;text-transform:uppercase;letter-spacing:.5px;flex:none')}>{rtl ? 'היום' : 'Today'}</div>
+          <div style={s('background:var(--accent);color:var(--accent-ink);font-size:10px;font-weight:700;padding:4px 8px;border-radius:7px;text-transform:uppercase;letter-spacing:.5px;flex:none')}>{label ?? (rtl ? 'היום' : 'Today')}</div>
         </div>
         <div style={s('display:flex;margin-top:14px')}>
           <div className="ctl" style={s('flex:1;background:var(--accent);color:var(--accent-ink);text-align:center;padding:13px;border-radius:13px;font-weight:700;font-size:14px')}>
@@ -49,6 +49,128 @@ function TodayEventCard({ ev, onOpen, token, rtl = false }) {
         </div>
       </div>
     </div>
+  );
+}
+
+// Local 'yyyy-MM-dd' for today (matches plan-row `iso`, which is a plain date string).
+function todayISO() {
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+}
+// 'yyyy-MM-dd' → local Date (constructing from parts avoids the UTC-midnight day shift).
+function localDate(iso) {
+  const [y, m, d] = String(iso || '').split('-').map(Number);
+  return (y && m && d) ? new Date(y, m - 1, d) : new Date(iso);
+}
+// Short weekday for the "Up next" badge, localised.
+function heroDayLabel(d, rtl) {
+  try { return d.toLocaleDateString(rtl ? 'he-IL' : 'en-US', { weekday: 'short' }); }
+  catch { return ''; }
+}
+// The next real training session after today from the current week's plan (skips
+// rest days and anything already done). Plan is this-week-only, so this looks ahead
+// to the end of the week — beyond that we fall back to events / the empty state.
+function nextPlannedSession(plan) {
+  const t = todayISO();
+  return (plan || [])
+    .filter((p) => p.iso && p.iso > t && p.status !== 'rest' && p.status !== 'done')
+    .sort((a, b) => (a.iso < b.iso ? -1 : 1))[0] || null;
+}
+// Decide the "today" hero: today's session, else today's event, else whichever of the
+// next planned session / next scheduled event comes first. null → nothing upcoming.
+function pickHero(vm, todayEvent, upcomingEvent) {
+  const plan = vm.plan || [];
+  const todayWk = plan.find((p) => p.status === 'today') || null;
+  if (todayWk) return { kind: 'session', item: todayWk, isToday: true };
+  if (todayEvent) return { kind: 'event', item: todayEvent, isToday: true };
+  const cands = [];
+  const upWk = nextPlannedSession(plan);
+  if (upWk) cands.push({ kind: 'session', item: upWk, ts: localDate(upWk.iso).getTime() });
+  if (upcomingEvent) cands.push({ kind: 'event', item: upcomingEvent, ts: new Date(upcomingEvent.start).getTime() });
+  cands.sort((a, b) => a.ts - b.ts);
+  return cands[0] ? { kind: cands[0].kind, item: cands[0].item, isToday: false } : null;
+}
+
+// The planned-session hero card. Reused for today (Start session + open-plan) and for an
+// upcoming session (single "View plan" CTA), in both LTR and RTL.
+function PlanHero({ wk, label, isToday, go, rtl }) {
+  const L = rtl
+    ? { dur: 'משך', load: 'עומס', start: 'התחל אימון', view: 'צפה בתוכנית' }
+    : { dur: 'Duration', load: 'Load', start: 'Start session', view: 'View plan' };
+  return (
+    <div style={s(`background:linear-gradient(160deg,var(--bg3),var(--bg2));border:1px solid var(--line);border-radius:22px;overflow:hidden;position:relative${rtl ? ';text-align:right' : ''}`)}>
+      <div style={s(`height:4px;background:${wk.color}`)} />
+      <div style={s('padding:17px 18px 18px')}>
+        <div style={s(`display:flex;justify-content:space-between;align-items:flex-start${rtl ? ';flex-direction:row-reverse' : ''}`)}>
+          <div style={s(`display:flex;gap:12px;align-items:center${rtl ? ';flex-direction:row-reverse' : ''}`)}>
+            <div style={s(`width:46px;height:46px;border-radius:14px;background:color-mix(in srgb,${wk.color} 18%, transparent);color:${wk.color};display:flex;align-items:center;justify-content:center;flex:none`)} dangerouslySetInnerHTML={html(wk.iconHtml)} />
+            <div>
+              <div style={s('font-size:19px;font-weight:700;letter-spacing:-.4px')}>{wk.title}</div>
+              {wk.sub && <div style={s('font-size:13px;color:var(--text2)')}>{wk.sub}</div>}
+            </div>
+          </div>
+          <div style={s('background:var(--accent);color:var(--accent-ink);font-size:10px;font-weight:700;padding:4px 8px;border-radius:7px;text-transform:uppercase;letter-spacing:.5px;flex:none')}>{label}</div>
+        </div>
+        <div style={s(`display:flex;margin-top:16px;border-top:1px solid var(--line);padding-top:14px${rtl ? ';flex-direction:row-reverse;text-align:right' : ''}`)}>
+          <div style={s('flex:1')}><div className="mono" style={s('font-size:20px;font-weight:700')}>{wk.dur}</div><div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-top:2px')}>{L.dur}</div></div>
+          <div style={s(`flex:1;${rtl ? 'border-right:1px solid var(--line);padding-right:14px' : 'border-left:1px solid var(--line);padding-left:14px'}`)}><div className="mono" style={s('font-size:20px;font-weight:700;color:var(--accent)')}>{wk.load}</div><div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-top:2px')}>{L.load}</div></div>
+        </div>
+        {isToday ? (
+          <div style={s(`display:flex;gap:9px;margin-top:14px${rtl ? ';flex-direction:row-reverse' : ''}`)}>
+            <div className="ctl" onClick={() => go('ride')} style={s('flex:1;background:var(--accent);color:var(--accent-ink);text-align:center;padding:13px;border-radius:13px;font-weight:700;font-size:14px')}>{L.start}</div>
+            <div className="ctl" onClick={() => go('plan')} style={s('width:52px;background:var(--bg4);border:1px solid var(--line);border-radius:13px;display:flex;align-items:center;justify-content:center')}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round" style={rtl ? { transform: 'scaleX(-1)' } : undefined}><path d="M9 6l6 6-6 6" /></svg>
+            </div>
+          </div>
+        ) : (
+          <div className="ctl" onClick={() => go('plan')} style={s('background:var(--accent);color:var(--accent-ink);text-align:center;padding:13px;border-radius:13px;font-weight:700;font-size:14px;margin-top:14px')}>{L.view}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Empty state when there's nothing today *and* nothing upcoming.
+function EmptyHero({ family, go, rtl }) {
+  const moto = family === 'motorsport';
+  const copy = moto
+    ? (rtl
+      ? { t: 'אין רכיבות מתוזמנות', s: 'הרכיבות הקבוצתיות של המועדון יופיעו כאן. הקש לצפייה באירועים.', to: 'events' }
+      : { t: 'No rides scheduled', s: "Your club's group rides show up here. Tap to see upcoming events.", to: 'events' })
+    : (rtl
+      ? { t: 'אין אימונים מתוכננים', s: 'התוכנית השבועית של המאמן תופיע כאן. הקש כדי לפתוח.', to: 'plan' }
+      : { t: 'No sessions planned', s: "Your coach's weekly plan shows up here. Tap to open your plan.", to: 'plan' });
+  return (
+    <div className="ctl" onClick={() => go(copy.to)} style={s('background:var(--bg2);border:1px dashed var(--line2);border-radius:20px;padding:22px 18px;text-align:center')}>
+      <div style={s('font-size:15px;font-weight:600')}>{copy.t}</div>
+      <div style={s('font-size:12.5px;color:var(--text3);margin-top:5px;line-height:1.5')}>{copy.s}</div>
+    </div>
+  );
+}
+
+// The home "today" hero: eyebrow + the chosen session/event card (or empty state).
+function TodayHero({ vm, go, openEvent, token, rtl, todayEvent, upcomingEvent }) {
+  const hero = pickHero(vm, todayEvent, upcomingEvent);
+  const upNext = hero && !hero.isToday;
+  const eyebrow = upNext
+    ? (rtl ? 'הבא בתור' : 'Up next')
+    : (rtl ? `היום · ${vm.todayLabelHe}` : `Today · ${vm.todayLabel}`);
+  const label = hero
+    ? (hero.isToday
+      ? (rtl ? 'היום' : 'Today')
+      : heroDayLabel(hero.kind === 'session' ? localDate(hero.item.iso) : new Date(hero.item.start), rtl))
+    : null;
+  return (
+    <>
+      <div style={s(`font-size:12px;color:var(--text3);font-weight:600;margin:4px 2px 10px;${rtl ? 'letter-spacing:.5px' : 'text-transform:uppercase;letter-spacing:1.4px'}`)}>{eyebrow}</div>
+      {!hero ? (
+        <EmptyHero family={vm.family} go={go} rtl={rtl} />
+      ) : hero.kind === 'session' ? (
+        <PlanHero wk={hero.item} label={label} isToday={hero.isToday} go={go} rtl={rtl} />
+      ) : (
+        <TodayEventCard ev={hero.item} onOpen={openEvent} token={token} rtl={rtl} label={label} />
+      )}
+    </>
   );
 }
 
@@ -146,61 +268,13 @@ function SquadRail({ squad, rtl, onOpen, token }) {
   );
 }
 
-function DashboardEN({ vm, go, openAthlete, openActivity, openEvent, getToken, onSwitchSquad, notifUnread = 0, todayEvent = null }) {
+function DashboardEN({ vm, go, openAthlete, openActivity, openEvent, getToken, onSwitchSquad, notifUnread = 0, todayEvent = null, upcomingEvent = null }) {
   const token = getToken?.() ?? null;
   const recent = last7Days(vm.activities);
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .4s ease')}>
-      {/* today hero — driven by the real plan (empty state when none) */}
-      {(() => {
-        const todayWk = vm.plan.find((p) => p.status === 'today');
-        return (
-          <>
-            <div style={s('font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:1.4px;font-weight:600;margin:4px 2px 10px')}>Today · {vm.todayLabel}</div>
-            {todayWk ? (
-              <div style={s('background:linear-gradient(160deg,var(--bg3),var(--bg2));border:1px solid var(--line);border-radius:22px;padding:0;overflow:hidden;position:relative')}>
-                <div style={s(`height:4px;background:${todayWk.color}`)} />
-                <div style={s('padding:17px 18px 18px')}>
-                  <div style={s('display:flex;justify-content:space-between;align-items:flex-start')}>
-                    <div style={s('display:flex;gap:12px;align-items:center')}>
-                      <div style={s(`width:46px;height:46px;border-radius:14px;background:color-mix(in srgb,${todayWk.color} 18%, transparent);color:${todayWk.color};display:flex;align-items:center;justify-content:center`)} dangerouslySetInnerHTML={html(todayWk.iconHtml)} />
-                      <div>
-                        <div style={s('font-size:19px;font-weight:700;letter-spacing:-.4px')}>{todayWk.title}</div>
-                        {todayWk.sub && <div style={s('font-size:13px;color:var(--text2)')}>{todayWk.sub}</div>}
-                      </div>
-                    </div>
-                    <div style={s('background:var(--accent);color:var(--accent-ink);font-size:10px;font-weight:700;padding:4px 8px;border-radius:7px;text-transform:uppercase;letter-spacing:.5px')}>Today</div>
-                  </div>
-                  <div style={s('display:flex;gap:0;margin-top:16px;border-top:1px solid var(--line);padding-top:14px')}>
-                    <div style={s('flex:1')}><div className="mono" style={s('font-size:20px;font-weight:700')}>{todayWk.dur}</div><div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-top:2px')}>Duration</div></div>
-                    <div style={s('flex:1;border-left:1px solid var(--line);padding-left:14px')}><div className="mono" style={s('font-size:20px;font-weight:700;color:var(--accent)')}>{todayWk.load}</div><div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-top:2px')}>Load</div></div>
-                  </div>
-                  <div style={s('display:flex;gap:9px;margin-top:14px')}>
-                    <div className="ctl" onClick={() => go('ride')} style={s('flex:1;background:var(--accent);color:var(--accent-ink);text-align:center;padding:13px;border-radius:13px;font-weight:700;font-size:14px')}>Start session</div>
-                    <div className="ctl" onClick={() => go('plan')} style={s('width:52px;background:var(--bg4);border:1px solid var(--line);border-radius:13px;display:flex;align-items:center;justify-content:center')}>
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2" strokeLinecap="round"><path d="M9 6l6 6-6 6" /></svg>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : vm.family === 'motorsport' ? (
-              todayEvent ? (
-                <TodayEventCard ev={todayEvent} onOpen={openEvent} token={token} />
-              ) : (
-                <div className="ctl" onClick={() => go('events')} style={s('background:var(--bg2);border:1px dashed var(--line2);border-radius:20px;padding:22px 18px;text-align:center')}>
-                  <div style={s('font-size:15px;font-weight:600')}>No ride scheduled for today</div>
-                  <div style={s('font-size:12.5px;color:var(--text3);margin-top:5px;line-height:1.5')}>Your club's group rides show up here. Tap to see upcoming events.</div>
-                </div>
-              )
-            ) : (
-              <div className="ctl" onClick={() => go('plan')} style={s('background:var(--bg2);border:1px dashed var(--line2);border-radius:20px;padding:22px 18px;text-align:center')}>
-                <div style={s('font-size:15px;font-weight:600')}>No session planned for today</div>
-                <div style={s('font-size:12.5px;color:var(--text3);margin-top:5px;line-height:1.5')}>Your coach's weekly plan shows up here. Tap to open your plan.</div>
-              </div>
-            )}
-          </>
-        );
-      })()}
+      {/* today hero — today's session/event, else the earliest upcoming one, else empty */}
+      <TodayHero vm={vm} go={go} openEvent={openEvent} token={token} rtl={false} todayEvent={todayEvent} upcomingEvent={upcomingEvent} />
 
       {/* squad status */}
       <div style={s('display:flex;justify-content:space-between;align-items:baseline;margin:22px 2px 12px')}>
@@ -227,55 +301,13 @@ function DashboardEN({ vm, go, openAthlete, openActivity, openEvent, getToken, o
   );
 }
 
-function DashboardHE({ vm, go, openAthlete, openActivity, openEvent, getToken, onSwitchSquad, notifUnread = 0, todayEvent = null }) {
+function DashboardHE({ vm, go, openAthlete, openActivity, openEvent, getToken, onSwitchSquad, notifUnread = 0, todayEvent = null, upcomingEvent = null }) {
   const token = getToken?.() ?? null;
   const recent = last7Days(vm.activities);
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .4s ease;text-align:right')}>
-      {(() => {
-        const todayWk = vm.plan.find((p) => p.status === 'today');
-        return (
-          <>
-            <div style={s('font-size:12px;color:var(--text3);letter-spacing:.5px;font-weight:600;margin:4px 2px 10px')}>היום · {vm.todayLabelHe}</div>
-            {todayWk ? (
-              <div style={s('background:linear-gradient(160deg,var(--bg3),var(--bg2));border:1px solid var(--line);border-radius:22px;overflow:hidden')}>
-                <div style={s(`height:4px;background:${todayWk.color}`)} />
-                <div style={s('padding:17px 18px 18px')}>
-                  <div style={s('display:flex;justify-content:space-between;align-items:flex-start;flex-direction:row-reverse')}>
-                    <div style={s('display:flex;gap:12px;align-items:center;flex-direction:row-reverse')}>
-                      <div style={s(`width:46px;height:46px;border-radius:14px;background:color-mix(in srgb,${todayWk.color} 18%, transparent);color:${todayWk.color};display:flex;align-items:center;justify-content:center`)} dangerouslySetInnerHTML={html(todayWk.iconHtml)} />
-                      <div style={s('text-align:right')}>
-                        <div style={s('font-size:19px;font-weight:700')}>{todayWk.title}</div>
-                        {todayWk.sub && <div style={s('font-size:13px;color:var(--text2)')}>{todayWk.sub}</div>}
-                      </div>
-                    </div>
-                    <div style={s('background:var(--accent);color:var(--accent-ink);font-size:10px;font-weight:700;padding:4px 8px;border-radius:7px')}>היום</div>
-                  </div>
-                  <div style={s('display:flex;margin-top:16px;border-top:1px solid var(--line);padding-top:14px;flex-direction:row-reverse;text-align:right')}>
-                    <div style={s('flex:1')}><div className="mono" style={s('font-size:20px;font-weight:700')}>{todayWk.dur}</div><div style={s('font-size:10px;color:var(--text3);margin-top:2px')}>משך</div></div>
-                    <div style={s('flex:1;border-right:1px solid var(--line);padding-right:14px')}><div className="mono" style={s('font-size:20px;font-weight:700;color:var(--accent)')}>{todayWk.load}</div><div style={s('font-size:10px;color:var(--text3);margin-top:2px')}>עומס</div></div>
-                  </div>
-                  <div className="ctl" onClick={() => go('ride')} style={s('background:var(--accent);color:var(--accent-ink);text-align:center;padding:13px;border-radius:13px;font-weight:700;font-size:14px;margin-top:14px')}>התחל אימון</div>
-                </div>
-              </div>
-            ) : vm.family === 'motorsport' ? (
-              todayEvent ? (
-                <TodayEventCard ev={todayEvent} onOpen={openEvent} token={token} rtl />
-              ) : (
-                <div className="ctl" onClick={() => go('events')} style={s('background:var(--bg2);border:1px dashed var(--line2);border-radius:20px;padding:22px 18px;text-align:center')}>
-                  <div style={s('font-size:15px;font-weight:600')}>אין רכיבה מתוזמנת להיום</div>
-                  <div style={s('font-size:12.5px;color:var(--text3);margin-top:5px;line-height:1.5')}>הרכיבות הקבוצתיות של המועדון יופיעו כאן. הקש לצפייה באירועים.</div>
-                </div>
-              )
-            ) : (
-              <div className="ctl" onClick={() => go('plan')} style={s('background:var(--bg2);border:1px dashed var(--line2);border-radius:20px;padding:22px 18px;text-align:center')}>
-                <div style={s('font-size:15px;font-weight:600')}>אין אימון מתוכנן להיום</div>
-                <div style={s('font-size:12.5px;color:var(--text3);margin-top:5px;line-height:1.5')}>התוכנית השבועית של המאמן תופיע כאן. הקש כדי לפתוח.</div>
-              </div>
-            )}
-          </>
-        );
-      })()}
+      {/* today hero — today's session/event, else the earliest upcoming one, else empty */}
+      <TodayHero vm={vm} go={go} openEvent={openEvent} token={token} rtl todayEvent={todayEvent} upcomingEvent={upcomingEvent} />
 
       <div style={s('display:flex;justify-content:space-between;align-items:baseline;margin:22px 2px 12px;flex-direction:row-reverse')}>
         <div style={s('font-size:12px;color:var(--text3);font-weight:600')}>המועדון השבוע</div>
@@ -306,25 +338,32 @@ export default function Dashboard({ vm, state, actions, getToken, onSwitchSquad 
   const { items: notifItems } = useNotifications({ getToken, enabled: !!getToken });
   const notifUnread = notifItems.filter((n) => n.unread).length;
 
-  // Motorsport clubs run on group rides (events), not a training plan — so the "today" hero must
-  // read the club's events. Fetch the active club's events and surface one scheduled for today.
-  const [todayEvent, setTodayEvent] = useState(null);
+  // The "today" hero surfaces the club's group rides alongside the training plan — so
+  // fetch the active club's events and keep the earliest one that hasn't happened yet
+  // (today or later). `todayEvent` is that one when it falls on today; the hero shows it
+  // (or the next planned session) and falls back to the soonest upcoming when nothing's on today.
+  const [upcomingEvent, setUpcomingEvent] = useState(null);
   useEffect(() => {
     let ok = true;
     const squadId = vm.activeClubId;
-    if (vm.family !== 'motorsport' || !squadId || !getToken) { setTodayEvent(null); return undefined; }
+    if (!squadId || !getToken) { setUpcomingEvent(null); return undefined; }
     (async () => {
       try {
         const t = await getToken();
         const evs = await listSquadEvents(t, squadId);
-        const today = (evs || []).find((e) => eventIsToday(e.start));
-        if (ok) setTodayEvent(today || null);
-      } catch { if (ok) setTodayEvent(null); }
+        const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
+        const up = (evs || [])
+          .filter((e) => { const ts = new Date(e.start).getTime(); return !Number.isNaN(ts) && ts >= startOfToday.getTime(); })
+          .sort((a, b) => new Date(a.start) - new Date(b.start))[0] || null;
+        if (ok) setUpcomingEvent(up);
+      } catch { if (ok) setUpcomingEvent(null); }
     })();
     return () => { ok = false; };
-  }, [vm.activeClubId, vm.family, getToken]);
+  }, [vm.activeClubId, getToken]);
+
+  const todayEvent = upcomingEvent && eventIsToday(upcomingEvent.start) ? upcomingEvent : null;
 
   return state.lang === 'he'
-    ? <DashboardHE vm={vm} go={actions.go} openAthlete={actions.openAthlete} openActivity={actions.openActivity} openEvent={actions.openEvent} getToken={getToken} onSwitchSquad={onSwitchSquad} notifUnread={notifUnread} todayEvent={todayEvent} />
-    : <DashboardEN vm={vm} go={actions.go} openAthlete={actions.openAthlete} openActivity={actions.openActivity} openEvent={actions.openEvent} getToken={getToken} onSwitchSquad={onSwitchSquad} notifUnread={notifUnread} todayEvent={todayEvent} />;
+    ? <DashboardHE vm={vm} go={actions.go} openAthlete={actions.openAthlete} openActivity={actions.openActivity} openEvent={actions.openEvent} getToken={getToken} onSwitchSquad={onSwitchSquad} notifUnread={notifUnread} todayEvent={todayEvent} upcomingEvent={upcomingEvent} />
+    : <DashboardEN vm={vm} go={actions.go} openAthlete={actions.openAthlete} openActivity={actions.openActivity} openEvent={actions.openEvent} getToken={getToken} onSwitchSquad={onSwitchSquad} notifUnread={notifUnread} todayEvent={todayEvent} upcomingEvent={upcomingEvent} />;
 }
