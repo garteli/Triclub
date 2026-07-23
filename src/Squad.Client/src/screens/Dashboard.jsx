@@ -6,7 +6,17 @@ import AuthedImage from '../components/AuthedImage.jsx';
 import SportIcon from '../components/SportIcon.jsx';
 import FeedActivityCard from '../components/FeedActivityCard.jsx';
 import { useNotifications } from '../hooks/useNotifications.js';
+import { mapRow } from '../hooks/usePlan.js';
+import { discIcon } from '../data/squadData.js';
 import { listSquadEvents } from '../lib/events.js';
+
+// Monday (week start, matching the plan's week convention) `weekOffset` weeks from today,
+// as a 'yyyy-MM-dd' string for the /api/plan?weekStart= query.
+function mondayISO(weekOffset = 0) {
+  const n = new Date();
+  const mon = new Date(n.getFullYear(), n.getMonth(), n.getDate() - ((n.getDay() + 6) % 7) + weekOffset * 7);
+  return `${mon.getFullYear()}-${String(mon.getMonth() + 1).padStart(2, '0')}-${String(mon.getDate()).padStart(2, '0')}`;
+}
 
 // Is an event's start on the local calendar-today?
 function eventIsToday(iso) {
@@ -62,9 +72,9 @@ function localDate(iso) {
   const [y, m, d] = String(iso || '').split('-').map(Number);
   return (y && m && d) ? new Date(y, m - 1, d) : new Date(iso);
 }
-// Short weekday for the "Up next" badge, localised.
+// Short weekday + day for the "Up next" badge (day disambiguates next-week items), localised.
 function heroDayLabel(d, rtl) {
-  try { return d.toLocaleDateString(rtl ? 'he-IL' : 'en-US', { weekday: 'short' }); }
+  try { return d.toLocaleDateString(rtl ? 'he-IL' : 'en-US', { weekday: 'short', day: 'numeric' }); }
   catch { return ''; }
 }
 // The next real training session after today from the current week's plan (skips
@@ -78,13 +88,14 @@ function nextPlannedSession(plan) {
 }
 // Decide the "today" hero: today's session, else today's event, else whichever of the
 // next planned session / next scheduled event comes first. null → nothing upcoming.
-function pickHero(vm, todayEvent, upcomingEvent) {
+function pickHero(vm, todayEvent, upcomingEvent, nextWeekSession) {
   const plan = vm.plan || [];
   const todayWk = plan.find((p) => p.status === 'today') || null;
   if (todayWk) return { kind: 'session', item: todayWk, isToday: true };
   if (todayEvent) return { kind: 'event', item: todayEvent, isToday: true };
   const cands = [];
-  const upWk = nextPlannedSession(plan);
+  // This week's next session, or (nothing left this week) the first of next week's plan.
+  const upWk = nextPlannedSession(plan) || nextWeekSession || null;
   if (upWk) cands.push({ kind: 'session', item: upWk, ts: localDate(upWk.iso).getTime() });
   if (upcomingEvent) cands.push({ kind: 'event', item: upcomingEvent, ts: new Date(upcomingEvent.start).getTime() });
   cands.sort((a, b) => a.ts - b.ts);
@@ -149,8 +160,8 @@ function EmptyHero({ family, go, rtl }) {
 }
 
 // The home "today" hero: eyebrow + the chosen session/event card (or empty state).
-function TodayHero({ vm, go, openEvent, token, rtl, todayEvent, upcomingEvent }) {
-  const hero = pickHero(vm, todayEvent, upcomingEvent);
+function TodayHero({ vm, go, openEvent, token, rtl, todayEvent, upcomingEvent, nextWeekSession }) {
+  const hero = pickHero(vm, todayEvent, upcomingEvent, nextWeekSession);
   const upNext = hero && !hero.isToday;
   const eyebrow = upNext
     ? (rtl ? 'הבא בתור' : 'Up next')
@@ -268,13 +279,13 @@ function SquadRail({ squad, rtl, onOpen, token }) {
   );
 }
 
-function DashboardEN({ vm, go, openAthlete, openActivity, openEvent, getToken, onSwitchSquad, notifUnread = 0, todayEvent = null, upcomingEvent = null }) {
+function DashboardEN({ vm, go, openAthlete, openActivity, openEvent, getToken, onSwitchSquad, notifUnread = 0, todayEvent = null, upcomingEvent = null, nextWeekSession = null }) {
   const token = getToken?.() ?? null;
   const recent = last7Days(vm.activities);
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .4s ease')}>
       {/* today hero — today's session/event, else the earliest upcoming one, else empty */}
-      <TodayHero vm={vm} go={go} openEvent={openEvent} token={token} rtl={false} todayEvent={todayEvent} upcomingEvent={upcomingEvent} />
+      <TodayHero vm={vm} go={go} openEvent={openEvent} token={token} rtl={false} todayEvent={todayEvent} upcomingEvent={upcomingEvent} nextWeekSession={nextWeekSession} />
 
       {/* squad status */}
       <div style={s('display:flex;justify-content:space-between;align-items:baseline;margin:22px 2px 12px')}>
@@ -301,13 +312,13 @@ function DashboardEN({ vm, go, openAthlete, openActivity, openEvent, getToken, o
   );
 }
 
-function DashboardHE({ vm, go, openAthlete, openActivity, openEvent, getToken, onSwitchSquad, notifUnread = 0, todayEvent = null, upcomingEvent = null }) {
+function DashboardHE({ vm, go, openAthlete, openActivity, openEvent, getToken, onSwitchSquad, notifUnread = 0, todayEvent = null, upcomingEvent = null, nextWeekSession = null }) {
   const token = getToken?.() ?? null;
   const recent = last7Days(vm.activities);
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .4s ease;text-align:right')}>
       {/* today hero — today's session/event, else the earliest upcoming one, else empty */}
-      <TodayHero vm={vm} go={go} openEvent={openEvent} token={token} rtl todayEvent={todayEvent} upcomingEvent={upcomingEvent} />
+      <TodayHero vm={vm} go={go} openEvent={openEvent} token={token} rtl todayEvent={todayEvent} upcomingEvent={upcomingEvent} nextWeekSession={nextWeekSession} />
 
       <div style={s('display:flex;justify-content:space-between;align-items:baseline;margin:22px 2px 12px;flex-direction:row-reverse')}>
         <div style={s('font-size:12px;color:var(--text3);font-weight:600')}>המועדון השבוע</div>
@@ -363,7 +374,33 @@ export default function Dashboard({ vm, state, actions, getToken, onSwitchSquad 
 
   const todayEvent = upcomingEvent && eventIsToday(upcomingEvent.start) ? upcomingEvent : null;
 
+  // The plan the hero reads is this-week-only. When there's nothing left to train this
+  // week (no session today, none still ahead), look ahead to next week's plan and surface
+  // its first real session so the hero keeps pointing at what's coming. Only fetched in
+  // that gap — a plan session today or later this week makes the extra call unnecessary.
+  const hasSessionThisWeekAhead = (vm.plan || []).some((p) => p.status === 'today') || !!nextPlannedSession(vm.plan);
+  const [nextWeekSession, setNextWeekSession] = useState(null);
+  useEffect(() => {
+    let ok = true;
+    const squadId = vm.activeClubId;
+    if (!getToken || !squadId || hasSessionThisWeekAhead) { setNextWeekSession(null); return undefined; }
+    (async () => {
+      try {
+        const t = await getToken();
+        const res = await fetch(`/api/plan?weekStart=${encodeURIComponent(mondayISO(1))}`, {
+          headers: t ? { Authorization: `Bearer ${t}` } : undefined,
+        });
+        if (!res.ok) { if (ok) setNextWeekSession(null); return; }
+        const data = await res.json();
+        const rows = (data.week || []).map((r) => { const m = mapRow(r); return { ...m, iconHtml: discIcon(m.disc) }; });
+        // These rows are all in a future week, so nextPlannedSession's "after today" holds.
+        if (ok) setNextWeekSession(nextPlannedSession(rows));
+      } catch { if (ok) setNextWeekSession(null); }
+    })();
+    return () => { ok = false; };
+  }, [vm.activeClubId, getToken, hasSessionThisWeekAhead]);
+
   return state.lang === 'he'
-    ? <DashboardHE vm={vm} go={actions.go} openAthlete={actions.openAthlete} openActivity={actions.openActivity} openEvent={actions.openEvent} getToken={getToken} onSwitchSquad={onSwitchSquad} notifUnread={notifUnread} todayEvent={todayEvent} upcomingEvent={upcomingEvent} />
-    : <DashboardEN vm={vm} go={actions.go} openAthlete={actions.openAthlete} openActivity={actions.openActivity} openEvent={actions.openEvent} getToken={getToken} onSwitchSquad={onSwitchSquad} notifUnread={notifUnread} todayEvent={todayEvent} upcomingEvent={upcomingEvent} />;
+    ? <DashboardHE vm={vm} go={actions.go} openAthlete={actions.openAthlete} openActivity={actions.openActivity} openEvent={actions.openEvent} getToken={getToken} onSwitchSquad={onSwitchSquad} notifUnread={notifUnread} todayEvent={todayEvent} upcomingEvent={upcomingEvent} nextWeekSession={nextWeekSession} />
+    : <DashboardEN vm={vm} go={actions.go} openAthlete={actions.openAthlete} openActivity={actions.openActivity} openEvent={actions.openEvent} getToken={getToken} onSwitchSquad={onSwitchSquad} notifUnread={notifUnread} todayEvent={todayEvent} upcomingEvent={upcomingEvent} nextWeekSession={nextWeekSession} />;
 }

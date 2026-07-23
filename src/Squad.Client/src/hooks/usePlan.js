@@ -6,7 +6,7 @@ const dur = (min) => `${Math.floor(min / 60)}:${String(min % 60).padStart(2, '0'
 
 // Maps a server plan row to the shape buildViewModel's plan section renders
 // (see data/squadData.js planWeek). `wk` = discipline keys the workout-detail sheet.
-function mapRow(r) {
+export function mapRow(r) {
   const d = new Date(r.date); // 'yyyy-MM-dd' parses as UTC
   return {
     id: r.id,
