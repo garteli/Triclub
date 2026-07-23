@@ -13,6 +13,7 @@
 		A1B2C3D40000000000000002 /* SquadPeerBeaconPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40000000000000001 /* SquadPeerBeaconPlugin.swift */; };
 		A1B2C3D40000000000000004 /* SquadUwbPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40000000000000003 /* SquadUwbPlugin.swift */; };
 		A1B2C3D40000000000000006 /* SquadKeepAwakePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40000000000000005 /* SquadKeepAwakePlugin.swift */; };
+		A1B2C3D40000000000000010 /* SquadDialerPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40000000000000009 /* SquadDialerPlugin.swift */; };
 		A1B2C3D40000000000000008 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40000000000000007 /* PrivacyInfo.xcprivacy */; };
 		504EC30D1FED79650016851F /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30B1FED79650016851F /* Main.storyboard */; };
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
@@ -29,6 +30,7 @@
 		A1B2C3D40000000000000001 /* SquadPeerBeaconPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SquadPeerBeaconPlugin.swift; sourceTree = "<group>"; };
 		A1B2C3D40000000000000003 /* SquadUwbPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SquadUwbPlugin.swift; sourceTree = "<group>"; };
 		A1B2C3D40000000000000005 /* SquadKeepAwakePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SquadKeepAwakePlugin.swift; sourceTree = "<group>"; };
+		A1B2C3D40000000000000009 /* SquadDialerPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SquadDialerPlugin.swift; sourceTree = "<group>"; };
 		A1B2C3D40000000000000007 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		504EC30C1FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		504EC30E1FED79650016851F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -86,6 +88,7 @@
 				A1B2C3D40000000000000001 /* SquadPeerBeaconPlugin.swift */,
 				A1B2C3D40000000000000003 /* SquadUwbPlugin.swift */,
 				A1B2C3D40000000000000005 /* SquadKeepAwakePlugin.swift */,
+				A1B2C3D40000000000000009 /* SquadDialerPlugin.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
 				504EC3101FED79650016851F /* LaunchScreen.storyboard */,
@@ -226,6 +229,7 @@
 				A1B2C3D40000000000000002 /* SquadPeerBeaconPlugin.swift in Sources */,
 				A1B2C3D40000000000000004 /* SquadUwbPlugin.swift in Sources */,
 				A1B2C3D40000000000000006 /* SquadKeepAwakePlugin.swift in Sources */,
+				A1B2C3D40000000000000010 /* SquadDialerPlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { s } from '../lib/style.js';
 import { alarmBeep } from '../lib/alarmSound.js';
+import { dialEmergency } from '../lib/dialer.js';
 
 // Live-ride fall-detection UI. Two pieces:
 //  • CrashAlertOverlay — YOUR device thinks you crashed. A full-screen "Are you OK?" countdown you
@@ -32,9 +33,10 @@ export function CrashAlertOverlay({ contact, location, manual = false, onAlert, 
     firedRef.current = true;
     try { onAlert?.(); } catch { /* ignore */ }
     setPhase('alerted');
-    // Dial SYNCHRONOUSLY so a user gesture (Get help now / Send SOS) actually opens the dialer on
-    // iOS. On pure countdown-expiry there's no gesture and iOS blocks it — the Call button covers that.
-    if (phone) { try { window.location.href = `tel:${phone}`; } catch { /* blocked */ } }
+    // Ring the emergency contact. On native the SquadDialer plugin dials even with no user gesture
+    // (Android places the call; iOS pops the system Call prompt). On the web this is a `tel:` nav,
+    // which only fires inside a gesture (Get help now / Send SOS) — the Call button covers the rest.
+    if (phone) dialEmergency(phone);
   };
 
   useEffect(() => {

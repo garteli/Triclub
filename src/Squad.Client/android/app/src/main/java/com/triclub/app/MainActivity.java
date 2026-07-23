@@ -9,6 +9,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         // Local (app-embedded) plugins must be registered before the bridge starts.
         registerPlugin(SquadPeerBeaconPlugin.class);
+        registerPlugin(SquadDialerPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }
