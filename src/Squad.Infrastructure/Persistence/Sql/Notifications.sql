@@ -22,3 +22,9 @@ CREATE TABLE dbo.Notification (
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Notification_Recipient_Created' AND object_id = OBJECT_ID('dbo.Notification'))
 CREATE INDEX IX_Notification_Recipient_Created ON dbo.Notification (RecipientId, CreatedUtc);
+
+-- The squad a notification belongs to (join/request/approved/declined/event), so the client can show
+-- which group it's about and switch the active squad to it on tap. Nullable (follow/etc. have none).
+-- Additive + idempotent; existing rows stay NULL.
+IF COL_LENGTH('dbo.Notification', 'SquadId') IS NULL
+    ALTER TABLE dbo.Notification ADD SquadId UNIQUEIDENTIFIER NULL;

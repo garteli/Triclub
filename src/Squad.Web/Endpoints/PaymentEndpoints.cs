@@ -38,7 +38,7 @@ public static class PaymentEndpoints
         // Let the coach know a rider logged a payment for their group (skip when the coach paid their own).
         if (created.CoachId != me)
             await notes.AddAsync(created.CoachId, "payment", me, created.PayerName,
-                $"recorded a payment for {created.SquadName}", ct);
+                $"recorded a payment for {created.SquadName}", created.SquadId, ct);
 
         return Results.Created($"/api/payments/{created.Id}", created);
     }

@@ -74,7 +74,7 @@ public static class AthleteEndpoints
         {
             var actor = await directory.GetAsync(me, ct);
             if (actor is not null)
-                await notes.AddAsync(id, "follow", me, actor.Name, "started following you", ct);
+                await notes.AddAsync(id, "follow", me, actor.Name, "started following you", null, ct);
         }
         return Results.Ok(new { following = true });
     }
