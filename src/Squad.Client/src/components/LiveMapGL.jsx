@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { s } from '../lib/style.js';
 import { BASEMAP_LABEL, baseSource, applyBasemap, nextBasemap, inIsrael } from '../lib/basemaps.js';
-import { getRouteStyle, setRouteStyle as persistRouteStyle, ROUTE_COLORS, ARROW_COLORS, ROUTE_WIDTHS } from '../lib/routeStyle.js';
+import { getRouteStyle, setRouteStyle as persistRouteStyle } from '../lib/routeStyle.js';
 import { getMapView, setMapStyle as persistMapStyle } from '../lib/mapView.js';
 import { addRouteArrows, styleArrows } from '../lib/mapArrows.js';
+import RouteStylePanel from './RouteStylePanel.jsx';
 
 // Interactive live-ride map tile: a real MapLibre basemap you can pinch-zoom, pan and rotate,
 // with the course route + your breadcrumb, and each rider as a coloured dot with their initials.
@@ -332,31 +333,8 @@ export default function LiveMapGL({ pts, course, path, riders, mySport, interact
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 18l7-7" /><circle cx="15.5" cy="8.5" r="1.5" fill="currentColor" stroke="none" /><path d="M12 3l3 3-8 8-3 1 1-3z" /><path d="M17 5l2-2 2 2-2 2z" /></svg>
       </div>
       {styleOpen && (
-        <div onPointerDown={stop} style={s('position:absolute;bottom:50px;right:50px;z-index:4;width:172px;border-radius:13px;padding:11px;background:color-mix(in srgb,var(--bg) 92%,transparent);border:1px solid var(--line2);box-shadow:0 8px 24px -8px rgba(0,0,0,.5)')}>
-          <div style={s('font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text3);margin-bottom:7px')}>Route colour</div>
-          <div style={s('display:flex;flex-wrap:wrap;gap:7px')}>
-            {ROUTE_COLORS.map((c) => (
-              <div key={c} className="ctl" onClick={(e) => { stop(e); applyRstyle({ ...rstyle, color: c }); }}
-                style={s(`width:24px;height:24px;border-radius:50%;background:${c};cursor:pointer;box-shadow:0 0 0 ${rstyle.color === c ? '2.5px var(--text)' : '1px var(--line2)'}`)} />
-            ))}
-          </div>
-          <div style={s('font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text3);margin:11px 0 7px')}>Arrow colour</div>
-          <div style={s('display:flex;flex-wrap:wrap;gap:7px')}>
-            {ARROW_COLORS.map((c) => (
-              <div key={c} className="ctl" onClick={(e) => { stop(e); applyRstyle({ ...rstyle, arrowColor: c }); }}
-                style={s(`width:24px;height:24px;border-radius:50%;background:${c};cursor:pointer;box-shadow:0 0 0 ${rstyle.arrowColor === c ? '2.5px var(--accent)' : '1px var(--line2)'}`)} />
-            ))}
-          </div>
-          <div style={s('font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text3);margin:11px 0 7px')}>Width</div>
-          <div style={s('display:flex;gap:7px')}>
-            {ROUTE_WIDTHS.map(({ label, w }) => (
-              <div key={w} className="ctl" onClick={(e) => { stop(e); applyRstyle({ ...rstyle, width: w }); }}
-                style={s(`flex:1;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:11.5px;font-weight:700;cursor:pointer;background:${rstyle.width === w ? 'color-mix(in srgb,var(--accent) 18%,transparent)' : 'var(--bg3)'};border:1px solid ${rstyle.width === w ? 'var(--accent)' : 'var(--line)'};color:var(--text)`)}>
-                <span style={s(`width:18px;height:${w}px;border-radius:${w}px;background:${rstyle.color}`)} />{label}
-              </div>
-            ))}
-          </div>
-        </div>
+        <RouteStylePanel rstyle={rstyle} applyRstyle={applyRstyle} onClose={() => setStyleOpen(false)}
+          variant="themed" pos="position:absolute;bottom:50px;right:50px;z-index:4" />
       )}
       {/* Basemap cycle (Voyager → Light → Satellite → Terrain → Off-road) */}
       <div

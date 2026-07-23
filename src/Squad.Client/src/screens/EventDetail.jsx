@@ -9,8 +9,9 @@ import { listEventParticipants, joinEvent, leaveEvent, getEventRoute } from '../
 import { buildElevationProfile } from '../lib/elevation.js';
 import { routeKm } from '../lib/courses.js';
 import { BASEMAP_LABEL, nextBasemap, inIsrael } from '../lib/basemaps.js';
-import { getRouteStyle, setRouteStyle as persistRouteStyle, ROUTE_COLORS, ARROW_COLORS, ROUTE_WIDTHS } from '../lib/routeStyle.js';
+import { getRouteStyle, setRouteStyle as persistRouteStyle } from '../lib/routeStyle.js';
 import { getMapView, setMapStyle as persistMapStyle } from '../lib/mapView.js';
+import RouteStylePanel from '../components/RouteStylePanel.jsx';
 
 // The member-facing event page: an identity block, a large map of the route, terrain-derived ride
 // stats + elevation, the meeting point, the organizer's notes, RSVP status, and the participant
@@ -97,7 +98,7 @@ function MapStyleControls({ mapStyle, cycleLayer, styleOpen, setStyleOpen }) {
         style={s(`width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;${glass}`)}>
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"><path d="M12 2l9 5-9 5-9-5z" /><path d="M3 12l9 5 9-5M3 17l9 5 9-5" /></svg>
       </div>
-      <div className="ctl" onClick={() => setStyleOpen((o) => !o)} title="Route colour & width"
+      <div className="ctl" onPointerDown={(e) => e.stopPropagation()} onClick={() => setStyleOpen((o) => !o)} title="Route colour & width"
         style={s(`width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;${glass}${styleOpen ? ';border-color:rgba(255,255,255,.5)' : ''}`)}>
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l3 3-8 8-3 1 1-3z" /><path d="M17 5l2-2 2 2-2 2z" /></svg>
       </div>
@@ -105,36 +106,6 @@ function MapStyleControls({ mapStyle, cycleLayer, styleOpen, setStyleOpen }) {
   );
 }
 
-// The colour/width popover, anchored just left of the control column.
-function StylePanel({ rstyle, applyRstyle, top = 10, right = 52 }) {
-  return (
-    <div style={s(`position:absolute;top:${top}px;right:${right}px;z-index:6;width:180px;border-radius:14px;padding:12px;${glass}`)}>
-      <div style={s('font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:rgba(255,255,255,.6);margin-bottom:8px')}>Route colour</div>
-      <div style={s('display:flex;flex-wrap:wrap;gap:8px')}>
-        {ROUTE_COLORS.map((c) => (
-          <div key={c} className="ctl" onClick={() => applyRstyle({ ...rstyle, color: c })} title={c}
-            style={s(`width:26px;height:26px;border-radius:50%;background:${c};box-shadow:0 0 0 ${rstyle.color === c ? '2.5px #fff' : '1px rgba(255,255,255,.25)'}`)} />
-        ))}
-      </div>
-      <div style={s('font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:rgba(255,255,255,.6);margin:12px 0 8px')}>Arrow colour</div>
-      <div style={s('display:flex;flex-wrap:wrap;gap:8px')}>
-        {ARROW_COLORS.map((c) => (
-          <div key={c} className="ctl" onClick={() => applyRstyle({ ...rstyle, arrowColor: c })} title={c}
-            style={s(`width:26px;height:26px;border-radius:50%;background:${c};box-shadow:0 0 0 ${rstyle.arrowColor === c ? '2.5px var(--accent)' : '1px rgba(255,255,255,.25)'}`)} />
-        ))}
-      </div>
-      <div style={s('font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:rgba(255,255,255,.6);margin:12px 0 8px')}>Width</div>
-      <div style={s('display:flex;gap:8px')}>
-        {ROUTE_WIDTHS.map(({ label, w }) => (
-          <div key={w} className="ctl" onClick={() => applyRstyle({ ...rstyle, width: w })}
-            style={s(`flex:1;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;gap:7px;font-size:12px;font-weight:700;background:${rstyle.width === w ? 'rgba(255,255,255,.18)' : 'rgba(255,255,255,.06)'};border:1px solid ${rstyle.width === w ? 'rgba(255,255,255,.45)' : 'rgba(255,255,255,.14)'}`)}>
-            <span style={s(`width:20px;height:${w}px;border-radius:${w}px;background:${rstyle.color}`)} />{label}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 // A terrain-derived elevation card: distance + total ascent from Open-Meteo, and a gradient area
 // chart of the profile. Fed the already-computed profile so the terrain is read once per route.
@@ -363,7 +334,7 @@ export default function EventDetail({ vm, state, actions, getToken }) {
               style={s(`width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;line-height:1;${glass}`)}>⤢</div>
             <MapStyleControls mapStyle={mapStyle} cycleLayer={cycleLayer} styleOpen={styleOpen} setStyleOpen={setStyleOpen} />
           </div>
-          {styleOpen && <StylePanel rstyle={rstyle} applyRstyle={applyRstyle} />}
+          {styleOpen && <RouteStylePanel rstyle={rstyle} applyRstyle={applyRstyle} onClose={() => setStyleOpen(false)} pos="position:absolute;top:10px;right:52px;z-index:6" />}
         </div>
       )}
 
@@ -487,7 +458,7 @@ export default function EventDetail({ vm, state, actions, getToken }) {
               style={s(`width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;line-height:1;${glass}`)}>✕</div>
             <MapStyleControls mapStyle={mapStyle} cycleLayer={cycleLayer} styleOpen={styleOpen} setStyleOpen={setStyleOpen} />
           </div>
-          {styleOpen && <StylePanel rstyle={rstyle} applyRstyle={applyRstyle} top={16} right={64} />}
+          {styleOpen && <RouteStylePanel rstyle={rstyle} applyRstyle={applyRstyle} onClose={() => setStyleOpen(false)} pos="position:absolute;top:16px;right:64px;z-index:6" />}
         </div>
       )}
 
