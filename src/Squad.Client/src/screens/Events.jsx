@@ -39,6 +39,12 @@ const fmtTime = (iso) => {
   return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 };
 const fmtDay = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+// A route saved without a name gets an auto label like "offroad-6309302794715136" — that's a
+// machine id, not a place, so don't surface it as the event's location.
+const displayPlace = (name) => {
+  const n = (name || '').trim();
+  return !n || /^[a-z]+-\d{4,}$/i.test(n) ? '' : n;
+};
 const monthName = (d) => d.toLocaleDateString('en-US', { month: 'long' });
 const isTodayIso = (iso) => { const d = new Date(iso); return !Number.isNaN(d.getTime()) && sameDay(d, new Date()); };
 
@@ -428,7 +434,7 @@ function EventCard({
   const chip = joined
     ? { bg: 'color-mix(in srgb,var(--accent) 16%,transparent)', border: 'color-mix(in srgb,var(--accent) 40%,transparent)', ink: 'var(--accent)' }
     : { bg: 'var(--bg3)', border: 'var(--line)', ink: 'var(--text)' };
-  const place = ev.courseName || '';
+  const place = displayPlace(ev.courseName);
   const start = route && route.length ? route.find((p) => Array.isArray(p) && Number.isFinite(p[0])) : null;
 
   const pill = 'flex:none;padding:8px 15px;border-radius:11px;font-size:12px;font-weight:700';
