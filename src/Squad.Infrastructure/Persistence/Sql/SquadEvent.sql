@@ -34,6 +34,11 @@ IF COL_LENGTH('dbo.SquadEvent', 'Published') IS NULL
 -- container, same as squad branding). Additive + idempotent.
 IF COL_LENGTH('dbo.SquadEvent', 'LogoBlob')   IS NULL ALTER TABLE dbo.SquadEvent ADD LogoBlob   NVARCHAR(200) NULL;
 IF COL_LENGTH('dbo.SquadEvent', 'BannerBlob') IS NULL ALTER TABLE dbo.SquadEvent ADD BannerBlob NVARCHAR(200) NULL;
+
+-- Reverse-geocoded name of the route's start point (nearest town/locality), cached so the client
+-- resolves it once and every later load reuses it instead of calling the geocoder again. Additive
+-- + idempotent; null until the first viewer with the route resolves and persists it.
+IF COL_LENGTH('dbo.SquadEvent', 'StartPlace') IS NULL ALTER TABLE dbo.SquadEvent ADD StartPlace NVARCHAR(120) NULL;
 GO
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_SquadEvent_Squad' AND object_id = OBJECT_ID('dbo.SquadEvent'))

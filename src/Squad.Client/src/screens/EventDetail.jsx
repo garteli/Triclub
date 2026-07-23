@@ -5,7 +5,7 @@ import RouteMapGL from '../components/RouteMapGL.jsx';
 import AuthedAvatar from '../components/AuthedAvatar.jsx';
 import AuthedImage from '../components/AuthedImage.jsx';
 import SportIcon from '../components/SportIcon.jsx';
-import { listEventParticipants, joinEvent, leaveEvent, getEventRoute } from '../lib/events.js';
+import { listEventParticipants, joinEvent, leaveEvent, getEventRoute, setEventStartPlace } from '../lib/events.js';
 import { buildElevationProfile } from '../lib/elevation.js';
 import { routeKm } from '../lib/courses.js';
 import { BASEMAP_LABEL, nextBasemap, inIsrael } from '../lib/basemaps.js';
@@ -193,7 +193,7 @@ export default function EventDetail({ vm, state, actions, getToken }) {
   const [styleOpen, setStyleOpen] = useState(false);    // route-style picker open
   const [dirTarget, setDirTarget] = useState(null);     // { lat, lon, title } → Directions action sheet
   const [shareMsg, setShareMsg] = useState('');         // transient confirmation after a share/copy
-  const [startPlace, setStartPlace] = useState(null);   // reverse-geocoded name of the route's start
+  const [startPlace, setStartPlace] = useState(ev?.startPlace || null); // route-start name (DB-cached, else geocoded)
   // terrain-derived elevation for the stat tile + elevation card (read once per route)
   const [elev, setElev] = useState(null);
   const [elevLoading, setElevLoading] = useState(false);
@@ -254,15 +254,23 @@ export default function EventDetail({ vm, state, actions, getToken }) {
     return () => ctrl.abort();
   }, [route]);
 
-  // Name the route's start point from its coordinates (reverse geocoding) for the meeting-point
-  // card — the nearest town/locality, real data, resolved once per start point.
+  // Name the route's start point for the meeting-point card. Prefer the value already cached on the
+  // event (DB); only when it's absent do we reverse-geocode the start coordinate — then persist it so
+  // this event is never geocoded again.
   useEffect(() => {
+    if (ev.startPlace) { setStartPlace(ev.startPlace); return undefined; }
     if (!start) { setStartPlace(null); return undefined; }
     const ctrl = new AbortController();
     setStartPlace(null);
-    reverseGeocode(start[0], start[1], ctrl.signal).then((n) => setStartPlace(n || null)).catch(() => {});
+    (async () => {
+      const name = await reverseGeocode(start[0], start[1], ctrl.signal);
+      if (!name) return;
+      setStartPlace(name);
+      try { const t = await getToken?.(); await setEventStartPlace(t, squadId, ev.id, name); } catch { /* best-effort cache */ }
+    })();
     return () => ctrl.abort();
-  }, [start]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [start, ev.startPlace, ev.id, squadId]);
 
   if (!ev) {
     return (

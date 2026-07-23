@@ -57,6 +57,10 @@ export const listEventParticipants = (token, squadId, eventId) => req(`/api/squa
 // The event's denormalized route for the event-page map → { points: [[lat,lon],…] }. Visible to any
 // member who can see the event (unlike /api/courses/{id}, which is owner-scoped). 404 → no route.
 export const getEventRoute = (token, squadId, eventId) => req(`/api/squads/${squadId}/events/${eventId}/route`, { token });
+// Cache the reverse-geocoded start-point name on the event (first-writer-wins) so later loads reuse
+// it instead of geocoding again → { place }.
+export const setEventStartPlace = (token, squadId, eventId, place) =>
+  req(`/api/squads/${squadId}/events/${eventId}/startplace`, { method: 'POST', token, body: { place } });
 
 // Per-event branding (owner-only). kind is 'logo' | 'banner'; blob is a downscaled JPEG. Returns { url }.
 export async function uploadEventImage(token, squadId, eventId, kind, blob) {
