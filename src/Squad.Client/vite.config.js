@@ -2,11 +2,17 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { execSync } from 'node:child_process'
 
-// A per-build id (this build's timestamp). Baked into the bundle as __BUILD_ID__ and written to
-// wwwroot/version.json; the running app polls version.json and, when it differs, offers a refresh —
-// so an open web/native session picks up a new deploy instead of showing the stale bundle.
-const buildId = String(Date.now())
+// A per-deploy id, baked into the bundle as __BUILD_ID__ and written to wwwroot/version.json; the
+// running app polls version.json and, when it differs, offers a refresh — so an open web/native
+// session picks up a new deploy instead of showing the stale bundle. It MUST be deterministic for a
+// given source tree: CI builds the client twice (dotnet build + publish), and a non-deterministic id
+// (e.g. a timestamp) would give the two builds different content-hashes, breaking StaticWebAssets.
+// The commit SHA is stable within a checkout and changes every deploy — exactly what we want.
+const buildId = (process.env.GITHUB_SHA
+  || (() => { try { return execSync('git rev-parse HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); } catch { return 'dev'; } })()
+).slice(0, 12)
 
 // The React app builds straight into the ASP.NET Core host's wwwroot,
 // so `dotnet run` serves the compiled SPA with no extra copy step.
