@@ -36,9 +36,15 @@ public sealed class GpxUrlRouteImportService : IRouteImportService
         "https://api.off-road.io/_ah/api/offroadApi/v2/tracks/{0}",
     };
 
+    // Match a whole track/route point element (self-closing or with a body) so we can also read its
+    // <ele> child — the real elevation from the source (e.g. off-road.io), which we keep so the route
+    // profile reflects the actual terrain instead of a coarse re-sample.
     private static readonly Regex TrkPt = new(
-        "<(?:trkpt|rtept)\\b[^>]*?\\blat=\"(?<lat>[-\\d.]+)\"[^>]*?\\blon=\"(?<lon>[-\\d.]+)\"",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        "<(?:trkpt|rtept)\\b(?<attrs>[^>]*?)(?:/>|>(?<body>.*?)</(?:trkpt|rtept)>)",
+        RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.Compiled);
+    private static readonly Regex LatAttr = new("\\blat=\"(?<v>[-\\d.]+)\"", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex LonAttr = new("\\blon=\"(?<v>[-\\d.]+)\"", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex EleTag = new("<ele>\\s*(?<v>[-\\d.]+)\\s*</ele>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex TrackLayerKey = new(
         "\"trackLayerKey\"\\s*:\\s*\"?(?<key>\\d{6,})\"?", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex NameTag = new(
@@ -170,13 +176,25 @@ public sealed class GpxUrlRouteImportService : IRouteImportService
     private static List<double[]> ParsePoints(string gpx)
     {
         var pts = new List<double[]>();
+        var inv = CultureInfo.InvariantCulture;
         foreach (Match m in TrkPt.Matches(gpx))
         {
-            if (double.TryParse(m.Groups["lat"].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var lat)
-                && double.TryParse(m.Groups["lon"].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var lon)
+            var attrs = m.Groups["attrs"].Value;
+            var la = LatAttr.Match(attrs);
+            var lo = LonAttr.Match(attrs);
+            if (la.Success && lo.Success
+                && double.TryParse(la.Groups["v"].Value, NumberStyles.Float, inv, out var lat)
+                && double.TryParse(lo.Groups["v"].Value, NumberStyles.Float, inv, out var lon)
                 && lat is >= -90 and <= 90 && lon is >= -180 and <= 180)
             {
-                pts.Add(new[] { lat, lon });
+                var body = m.Groups["body"].Value;
+                // Keep the point's elevation when the source carries it → [lat, lon, ele].
+                if (body.Length > 0 && EleTag.Match(body) is { Success: true } em
+                    && double.TryParse(em.Groups["v"].Value, NumberStyles.Float, inv, out var ele)
+                    && ele is > -500 and < 9000)
+                    pts.Add(new[] { lat, lon, Math.Round(ele, 1) });
+                else
+                    pts.Add(new[] { lat, lon });
                 if (pts.Count >= MaxPoints) break;
             }
         }

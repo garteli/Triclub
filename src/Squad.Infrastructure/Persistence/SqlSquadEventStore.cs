@@ -106,7 +106,9 @@ public sealed class SqlSquadEventStore(string connectionString) : ISquadEventSto
             UPDATE e SET
                 e.Title = @title, e.Sport = @sport, e.StartUtc = @startUtc,
                 e.CourseId = @courseId, e.CourseName = @courseName, e.CourseKm = @courseKm,
-                e.CoursePoints = @coursePoints, e.Notes = @notes
+                e.CoursePoints = @coursePoints, e.Notes = @notes,
+                -- the route may have changed → drop the cached start-place + elevation so they re-resolve
+                e.StartPlace = NULL, e.ElevationJson = NULL
             FROM dbo.SquadEvent e
             JOIN dbo.Squad s ON s.Id = e.SquadId
             WHERE e.Id = @eventId AND e.SquadId = @squadId AND s.OwnerId = @ownerId;

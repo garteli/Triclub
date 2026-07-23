@@ -41,6 +41,28 @@ async function fetchElevations(samples, signal) {
   return out;
 }
 
+// Build the profile straight from a route that already carries per-point elevation (a 3rd value:
+// [lat,lon,ele], e.g. an imported off-road.io GPX). Returns the same { profile,ascent,min,max } shape
+// — real source elevation, no terrain API, no rate limit. Null when the route has no usable elevation.
+export function profileFromRoute(points) {
+  const pts = (points || []).filter((p) => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]));
+  const withEle = pts.filter((p) => Number.isFinite(p[2]));
+  // Need elevation on most points to trust it (a stray value isn't a profile).
+  if (withEle.length < 2 || withEle.length < pts.length * 0.5) return null;
+  const profile = [{ dist: 0, e: Number.isFinite(pts[0][2]) ? pts[0][2] : withEle[0][2] }];
+  let dist = 0;
+  for (let i = 1; i < pts.length; i++) {
+    dist += haversineMeters({ lat: pts[i - 1][0], lon: pts[i - 1][1] }, { lat: pts[i][0], lon: pts[i][1] });
+    const e = Number.isFinite(pts[i][2]) ? pts[i][2] : profile[profile.length - 1].e; // carry last if a point lacks ele
+    profile.push({ dist, e });
+  }
+  if (dist <= 0) return null;
+  let ascent = 0;
+  for (let i = 1; i < profile.length; i++) { const d = profile[i].e - profile[i - 1].e; if (d > 0) ascent += d; }
+  const es = profile.map((p) => p.e);
+  return { profile, ascent: Math.round(ascent), min: Math.min(...es), max: Math.max(...es) };
+}
+
 // Build the elevation profile for a route: samples along it, reads the terrain, and returns
 // { profile:[{dist,e}], ascent, min, max } — or null if it can't be built. Pass an AbortSignal.
 export async function buildElevationProfile(pts, signal) {

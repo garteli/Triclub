@@ -76,8 +76,9 @@ public static class CourseEndpoints
             return Results.BadRequest(new { error = result.Error ?? "Couldn't import that route." });
 
         var route = result.Route;
-        // The importer already validated/capped points; serialize as [[lat,lon],…].
-        var clean = route.Points.Select(p => new[] { p[0], p[1] }).ToArray();
+        // The importer already validated/capped points; keep [lat,lon] and the source elevation when
+        // present ([lat,lon,ele]) so the route's profile reflects the real terrain, not a re-sample.
+        var clean = route.Points.Select(p => p.Length >= 3 ? new[] { p[0], p[1], p[2] } : new[] { p[0], p[1] }).ToArray();
         if (clean.Length < 2) return Results.BadRequest(new { error = "That route had no usable track points." });
 
         var name = string.IsNullOrWhiteSpace(route.Name) ? "Imported route" : route.Name.Trim();
