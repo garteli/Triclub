@@ -288,6 +288,19 @@ public sealed class SqlSquadEventStore(string connectionString) : ISquadEventSto
         return n > 0;
     }
 
+    public async Task<EventCalendarInfo?> GetCalendarInfoAsync(Guid squadId, Guid eventId, CancellationToken ct)
+    {
+        await using var conn = new SqlConnection(connectionString);
+        // Published events only (drafts stay private). Place = the cached start-point name, else the
+        // denormalized course name.
+        return await conn.QuerySingleOrDefaultAsync<EventCalendarInfo>(new CommandDefinition("""
+            SELECT e.Title, CAST(e.StartUtc AS datetimeoffset(0)) AS StartUtc, e.Notes,
+                   COALESCE(e.StartPlace, e.CourseName) AS Place
+            FROM dbo.SquadEvent e
+            WHERE e.Id = @eventId AND e.SquadId = @squadId AND e.Published = 1;
+            """, new { squadId, eventId }, cancellationToken: ct));
+    }
+
     // Per-event branding blob name. `kind` is whitelisted to a fixed column — never user text in SQL.
     private static string ImageCol(string kind) => string.Equals(kind, "banner", StringComparison.OrdinalIgnoreCase) ? "BannerBlob" : "LogoBlob";
 
