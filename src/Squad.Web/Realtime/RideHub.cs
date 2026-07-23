@@ -18,12 +18,18 @@ using Squad.Core;
 namespace Squad.Web;
 
 [Authorize]
-public sealed class RideHub(IAthleteDirectory directory, IRideSessionState state) : Hub
+public sealed class RideHub(IAthleteDirectory directory, IRideSessionState state, ISquadService squads) : Hub
 {
     private static string RideGroup(Guid rideId) => $"ride:{rideId}";
 
     public async Task JoinRide(Guid rideId)
     {
+        // A ride channel is a squad's channel (rideId == squadId). Only members may see/appear in it,
+        // so someone the owner just removed can't linger in — or rejoin — the group's lobby.
+        var athleteId = ResolveAthleteId(Context.User);
+        if (athleteId is null || !await squads.IsMemberAsync(rideId, athleteId.Value, Context.ConnectionAborted))
+            return;
+
         await Groups.AddToGroupAsync(Context.ConnectionId, RideGroup(rideId));
         // Hand the newcomer the current positions so the map isn't empty until the next tick.
         await Clients.Caller.SendAsync("snapshot", state.Snapshot(rideId));
@@ -45,7 +51,9 @@ public sealed class RideHub(IAthleteDirectory directory, IRideSessionState state
         var athleteId = ResolveAthleteId(Context.User);
         if (athleteId is null) return;
 
-        // Reuse cached identity; only hit the directory the first time we see this rider.
+        // Reuse cached identity; only hit the directory the first time we see this rider. The first
+        // time (or the first push after they were evicted) also re-checks membership, so a removed
+        // rider's stale client can't re-add itself to the squad's presence.
         string name, initials, color;
         state.TryGet(rideId, athleteId.Value, out var existing);
         if (existing is not null)
@@ -54,6 +62,7 @@ public sealed class RideHub(IAthleteDirectory directory, IRideSessionState state
         }
         else
         {
+            if (!await squads.IsMemberAsync(rideId, athleteId.Value, Context.ConnectionAborted)) return;
             var p = await directory.GetAsync(athleteId.Value, Context.ConnectionAborted);
             name = p?.Name ?? ""; initials = p?.Initials ?? ""; color = p?.AvatarColor ?? "#d6ff3f";
         }

@@ -1,5 +1,7 @@
 using System.Security.Claims;
 
+using Microsoft.AspNetCore.SignalR;
+
 using Squad.Core;
 
 namespace Squad.Web;
@@ -44,12 +46,25 @@ public static class SquadEndpoints
         HttpContext http, ISquadService squads, AdminRegistry admins, IConfiguration config, CancellationToken ct)
     {
         var list = await squads.ListAsync(Me(http), ct);
-        // The seeded "landing" demo club is hidden from normal users (so a new/no-group user never
-        // lands in it). Only admins or a configured review account (Squads:ReviewEmails) still see it
-        // in Discover — e.g. the app-store review account, which needs a populated club to browse.
-        if (!CanSeeHiddenClubs(http, admins, config))
-            list = list.Where(s => s.Id != Squads.Landing).ToList();
+        // Clubs whose ids are listed in Squads:HiddenIds are hidden from normal users in Discover
+        // (e.g. a demo/review club, so a new/no-group user never lands in it). Only admins or a
+        // configured review account (Squads:ReviewEmails) still see them — e.g. the app-store review
+        // account, which needs a populated club to browse.
+        var hidden = HiddenSquadIds(config);
+        if (hidden.Count > 0 && !CanSeeHiddenClubs(http, admins, config))
+            list = list.Where(s => !hidden.Contains(s.Id)).ToList();
         return Results.Ok(list);
+    }
+
+    // The squad ids hidden from the general Discover list, from the Squads:HiddenIds config
+    // (comma/semicolon-separated GUIDs). Empty when unset.
+    private static HashSet<Guid> HiddenSquadIds(IConfiguration config)
+    {
+        var set = new HashSet<Guid>();
+        foreach (var part in (config["Squads:HiddenIds"] ?? string.Empty)
+                     .Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            if (Guid.TryParse(part, out var id)) set.Add(id);
+        return set;
     }
 
     // True when the caller may see clubs that are hidden from the general population (the seeded
@@ -179,12 +194,19 @@ public static class SquadEndpoints
         };
     }
 
-    private static async Task<IResult> RemoveMember(Guid id, Guid athleteId, HttpContext http, ISquadService squads, CancellationToken ct)
+    private static async Task<IResult> RemoveMember(
+        Guid id, Guid athleteId, HttpContext http, ISquadService squads,
+        IRideSessionState rideState, IHubContext<RideHub> rideHub, CancellationToken ct)
     {
         if (Me(http) is not { } me) return Results.Unauthorized();
-        return await squads.RemoveMemberAsync(id, athleteId, me, ct)
-            ? Results.Ok(new { status = "removed" })
-            : Results.NotFound(new { error = "Couldn't remove that member (not a member, the owner, or you don't manage this squad)." });
+        if (!await squads.RemoveMemberAsync(id, athleteId, me, ct))
+            return Results.NotFound(new { error = "Couldn't remove that member (not a member, the owner, or you don't manage this squad)." });
+
+        // Evict the removed athlete from the squad's live-ride presence and tell everyone in the
+        // lobby, so they disappear immediately instead of lingering as a stale rider.
+        rideState.Remove(id, athleteId);
+        await rideHub.Clients.Group($"ride:{id}").SendAsync("riderLeft", athleteId, ct);
+        return Results.Ok(new { status = "removed" });
     }
 
     private static async Task<IResult> SetRole(Guid id, Guid athleteId, SetRoleRequest body, HttpContext http, ISquadService squads, CancellationToken ct)

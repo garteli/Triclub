@@ -141,6 +141,10 @@ public interface ISquadService
     /// <summary>Join a squad (idempotent) and make it the athlete's active squad.</summary>
     Task JoinAsync(Guid squadId, Guid athleteId, CancellationToken ct);
 
+    /// <summary>Whether the athlete currently has a membership row in the squad. Used by the live-ride
+    /// hub to keep non-members (e.g. someone the owner just removed) out of a squad's ride presence.</summary>
+    Task<bool> IsMemberAsync(Guid squadId, Guid athleteId, CancellationToken ct);
+
     /// <summary>Switch the athlete's active squad to one they already belong to (the feed /
     /// leaderboard / activities follow). Returns false if they're not a member of it.</summary>
     Task<bool> SetActiveSquadAsync(Guid squadId, Guid athleteId, CancellationToken ct);
