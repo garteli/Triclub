@@ -13,7 +13,9 @@ const ago = (iso) => {
 const KIND = {
   follow:   { icon: 'heart', color: '#ff6f61' },
   join:     { icon: 'bike', color: '#37c0ff' },
-  request:  { icon: 'clipboard', color: '#ffce4a' },
+  // A join request (group or event) is the owner's to act on — send them to the requests inbox
+  // (where they can approve/decline), not to the requester's profile.
+  request:  { icon: 'clipboard', color: '#ffce4a', target: 'requests' },
   approved: { icon: 'trophy', color: '#4fe08b' },
   declined: { icon: 'clipboard', color: '#ff6a2c' },
   message:  { icon: 'chat', color: '#5a86ff' },
