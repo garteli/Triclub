@@ -70,7 +70,12 @@ export default function DirectMessages({ state, getToken, meId }) {
                       : <div style={s(bubbleFor(isMine))}>{m.body}</div>}
                     <span style={s('display:flex;gap:8px;align-items:center;font-size:9.5px;color:var(--text3);margin-top:3px;' + (isMine ? 'flex-direction:row-reverse' : ''))}>
                       {time(m.createdUtc)}
-                      {isMine && !m.deleted && <span className="ctl" onClick={() => askDelete(m.id)} style={s('color:var(--text3);cursor:pointer')}>Delete</span>}
+                      {isMine && !m.deleted && (
+                        <span className="ctl" onClick={() => askDelete(m.id)} style={s('display:inline-flex;align-items:center;gap:5px;color:var(--bad);font-weight:700;font-size:11px;padding:4px 9px;border:1px solid color-mix(in srgb,var(--bad) 45%,transparent);border-radius:9px;cursor:pointer')}>
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /><path d="M10 11v6M14 11v6" /></svg>
+                          Delete
+                        </span>
+                      )}
                     </span>
                   </div>
                 );
