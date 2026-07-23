@@ -15,10 +15,13 @@ const buildStyle = (style) => ({
   layers: [{ id: 'base', type: 'raster', source: 'base' }],
 });
 
-export default function RouteMapGL({ route, styleName = 'voyager', pitch = 0, terrain = false, interactive = true, fitPadding = 40, onError, onReady }) {
+export default function RouteMapGL({ route, styleName = 'voyager', pitch = 0, terrain = false, interactive = true, fitPadding = 40, routeColor = '#ff6a2c', routeWidth = 4, onError, onReady }) {
   const elRef = useRef(null);
   const mapRef = useRef(null);
   const readyRef = useRef(false);
+  // Keep the latest style available inside the (route-keyed) map-build effect without re-creating.
+  const styleRef = useRef({ routeColor, routeWidth });
+  styleRef.current = { routeColor, routeWidth };
 
   useEffect(() => {
     let map, cancelled = false;
@@ -41,7 +44,7 @@ export default function RouteMapGL({ route, styleName = 'voyager', pitch = 0, te
           if (terrain) { try { map.setTerrain({ source: 'dem', exaggeration: 1.3 }); } catch { /* no webgl2 */ } }
           if (pts.length > 1) {
             map.addSource('route', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: pts.map(([la, lo]) => [lo, la]) } } });
-            map.addLayer({ id: 'route', type: 'line', source: 'route', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#ff6a2c', 'line-width': 4 } });
+            map.addLayer({ id: 'route', type: 'line', source: 'route', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': styleRef.current.routeColor, 'line-width': styleRef.current.routeWidth } });
             map.addSource('ends', { type: 'geojson', data: { type: 'FeatureCollection', features: [
               { type: 'Feature', properties: { c: '#4fe08b' }, geometry: { type: 'Point', coordinates: [pts[0][1], pts[0][0]] } },
               { type: 'Feature', properties: { c: '#ff5d5d' }, geometry: { type: 'Point', coordinates: [pts[pts.length - 1][1], pts[pts.length - 1][0]] } },
@@ -63,6 +66,13 @@ export default function RouteMapGL({ route, styleName = 'voyager', pitch = 0, te
   // React to control changes without re-creating the map. Rebuild the base (via applyBasemap) so
   // maxzoom + attribution track the layer — the route line stays above it.
   useEffect(() => { const m = mapRef.current; if (m && m.getSource && m.getSource('base')) applyBasemap(m, styleName); }, [styleName]);
+  // Apply route colour/width live to the existing line (no map re-create).
+  useEffect(() => {
+    const m = mapRef.current;
+    if (!m || !m.getLayer || !m.getLayer('route')) return;
+    m.setPaintProperty('route', 'line-color', routeColor);
+    m.setPaintProperty('route', 'line-width', routeWidth);
+  }, [routeColor, routeWidth]);
   useEffect(() => {
     const m = mapRef.current;
     if (!m || !readyRef.current) return;
