@@ -174,6 +174,18 @@ public sealed class SqlSquadEventStore(string connectionString) : ISquadEventSto
         return rows.ToList();
     }
 
+    public async Task<string?> GetRouteAsync(Guid squadId, Guid meId, Guid eventId, CancellationToken ct)
+    {
+        await using var conn = new SqlConnection(connectionString);
+        // Same visibility gate as the participant roster: any signed-in athlete may read a PUBLISHED
+        // event's route; the owner also reads their drafts. Returns the denormalized points JSON so a
+        // member needn't own the source course (which is owner-scoped). NULL → 404 / no route.
+        return await conn.ExecuteScalarAsync<string?>(new CommandDefinition("""
+            SELECT e.CoursePoints FROM dbo.SquadEvent e JOIN dbo.Squad s ON s.Id = e.SquadId
+            WHERE e.Id = @eventId AND e.SquadId = @squadId AND (e.Published = 1 OR s.OwnerId = @meId);
+            """, new { squadId, eventId, meId }, cancellationToken: ct));
+    }
+
     // Per-event branding blob name. `kind` is whitelisted to a fixed column — never user text in SQL.
     private static string ImageCol(string kind) => string.Equals(kind, "banner", StringComparison.OrdinalIgnoreCase) ? "BannerBlob" : "LogoBlob";
 

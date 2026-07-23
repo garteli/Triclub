@@ -20,6 +20,7 @@ public static class SquadEventEndpoints
         app.MapPost("/api/squads/{squadId:guid}/events/{eventId:guid}/unpublish", UnpublishEvent).RequireAuthorization();
         app.MapGet("/api/squads/{squadId:guid}/events/{eventId:guid}/attendees", EventAttendees).RequireAuthorization();
         app.MapGet("/api/squads/{squadId:guid}/events/{eventId:guid}/participants", EventParticipants).RequireAuthorization();
+        app.MapGet("/api/squads/{squadId:guid}/events/{eventId:guid}/route", EventRoute).RequireAuthorization();
         app.MapDelete("/api/squads/{squadId:guid}/events/{eventId:guid}", DeleteEvent).RequireAuthorization();
         // Member-scoped RSVP + check-in, plus the caller's own joined-events list.
         app.MapPost("/api/events/{eventId:guid}/join", JoinEvent).RequireAuthorization();
@@ -157,6 +158,18 @@ public static class SquadEventEndpoints
                 checkedIn = a.CheckedInUtc != null,
                 you = a.AthleteId == me,   // the caller's own row — not tappable on the client
             }));
+    }
+
+    // The event's route geometry for drawing the map on the member-facing event page. Serves the
+    // points denormalized onto the event, so a member needn't own the (owner-scoped) source course.
+    private static async Task<IResult> EventRoute(
+        Guid squadId, Guid eventId, HttpContext http, ISquadEventStore events, CancellationToken ct)
+    {
+        if (Me(http) is not { } me) return Results.Unauthorized();
+        var json = await events.GetRouteAsync(squadId, me, eventId, ct);
+        if (string.IsNullOrWhiteSpace(json)) return Results.NotFound(new { error = "No route for this session." });
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+        return Results.Ok(new { points = doc.RootElement.Clone() });
     }
 
     // Resolve + validate the shared event fields (title/sport/start/route/notes). Returns a parsed

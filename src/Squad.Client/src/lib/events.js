@@ -54,6 +54,9 @@ export const unpublishEvent = (token, squadId, eventId) => req(`/api/squads/${sq
 export const listEventAttendees = (token, squadId, eventId) => req(`/api/squads/${squadId}/events/${eventId}/attendees`, { token });
 // Member-facing participant roster (the event page) → [{ athleteId, name, initials, avatarColor, avatarUrl, checkedIn, you }]
 export const listEventParticipants = (token, squadId, eventId) => req(`/api/squads/${squadId}/events/${eventId}/participants`, { token });
+// The event's denormalized route for the event-page map → { points: [[lat,lon],…] }. Visible to any
+// member who can see the event (unlike /api/courses/{id}, which is owner-scoped). 404 → no route.
+export const getEventRoute = (token, squadId, eventId) => req(`/api/squads/${squadId}/events/${eventId}/route`, { token });
 
 // Per-event branding (owner-only). kind is 'logo' | 'banner'; blob is a downscaled JPEG. Returns { url }.
 export async function uploadEventImage(token, squadId, eventId, kind, blob) {
