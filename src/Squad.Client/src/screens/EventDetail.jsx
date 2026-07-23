@@ -5,8 +5,7 @@ import RouteMapGL from '../components/RouteMapGL.jsx';
 import AuthedAvatar from '../components/AuthedAvatar.jsx';
 import AuthedImage from '../components/AuthedImage.jsx';
 import SportIcon from '../components/SportIcon.jsx';
-import { getCourse } from '../lib/courses.js';
-import { listEventParticipants, joinEvent, leaveEvent } from '../lib/events.js';
+import { listEventParticipants, joinEvent, leaveEvent, getEventRoute } from '../lib/events.js';
 
 // The member-facing event page: details, a large map of the route, the participant roster, and a
 // Join/Leave control. Check-in deliberately lives only on the Live page (on the day of the ride).
@@ -31,6 +30,7 @@ export default function EventDetail({ vm, state, actions, getToken }) {
   const [joined, setJoined] = useState(!!ev?.joined);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [mapFull, setMapFull] = useState(false); // fullscreen route map overlay
 
   const loadPeople = async (t) => {
     try { return await listEventParticipants(t, squadId, ev.id); } catch { return []; }
@@ -41,8 +41,10 @@ export default function EventDetail({ vm, state, actions, getToken }) {
     let ok = true;
     (async () => {
       const t = await getToken?.();
-      if (ev.courseId) {
-        try { const c = await getCourse(t, ev.courseId); if (ok) setRoute(c?.points?.length ? c.points : null); }
+      // Draw the route from the points denormalized onto the event — visible to any member who can
+      // see the event (the source course is owner-scoped, so a plain getCourse 404s for members).
+      if (ev.courseId || ev.courseName || ev.courseKm) {
+        try { const r = await getEventRoute(t, squadId, ev.id); if (ok) setRoute(r?.points?.length ? r.points : null); }
         catch { if (ok) setRoute(null); }
       }
       const p = await loadPeople(t);
@@ -99,10 +101,12 @@ export default function EventDetail({ vm, state, actions, getToken }) {
         </div>
       </div>
 
-      {/* large route map */}
+      {/* large route map — tap ⤢ to go fullscreen */}
       {route && route.length > 1 && (
-        <div style={s('margin-top:16px;border-radius:18px;overflow:hidden;border:1px solid var(--line);height:280px')}>
+        <div style={s('position:relative;margin-top:16px;border-radius:18px;overflow:hidden;border:1px solid var(--line);height:280px')}>
           <RouteMapGL route={route} />
+          <div className="ctl" onClick={() => setMapFull(true)} aria-label="Expand map"
+            style={s('position:absolute;top:10px;right:10px;z-index:5;width:34px;height:34px;border-radius:10px;background:rgba(0,0,0,.55);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;line-height:1')}>⤢</div>
         </div>
       )}
       {(ev.courseName || ev.courseKm) && (
@@ -142,6 +146,15 @@ export default function EventDetail({ vm, state, actions, getToken }) {
               {p.checkedIn && <span style={s('font-size:10.5px;font-weight:700;color:var(--good);flex:none')}>✓ Checked in</span>}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* fullscreen route map — covers the whole screen, hides everything else */}
+      {mapFull && route && route.length > 1 && (
+        <div style={s('position:fixed;inset:0;z-index:300;background:var(--bg)')}>
+          <RouteMapGL route={route} />
+          <div className="ctl" onClick={() => setMapFull(false)} aria-label="Close map"
+            style={s('position:absolute;top:16px;right:16px;z-index:5;width:40px;height:40px;border-radius:12px;background:rgba(0,0,0,.6);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px;line-height:1')}>✕</div>
         </div>
       )}
     </div>

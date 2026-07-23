@@ -69,6 +69,10 @@ public interface ISquadEventStore
     /// <summary>The event's participant roster for the member-facing event page — any signed-in athlete
     /// may see a published event's roster (owner also sees drafts). Null if not visible to the caller.</summary>
     Task<IReadOnlyList<SquadEventAttendee>?> ListParticipantsAsync(Guid squadId, Guid meId, Guid eventId, CancellationToken ct);
+    /// <summary>The event's denormalized route geometry (JSON [[lat,lon],…]) for drawing the map on the
+    /// event page — visible to anyone who can see the event, so a member needn't own the source course.
+    /// Null if the event isn't visible to the caller or has no route.</summary>
+    Task<string?> GetRouteAsync(Guid squadId, Guid meId, Guid eventId, CancellationToken ct);
     /// <summary>Delete an event if <paramref name="ownerId"/> owns its squad; false otherwise.</summary>
     Task<bool> DeleteAsync(Guid squadId, Guid ownerId, Guid eventId, CancellationToken ct);
     Task<bool> JoinAsync(Guid eventId, Guid meId, CancellationToken ct);
