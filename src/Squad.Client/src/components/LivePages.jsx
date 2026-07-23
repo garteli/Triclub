@@ -153,6 +153,11 @@ function PelotonField({ v }) {
   );
 }
 
+// Tiles whose value uses the container-query-scaled `.live-metric-val` font MUST carry `.live-tile`
+// (it sets `container-type: size`, the basis for the cqw/cqh sizing). Metric and radar tiles both do
+// — miss one and its value sizes against a larger ancestor and overflows (e.g. radar "Clear").
+const usesMetricVal = (f) => f.kind === 'metric' || f.kind === 'radar';
+
 // ---- Rear-radar field: closest approaching vehicle + a proximity bar (real Varia/BLE radar) ----
 function RadarField({ v, mono }) {
   const color = mono ? '#c9d0d9' : v.color;
@@ -301,7 +306,7 @@ function FieldCell({ f, editing, actions, index, indoor, mySport, climb, mono })
   };
   return (
     <div
-      className={'ctl' + (f.kind === 'metric' ? ' live-tile' : '')}
+      className={'ctl' + (usesMetricVal(f) ? ' live-tile' : '')}
       data-fi={index}
       onPointerDown={onDown}
       onPointerUp={actions.pressEnd}
@@ -348,7 +353,7 @@ function FreeTile({ f, index, slot, editing, actions, indoor, mySport, climb, mo
   const pos = `grid-column:${slot.x} / span ${slot.w};grid-row:${slot.y} / span ${slot.h};`;
   return (
     <div
-      className={f.kind === 'metric' ? 'live-tile' : undefined}
+      className={usesMetricVal(f) ? 'live-tile' : undefined}
       onPointerDown={onBodyDown} onPointerMove={onMove} onPointerUp={end} onPointerCancel={end} onPointerLeave={() => { if (!editing) actions.pressEnd(); }}
       style={s(f.cellStyle + pos + (editing ? 'cursor:grab;touch-action:none;' : ''))}
     >
