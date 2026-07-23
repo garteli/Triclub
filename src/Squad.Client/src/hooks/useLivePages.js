@@ -44,6 +44,27 @@ const saveState = (family, st) => {
 
 const COUNT_POOL = ['spd', 'hr', 'pwr', 'dist', 'time', 'cad', 'avgspd', 'grad'];
 
+// Free-form layout: tiles are positioned + sized on an 8-col × 20-row grid (1-based).
+export const FREE_COLS = 8;
+export const FREE_ROWS = 20;
+// Default placement for a new free tile: 4×3 blocks, two per row, flowing down.
+const autoSlot = (i) => ({ x: (i % 2) * 4 + 1, y: Math.min(FREE_ROWS - 2, Math.floor(i / 2) * 3 + 1), w: 4, h: 3 });
+// Slots aligned 1:1 with fields, repaired/back-filled + clamped to the grid.
+export function ensureSlots(page) {
+  const n = page.fields.length;
+  const src = Array.isArray(page.slots) ? page.slots : [];
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const a = autoSlot(i), sl = src[i] || {};
+    const w = Math.max(1, Math.min(FREE_COLS, sl.w || a.w));
+    const h = Math.max(1, Math.min(FREE_ROWS, sl.h || a.h));
+    const x = Math.max(1, Math.min(FREE_COLS - w + 1, sl.x || a.x));
+    const y = Math.max(1, Math.min(FREE_ROWS - h + 1, sl.y || a.y));
+    out.push({ x, y, w, h });
+  }
+  return out;
+}
+
 // Monochrome display toggle — a global preference (not per-family), persisted on this device.
 const MONO_KEY = 'squad.livepages.mono';
 const loadMono = () => { try { return localStorage.getItem(MONO_KEY) === '1'; } catch { return false; } };
@@ -117,8 +138,22 @@ export function useLivePages(t, active, family) {
   const toggleAutoRotate = useCallback(() => setAutoRotate((a) => !a), []);
   const setMonoOn = useCallback((v) => setMono(!!v), []);
 
-  const setPageLayout = useCallback((layout) => mut((c) => balanceHero({ ...c, layout })), [mut]);
+  const setPageLayout = useCallback((layout) => mut((c) => {
+    if (layout === 'free') return { ...c, layout, slots: ensureSlots(c) };
+    return balanceHero({ ...c, layout });
+  }), [mut]);
   const setPageSide = useCallback((side) => mut((c) => ({ ...c, side })), [mut]);
+  // Free-layout tile geometry — move (x,y) and resize (w,h) on the 8×20 grid.
+  const moveSlot = useCallback((i, x, y) => mut((c) => { const slots = ensureSlots(c).slice(); if (!slots[i]) return c; slots[i] = { ...slots[i], x, y }; return { ...c, slots }; }), [mut]);
+  const resizeSlot = useCallback((i, w, h) => mut((c) => { const slots = ensureSlots(c).slice(); if (!slots[i]) return c; slots[i] = { ...slots[i], w, h }; return { ...c, slots }; }), [mut]);
+  const addField = useCallback(() => mut((c) => {
+    const tok = COUNT_POOL.find((t) => !c.fields.includes(t)) || COUNT_POOL[c.fields.length % COUNT_POOL.length];
+    return { ...c, fields: [...c.fields, tok], slots: [...ensureSlots(c), autoSlot(c.fields.length)] };
+  }), [mut]);
+  const removeField = useCallback((i) => mut((c) => {
+    if (c.fields.length <= 1) return c;
+    return { ...c, fields: c.fields.filter((_, k) => k !== i), slots: ensureSlots(c).filter((_, k) => k !== i) };
+  }), [mut]);
   const setPageCount = useCallback((n) => mut((c) => {
     const f = c.fields.slice(0, n); let k = 0;
     while (f.length < n) f.push(COUNT_POOL[k++ % COUNT_POOL.length]);
@@ -192,7 +227,7 @@ export function useLivePages(t, active, family) {
     pages, pageIdx, editFields, picker, autoRotate, pagerVisible, dragFrom, family, mono,
     actions: {
       goPage, nextPage, prevPage, toggleEdit, toggleAutoRotate, setMono: setMonoOn,
-      setPageLayout, setPageSide, setPageCount,
+      setPageLayout, setPageSide, setPageCount, moveSlot, resizeSlot, addField, removeField,
       pressStart, pressEnd, onDragStart, onDropAt, setHero,
       openPicker, closePicker, pickField, addPage, deletePage, pokePager,
     },
