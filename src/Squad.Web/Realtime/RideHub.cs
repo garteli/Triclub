@@ -6,6 +6,7 @@
 //  athlete DB on every telemetry tick.
 // ===========================================================================
 using System;
+using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
@@ -18,7 +19,7 @@ using Squad.Core;
 namespace Squad.Web;
 
 [Authorize]
-public sealed class RideHub(IAthleteDirectory directory, IRideSessionState state, ISquadService squads) : Hub
+public sealed class RideHub(IAthleteDirectory directory, IRideSessionState state, ISquadService squads, INotificationService notes) : Hub
 {
     private static string RideGroup(Guid rideId) => $"ride:{rideId}";
 
@@ -174,6 +175,49 @@ public sealed class RideHub(IAthleteDirectory directory, IRideSessionState state
             to = toAthleteId,
             token,
         });
+    }
+
+    /// <summary>
+    /// A rider's device detected a fall (impact + stillness) that they did not cancel. Broadcasts a
+    /// <c>crashAlert</c> to everyone in the ride group in realtime (with the rider's last position so
+    /// teammates can reach them), and fans an in-app notification out to the whole squad so members who
+    /// aren't currently riding still see it. Identity is taken from the connection, never the payload.
+    /// Best-effort: a failed notification write for one member never blocks the others or the broadcast.
+    /// </summary>
+    public async Task RaiseCrashAlert(Guid rideId, double? lat, double? lon)
+    {
+        var athleteId = ResolveAthleteId(Context.User);
+        if (athleteId is null || !await squads.IsMemberAsync(rideId, athleteId.Value, Context.ConnectionAborted))
+            return;
+
+        var p = await directory.GetAsync(athleteId.Value, Context.ConnectionAborted);
+        var name = string.IsNullOrWhiteSpace(p?.Name) ? "A rider" : p!.Name;
+
+        // Realtime banner to everyone currently in the ride group.
+        await Clients.Group(RideGroup(rideId)).SendAsync("crashAlert", new
+        {
+            athleteId = athleteId.Value,
+            name,
+            lat,
+            lon,
+            ts = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+        });
+
+        // In-app fan-out to the whole squad (members not currently riding still get notified).
+        var text = lat is { } la && lon is { } lo
+            ? $"{name} may have crashed during a group ride. Last position {la.ToString("0.00000", System.Globalization.CultureInfo.InvariantCulture)}, {lo.ToString("0.00000", System.Globalization.CultureInfo.InvariantCulture)}."
+            : $"{name} may have crashed during a group ride.";
+
+        IReadOnlyList<Guid> members;
+        try { members = await squads.GetMemberIdsAsync(rideId, Context.ConnectionAborted); }
+        catch { members = System.Array.Empty<Guid>(); }
+
+        foreach (var memberId in members)
+        {
+            if (memberId == athleteId.Value) continue;
+            try { await notes.AddAsync(memberId, "crash", athleteId.Value, name, text, rideId, Context.ConnectionAborted); }
+            catch { /* best-effort per recipient — never fail the whole alert */ }
+        }
     }
 
     private static Guid? ResolveAthleteId(ClaimsPrincipal? user)

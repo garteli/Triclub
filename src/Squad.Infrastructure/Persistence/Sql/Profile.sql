@@ -18,3 +18,6 @@ IF COL_LENGTH('dbo.Athlete', 'Bio')         IS NULL ALTER TABLE dbo.Athlete ADD 
 IF COL_LENGTH('dbo.Athlete', 'BirthDate')   IS NULL ALTER TABLE dbo.Athlete ADD BirthDate   NVARCHAR(10)  NULL;
 IF COL_LENGTH('dbo.Athlete', 'Gender')      IS NULL ALTER TABLE dbo.Athlete ADD Gender      NVARCHAR(20)  NULL;
 IF COL_LENGTH('dbo.Athlete', 'WeightKg')    IS NULL ALTER TABLE dbo.Athlete ADD WeightKg    DECIMAL(5,1)  NULL;
+-- Emergency contact — surfaced by the live-ride fall-detection "Call" action.
+IF COL_LENGTH('dbo.Athlete', 'EmergencyName')  IS NULL ALTER TABLE dbo.Athlete ADD EmergencyName  NVARCHAR(120) NULL;
+IF COL_LENGTH('dbo.Athlete', 'EmergencyPhone') IS NULL ALTER TABLE dbo.Athlete ADD EmergencyPhone NVARCHAR(40)  NULL;

@@ -46,8 +46,11 @@ export function mapLiveRider(u, meId) {
 export function useLiveRide(rideId, { hubUrl = API_BASE + '/hubs/ride', getToken, meId, enabled = true } = {}) {
   const [byId, setById] = useState({});
   const [status, setStatus] = useState('idle'); // 'idle' | 'live' | 'offline'
+  const [crash, setCrash] = useState(null); // latest crash alert raised by ANOTHER rider (banner)
   const connRef = useRef(null);
   const uwbSubs = useRef(new Set()); // subscribers to relayed UWB discovery tokens
+  const meIdRef = useRef(meId);
+  meIdRef.current = meId;
 
   useEffect(() => {
     if (!enabled || !rideId) return;
@@ -65,6 +68,8 @@ export function useLiveRide(rideId, { hubUrl = API_BASE + '/hubs/ride', getToken
     conn.on('riderLeft', (athleteId) => setById((prev) => { const n = { ...prev }; delete n[athleteId]; return n; }));
     // UWB discovery-token relay (Nearby Interaction handshake) — dispatched to subscribers.
     conn.on('uwbToken', (msg) => uwbSubs.current.forEach((cb) => { try { cb(msg); } catch { /* ignore */ } }));
+    // A teammate's device raised a fall alert — surface it as a banner (ignore our own echo).
+    conn.on('crashAlert', (msg) => { if (msg && msg.athleteId !== meIdRef.current) setCrash(msg); });
     conn.onreconnected(() => { setStatus('live'); conn.invoke('JoinRide', rideId).catch(() => {}); });
     conn.onclose(() => setStatus('offline'));
 
@@ -102,9 +107,16 @@ export function useLiveRide(rideId, { hubUrl = API_BASE + '/hubs/ride', getToken
   );
   const onUwbToken = useCallback((cb) => { uwbSubs.current.add(cb); return () => uwbSubs.current.delete(cb); }, []);
 
+  // Raise a fall/crash alert to the whole ride group + squad (best-effort; older backend → no-op).
+  const raiseCrashAlert = useCallback(
+    (lat, lon) => connRef.current?.invoke('RaiseCrashAlert', rideId, lat ?? null, lon ?? null).catch(() => {}),
+    [rideId],
+  );
+  const dismissCrash = useCallback(() => setCrash(null), []);
+
   // Memoised on the raw hub state so the reference only changes when a rider actually
   // moves/joins/leaves — lets useRideTelemetry re-render the map on each position update
   // (not on every unrelated App render).
   const riders = useMemo(() => Object.values(byId).map((u) => mapLiveRider(u, meId)), [byId, meId]);
-  return { riders, status, pushTelemetry, pushPeerRange, pushUwbToken, onUwbToken };
+  return { riders, status, pushTelemetry, pushPeerRange, pushUwbToken, onUwbToken, raiseCrashAlert, crash, dismissCrash };
 }

@@ -334,6 +334,8 @@ export function buildViewModel(state, t, opts = {}) {
     birthDate: me.birthDate ?? p.birthDate ?? '',
     gender: me.gender ?? p.gender ?? '',
     weight: me.weight ?? p.weightKg ?? '',
+    emergencyName: me.emergencyName ?? p.emergencyName ?? '',
+    emergencyPhone: me.emergencyPhone ?? p.emergencyPhone ?? '',
     initials: p.initials || '', color: p.avatarColor, photo: opts.avatar || null,
   } : {
     name: me.name || '', club: me.club || danaExtra.club || '', ageGroup: me.ageGroup || danaExtra.ageGroup || '',

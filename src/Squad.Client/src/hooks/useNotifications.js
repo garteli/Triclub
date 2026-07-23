@@ -22,6 +22,8 @@ const KIND = {
   activity: { icon: 'trophy', color: '#ffce4a' },
   plan:     { icon: 'calendar', color: 'var(--accent)', target: 'plan' },
   event:    { icon: 'calendar', color: '#37c0ff', target: 'group' },
+  // A teammate's fall alert on a live ride — tap to jump to the ride screen.
+  crash:    { icon: 'alert', color: '#ff5d5d', target: 'ride' },
 };
 
 function mapNote(n) {

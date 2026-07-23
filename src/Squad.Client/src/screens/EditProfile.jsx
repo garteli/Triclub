@@ -37,6 +37,7 @@ export default function EditProfile({ vm, actions, getToken, onProfileSaved }) {
     name: m.name, club: m.club, sport: m.sport, level: m.level,
     ftp: String(m.ftp ?? ''), weekly: m.weekly, bio: m.bio,
     birthDate: m.birthDate || '', gender: m.gender || '', weight: String(m.weight ?? ''),
+    emergencyName: m.emergencyName || '', emergencyPhone: m.emergencyPhone || '',
   });
   const ageGroup = ageGroupFromBirthDate(form.birthDate);
   const [busy, setBusy] = useState(false);
@@ -82,6 +83,7 @@ export default function EditProfile({ vm, actions, getToken, onProfileSaved }) {
         birthDate: form.birthDate || null, gender: form.gender || null,
         weightKg: Number.isFinite(weightNum) ? weightNum : null,
         ageGroup: ageGroup || null, // derived from birthDate, kept in sync server-side
+        emergencyName: form.emergencyName, emergencyPhone: form.emergencyPhone,
       });
       onProfileSaved?.(updated);
       actions.setMe({ ...form, ftp: form.ftp, ageGroup }); // instant local reflection
@@ -136,6 +138,13 @@ export default function EditProfile({ vm, actions, getToken, onProfileSaved }) {
       </div>
 
       <TextArea label="Bio" value={form.bio} onChange={set('bio')} placeholder="A line about your training and goals…" />
+
+      <FieldLabel>Emergency contact</FieldLabel>
+      <div style={s('font-size:11.5px;color:var(--text3);line-height:1.4;margin:-4px 2px 8px')}>Called by fall detection on a live ride if you crash and don’t respond.</div>
+      <div style={s('display:flex;gap:9px')}>
+        <div style={s('flex:1;min-width:0')}><Field label="Name" value={form.emergencyName} onChange={set('emergencyName')} placeholder="e.g. Alex (partner)" /></div>
+        <div style={s('flex:1;min-width:0')}><Field label="Phone" value={form.emergencyPhone} onChange={set('emergencyPhone')} placeholder="+972 5x-xxx-xxxx" type="tel" mono /></div>
+      </div>
 
       {error && <div style={s('color:var(--bad);font-size:12.5px;margin-top:12px;text-align:center')}>{error}</div>}
       <PrimaryBtn onClick={busy ? undefined : save} disabled={busy}>{busy ? 'Saving…' : 'Save changes'}</PrimaryBtn>
