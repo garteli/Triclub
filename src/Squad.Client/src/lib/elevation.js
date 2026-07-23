@@ -26,12 +26,19 @@ export function sampleAlong(pts, N) {
 }
 
 // Terrain elevations (metres[]) for a set of {lat,lon} samples, aligned to the samples.
+// Chunked to ≤100 coordinates per request (Open-Meteo's per-call limit) so a dense route
+// still resolves in a few calls.
 async function fetchElevations(samples, signal) {
-  const lat = samples.map((s) => s.lat.toFixed(5)).join(',');
-  const lon = samples.map((s) => s.lon.toFixed(5)).join(',');
-  const res = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lat}&longitude=${lon}`, { signal });
-  if (!res.ok) throw new Error('elevation');
-  return (await res.json()).elevation || [];
+  const out = [];
+  for (let i = 0; i < samples.length; i += 100) {
+    const batch = samples.slice(i, i + 100);
+    const lat = batch.map((s) => s.lat.toFixed(5)).join(',');
+    const lon = batch.map((s) => s.lon.toFixed(5)).join(',');
+    const res = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lat}&longitude=${lon}`, { signal });
+    if (!res.ok) throw new Error('elevation');
+    out.push(...((await res.json()).elevation || []));
+  }
+  return out;
 }
 
 // Build the elevation profile for a route: samples along it, reads the terrain, and returns
@@ -48,6 +55,31 @@ export async function buildElevationProfile(pts, signal) {
     ascent: Math.round(ascent),
     min: Math.min(...els),
     max: Math.max(...els),
+  };
+}
+
+// Denser terrain profile for climb detection: samples the route at ~fixed spacing (capped so the
+// terrain read stays a few API calls) and returns { profile:[{dist,e}], ascent, min, max, spacingM }.
+// Coarser buildElevationProfile is fine for a sparkline; climb detection wants tighter spacing.
+export async function buildDenseProfile(pts, signal, { maxSamples = 300, minSpacingM = 80 } = {}) {
+  const clean = (pts || []).filter((p) => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]));
+  if (clean.length < 2) return null;
+  let total = 0;
+  for (let i = 1; i < clean.length; i++) total += haversineMeters({ lat: clean[i - 1][0], lon: clean[i - 1][1] }, { lat: clean[i][0], lon: clean[i][1] });
+  if (total === 0) return null;
+  const N = Math.max(4, Math.min(maxSamples, Math.floor(total / minSpacingM) + 1));
+  const samples = sampleAlong(clean, N);
+  if (samples.length < 2) return null;
+  const els = await fetchElevations(samples, signal);
+  if (els.length !== samples.length) throw new Error('mismatch');
+  let ascent = 0;
+  for (let i = 1; i < els.length; i++) { const d = els[i] - els[i - 1]; if (d > 0) ascent += d; }
+  return {
+    profile: samples.map((sm, i) => ({ dist: sm.dist, e: els[i] })),
+    ascent: Math.round(ascent),
+    min: Math.min(...els),
+    max: Math.max(...els),
+    spacingM: total / (N - 1),
   };
 }
 
