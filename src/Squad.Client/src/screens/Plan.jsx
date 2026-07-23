@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { s } from '../lib/style.js';
 import EmptyState from '../components/EmptyState.jsx';
-import SportIcon from '../components/SportIcon.jsx';
-import AuthedImage from '../components/AuthedImage.jsx';
-import { listSquadEvents, joinEvent, leaveEvent } from '../lib/events.js';
-
-const glyphForSport = (sport, family) =>
-  family === 'motorsport' ? 'moto' : ({ 1: 'swim', 2: 'bike', 3: 'run' }[sport] || 'bike');
+import { EventCard, DirectionsSheet } from '../components/EventCard.jsx';
+import {
+  listSquadEvents, joinEvent, leaveEvent, checkInEvent, undoCheckInEvent,
+  getEventRoute, listEventParticipants, setEventStartPlace,
+} from '../lib/events.js';
+import { reverseGeocode } from '../lib/reverseGeocode.js';
 
 const fmtRange = (a, b) => {
   const f = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
@@ -23,13 +23,72 @@ const cap = (t) => (t ? t[0].toUpperCase() + t.slice(1) : t);
 // mapRow builds a session title as "Discipline · Title"; the card shows the discipline as a
 // coloured chip, so strip that prefix off the headline to avoid repeating it.
 const stripDisc = (t) => (t && t.includes(' · ') ? t.slice(t.indexOf(' · ') + 3) : t);
-const SPORT_NAME = { 1: 'Swim', 2: 'Bike', 3: 'Run' };
-const SPORT_COLOR = { 1: 'var(--swim)', 2: 'var(--bike)', 3: 'var(--run)' };
 const FULL_DOW = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 const ClockIcon = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>;
-const UsersIcon = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.9" /></svg>;
 const CheckIcon = ({ size = 11 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>;
+
+// A group event on the Plan page renders with the same rich card as the Events screen. This
+// self-contained wrapper owns the same lazy enrichment (route + who's-going) and the member
+// RSVP/check-in actions, so a single <EventCard> is all the Plan agenda has to drop in.
+function PlanEventCard({ ev, squadId, getToken, onOpen, onDirections }) {
+  const [item, setItem] = useState(ev);
+  const [route, setRoute] = useState(undefined);        // undefined = not fetched, null = none, [...] = points
+  const [participants, setParticipants] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const token = getToken?.();
+  useEffect(() => { setItem(ev); }, [ev]);
+
+  // who's-going faces — only worth a call once someone has joined
+  useEffect(() => {
+    let alive = true;
+    if ((item.joinCount || 0) <= 0) { setParticipants([]); return () => { alive = false; }; }
+    (async () => {
+      try { const t = await getToken?.(); const p = await listEventParticipants(t, squadId, item.id); if (alive) setParticipants(p || []); }
+      catch { if (alive) setParticipants([]); }
+    })();
+    return () => { alive = false; };
+  }, [item.id, item.joinCount, squadId, getToken]);
+
+  // route for the map preview + directions — only events that carry a course have one
+  useEffect(() => {
+    if (!(item.courseId || item.courseName || item.courseKm)) { setRoute(null); return; }
+    let alive = true;
+    (async () => {
+      try {
+        const t = await getToken?.();
+        const rt = await getEventRoute(t, squadId, item.id);
+        const pts = rt?.points?.length ? rt.points : null;
+        if (alive) setRoute(pts);
+        // Name the start point once (reverse geocode) and cache it back on the event + server.
+        if (pts && !item.startPlace) {
+          const st = pts.find((p) => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]));
+          if (st) {
+            const name = await reverseGeocode(st[0], st[1]);
+            if (name && alive) { setItem((x) => ({ ...x, startPlace: name })); try { await setEventStartPlace(t, squadId, item.id, name); } catch { /* best-effort cache */ } }
+          }
+        }
+      } catch { if (alive) setRoute(null); }
+    })();
+    return () => { alive = false; };
+  }, [item.id, squadId, getToken]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const act = async (fn, patch) => {
+    setBusy(true);
+    try { const t = await getToken?.(); await fn(t, item.id); setItem((x) => ({ ...x, ...patch(x) })); }
+    catch { /* ignore */ } finally { setBusy(false); }
+  };
+  const join = () => act(joinEvent, (e) => ({ joined: true, joinCount: (e.joinCount || 0) + 1 }));
+  const leave = () => act(leaveEvent, (e) => ({ joined: false, checkedIn: false, joinCount: Math.max(0, (e.joinCount || 1) - 1) }));
+  const checkin = () => act(checkInEvent, (e) => ({ checkedIn: true, checkedInCount: (e.checkedInCount || 0) + 1 }));
+  const undoCheckin = () => act(undoCheckInEvent, (e) => ({ checkedIn: false, checkedInCount: Math.max(0, (e.checkedInCount || 1) - 1) }));
+
+  return (
+    <EventCard ev={item} isOwner={false} busy={busy} token={token} route={route} participants={participants}
+      onOpen={onOpen} onDirections={onDirections}
+      onJoin={join} onLeave={leave} onCheckIn={checkin} onUndoCheckIn={undoCheckin} />
+  );
+}
 
 // A sheet listing the plans currently on the athlete's calendar, each removable (their copy only).
 function MyPlansSheet({ planMine, onClose }) {
@@ -197,7 +256,7 @@ export default function Plan({ vm, state, actions, planMine, live, meId, getToke
   // Group sessions the coach scheduled are shown as sessions in the plan — unified with the
   // workouts, so a week with only a group ride no longer reads as "No sessions planned".
   const [events, setEvents] = useState([]);
-  const [evBusyId, setEvBusyId] = useState(null);
+  const [dirTarget, setDirTarget] = useState(null); // { lat, lon, title } → Directions action sheet
   const loadEvents = useCallback(async () => {
     if (!vm.activeClubId || !getToken) { setEvents([]); return; }
     try { setEvents((await listSquadEvents(await getToken(), vm.activeClubId)) || []); } catch { setEvents([]); }
@@ -216,7 +275,6 @@ export default function Plan({ vm, state, actions, planMine, live, meId, getToke
     return (events || []).filter((e) => { const t = new Date(e.start); return t >= weekStart && t < end; }).sort(byStart);
   }, [events, weekStart]);
   const upcomingEvents = useMemo(() => (events || []).slice().sort(byStart), [events]);
-  const evToken = getToken?.();
 
   // ---- week UI model: a 7-day load strip + an agenda grouped by real calendar day ----
   const todayIso = isoOf(new Date());
@@ -238,44 +296,18 @@ export default function Plan({ vm, state, actions, planMine, live, meId, getToke
   const restDays = weekDays.filter((x) => x.rest).map((x) => FULL_DOW[x.d.getDay()]);
   const hasCards = weekDays.some((x) => x.workouts.length || x.evs.length);
 
-  const toggleJoin = async (ev) => {
-    setEvBusyId(ev.id);
-    try { const t = await getToken?.(); if (ev.joined) await leaveEvent(t, ev.id); else await joinEvent(t, ev.id); await loadEvents(); }
-    catch { /* ignore */ } finally { setEvBusyId(null); }
-  };
-  const renderEvent = (ev) => {
-    const d = new Date(ev.start);
-    const busy = evBusyId === ev.id;
-    return (
-      <div key={`ev-${ev.id}`} className="ctl" onClick={() => actions.openEvent(ev)}
-        style={s('background:var(--bg2);border:1px solid color-mix(in srgb,var(--accent) 28%,var(--line));border-radius:16px;padding:12px 13px;display:flex;gap:12px;align-items:center')}>
-        <div style={s('flex:none;width:38px;text-align:center')}>
-          <div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600')}>{d.toLocaleDateString('en-US', { weekday: 'short' })}</div>
-          <div className="mono" style={s('font-size:17px;font-weight:700')}>{Number.isNaN(d.getTime()) ? '—' : d.getDate()}</div>
-        </div>
-        <div style={s('width:1px;height:34px;background:var(--line)')} />
-        <div style={s('width:36px;height:36px;border-radius:11px;background:var(--accent-dim);color:var(--accent);flex:none;display:flex;align-items:center;justify-content:center;overflow:hidden')}>
-          {ev.logoUrl ? <AuthedImage url={ev.logoUrl} token={evToken} style="width:100%;height:100%;object-fit:cover" /> : <SportIcon name={glyphForSport(ev.sport, vm.family)} size={18} />}
-        </div>
-        <div style={s('flex:1;min-width:0')}>
-          <div style={s('font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap')}>{ev.title}</div>
-          <div style={s('font-size:11.5px;color:var(--text2)')}>{d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}{ev.courseName ? ` · ${ev.courseName}` : ''} · {ev.joinCount || 0} going</div>
-        </div>
-        <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : (e) => { e.stopPropagation(); toggleJoin(ev); }}
-          style={s(ev.joined
-            ? 'flex:none;font-size:11px;font-weight:700;color:var(--text3);padding:7px 11px;border-radius:9px;border:1px solid var(--line)'
-            : 'flex:none;font-size:11px;font-weight:700;color:var(--accent-ink);background:var(--accent);padding:7px 13px;border-radius:9px')}>
-          {busy ? '…' : ev.joined ? 'Going' : 'Join'}
-        </div>
-      </div>
-    );
-  };
+  // Group events on the Plan page render with the same rich EventCard as the Events screen.
+  const onDirections = (lat, lon, title) => setDirTarget({ lat, lon, title });
+  const openLink = actions.openLink || ((u) => { try { window.open(u, '_blank', 'noopener'); } catch { /* ignore */ } });
+  const renderEventCard = (ev) => (
+    <PlanEventCard key={`ev-${ev.id}`} ev={ev} squadId={vm.activeClubId} getToken={getToken}
+      onOpen={() => actions.openEvent(ev)} onDirections={(lat, lon) => onDirections(lat, lon, ev.title)} />
+  );
 
   // ---- agenda cards (week view) — a coloured discipline spine, a kind chip and a trailing action ----
   const doneBtn = 'flex:none;display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:11px;background:color-mix(in srgb,var(--good) 15%,transparent);border:1px solid color-mix(in srgb,var(--good) 36%,transparent);color:var(--good)';
   const startBtn = 'flex:none;padding:10px 15px;border-radius:11px;background:var(--accent);color:var(--accent-ink);font-size:12.5px;font-weight:700';
   const ghostBtn = 'flex:none;padding:10px 15px;border-radius:11px;background:var(--bg3);border:1px solid var(--line);color:var(--text);font-size:12.5px;font-weight:700';
-  const joinedBtn = 'flex:none;display:flex;align-items:center;gap:5px;padding:10px 14px;border-radius:11px;background:color-mix(in srgb,var(--good) 15%,transparent);border:1px solid color-mix(in srgb,var(--good) 36%,transparent);color:var(--good);font-size:12.5px;font-weight:700';
 
   const renderWorkoutCard = (p) => {
     const done = p.status === 'done';
@@ -299,34 +331,6 @@ export default function Plan({ vm, state, actions, planMine, live, meId, getToke
           <div style={s('display:flex;align-items:center;padding:0 13px 0 4px')}>
             <div className="ctl" onClick={(e) => { e.stopPropagation(); actions.openWorkout(p); }} style={s(done ? doneBtn : isToday ? startBtn : ghostBtn)}>
               {done ? <CheckIcon size={15} /> : isToday ? 'Start' : 'View'}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const renderEventCard = (ev) => {
-    const d = new Date(ev.start);
-    const busy = evBusyId === ev.id;
-    const rt = isRtl(ev.title);
-    const col = SPORT_COLOR[ev.sport] || 'var(--accent)';
-    return (
-      <div key={`ev-${ev.id}`} className="ctl" onClick={() => actions.openEvent(ev)}
-        style={s(`background:var(--bg2);border:1px solid ${ev.joined ? 'color-mix(in srgb,var(--good) 28%,var(--line))' : 'var(--line)'};border-radius:16px;overflow:hidden`)}>
-        <div style={s('display:flex;align-items:stretch')}>
-          <div style={s(`width:4px;flex:none;background:${col}`)} />
-          <div style={s('flex:1;padding:13px 14px;min-width:0')}>
-            <span style={s(`font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:${col}`)}>Event · {SPORT_NAME[ev.sport] || 'Session'}</span>
-            <div dir={rt ? 'rtl' : 'ltr'} style={s(`font-size:15px;font-weight:700;margin-top:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${rt ? 'text-align:right' : ''}`)}>{ev.title}</div>
-            <div style={s('display:flex;flex-wrap:wrap;gap:12px;font-size:11px;color:var(--text2);margin-top:6px')}>
-              <span style={s('display:flex;align-items:center;gap:5px')}><ClockIcon />{Number.isNaN(d.getTime()) ? '—' : d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}{ev.courseName ? ` · ${ev.courseName}` : ''}</span>
-              <span style={s('display:flex;align-items:center;gap:5px')}><UsersIcon />{ev.joinCount || 0} going</span>
-            </div>
-          </div>
-          <div style={s('display:flex;align-items:center;padding:0 13px 0 4px')}>
-            <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : (e) => { e.stopPropagation(); toggleJoin(ev); }} style={s(ev.joined ? joinedBtn : ghostBtn)}>
-              {busy ? '…' : ev.joined ? <><CheckIcon />Joined</> : 'Join'}
             </div>
           </div>
         </div>
@@ -483,7 +487,7 @@ export default function Plan({ vm, state, actions, planMine, live, meId, getToke
             {upcomingEvents.length > 0 && (
               <>
                 <div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.4px;font-weight:600;margin:22px 2px 10px')}>Group sessions</div>
-                <div style={s('display:flex;flex-direction:column;gap:9px')}>{upcomingEvents.map(renderEvent)}</div>
+                <div style={s('display:flex;flex-direction:column;gap:10px')}>{upcomingEvents.map(renderEventCard)}</div>
               </>
             )}
           </>
@@ -492,6 +496,10 @@ export default function Plan({ vm, state, actions, planMine, live, meId, getToke
 
       {state.showWorkout && <WorkoutSheet wkDetail={vm.wkDetail} actions={actions} live={live} />}
       {showMine && planMine && <MyPlansSheet planMine={planMine} onClose={() => setShowMine(false)} />}
+      {dirTarget && (
+        <DirectionsSheet target={dirTarget} onClose={() => setDirTarget(null)}
+          onPick={(url) => { openLink(url); setDirTarget(null); }} />
+      )}
     </>
   );
 }
