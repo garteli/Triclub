@@ -25,8 +25,6 @@ const finite = (arr) => (arr || []).filter((v) => v != null && Number.isFinite(v
 const avgOf = (arr) => { const f = finite(arr); return f.length ? Math.round(f.reduce((a, b) => a + b, 0) / f.length) : null; };
 const maxOf = (arr) => { const f = finite(arr); return f.length ? Math.round(Math.max(...f)) : null; };
 
-// Small "not-real-data-yet" tag so the stubbed cards never read as genuine metrics.
-const Sample = () => <span style={s('font-size:8.5px;font-weight:800;color:var(--text3);border:1px solid var(--line2);border-radius:5px;padding:1px 5px;letter-spacing:.5px;flex:none')}>SAMPLE</span>;
 const Spark = ({ icon }) => (
   <div style={s('width:22px;height:22px;border-radius:7px;background:var(--accent);display:flex;align-items:center;justify-content:center;flex:none')}>
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--accent-ink)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">{icon}</svg>
@@ -135,35 +133,26 @@ function MetricHero({ a, load }) {
   );
 }
 
-// ---- Athlete Intelligence (no AI wired yet → SAMPLE copy) ----
-function AIInsight() {
-  return (
-    <div style={s('padding:14px 18px 0')}>
-      <div style={s('background:linear-gradient(150deg,color-mix(in srgb,var(--accent) 14%,var(--bg2)),var(--bg2));border:1px solid color-mix(in srgb,var(--accent) 35%,transparent);border-radius:18px;padding:15px 16px')}>
-        <div style={s('display:flex;align-items:center;gap:8px')}><Spark icon={boltPath} /><span style={s('font-size:13px;font-weight:700')}>Athlete Intelligence</span><span style={s('margin-left:auto')}><Sample /></span></div>
-        <div style={s('font-size:13.5px;color:var(--text);line-height:1.5;margin-top:11px')}>Strong endurance performance with <b>new 30-day power bests</b> across all durations; maintained typical effort despite higher elevation gain.</div>
-        <div className="ctl" style={s('background:var(--accent);color:var(--accent-ink);text-align:center;padding:12px;border-radius:12px;font-weight:700;font-size:14px;margin-top:13px')}>Say More</div>
-      </div>
-    </div>
-  );
-}
-
 // ---- device + weather (real: device from the FIT file, weather from Open-Meteo) ----
-// Each line falls back to a SAMPLE placeholder only when that datum is missing (e.g. an
-// indoor session has no weather; a manual/native entry may have no device).
+// Each line only renders when that datum exists — no placeholder fallback (an indoor
+// session has no weather; a manual/native entry may have no device).
 function DeviceWeather({ device, weather }) {
   const wxText = describeWeather(weather);
+  if (!device && !wxText) return null;
   return (
     <div style={s('padding:16px 18px 0;display:flex;flex-direction:column;gap:12px')}>
-      <div style={s('display:flex;align-items:center;gap:11px')}>
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2.5" /><path d="M9 6h6" /></svg>
-        <span style={s('font-size:13px;color:var(--text)')}>{device || 'Garmin Edge 1050'}</span>{!device && <Sample />}
-      </div>
-      <div style={s('display:flex;align-items:flex-start;gap:11px')}>
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--warn)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4.5" /><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19" /></svg>
-        <span style={s('font-size:12.5px;color:var(--text2);line-height:1.45')}>{wxText || 'Clear, 23°C. Feels like 23°C. Humidity 71%. Wind 4.0 km/h from SSE.'}</span>
-        {!weather && <Sample />}
-      </div>
+      {device && (
+        <div style={s('display:flex;align-items:center;gap:11px')}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2.5" /><path d="M9 6h6" /></svg>
+          <span style={s('font-size:13px;color:var(--text)')}>{device}</span>
+        </div>
+      )}
+      {wxText && (
+        <div style={s('display:flex;align-items:flex-start;gap:11px')}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--warn)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4.5" /><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19" /></svg>
+          <span style={s('font-size:12.5px;color:var(--text2);line-height:1.45')}>{wxText}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -327,37 +316,23 @@ function RelativeEffort({ score }) {
   );
 }
 
-// ---- fitness (still SAMPLE) + matched rides (real: squad-mates who rode the same
-// place + time, from the /track endpoint) ----
+// ---- matched rides (real: squad-mates who rode the same place + time, from the /track
+// endpoint) — only renders once this activity has at least one match ----
 function StubTrends({ matched }) {
   const mates = matched || [];
+  if (!mates.length) return null;
   return (
     <div style={s('padding:16px 18px 0')}>
       <div style={s('display:flex;align-items:center;gap:6px;margin-bottom:8px')}><span style={s(label)}>Trends</span></div>
       <div style={s('display:flex;gap:10px')}>
-        <div style={s('flex:1;background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:14px')}>
-          <div style={s('display:flex;align-items:center;gap:6px')}><span style={s('font-size:14px;font-weight:700')}>Fitness +3</span><Sample /></div>
-          <div style={s('font-size:11px;color:var(--text3);margin-top:2px')}>Score <b className="mono" style={s('color:var(--text)')}>19</b></div>
-          <svg viewBox="0 0 120 54" preserveAspectRatio="none" style={{ width: '100%', height: 44, marginTop: 8, display: 'block' }}><polyline points="4,34 30,30 56,32 84,40 104,34 116,10" fill="none" stroke="var(--accent)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /><circle cx="116" cy="10" r="3" fill="var(--accent)" /></svg>
-        </div>
         <MatchedRides mates={mates} />
       </div>
     </div>
   );
 }
 
-// The teammates who rode alongside (same sport, start point + time). Real data when present;
-// falls back to a SAMPLE card until this activity has any matches.
+// The teammates who rode alongside (same sport, start point + time). Real data only.
 function MatchedRides({ mates }) {
-  if (!mates.length) {
-    return (
-      <div style={s('flex:1;background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:14px')}>
-        <div style={s('display:flex;align-items:center;gap:6px')}><span style={s('font-size:14px;font-weight:700')}>Matched Rides</span><Sample /></div>
-        <div className="mono" style={s('font-size:11px;color:var(--text3);margin-top:2px')}>28.2 km/h · 17</div>
-        <svg viewBox="0 0 120 54" preserveAspectRatio="none" style={{ width: '100%', height: 44, marginTop: 8, display: 'block' }}><polyline points="4,18 34,16 62,20 90,30 116,26" fill="none" stroke="var(--swim)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /><circle cx="116" cy="26" r="3" fill="var(--accent)" /></svg>
-      </div>
-    );
-  }
   const names = mates.map((m) => (m.athleteName || '').split(' ')[0]).filter(Boolean);
   const sub = names.length <= 2 ? names.join(' & ') : `${names.slice(0, 2).join(', ')} +${names.length - 2}`;
   return (
@@ -651,9 +626,8 @@ function BestEfforts({ bestPower, bestDist }) {
 }
 
 // Data-driven single-activity detail (yours or a teammate's), redesigned to a rich
-// Strava-style page. Everything derived from the real recording where possible; a few
-// cards (Athlete Intelligence, device, weather, fitness/matched, goals) are tagged
-// SAMPLE until a data source exists.
+// Strava-style page. Everything derived from the real recording — cards without a real
+// data source yet (device, weather, matched rides) render only when that data exists.
 // Route length (km) of an activity's [[lat,lon],…] polyline — same haversine sum CoursePicker uses.
 const courseDistKm = (pts) => {
   let m = 0;
@@ -792,7 +766,6 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
 
       <AthleteTitle a={a} token={token} onAthlete={actions.openAthlete} />
       <MetricHero a={a} load={effLoad} />
-      <AIInsight />
       <DeviceWeather device={a.deviceName} weather={a.weather} />
 
       {/* social — real kudos (self-kudos blocked) + comments */}
