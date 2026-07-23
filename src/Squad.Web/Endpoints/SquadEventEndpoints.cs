@@ -22,6 +22,8 @@ public static class SquadEventEndpoints
         app.MapGet("/api/squads/{squadId:guid}/events/{eventId:guid}/participants", EventParticipants).RequireAuthorization();
         app.MapGet("/api/squads/{squadId:guid}/events/{eventId:guid}/route", EventRoute).RequireAuthorization();
         app.MapPost("/api/squads/{squadId:guid}/events/{eventId:guid}/startplace", SetStartPlace).RequireAuthorization();
+        app.MapGet("/api/squads/{squadId:guid}/events/{eventId:guid}/elevation", GetElevation).RequireAuthorization();
+        app.MapPost("/api/squads/{squadId:guid}/events/{eventId:guid}/elevation", SetElevation).RequireAuthorization();
         // Anonymous on purpose: an .ics must be openable by plain navigation (no Authorization header),
         // which is how iOS/Android hand it to the Calendar app. Exposes only a PUBLISHED event's details.
         app.MapGet("/api/squads/{squadId:guid}/events/{eventId:guid}/calendar.ics", EventCalendar);
@@ -195,6 +197,32 @@ public static class SquadEventEndpoints
     }
 
     private sealed record StartPlaceRequest(string? Place);
+
+    // Terrain elevation profile cache — the client reads a rate-limited free API once and stores the
+    // result here so every later viewer reuses it. GET returns the cached profile (404 if none yet).
+    private static async Task<IResult> GetElevation(
+        Guid squadId, Guid eventId, HttpContext http, ISquadEventStore events, CancellationToken ct)
+    {
+        if (Me(http) is not { } me) return Results.Unauthorized();
+        var json = await events.GetElevationAsync(squadId, me, eventId, ct);
+        if (string.IsNullOrWhiteSpace(json)) return Results.NotFound(new { error = "No cached elevation." });
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+        return Results.Ok(new { elevation = doc.RootElement.Clone() });
+    }
+
+    private static async Task<IResult> SetElevation(
+        Guid squadId, Guid eventId, ElevationRequest req, HttpContext http, ISquadEventStore events, CancellationToken ct)
+    {
+        if (Me(http) is not { } me) return Results.Unauthorized();
+        if (req?.Elevation is not { } el || el.ValueKind != System.Text.Json.JsonValueKind.Object)
+            return Results.BadRequest(new { error = "An elevation profile is required." });
+        var json = el.GetRawText();
+        if (json.Length > 200_000) return Results.BadRequest(new { error = "Elevation profile too large." });
+        await events.SetElevationAsync(squadId, me, eventId, json, ct);
+        return Results.Ok(new { cached = true });
+    }
+
+    private sealed record ElevationRequest(System.Text.Json.JsonElement? Elevation);
 
     // Serve a published event as an .ics the OS can open in Calendar. Delivered as text/calendar so
     // iOS/Android recognise it and offer "Add to Calendar" — unlike a blob download, which iOS ignores.

@@ -61,6 +61,12 @@ export const getEventRoute = (token, squadId, eventId) => req(`/api/squads/${squ
 // it instead of geocoding again → { place }.
 export const setEventStartPlace = (token, squadId, eventId, place) =>
   req(`/api/squads/${squadId}/events/${eventId}/startplace`, { method: 'POST', token, body: { place } });
+// Cached terrain elevation profile ({ profile, ascent, min, max }). GET → { elevation } (404 = none
+// cached yet); POST caches what the client computed so later viewers don't re-call the elevation API.
+export const getEventElevation = (token, squadId, eventId) =>
+  req(`/api/squads/${squadId}/events/${eventId}/elevation`, { token });
+export const setEventElevation = (token, squadId, eventId, elevation) =>
+  req(`/api/squads/${squadId}/events/${eventId}/elevation`, { method: 'POST', token, body: { elevation } });
 
 // Per-event branding (owner-only). kind is 'logo' | 'banner'; blob is a downscaled JPEG. Returns { url }.
 export async function uploadEventImage(token, squadId, eventId, kind, blob) {
