@@ -13,6 +13,7 @@ import { getRouteStyle, setRouteStyle as persistRouteStyle } from '../lib/routeS
 import { getMapView, setMapStyle as persistMapStyle } from '../lib/mapView.js';
 import { eventShareUrl } from '../lib/eventLink.js';
 import { reverseGeocode } from '../lib/reverseGeocode.js';
+import { addToDeviceCalendar } from '../lib/calendar.js';
 import RouteStylePanel from '../components/RouteStylePanel.jsx';
 
 // The member-facing event page: an identity block, a large map of the route, terrain-derived ride
@@ -302,11 +303,17 @@ export default function EventDetail({ vm, state, actions, getToken }) {
   // route/GPS file name (which is often just an auto-generated filename like "offroad-1234…").
   const openDirections = () => { if (start) setDirTarget({ lat: start[0], lon: start[1], title: startPlace || ev.title }); };
 
-  // Add the event to the device calendar. The reliable path on iPhone is the native share sheet with
-  // the .ics file — iOS shows the event and offers Calendar (a hosted https .ics only offers to
-  // *subscribe*, and a data: URI does nothing in the in-app WebView). Falls back to the served
-  // text/calendar URL where file-sharing isn't available (most desktop browsers).
+  // Add the event to the device calendar. Native (iOS/Android) opens the OS calendar editor via the
+  // Capacitor plugin — the reliable path on iPhone. If that's unavailable (web, or an older native
+  // build without the plugin), fall back to sharing the .ics file, then to the served text/calendar URL.
   const addToCalendar = async () => {
+    const start = new Date(ev.start);
+    if (Number.isNaN(start.getTime())) return;
+    const handled = await addToDeviceCalendar({
+      title: ev.title || 'Event', startMs: start.getTime(), location: startPlace || '', description: ev.notes || '',
+    });
+    if (handled) return;
+
     const ics = buildEventIcs(ev, startPlace || '');
     const fname = `${(ev.title || 'event').replace(/[^\w-]+/g, '-').slice(0, 40) || 'event'}.ics`;
     try {

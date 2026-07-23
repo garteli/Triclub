@@ -21,6 +21,7 @@
     "@capacitor/inappbrowser": "^2.5.5",
     "@capacitor/ios": "^7.6.8",
     "@capgo/capacitor-social-login": "^7.20.0",
+    "@ebarooni/capacitor-calendar": "^7.2.0",
     "@microsoft/signalr": "^8.0.7",
     "@perfood/capacitor-healthkit": "^1.0.0",
     "fflate": "^0.8.3",
