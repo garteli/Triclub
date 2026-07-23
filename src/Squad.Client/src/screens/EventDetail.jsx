@@ -7,13 +7,13 @@ import AuthedImage from '../components/AuthedImage.jsx';
 import SportIcon from '../components/SportIcon.jsx';
 import { listEventParticipants, joinEvent, leaveEvent, getEventRoute, setEventStartPlace } from '../lib/events.js';
 import { buildElevationProfile } from '../lib/elevation.js';
-import { routeKm } from '../lib/courses.js';
 import { BASEMAP_LABEL, nextBasemap, inIsrael } from '../lib/basemaps.js';
 import { getRouteStyle, setRouteStyle as persistRouteStyle } from '../lib/routeStyle.js';
 import { getMapView, setMapStyle as persistMapStyle } from '../lib/mapView.js';
 import { eventShareUrl } from '../lib/eventLink.js';
 import { reverseGeocode } from '../lib/reverseGeocode.js';
 import { addToDeviceCalendar } from '../lib/calendar.js';
+import RouteBreakdown from '../components/RouteBreakdown.jsx';
 import RouteStylePanel from '../components/RouteStylePanel.jsx';
 
 // The member-facing event page: an identity block, a large map of the route, terrain-derived ride
@@ -97,54 +97,6 @@ function MapStyleControls({ mapStyle, cycleLayer, styleOpen, setStyleOpen }) {
 }
 
 
-// A terrain-derived elevation card: distance + total ascent from Open-Meteo, and a gradient area
-// chart of the profile. Fed the already-computed profile so the terrain is read once per route.
-function ElevationCard({ elev, km, loading, failed, color }) {
-  const W = 320, H = 76;
-  let line = '', area = '';
-  if (elev && elev.profile.length >= 2) {
-    const total = elev.profile[elev.profile.length - 1].dist || 1;
-    const span = Math.max(1, elev.max - elev.min);
-    const px = (d) => (d / total) * W;
-    const py = (e) => H - 4 - ((e - elev.min) / span) * (H - 14);
-    line = elev.profile.map((p, i) => `${i ? 'L' : 'M'}${px(p.dist).toFixed(1)} ${py(p.e).toFixed(1)}`).join(' ');
-    const [x0] = [px(0)];
-    const xn = px(total);
-    area = `${line} L${xn.toFixed(1)} ${H - 2} L${x0.toFixed(1)} ${H - 2} Z`;
-  }
-  return (
-    <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:18px;padding:14px 15px 12px;margin-top:10px')}>
-      <div style={s('display:flex;align-items:center;justify-content:space-between')}>
-        <span style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1.3px;font-weight:600')}>Elevation profile</span>
-        <span className="mono" style={s('font-size:11px;color:var(--text2)')}>
-          {km ? `${km.toFixed(1)} km` : ''}{elev ? <> · <span style={s('color:var(--accent);font-weight:700')}>↑{elev.ascent} m</span></> : loading ? ' · reading terrain…' : failed ? ' · unavailable' : ''}
-        </span>
-      </div>
-      {line ? (
-        <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: '100%', height: 52, marginTop: 9, display: 'block' }}>
-          <defs>
-            <linearGradient id="evElevFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stopColor={color} stopOpacity="0.38" />
-              <stop offset="1" stopColor={color} stopOpacity="0" />
-            </linearGradient>
-          </defs>
-          <path d={area} fill="url(#evElevFill)" />
-          <path d={line} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
-        </svg>
-      ) : (
-        <div style={s('height:52px;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--text3);margin-top:9px')}>
-          {loading ? 'Reading terrain…' : 'Elevation unavailable'}
-        </div>
-      )}
-      {km ? (
-        <div className="mono" style={s('display:flex;justify-content:space-between;font-size:9px;color:var(--text3);margin-top:2px')}>
-          <span>0 km</span><span>{(km / 2).toFixed(1)} km</span><span>{km.toFixed(1)} km</span>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
 // Directions action sheet — pick which navigation app to open for the start point.
 function DirectionsSheet({ target, onClose, onPick }) {
   const apps = navApps(target.lat, target.lon);
@@ -191,20 +143,14 @@ export default function EventDetail({ vm, state, actions, getToken }) {
   const [dirTarget, setDirTarget] = useState(null);     // { lat, lon, title } → Directions action sheet
   const [shareMsg, setShareMsg] = useState('');         // transient confirmation after a share/copy
   const [startPlace, setStartPlace] = useState(ev?.startPlace || null); // route-start name (DB-cached, else geocoded)
-  // terrain-derived elevation for the stat tile + elevation card (read once per route)
+  // terrain-derived elevation profile, read once per route — feeds the route breakdown.
   const [elev, setElev] = useState(null);
   const [elevLoading, setElevLoading] = useState(false);
-  const [elevFailed, setElevFailed] = useState(false);
 
   const meta = typeMeta(ev?.sport, vm.family);
   const when = fmtDateLine(ev?.start);
   const today = isTodayIso(ev?.start);
   const start = useMemo(() => (route || []).find((p) => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1])) || null, [route]);
-  const km = useMemo(() => {
-    if (Number.isFinite(ev?.courseKm) && ev.courseKm > 0) return ev.courseKm;
-    const pts = (route || []).filter((p) => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]));
-    return pts.length > 1 ? routeKm(pts) : 0;
-  }, [ev?.courseKm, route]);
 
   // Off-road basemap only makes sense over Israel (blank tiles elsewhere).
   const israel = useMemo(() => (start ? inIsrael(start[0], start[1]) : true), [start]);
@@ -240,12 +186,12 @@ export default function EventDetail({ vm, state, actions, getToken }) {
   // Read the real terrain elevation once we have a drawable route.
   useEffect(() => {
     const pts = (route || []).filter((p) => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]));
-    if (pts.length < 2) { setElev(null); setElevLoading(false); setElevFailed(false); return undefined; }
+    if (pts.length < 2) { setElev(null); setElevLoading(false); return undefined; }
     const ctrl = new AbortController();
-    setElevLoading(true); setElevFailed(false);
+    setElevLoading(true);
     (async () => {
       try { setElev(await buildElevationProfile(pts, ctrl.signal)); }
-      catch (e) { if (e.name !== 'AbortError') { setElev(null); setElevFailed(true); } }
+      catch (e) { if (e.name !== 'AbortError') setElev(null); }
       finally { setElevLoading(false); }
     })();
     return () => ctrl.abort();
@@ -402,25 +348,9 @@ export default function EventDetail({ vm, state, actions, getToken }) {
         </div>
       )}
 
-      {/* ride stats — distance from the route, climb from the terrain (both real) */}
-      {hasRoute && km > 0 && (
-        <div style={s('display:flex;gap:8px;margin-top:12px')}>
-          <div style={s('flex:1;background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:11px 12px')}>
-            <div className="mono" style={s('font-size:17px;font-weight:700')}>{km.toFixed(1)}<span style={s('font-size:11px;color:var(--text2);font-weight:600')}> km</span></div>
-            <div style={s('font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-top:3px')}>Distance</div>
-          </div>
-          <div style={s('flex:1;background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:11px 12px')}>
-            <div className="mono" style={s('font-size:17px;font-weight:700')}>
-              {elev ? <>↑{elev.ascent}<span style={s('font-size:11px;color:var(--text2);font-weight:600')}> m</span></>
-                : <span style={s('color:var(--text3)')}>{elevLoading ? '…' : '—'}</span>}
-            </div>
-            <div style={s('font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-top:3px')}>Climb</div>
-          </div>
-        </div>
-      )}
-
-      {/* elevation profile (real terrain) */}
-      {hasRoute && <ElevationCard elev={elev} km={km} loading={elevLoading} failed={elevFailed} color={rstyle.color} />}
+      {/* route breakdown — Grand-Tour-style stage profile split into flats/climbs/descents, with a
+          section-by-section list. All from the real terrain (elev). */}
+      {hasRoute && <RouteBreakdown route={route} elev={elev} loading={elevLoading} />}
 
       {/* meeting point — directions to the route start */}
       {start && (
