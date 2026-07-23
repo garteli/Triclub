@@ -277,7 +277,7 @@ function Active({ actions, live }) {
       <UwbReadout uwb={live?.uwb} riders={live?.riders} blePeers={live?.peerRanging?.peers} />
 
       {/* ClimbPro — auto-appears when a climb on the followed course is near/underway */}
-      <ClimbPro climb={climb} />
+      <ClimbPro climb={climb} mono={!!live?.livePages?.mono} />
 
       <LivePages tel={tel} lp={live?.livePages} uwb={live?.uwb} blePeers={live?.peerRanging?.peers} indoor={!!live?.rideType?.indoor} mySport={live?.rideType?.value} climb={climb} />
     </div>

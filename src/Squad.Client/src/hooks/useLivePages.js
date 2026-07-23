@@ -44,6 +44,10 @@ const saveState = (family, st) => {
 
 const COUNT_POOL = ['spd', 'hr', 'pwr', 'dist', 'time', 'cad', 'avgspd', 'grad'];
 
+// Monochrome display toggle — a global preference (not per-family), persisted on this device.
+const MONO_KEY = 'squad.livepages.mono';
+const loadMono = () => { try { return localStorage.getItem(MONO_KEY) === '1'; } catch { return false; } };
+
 // A hero tile spans the full width, so the remaining tiles should complete rows of two.
 // If they don't (even total), append a fresh metric so the grid never leaves a gap.
 function balanceHero(c) {
@@ -77,6 +81,8 @@ export function useLivePages(t, active, family) {
   useEffect(() => { saveState(curFamily.current === 'motorsport' ? 'motorsport' : 'endurance', { pages, page: dataPage }); }, [pages, dataPage]);
   const [picker, setPicker] = useState({ open: false, slot: 0 });
   const [autoRotate, setAutoRotate] = useState(false);
+  const [mono, setMono] = useState(loadMono);
+  useEffect(() => { try { localStorage.setItem(MONO_KEY, mono ? '1' : '0'); } catch { /* storage unavailable */ } }, [mono]);
   const [pagerVisible, setPagerVisible] = useState(true);
   const [dragFrom, setDragFrom] = useState(null);
 
@@ -109,6 +115,7 @@ export function useLivePages(t, active, family) {
 
   const toggleEdit = useCallback(() => { setEditFields((e) => !e); closePicker(); }, [closePicker]);
   const toggleAutoRotate = useCallback(() => setAutoRotate((a) => !a), []);
+  const setMonoOn = useCallback((v) => setMono(!!v), []);
 
   const setPageLayout = useCallback((layout) => mut((c) => balanceHero({ ...c, layout })), [mut]);
   const setPageSide = useCallback((side) => mut((c) => ({ ...c, side })), [mut]);
@@ -182,9 +189,9 @@ export function useLivePages(t, active, family) {
   useEffect(() => () => { clearTimeout(pressTimer.current); clearTimeout(pagerTimer.current); }, []);
 
   return {
-    pages, pageIdx, editFields, picker, autoRotate, pagerVisible, dragFrom, family,
+    pages, pageIdx, editFields, picker, autoRotate, pagerVisible, dragFrom, family, mono,
     actions: {
-      goPage, nextPage, prevPage, toggleEdit, toggleAutoRotate,
+      goPage, nextPage, prevPage, toggleEdit, toggleAutoRotate, setMono: setMonoOn,
       setPageLayout, setPageSide, setPageCount,
       pressStart, pressEnd, onDragStart, onDropAt, setHero,
       openPicker, closePicker, pickField, addPage, deletePage, pokePager,
