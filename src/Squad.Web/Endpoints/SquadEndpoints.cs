@@ -40,10 +40,29 @@ public static class SquadEndpoints
         return app;
     }
 
-    private static async Task<IResult> List(HttpContext http, ISquadService squads, CancellationToken ct)
+    private static async Task<IResult> List(
+        HttpContext http, ISquadService squads, AdminRegistry admins, IConfiguration config, CancellationToken ct)
     {
-        var me = Me(http);
-        return Results.Ok(await squads.ListAsync(me, ct));
+        var list = await squads.ListAsync(Me(http), ct);
+        // The seeded "landing" demo club is hidden from normal users (so a new/no-group user never
+        // lands in it). Only admins or a configured review account (Squads:ReviewEmails) still see it
+        // in Discover — e.g. the app-store review account, which needs a populated club to browse.
+        if (!CanSeeHiddenClubs(http, admins, config))
+            list = list.Where(s => s.Id != Squads.Landing).ToList();
+        return Results.Ok(list);
+    }
+
+    // True when the caller may see clubs that are hidden from the general population (the seeded
+    // landing club). Admins always may; a review account is whitelisted via the Squads:ReviewEmails
+    // config (comma/semicolon-separated) so it can browse the demo club without sysadmin powers.
+    private static bool CanSeeHiddenClubs(HttpContext http, AdminRegistry admins, IConfiguration config)
+    {
+        var email = http.User.FindFirstValue(ClaimTypes.Email);
+        if (string.IsNullOrWhiteSpace(email)) return false;
+        if (admins.IsAdmin(email)) return true;
+        var reviewers = (config["Squads:ReviewEmails"] ?? string.Empty)
+            .Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return reviewers.Any(r => string.Equals(r, email.Trim(), StringComparison.OrdinalIgnoreCase));
     }
 
     private static async Task<IResult> Get(Guid id, HttpContext http, ISquadService squads, CancellationToken ct)
