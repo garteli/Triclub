@@ -155,6 +155,11 @@ public sealed class SqlSquadService(string connectionString) : ISquadService
         if (updated == 0) { await tx.RollbackAsync(ct); return null; }
 
         await AddMembership(conn, tx, squadId, athleteId, "member", ct);
+        // Make the approved-into squad the athlete's active squad — same as a direct join or an invite
+        // accept — so they land in the group's feed/leaderboard/live lobby (which all follow the active
+        // squad). Without this the new member has a Membership row but their live/lobby channel still
+        // points at their old squad, so they never appear in the group's lobby.
+        await SetActiveSquad(conn, tx, athleteId, squadId, ct);
         await tx.CommitAsync(ct);
         return applicant;
     }
