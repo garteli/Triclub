@@ -1,11 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { s } from '../lib/style.js';
 import { Back } from './wizard.jsx';
 import RouteMapGL from '../components/RouteMapGL.jsx';
+import ElevationProfile from '../components/ElevationProfile.jsx';
 import AuthedAvatar from '../components/AuthedAvatar.jsx';
 import AuthedImage from '../components/AuthedImage.jsx';
 import SportIcon from '../components/SportIcon.jsx';
 import { listEventParticipants, joinEvent, leaveEvent, getEventRoute } from '../lib/events.js';
+import { BASEMAP_LABEL, nextBasemap, inIsrael } from '../lib/basemaps.js';
+import { getRouteStyle, setRouteStyle as persistRouteStyle, ROUTE_COLORS, ROUTE_WIDTHS } from '../lib/routeStyle.js';
 
 // The member-facing event page: details, a large map of the route, the participant roster, and a
 // Join/Leave control. Check-in deliberately lives only on the Live page (on the day of the ride).
@@ -20,6 +23,49 @@ const fmtWhen = (iso) => {
   return `${d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })} · ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
 };
 
+const glass = 'background:rgba(0,0,0,.55);backdrop-filter:blur(6px);color:#fff;border:1px solid rgba(255,255,255,.14)';
+
+// Map overlay controls shared by the inline card and the fullscreen view: a basemap-layer cycle
+// button and a route colour/width picker — the same set the app's other maps offer.
+function MapStyleControls({ mapStyle, cycleLayer, styleOpen, setStyleOpen }) {
+  return (
+    <>
+      <div className="ctl" onClick={cycleLayer} title={`Map: ${BASEMAP_LABEL[mapStyle] || mapStyle}`}
+        style={s(`width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;${glass}`)}>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"><path d="M12 2l9 5-9 5-9-5z" /><path d="M3 12l9 5 9-5M3 17l9 5 9-5" /></svg>
+      </div>
+      <div className="ctl" onClick={() => setStyleOpen((o) => !o)} title="Route colour & width"
+        style={s(`width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;${glass}${styleOpen ? ';border-color:rgba(255,255,255,.5)' : ''}`)}>
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l3 3-8 8-3 1 1-3z" /><path d="M17 5l2-2 2 2-2 2z" /></svg>
+      </div>
+    </>
+  );
+}
+
+// The colour/width popover, anchored just left of the control column.
+function StylePanel({ rstyle, applyRstyle, top = 10, right = 52 }) {
+  return (
+    <div style={s(`position:absolute;top:${top}px;right:${right}px;z-index:6;width:180px;border-radius:14px;padding:12px;${glass}`)}>
+      <div style={s('font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:rgba(255,255,255,.6);margin-bottom:8px')}>Route colour</div>
+      <div style={s('display:flex;flex-wrap:wrap;gap:8px')}>
+        {ROUTE_COLORS.map((c) => (
+          <div key={c} className="ctl" onClick={() => applyRstyle({ ...rstyle, color: c })} title={c}
+            style={s(`width:26px;height:26px;border-radius:50%;background:${c};box-shadow:0 0 0 ${rstyle.color === c ? '2.5px #fff' : '1px rgba(255,255,255,.25)'}`)} />
+        ))}
+      </div>
+      <div style={s('font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:rgba(255,255,255,.6);margin:12px 0 8px')}>Width</div>
+      <div style={s('display:flex;gap:8px')}>
+        {ROUTE_WIDTHS.map(({ label, w }) => (
+          <div key={w} className="ctl" onClick={() => applyRstyle({ ...rstyle, width: w })}
+            style={s(`flex:1;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;gap:7px;font-size:12px;font-weight:700;background:${rstyle.width === w ? 'rgba(255,255,255,.18)' : 'rgba(255,255,255,.06)'};border:1px solid ${rstyle.width === w ? 'rgba(255,255,255,.45)' : 'rgba(255,255,255,.14)'}`)}>
+            <span style={s(`width:20px;height:${w}px;border-radius:${w}px;background:${rstyle.color}`)} />{label}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function EventDetail({ vm, state, actions, getToken }) {
   const ev = state?.selEvent || null;
   const squadId = ev?.squadId || vm.activeClubId;
@@ -31,6 +77,19 @@ export default function EventDetail({ vm, state, actions, getToken }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [mapFull, setMapFull] = useState(false); // fullscreen route map overlay
+  const [mapStyle, setMapStyle] = useState('voyager'); // basemap layer
+  const [rstyle, setRstyle] = useState(getRouteStyle);  // per-user route colour + width
+  const [styleOpen, setStyleOpen] = useState(false);    // route-style picker open
+
+  // Off-road basemap only makes sense over Israel (blank tiles elsewhere).
+  const israel = useMemo(() => {
+    const p = (route || []).find((q) => Array.isArray(q) && Number.isFinite(q[0]));
+    return p ? inIsrael(p[0], p[1]) : true;
+  }, [route]);
+  const cycleLayer = () => setMapStyle((st) => nextBasemap(st, israel));
+  const applyRstyle = (next) => { setRstyle(next); persistRouteStyle(next); };
+  // Fall back to a global basemap if we're on Off-road but the route isn't in Israel.
+  useEffect(() => { if (!israel && mapStyle === 'offroad') setMapStyle('voyager'); }, [israel, mapStyle]);
 
   const loadPeople = async (t) => {
     try { return await listEventParticipants(t, squadId, ev.id); } catch { return []; }
@@ -101,14 +160,19 @@ export default function EventDetail({ vm, state, actions, getToken }) {
         </div>
       </div>
 
-      {/* large route map — tap ⤢ to go fullscreen */}
+      {/* large route map — layers + route colour/width controls; tap ⤢ to go fullscreen */}
       {route && route.length > 1 && (
         <div style={s('position:relative;margin-top:16px;border-radius:18px;overflow:hidden;border:1px solid var(--line);height:280px')}>
-          <RouteMapGL route={route} />
-          <div className="ctl" onClick={() => setMapFull(true)} aria-label="Expand map"
-            style={s('position:absolute;top:10px;right:10px;z-index:5;width:34px;height:34px;border-radius:10px;background:rgba(0,0,0,.55);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;line-height:1')}>⤢</div>
+          <RouteMapGL route={route} styleName={mapStyle} routeColor={rstyle.color} routeWidth={rstyle.width} />
+          <div style={s('position:absolute;top:10px;right:10px;z-index:5;display:flex;flex-direction:column;gap:8px')}>
+            <div className="ctl" onClick={() => setMapFull(true)} aria-label="Expand map"
+              style={s(`width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;line-height:1;${glass}`)}>⤢</div>
+            <MapStyleControls mapStyle={mapStyle} cycleLayer={cycleLayer} styleOpen={styleOpen} setStyleOpen={setStyleOpen} />
+          </div>
+          {styleOpen && <StylePanel rstyle={rstyle} applyRstyle={applyRstyle} />}
         </div>
       )}
+      {route && route.length > 1 && <ElevationProfile route={route} color={rstyle.color} />}
       {(ev.courseName || ev.courseKm) && (
         <div style={s('font-size:12.5px;color:var(--text2);margin-top:10px')}>
           Route: {ev.courseName || 'Course'}{ev.courseKm ? ` · ${ev.courseKm.toFixed(1)} km` : ''}
@@ -152,9 +216,13 @@ export default function EventDetail({ vm, state, actions, getToken }) {
       {/* fullscreen route map — covers the whole screen, hides everything else */}
       {mapFull && route && route.length > 1 && (
         <div style={s('position:fixed;inset:0;z-index:300;background:var(--bg)')}>
-          <RouteMapGL route={route} />
-          <div className="ctl" onClick={() => setMapFull(false)} aria-label="Close map"
-            style={s('position:absolute;top:16px;right:16px;z-index:5;width:40px;height:40px;border-radius:12px;background:rgba(0,0,0,.6);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px;line-height:1')}>✕</div>
+          <RouteMapGL route={route} styleName={mapStyle} routeColor={rstyle.color} routeWidth={rstyle.width} fitPadding={70} />
+          <div style={s('position:absolute;top:16px;right:16px;z-index:5;display:flex;flex-direction:column;gap:8px')}>
+            <div className="ctl" onClick={() => setMapFull(false)} aria-label="Close map"
+              style={s(`width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;line-height:1;${glass}`)}>✕</div>
+            <MapStyleControls mapStyle={mapStyle} cycleLayer={cycleLayer} styleOpen={styleOpen} setStyleOpen={setStyleOpen} />
+          </div>
+          {styleOpen && <StylePanel rstyle={rstyle} applyRstyle={applyRstyle} top={16} right={64} />}
         </div>
       )}
     </div>
