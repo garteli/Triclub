@@ -40,6 +40,17 @@ public sealed class IngestWorker(
         // Carry the event link (set when the athlete recorded a scheduled group ride) through —
         // adapters are source-only and don't know about it, so stamp it here from the raw record.
         if (raw.EventId is not null) activity = activity with { EventId = raw.EventId };
+
+        // Drop empty activities: a ride that never moved (no distance AND no moving time) is junk
+        // — e.g. a live ride started and immediately stopped, or a GPS-less session. Don't commit
+        // or fan it out, so it never reaches the feed/leaderboard.
+        if ((activity.DistanceMeters ?? 0) <= 0 && activity.MovingTime <= TimeSpan.Zero)
+        {
+            log.LogInformation("Ingest skipped empty activity: athlete {Athlete} {Sport} [{Source}] raw {RawId}",
+                activity.AthleteId, activity.Sport, activity.Source, rawId);
+            return;
+        }
+
         activity = await EnrichWeatherAsync(sp, activity, ct);
         var outcome = await repo.UpsertByFingerprintAsync(activity, SourceRank.Of(activity.Source), ct);
 

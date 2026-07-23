@@ -172,7 +172,8 @@ const HEADER_META = {
   adminuser: { title: 'User details' },
   admingroup: { title: 'Group details' },
   // Tab root + contextual screens (dynamic titles from the view model).
-  plan: { root: true },
+  // (plan intentionally omitted: the Training Plan page carries its own in-page header, like the
+  //  Events page, so it renders without the global club-branding AppHeader.)
   athlete: { title: (vm) => vm.athlete?.name || 'Athlete' },
   group: { title: (vm) => vm.selGroupData?.name || 'Group' },
   recordpay: { title: 'Record a payment' },
