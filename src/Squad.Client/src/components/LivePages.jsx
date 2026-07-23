@@ -1,5 +1,8 @@
 import { useRef } from 'react';
 import { s } from '../lib/style.js';
+import { FREE_COLS, FREE_ROWS, ensureSlots } from '../hooks/useLivePages.js';
+
+const FREE_GAP = 6; // px gap between free-grid cells (kept in sync with the grid's `gap`)
 import { metricCatalog, metricGroupsFor, liveMetricValues, liveChartsView, liveRadarView, spreadRiders, pelotonView, metricAccent, metricIcon } from '../lib/liveMetrics.js';
 import LiveMapGL from './LiveMapGL.jsx';
 import LiveElevationStrip from './LiveElevationStrip.jsx';
@@ -150,24 +153,10 @@ function PelotonField({ v }) {
   );
 }
 
-// ---- a single field cell (metric / chart / map) with edit overlays ----
-function FieldCell({ f, editing, actions, index, indoor, mySport, climb, mono }) {
-  const stop = (e) => { if (e && e.stopPropagation) e.stopPropagation(); };
-  // Long-press-to-edit is armed on every tile EXCEPT the map — holding on the map is a pan/
-  // interaction gesture, not an intent to enter edit mode (enter edit from another tile instead).
-  const armLongPress = () => { if (!editing && f.kind !== 'map') actions.pressStart(); };
+// ---- the kind-specific content of a tile (metric / chart / map / …), no wrapper ----
+function FieldBody({ f, editing, indoor, mySport, climb, mono }) {
   return (
-    <div
-      className={'ctl' + (f.kind === 'metric' ? ' live-tile' : '')}
-      draggable={editing}
-      onDragStart={() => actions.onDragStart(index)}
-      onDragOver={(e) => e.preventDefault()}
-      onDrop={() => actions.onDropAt(index)}
-      onPointerDown={armLongPress}
-      onPointerUp={actions.pressEnd}
-      onPointerLeave={actions.pressEnd}
-      style={s(f.cellStyle)}
-    >
+    <>
       {f.kind === 'metric' && (
         <>
           {/* accent bar */}
@@ -252,16 +241,93 @@ function FieldCell({ f, editing, actions, index, indoor, mySport, climb, mono })
           )}
         </>
       )}
+    </>
+  );
+}
+
+// A cog button (opens the field picker) — shared by the grid + free wrappers.
+function CogBtn({ onClick, style }) {
+  return (
+    <div onClick={onClick} onPointerDown={(e) => e.stopPropagation()} style={s(`position:absolute;width:22px;height:22px;border-radius:7px;background:var(--accent);display:flex;align-items:center;justify-content:center;color:var(--accent-ink);z-index:3;${style}`)}>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3.2" /><path d="M12 2.6v3M12 18.4v3M2.6 12h3M18.4 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1" /></svg>
+    </div>
+  );
+}
+
+// ---- a single field cell in the classic (grid / hero) layout, with edit overlays ----
+function FieldCell({ f, editing, actions, index, indoor, mySport, climb, mono }) {
+  const stop = (e) => { if (e && e.stopPropagation) e.stopPropagation(); };
+  // Long-press-to-edit is armed on every tile EXCEPT the map — holding on the map is a pan/
+  // interaction gesture, not an intent to enter edit mode (enter edit from another tile instead).
+  const armLongPress = () => { if (!editing && f.kind !== 'map') actions.pressStart(); };
+  return (
+    <div
+      className={'ctl' + (f.kind === 'metric' ? ' live-tile' : '')}
+      draggable={editing}
+      onDragStart={() => actions.onDragStart(index)}
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={() => actions.onDropAt(index)}
+      onPointerDown={armLongPress}
+      onPointerUp={actions.pressEnd}
+      onPointerLeave={actions.pressEnd}
+      style={s(f.cellStyle)}
+    >
+      <FieldBody f={f} editing={editing} indoor={indoor} mySport={mySport} climb={climb} mono={mono} />
       {editing && (
-        <div onClick={(e) => { stop(e); actions.setHero(index); }} style={s(`position:absolute;top:8px;left:8px;width:20px;height:20px;border-radius:6px;background:${f.starBg};display:flex;align-items:center;justify-content:center`)}>
+        <div onClick={(e) => { stop(e); actions.setHero(index); }} style={s(`position:absolute;top:8px;left:8px;width:20px;height:20px;border-radius:6px;background:${f.starBg};display:flex;align-items:center;justify-content:center;z-index:3`)}>
           <svg width="11" height="11" viewBox="0 0 24 24" fill={f.starFill} stroke={f.starStroke} strokeWidth="2" strokeLinejoin="round"><path d="M12 3l2.6 6.3 6.8.5-5.2 4.4 1.6 6.6L12 17.8 6.2 21.3l1.6-6.6L2.6 9.8l6.8-.5z" /></svg>
         </div>
       )}
+      {editing && <CogBtn onClick={(e) => { stop(e); actions.openPicker(index); }} style="top:8px;right:8px" />}
+    </div>
+  );
+}
+
+// ---- a tile in the free-form 8×20 layout: drag the body to move, the corner to resize ----
+function FreeTile({ f, index, slot, editing, actions, indoor, mySport, climb, mono, gridRef }) {
+  const drag = useRef(null);
+  const stop = (e) => { if (e && e.stopPropagation) e.stopPropagation(); };
+  // Grid step in px (track + gap), so a pointer delta maps cleanly to whole cells.
+  const step = () => {
+    const r = gridRef.current?.getBoundingClientRect();
+    return { cw: ((r?.width || 1) + FREE_GAP) / FREE_COLS, ch: ((r?.height || 1) + FREE_GAP) / FREE_ROWS };
+  };
+  const onMove = (e) => {
+    const d = drag.current; if (!d) return;
+    const { cw, ch } = step();
+    const dc = Math.round((e.clientX - d.sx) / cw), dr = Math.round((e.clientY - d.sy) / ch);
+    if (d.mode === 'move') {
+      const x = Math.min(Math.max(1, d.x0 + dc), FREE_COLS - d.w0 + 1);
+      const y = Math.min(Math.max(1, d.y0 + dr), FREE_ROWS - d.h0 + 1);
+      actions.moveSlot(index, x, y);
+    } else {
+      const w = Math.min(Math.max(1, d.w0 + dc), FREE_COLS - d.x0 + 1);
+      const h = Math.min(Math.max(1, d.h0 + dr), FREE_ROWS - d.y0 + 1);
+      actions.resizeSlot(index, w, h);
+    }
+  };
+  const begin = (mode, e) => { stop(e); drag.current = { mode, sx: e.clientX, sy: e.clientY, x0: slot.x, y0: slot.y, w0: slot.w, h0: slot.h }; try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* no capture */ } };
+  const end = (e) => { drag.current = null; try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* none */ } if (!editing) actions.pressEnd(); };
+  const onBodyDown = (e) => { if (editing) begin('move', e); else if (f.kind !== 'map') actions.pressStart(); };
+  const pos = `grid-column:${slot.x} / span ${slot.w};grid-row:${slot.y} / span ${slot.h};`;
+  return (
+    <div
+      className={f.kind === 'metric' ? 'live-tile' : undefined}
+      onPointerDown={onBodyDown} onPointerMove={onMove} onPointerUp={end} onPointerCancel={end} onPointerLeave={() => { if (!editing) actions.pressEnd(); }}
+      style={s(f.cellStyle + pos + (editing ? 'cursor:grab;touch-action:none;' : ''))}
+    >
+      <FieldBody f={f} editing={editing} indoor={indoor} mySport={mySport} climb={climb} mono={mono} />
       {editing && (
-        // Cog → open the field picker for this tile. In edit mode only; tapping the
-        // tile body no longer opens it (that just enters edit via long-press).
-        <div onClick={(e) => { stop(e); actions.openPicker(index); }} style={s('position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:7px;background:var(--accent);display:flex;align-items:center;justify-content:center;color:var(--accent-ink)')}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3.2" /><path d="M12 2.6v3M12 18.4v3M2.6 12h3M18.4 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1" /></svg>
+        <div onClick={(e) => { stop(e); actions.removeField(index); }} onPointerDown={(e) => e.stopPropagation()} style={s('position:absolute;top:8px;left:8px;width:20px;height:20px;border-radius:6px;background:var(--bg3);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--bad);z-index:3')}>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+        </div>
+      )}
+      {editing && <CogBtn onClick={(e) => { stop(e); actions.openPicker(index); }} style="top:8px;right:8px" />}
+      {editing && (
+        // resize grip (bottom-right)
+        <div onPointerDown={(e) => begin('resize', e)} onPointerMove={onMove} onPointerUp={end} onPointerCancel={end}
+          style={s('position:absolute;right:0;bottom:0;width:24px;height:24px;display:flex;align-items:flex-end;justify-content:flex-end;padding:3px;cursor:nwse-resize;touch-action:none;z-index:3')}>
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round"><path d="M14 6L6 14M14 11l-3 3" /></svg>
         </div>
       )}
     </div>
@@ -278,14 +344,28 @@ function seg(activeVal, val, label, onSet) {
 
 function EditPanel({ page, actions, mono }) {
   const count = page.fields.length;
+  const free = page.layout === 'free';
   return (
     <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:12px 13px;margin:10px 12px 0')}>
-      <div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:7px')}>Fields</div>
-      <div style={s('display:flex;gap:6px')}>{[1, 2, 3, 4, 6].map((n) => seg(count, n, String(n), () => actions.setPageCount(n)))}</div>
-      <div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin:11px 0 7px')}>Arrangement</div>
-      <div style={s('display:flex;gap:6px')}>{[['grid', 'Grid'], ['hero', 'Hero']].map(([id, l]) => seg(page.layout, id, l, () => actions.setPageLayout(id)))}</div>
-      <div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin:11px 0 7px')}>Side column</div>
-      <div style={s('display:flex;gap:6px')}>{[['none', 'Off'], ['group', 'Column']].map(([id, l]) => seg(page.side || 'none', id, l, () => actions.setPageSide(id)))}</div>
+      {/* Field count is auto-managed in free layout (add/remove per tile). */}
+      {!free && (
+        <>
+          <div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:7px')}>Fields</div>
+          <div style={s('display:flex;gap:6px')}>{[1, 2, 3, 4, 6].map((n) => seg(count, n, String(n), () => actions.setPageCount(n)))}</div>
+        </>
+      )}
+      <div style={s(`font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin:${free ? '0' : '11px'} 0 7px`)}>Arrangement</div>
+      <div style={s('display:flex;gap:6px')}>{[['grid', 'Grid'], ['hero', 'Hero'], ['free', 'Free']].map(([id, l]) => seg(page.layout, id, l, () => actions.setPageLayout(id)))}</div>
+      {free ? (
+        <>
+          <div className="ctl" onClick={actions.addField} style={s('text-align:center;padding:9px;border-radius:10px;font-size:12px;font-weight:700;background:var(--bg3);border:1px dashed var(--line2);color:var(--text2);margin-top:11px')}>+ Add field</div>
+        </>
+      ) : (
+        <>
+          <div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin:11px 0 7px')}>Side column</div>
+          <div style={s('display:flex;gap:6px')}>{[['none', 'Off'], ['group', 'Column']].map(([id, l]) => seg(page.side || 'none', id, l, () => actions.setPageSide(id)))}</div>
+        </>
+      )}
       <div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin:11px 0 7px')}>Colour</div>
       <div style={s('display:flex;gap:6px')}>{[[false, 'Colour'], [true, 'Mono']].map(([id, l]) => seg(!!mono, id, l, () => actions.setMono(id)))}</div>
       <div style={s('display:flex;gap:8px;margin-top:12px')}>
@@ -294,7 +374,7 @@ function EditPanel({ page, actions, mono }) {
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" /></svg>
         </div>
       </div>
-      <div style={s('font-size:11px;color:var(--text3);margin-top:10px;line-height:1.4')}>Tap a tile's ⚙ to change it — pick a metric, a chart, or the route map. Drag tiles to reorder.</div>
+      <div style={s('font-size:11px;color:var(--text3);margin-top:10px;line-height:1.4')}>{free ? 'Drag a tile to move it, drag its corner to resize on the 8×20 grid. ⚙ changes the field, ✕ removes it.' : 'Tap a tile\'s ⚙ to change it — pick a metric, a chart, or the route map. Drag tiles to reorder.'}</div>
     </div>
   );
 }
@@ -438,16 +518,28 @@ export default function LivePages({ tel, lp, uwb, blePeers, indoor = false, mySp
     }
   };
 
+  const isFree = page.layout === 'free';
+  const slots = isFree ? ensureSlots(page) : null;
+  const freeGridRef = useRef(null);
   const gridStyle = `flex:1;display:grid;grid-template-columns:repeat(${cols},1fr);gap:8px;grid-auto-rows:1fr;min-width:0`;
+  const freeGridStyle = `flex:1;display:grid;grid-template-columns:repeat(${FREE_COLS},1fr);grid-template-rows:repeat(${FREE_ROWS},1fr);gap:${FREE_GAP}px;min-width:0`;
 
   return (
     <>
-      {/* full-screen page: optional Group column + fields grid */}
-      <div className="live-row" style={s('display:flex;gap:9px;padding:0 12px;touch-action:pan-y')} onPointerDown={onRowPointerDown} onPointerUp={onRowPointerUp}>
-        {withSide && <GroupColumn tel={tel} />}
-        <div style={s(gridStyle)}>
-          {fields.map((f, i) => <FieldCell key={i} f={f} index={i} editing={editFields} actions={actions} indoor={indoor} mySport={mySport} climb={climb} mono={mono} />)}
-        </div>
+      {/* full-screen page: free 8×20 grid, or the optional Group column + auto grid */}
+      <div className="live-row" style={s(`display:flex;gap:9px;padding:0 12px;touch-action:${isFree && editFields ? 'none' : 'pan-y'}`)} onPointerDown={onRowPointerDown} onPointerUp={onRowPointerUp}>
+        {isFree ? (
+          <div ref={freeGridRef} style={s(freeGridStyle)}>
+            {fields.map((f, i) => <FreeTile key={i} f={f} index={i} slot={slots[i]} editing={editFields} actions={actions} indoor={indoor} mySport={mySport} climb={climb} mono={mono} gridRef={freeGridRef} />)}
+          </div>
+        ) : (
+          <>
+            {withSide && <GroupColumn tel={tel} />}
+            <div style={s(gridStyle)}>
+              {fields.map((f, i) => <FieldCell key={i} f={f} index={i} editing={editFields} actions={actions} indoor={indoor} mySport={mySport} climb={climb} mono={mono} />)}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Bottom pager strip — a dedicated swipe/tap area to change pages. It's the way to switch
