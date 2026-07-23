@@ -49,6 +49,20 @@ export const FREE_COLS = 8;
 export const FREE_ROWS = 20;
 // Default placement for a new free tile: 4×3 blocks, two per row, flowing down.
 const autoSlot = (i) => ({ x: (i % 2) * 4 + 1, y: Math.min(FREE_ROWS - 2, Math.floor(i / 2) * 3 + 1), w: 4, h: 3 });
+// Do two grid rects overlap? (half-open cells)
+const rectsOverlap = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+// Is `rect` in-bounds and clear of every slot except `skip`?
+const slotFree = (slots, rect, skip) =>
+  rect.x >= 1 && rect.y >= 1 && rect.x + rect.w - 1 <= FREE_COLS && rect.y + rect.h - 1 <= FREE_ROWS &&
+  !slots.some((s, i) => i !== skip && rectsOverlap(rect, s));
+// First free WxH cell (row-major), or null if the grid has no room.
+const findFreeSlot = (slots, w, h) => {
+  for (let y = 1; y <= FREE_ROWS - h + 1; y++) for (let x = 1; x <= FREE_COLS - w + 1; x++) {
+    if (slotFree(slots, { x, y, w, h }, -1)) return { x, y, w, h };
+  }
+  return null;
+};
+
 // Slots aligned 1:1 with fields, repaired/back-filled + clamped to the grid.
 export function ensureSlots(page) {
   const n = page.fields.length;
@@ -143,12 +157,25 @@ export function useLivePages(t, active, family) {
     return balanceHero({ ...c, layout });
   }), [mut]);
   const setPageSide = useCallback((side) => mut((c) => ({ ...c, side })), [mut]);
-  // Free-layout tile geometry — move (x,y) and resize (w,h) on the 8×20 grid.
-  const moveSlot = useCallback((i, x, y) => mut((c) => { const slots = ensureSlots(c).slice(); if (!slots[i]) return c; slots[i] = { ...slots[i], x, y }; return { ...c, slots }; }), [mut]);
-  const resizeSlot = useCallback((i, w, h) => mut((c) => { const slots = ensureSlots(c).slice(); if (!slots[i]) return c; slots[i] = { ...slots[i], w, h }; return { ...c, slots }; }), [mut]);
+  // Free-layout tile geometry — move (x,y) and resize (w,h) on the 8×20 grid. Both reject a change
+  // that would overlap another tile (so the tile stops at the edge of its neighbours).
+  const moveSlot = useCallback((i, x, y) => mut((c) => {
+    const slots = ensureSlots(c).slice(); if (!slots[i]) return c;
+    const rect = { ...slots[i], x, y };
+    if (!slotFree(slots, rect, i)) return c;
+    slots[i] = rect; return { ...c, slots };
+  }), [mut]);
+  const resizeSlot = useCallback((i, w, h) => mut((c) => {
+    const slots = ensureSlots(c).slice(); if (!slots[i]) return c;
+    const rect = { ...slots[i], w, h };
+    if (!slotFree(slots, rect, i)) return c;
+    slots[i] = rect; return { ...c, slots };
+  }), [mut]);
   const addField = useCallback(() => mut((c) => {
     const tok = COUNT_POOL.find((t) => !c.fields.includes(t)) || COUNT_POOL[c.fields.length % COUNT_POOL.length];
-    return { ...c, fields: [...c.fields, tok], slots: [...ensureSlots(c), autoSlot(c.fields.length)] };
+    const slots = ensureSlots(c);
+    const spot = findFreeSlot(slots, 4, 3) || findFreeSlot(slots, 3, 2) || findFreeSlot(slots, 2, 2) || { x: 1, y: 1, w: 2, h: 2 };
+    return { ...c, fields: [...c.fields, tok], slots: [...slots, spot] };
   }), [mut]);
   const removeField = useCallback((i) => mut((c) => {
     if (c.fields.length <= 1) return c;

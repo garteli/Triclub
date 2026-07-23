@@ -153,6 +153,34 @@ function PelotonField({ v }) {
   );
 }
 
+// ---- Rear-radar field: closest approaching vehicle + a proximity bar (real Varia/BLE radar) ----
+function RadarField({ v, mono }) {
+  const color = mono ? '#c9d0d9' : v.color;
+  const valColor = v.hasVehicle ? color : (mono ? '#dfe4ea' : 'var(--good)');
+  // Closer vehicle → fuller bar (0–150 m window). Empty when the road is clear.
+  const near = v.hasVehicle && v.dist != null ? Math.max(6, Math.min(100, 100 - (v.dist / 150) * 100)) : 0;
+  return (
+    <>
+      <div style={s(`position:absolute;top:0;left:0;right:0;height:3px;background:${color};opacity:.9`)} />
+      <div style={s('display:flex;align-items:center;justify-content:center;gap:6px;min-width:0')}>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" style={{ flex: 'none' }}>
+          <path d="M5 11l1.5-4.5A2 2 0 0 1 8.4 5h7.2a2 2 0 0 1 1.9 1.5L19 11" /><path d="M3 11h18v4a1 1 0 0 1-1 1h-1a2 2 0 0 1-4 0H9a2 2 0 0 1-4 0H4a1 1 0 0 1-1-1z" />
+        </svg>
+        <span style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1.1px;font-weight:700;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>Rear radar</span>
+      </div>
+      <div style={s('flex:1;display:flex;align-items:center;justify-content:center;gap:5px;min-width:0')}>
+        <span className={'mono live-metric-val'} style={s(`--vf:34px;--vfw:26cqw;color:${valColor}`)}>{v.hasVehicle ? v.closest : 'Clear'}</span>
+        {v.hasVehicle && <span className="mono" style={s('font-size:12px;color:var(--text2);font-weight:600')}>m</span>}
+      </div>
+      <div style={s('height:16px;display:flex;align-items:center')}>
+        <div style={s('width:100%;height:6px;border-radius:3px;background:var(--bg4);overflow:hidden')}>
+          <div style={s(`height:100%;width:${near}%;background:${color};border-radius:3px;transition:width .9s linear`)} />
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ---- the kind-specific content of a tile (metric / chart / map / …), no wrapper ----
 function FieldBody({ f, editing, indoor, mySport, climb, mono }) {
   return (
@@ -214,6 +242,7 @@ function FieldBody({ f, editing, indoor, mySport, climb, mono }) {
       )}
       {f.kind === 'elev' && <LiveElevationChart route={f.route} you={f.you} source={f.source} indoor={indoor} mono={mono} />}
       {f.kind === 'climbpro' && <ClimbField climb={climb} indoor={indoor} mono={mono} />}
+      {f.kind === 'radar' && <RadarField v={f.radar} mono={mono} />}
       {f.kind === 'peloton' && <PelotonField v={f.v} />}
       {f.kind === 'map' && (
         <>
@@ -402,7 +431,7 @@ function PickerSheet({ page, slot, actions, family }) {
   // Motorsport has no power meter — drop the power chart (metricGroupsFor hides the rest).
   const charts = [['chart:spd', 'Speed chart', 'graph'], ['chart:hr', 'HR chart', 'graph'], ...(motor ? [] : [['chart:power', 'Power chart', 'graph']]), ['elev:track', 'Elevation chart', 'graph'], ['climbpro', 'Climb view', 'ClimbPro']];
   const maps = [['map', 'Route map', 'map'], ['map+elev', 'Route map + elevation', 'map'], ['elev:route', 'Route elevation', 'chart']];
-  const group = [['peloton', 'Peloton spread', '2D']];
+  const group = [['peloton', 'Peloton spread', '2D'], ['radar', 'Rear radar', 'safety']];
   const section = (title, rows) => (
     <>
       <div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:7px')}>{title}</div>
@@ -480,6 +509,7 @@ export default function LivePages({ tel, lp, uwb, blePeers, indoor = false, mySp
       return { ...base, kind: 'elev', source: isRoute ? 'route' : 'track', route: isRoute ? course : path, you };
     }
     if (tok === 'climbpro') return { ...base, kind: 'climbpro' };
+    if (tok === 'radar') return { ...base, kind: 'radar', radar: liveRadarView(tel) };
     if (tok === 'peloton') return { ...base, kind: 'peloton', v: { ...pelotonView(tel), uwb, blePeers } };
     if (charts[tok]) { const c = charts[tok]; return { ...base, kind: 'chart', label: c.label, value: c.cur, unit: c.unit, color: mono ? '#cdd3db' : c.color, pts: c.pts, area: c.area }; }
     const m = metricCatalog[tok] || { label: tok, unit: '' };
