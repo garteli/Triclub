@@ -3,6 +3,7 @@ import { s } from '../lib/style.js';
 import { Back, Title, Sub, FieldLabel, Field, TextArea, Chips, PrimaryBtn } from './wizard.jsx';
 import AuthedImage from '../components/AuthedImage.jsx';
 import GroupTargets from '../components/GroupTargets.jsx';
+import { useJoinRequests } from '../hooks/useJoinRequests.js';
 import { downscaleToJpeg } from '../lib/photos.js';
 import { dataUrlToBlob } from '../lib/avatar.js';
 import { bustAuthedImage } from '../lib/authedImage.js';
@@ -78,6 +79,19 @@ export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged
   const [inviteUrl, setInviteUrl] = useState('');
   const [inviteBusy, setInviteBusy] = useState(false);
   const [inviteMsg, setInviteMsg] = useState('');
+
+  // Pending join requests across the owner's squads; we show the ones for THIS group here.
+  const { items: allRequests, approve: approveReq, decline: declineReq } = useJoinRequests({ getToken, enabled: isOwner });
+  const groupRequests = (allRequests || []).filter((r) => String(r.squadId) === String(g.id));
+  const onApproveReq = async (r) => {
+    setMemberErr(''); setMemberMsg('');
+    try { await approveReq(r.squadId, r.athleteId); setMemberMsg(`Approved ${r.name}.`); await loadMembers(); onDataChanged?.(); }
+    catch (ex) { setMemberErr(ex.message || 'Could not approve.'); }
+  };
+  const onDeclineReq = async (r) => {
+    setMemberErr(''); setMemberMsg('');
+    try { await declineReq(r.squadId, r.athleteId); } catch (ex) { setMemberErr(ex.message || 'Could not decline.'); }
+  };
 
   const loadMembers = useCallback(async () => {
     try {
@@ -301,6 +315,30 @@ export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged
       {err &&<div style={s('color:var(--bad);font-size:12.5px;margin-top:12px;text-align:center')}>{err}</div>}
       {saved && !err && <div style={s('color:var(--good);font-size:12.5px;margin-top:12px;text-align:center')}>Saved. Changes are live for members.</div>}
       <PrimaryBtn onClick={busy ? undefined : save} disabled={busy}>{busy ? 'Saving…' : 'Save changes'}</PrimaryBtn>
+
+      {/* ---- pending join requests (athletes who asked to join this group) ---- */}
+      {groupRequests.length > 0 && (
+        <>
+          <FieldLabel>Join requests · {groupRequests.length}</FieldLabel>
+          <div style={s('display:flex;flex-direction:column;gap:8px')}>
+            {groupRequests.map((r) => (
+              <div key={r.athleteId} style={s('background:var(--bg2);border:1px solid color-mix(in srgb,var(--accent) 22%,var(--line));border-radius:13px;padding:10px 12px')}>
+                <div style={s('display:flex;align-items:center;gap:11px')}>
+                  <div style={s(`width:38px;height:38px;border-radius:11px;flex:none;background:${r.color};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#0c0e11`)}>{r.initials}</div>
+                  <div style={s('flex:1;min-width:0')}>
+                    <div style={s('font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>{r.name}</div>
+                    <div style={s('font-size:10.5px;color:var(--text3)')}>asked to join · {r.when}</div>
+                  </div>
+                </div>
+                <div style={s('display:flex;gap:8px;margin-top:10px')}>
+                  <div className="ctl" onClick={() => onDeclineReq(r)} style={s('flex:1;text-align:center;font-size:12px;font-weight:700;color:var(--bad);background:color-mix(in srgb,var(--bad) 12%,transparent);border:1px solid color-mix(in srgb,var(--bad) 30%,transparent);padding:9px;border-radius:10px')}>Decline</div>
+                  <div className="ctl" onClick={() => onApproveReq(r)} style={s('flex:1;text-align:center;font-size:12px;font-weight:700;color:#04140b;background:var(--good);padding:9px;border-radius:10px')}>Approve</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
       {/* ---- members ---- */}
       <FieldLabel>Members{members ? ` · ${members.length}` : ''}</FieldLabel>
