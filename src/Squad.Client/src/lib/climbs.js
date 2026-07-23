@@ -18,11 +18,11 @@ function smoothElev(es, k = 2) {
 // Gradient colour bands (steeper = hotter), mirroring the ClimbPro convention. Fixed hexes so
 // they read the same on the dark ride display regardless of theme accent.
 export function gradeColor(g) {
-  if (g < 3) return '#79c257';
-  if (g < 6) return '#e9c341';
-  if (g < 9) return '#ef8f2e';
-  if (g < 12) return '#e05c2b';
-  return '#d13b3b';
+  if (g < 3) return '#4fe08b';
+  if (g < 6) return '#c3e83a';
+  if (g < 9) return '#ffc24d';
+  if (g < 12) return '#ff8a2c';
+  return '#ff4d38';
 }
 
 // Garmin-ish climb category from a score = length(m) × average grade(%). null = below Cat 4

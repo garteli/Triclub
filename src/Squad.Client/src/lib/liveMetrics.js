@@ -135,10 +135,10 @@ function climbVals(climb) {
   const catLabel = climb.category ? (climb.category === 'HC' ? 'HC' : `Cat ${climb.category}`) : 'Climb';
   return {
     climbnum: { v: `${climb.index + 1}/${climb.total}`, color: 'var(--accent)' },
-    climbcat: { v: catLabel, color: climb.accent },
+    climbcat: { v: catLabel, color: 'var(--accent)' },
     climbstart: { v: r0(climb.climbing ? 0 : climb.distToStartM) },
     climbdist: { v: r0(climb.distToGoM) },
-    climbascent: { v: r0(climb.ascentToGoM), color: climb.accent },
+    climbascent: { v: r0(climb.ascentToGoM), color: 'var(--accent)' },
     climbtime: { v: mmss(Math.round(climb.etaSec)) },
     climbgrade: { v: f1(climb.gradeNow), color: gradeColor(climb.gradeNow) },
   };

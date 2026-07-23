@@ -9,8 +9,7 @@ import { gradeColor } from '../lib/climbs.js';
 // there's no course, no fix, or no climb nearby. All derived from real terrain — never fabricated.
 
 const APPROACH_M = 1000; // surface the climb this far before it begins
-const VW = 300;          // SVG x units (stretched to width); y is a 0..100 viewBox
-const PAD_T = 14, PAD_B = 4;
+const LW = 400, LH = 104; // elevation-line viewBox (stretched to width; preserveAspectRatio none)
 // Fallback climbing speed (kph) from gradient when there's no live speed yet.
 const estKph = (grade) => Math.max(6, Math.min(24, 18 - (grade || 0) * 1.0));
 
@@ -62,22 +61,23 @@ export function useClimb(tel, { indoor = false } = {}) {
   const etaSec = (distToGoM / 1000) / (liveKph || estKph(remGrade)) * 3600;
   const gradeNow = climbing ? gradeAt(progress) : climb.avgGrade;
 
-  // Gradient-shaded profile slice (exact endpoints) + the rider's position, for the card.
+  // Profile slice (exact endpoints) → gradient bars (height ∝ steepness, colour by band) + an
+  // elevation line, plus the rider's position — the geometry the ClimbPro card renders.
   const inner = prof.filter((p) => p.dist > climb.startDist && p.dist < climb.endDist);
   const cp = [{ dist: climb.startDist, e: elevAt(prof, climb.startDist) }, ...inner, { dist: climb.endDist, e: elevAt(prof, climb.endDist) }];
   const eMin = Math.min(...cp.map((p) => p.e)), eMax = Math.max(...cp.map((p) => p.e));
   const span = Math.max(1, eMax - eMin);
-  const px = (d) => ((d - climb.startDist) / Math.max(1, climb.length)) * VW;
-  const py = (e) => PAD_T + (1 - (e - eMin) / span) * (100 - PAD_T - PAD_B);
-  const segs = [];
+  const yOf = (e) => LH - 4 - ((e - eMin) / span) * (LH - 24); // elevation → line y (viewBox units)
+  const bars = [];
   for (let i = 1; i < cp.length; i++) {
-    const a = cp[i - 1], b = cp[i];
-    const dl = b.dist - a.dist;
-    const g = dl > 0 ? ((b.e - a.e) / dl) * 100 : 0;
-    segs.push({ x0: px(a.dist), x1: px(b.dist), y0: py(a.e), y1: py(b.e), color: gradeColor(g) });
+    const dl = cp[i].dist - cp[i - 1].dist;
+    const g = dl > 0 ? ((cp[i].e - cp[i - 1].e) / dl) * 100 : 0;
+    const steep = Math.max(0, Math.min(1, g / 15)); // 15% → full-height bar
+    bars.push({ h: (18 + steep * 80).toFixed(1), color: gradeColor(Math.max(0, g)) });
   }
+  const linePath = cp.map((p, i) => `${i ? 'L' : 'M'}${(6 + (i / Math.max(1, cp.length - 1)) * (LW - 12)).toFixed(1)} ${yOf(p.e).toFixed(1)}`).join(' ');
   const posFrac = climbing ? Math.max(0, Math.min(1, (progress - climb.startDist) / Math.max(1, climb.length))) : null;
-  const posTopPct = climbing ? py(elevAt(prof, Math.min(climb.endDist, Math.max(climb.startDist, progress)))) : null;
+  const posTopPct = climbing ? (yOf(elevAt(prof, Math.min(climb.endDist, Math.max(climb.startDist, progress)))) / LH) * 100 : null;
 
   return {
     id: climb.startDist,        // stable id (for the card's dismiss)
@@ -85,7 +85,6 @@ export function useClimb(tel, { indoor = false } = {}) {
     distToStartM: distToStart,  // approach only
     distToGoM, ascentToGoM, etaSec, gradeNow,
     category: climb.category, topE: climb.topE, avgGrade: climb.avgGrade,
-    accent: gradeColor(climb.avgGrade),
-    segs, posFrac, posTopPct,
+    bars, linePath, posFrac, posTopPct,
   };
 }
