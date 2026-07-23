@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { s } from '../lib/style.js';
 import { FREE_COLS, FREE_ROWS, ensureSlots } from '../hooks/useLivePages.js';
 
@@ -428,6 +428,18 @@ function PickerRow({ label, unit, active, onPick }) {
 function PickerSheet({ page, slot, actions, family }) {
   const cur = page.fields[slot];
   const motor = family === 'motorsport';
+  // Pull-down-to-dismiss: drag the handle/header down; past ~90px (or a flick) closes the sheet.
+  const [dragY, setDragY] = useState(0);
+  const [touched, setTouched] = useState(false); // once grabbed, stop replaying the entrance animation
+  const drag = useRef(null);
+  const onGrabDown = (e) => { setTouched(true); drag.current = { y: e.clientY, t: e.timeStamp }; try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* no capture */ } };
+  const onGrabMove = (e) => { if (drag.current) { const dy = e.clientY - drag.current.y; setDragY(dy > 0 ? dy : 0); } };
+  const onGrabUp = (e) => {
+    const d = drag.current; if (!d) return;
+    const dy = e.clientY - d.y; const flick = dy > 30 && e.timeStamp - d.t < 250;
+    drag.current = null;
+    if (dy > 90 || flick) actions.closePicker(); else setDragY(0);
+  };
   // Motorsport has no power meter — drop the power chart (metricGroupsFor hides the rest).
   const charts = [['chart:spd', 'Speed chart', 'graph'], ['chart:hr', 'HR chart', 'graph'], ...(motor ? [] : [['chart:power', 'Power chart', 'graph']]), ['elev:track', 'Elevation chart', 'graph'], ['climbpro', 'Climb view', 'ClimbPro']];
   const maps = [['map', 'Route map', 'map'], ['map+elev', 'Route map + elevation', 'map'], ['elev:route', 'Route elevation', 'chart']];
@@ -442,10 +454,13 @@ function PickerSheet({ page, slot, actions, family }) {
   );
   return (
     <>
-      <div className="ctl" onClick={actions.closePicker} style={s('position:absolute;inset:0;background:rgba(0,0,0,.55);z-index:50')} />
-      <div className="scr" style={s('position:absolute;left:0;right:0;bottom:0;z-index:51;background:var(--bg);border-radius:26px 26px 0 0;border-top:1px solid var(--line2);max-height:80%;overflow-y:auto;padding:14px 18px 32px;animation:floatUp .3s ease')}>
-        <div style={s('width:40px;height:4px;border-radius:3px;background:var(--line2);margin:0 auto 14px')} />
-        <div style={s('font-size:17px;font-weight:700;letter-spacing:-.3px;margin-bottom:12px')}>Choose a field</div>
+      <div className="ctl" onClick={actions.closePicker} style={s(`position:absolute;inset:0;background:rgba(0,0,0,${(0.55 * Math.max(0, 1 - dragY / 400)).toFixed(2)});z-index:50`)} />
+      <div className="scr" style={s(`position:absolute;left:0;right:0;bottom:0;z-index:51;background:var(--bg);border-radius:26px 26px 0 0;border-top:1px solid var(--line2);max-height:80%;overflow-y:auto;padding:14px 18px 32px;${dragY ? `transform:translateY(${dragY}px);transition:none` : (touched ? 'transform:translateY(0);transition:transform .22s ease' : 'animation:floatUp .3s ease')}`)}>
+        {/* grab zone — handle + title; drag it down to dismiss */}
+        <div onPointerDown={onGrabDown} onPointerMove={onGrabMove} onPointerUp={onGrabUp} onPointerCancel={onGrabUp} style={s('touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none;margin:-14px -18px 0;padding:14px 18px 2px')}>
+          <div style={s('width:40px;height:4px;border-radius:3px;background:var(--line2);margin:0 auto 14px')} />
+          <div style={s('font-size:17px;font-weight:700;letter-spacing:-.3px;margin-bottom:12px')}>Choose a field</div>
+        </div>
         {section('Charts', charts)}
         {section('Group', group)}
         {section('Map', maps)}
