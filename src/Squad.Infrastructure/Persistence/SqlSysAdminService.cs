@@ -22,23 +22,33 @@ namespace Squad.Infrastructure;
 
 public sealed class SqlSysAdminService(string connectionString) : ISysAdminService
 {
+    // The App Store review / demo club and its seeded members are kept live (the reviewer signs in
+    // with them) but hidden from the sysadmin console so they don't clutter the real user/club lists.
+    private const string DemoClub = "Bay Area Tri Club";
+    // An athlete belongs to the demo club (as a member or its owner) → hidden from the lists/counts.
+    private const string InDemoClub = """
+        (EXISTS (SELECT 1 FROM dbo.Membership dm JOIN dbo.Squad ds ON ds.Id = dm.SquadId
+                 WHERE dm.AthleteId = a.Id AND ds.Name = @demoClub)
+         OR EXISTS (SELECT 1 FROM dbo.Squad dso WHERE dso.OwnerId = a.Id AND dso.Name = @demoClub))
+        """;
+
     public async Task<AdminOverview> GetOverviewAsync(CancellationToken ct)
     {
         await using var conn = new SqlConnection(connectionString);
-        return await conn.QuerySingleAsync<AdminOverview>(new CommandDefinition("""
+        return await conn.QuerySingleAsync<AdminOverview>(new CommandDefinition($"""
             SELECT
-                (SELECT COUNT(*) FROM dbo.Athlete)                       AS Users,
-                (SELECT COUNT(*) FROM dbo.Squad WHERE Kind <> 'personal') AS Clubs,
+                (SELECT COUNT(*) FROM dbo.Athlete a WHERE NOT {InDemoClub})   AS Users,
+                (SELECT COUNT(*) FROM dbo.Squad WHERE Kind <> 'personal' AND Name <> @demoClub) AS Clubs,
                 (SELECT COUNT(*) FROM dbo.Squad WHERE Kind =  'personal') AS PersonalSquads,
                 (SELECT COUNT(*) FROM dbo.Activity)                      AS Activities;
-            """, cancellationToken: ct));
+            """, new { demoClub = DemoClub }, cancellationToken: ct));
     }
 
     public async Task<IReadOnlyList<AdminUserRow>> ListUsersAsync(string? search, CancellationToken ct)
     {
         var term = string.IsNullOrWhiteSpace(search) ? null : $"%{search.Trim()}%";
         await using var conn = new SqlConnection(connectionString);
-        var rows = await conn.QueryAsync<AdminUserRow>(new CommandDefinition("""
+        var rows = await conn.QueryAsync<AdminUserRow>(new CommandDefinition($"""
             SELECT a.Id, a.DisplayName AS Name, a.Email, a.Initials, a.AvatarColor,
                    a.SquadId AS ActiveSquadId, sq.Name AS ActiveSquadName,
                    (SELECT COUNT(*) FROM dbo.Membership m WHERE m.AthleteId = a.Id) AS Memberships,
@@ -50,9 +60,10 @@ public sealed class SqlSysAdminService(string connectionString) : ISysAdminServi
                         THEN '/api/images/avatars/' + LOWER(CONVERT(varchar(36), a.Id)) END AS AvatarUrl
             FROM dbo.Athlete a
             LEFT JOIN dbo.Squad sq ON sq.Id = a.SquadId
-            WHERE @term IS NULL OR a.DisplayName LIKE @term OR a.Email LIKE @term
+            WHERE (@term IS NULL OR a.DisplayName LIKE @term OR a.Email LIKE @term)
+              AND NOT {InDemoClub}
             ORDER BY a.DisplayName;
-            """, new { term }, cancellationToken: ct));
+            """, new { term, demoClub = DemoClub }, cancellationToken: ct));
         return rows.ToList();
     }
 
@@ -68,8 +79,9 @@ public sealed class SqlSysAdminService(string connectionString) : ISysAdminServi
             FROM dbo.Squad s
             LEFT JOIN dbo.Athlete o ON o.Id = s.OwnerId
             WHERE s.Kind <> 'personal'   -- per-user private "Solo" squads are not listed
+              AND s.Name <> @demoClub    -- hide the App Store review / demo club
             ORDER BY MemberCount DESC, s.CreatedUtc DESC;
-            """, cancellationToken: ct));
+            """, new { demoClub = DemoClub }, cancellationToken: ct));
         return rows.ToList();
     }
 
