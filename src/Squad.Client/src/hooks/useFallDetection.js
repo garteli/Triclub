@@ -12,20 +12,26 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 // requested from a user gesture — call requestPermission() from the arm toggle's onClick.
 
 const G = 9.80665;            // 1 g
-const IMPACT_MS2 = 30;        // ~3 g total — a crash impact, well above normal riding vibration
 const SETTLE_MS = 600;        // ignore the ring-out right after the impact
 const STILL_WINDOW_MS = 3500; // watch this long after impact for stillness
 const STILL_DEV_MS2 = 3.0;    // max deviation from 1 g during the window to count as "not moving"
 
-export function useFallDetection({ active = false, onFall } = {}) {
+// Impact-magnitude threshold (m/s², total incl. gravity) per sensitivity level. Lower = more
+// sensitive (triggers on a lighter hit, more false alarms); higher = needs a harder crash.
+export const FALL_IMPACT_MS2 = { high: 22, medium: 30, low: 40 };
+const DEFAULT_IMPACT_MS2 = FALL_IMPACT_MS2.medium;
+
+export function useFallDetection({ active = false, onFall, impactMs2 = DEFAULT_IMPACT_MS2 } = {}) {
   const supported = typeof window !== 'undefined' && typeof window.DeviceMotionEvent !== 'undefined';
   const needsPermission = supported && typeof window.DeviceMotionEvent.requestPermission === 'function';
   const [permission, setPermission] = useState(
     supported ? (needsPermission ? 'prompt' : 'granted') : 'unsupported');
 
-  // Keep the latest onFall without re-attaching the listener each render.
+  // Keep the latest onFall + threshold without re-attaching the listener each render.
   const onFallRef = useRef(onFall);
   onFallRef.current = onFall;
+  const impactRef = useRef(impactMs2);
+  impactRef.current = impactMs2;
   // Impact→stillness state machine, in a ref so re-renders don't reset it.
   const sm = useRef({ phase: 'idle', tImpact: 0, maxDev: 0 });
 
@@ -52,7 +58,7 @@ export function useFallDetection({ active = false, onFall } = {}) {
       const st = sm.current;
 
       if (st.phase === 'idle') {
-        if (mag >= IMPACT_MS2) { st.phase = 'watching'; st.tImpact = now; st.maxDev = 0; }
+        if (mag >= impactRef.current) { st.phase = 'watching'; st.tImpact = now; st.maxDev = 0; }
         return;
       }
       // watching: after the impact settles, track how much the phone still moves.

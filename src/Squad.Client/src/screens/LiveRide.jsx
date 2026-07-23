@@ -130,8 +130,15 @@ function TodayRides({ live, actions }) {
   );
 }
 
-// Fall-detection arm card for the lobby. Toggles accelerometer monitoring for this ride and nudges
-// the rider to set an emergency contact (needed for the auto-call) when they arm without one.
+// Impact-sensitivity blurb shown next to the selector — what each level trades off.
+const SENS_HINT = {
+  low: 'Needs a harder crash',
+  medium: 'Balanced',
+  high: 'Triggers more easily',
+};
+
+// Fall-detection arm card for the lobby. Toggles accelerometer monitoring for this ride, tunes the
+// impact sensitivity, and nudges the rider to set an emergency contact (for the auto-call).
 function FallDetectCard({ fall, actions }) {
   const unsupported = fall.supported === false;
   const on = !!fall.armed;
@@ -155,6 +162,24 @@ function FallDetectCard({ fall, actions }) {
           <div style={s('width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.35)')} />
         </div>
       </div>
+
+      {!unsupported && fall.setSensitivity && (
+        <div style={s('margin-top:13px')}>
+          <div style={s('display:flex;align-items:center;justify-content:space-between;margin:0 2px 6px')}>
+            <span style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:600')}>Impact sensitivity</span>
+            <span style={s('font-size:10.5px;color:var(--text3)')}>{SENS_HINT[fall.sensitivity] || ''}</span>
+          </div>
+          <div style={s('display:flex;gap:5px;background:var(--bg3);border:1px solid var(--line);border-radius:11px;padding:4px')}>
+            {[['low', 'Low'], ['medium', 'Medium'], ['high', 'High']].map(([v, label]) => {
+              const sel = (fall.sensitivity || 'medium') === v;
+              return (
+                <div key={v} className="ctl" onClick={() => fall.setSensitivity(v)}
+                  style={s(`flex:1;text-align:center;padding:7px 4px;border-radius:8px;font-size:11.5px;font-weight:700;` + (sel ? 'background:var(--accent);color:var(--accent-ink)' : 'color:var(--text2)'))}>{label}</div>
+              );
+            })}
+          </div>
+        </div>
+      )}
       {on && !fall.hasContact && (
         <div className="ctl" onClick={() => actions.go('editprofile')}
           style={s('margin-top:11px;display:flex;align-items:center;gap:8px;padding:9px 11px;border-radius:11px;background:color-mix(in srgb,var(--warn) 12%,var(--bg3));border:1px solid color-mix(in srgb,var(--warn) 30%,transparent)')}>
