@@ -372,7 +372,7 @@ export default function EventDetail({ vm, state, actions, getToken }) {
             <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="var(--good)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
           </div>
           <div style={s('flex:1;min-width:0')}>
-            <div dir="auto" style={s('font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>Start · {ev.title}</div>
+            <div style={s('font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>Start point</div>
             <div style={s('font-size:11px;color:var(--text2);margin-top:1px')}>Directions to the meeting point</div>
           </div>
           <div style={s('flex:none;padding:6px 11px;border-radius:9px;background:var(--bg3);border:1px solid var(--line);font-size:11px;font-weight:700;color:var(--accent)')}>Directions</div>
