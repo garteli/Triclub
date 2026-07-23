@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
-import { buildElevationProfile } from '../lib/elevation.js';
+import { buildElevationProfile, profileFromRoute } from '../lib/elevation.js';
 
-// Reads the REAL terrain profile (Open-Meteo) for a [[lat,lon],…] route and keeps it fresh as the
-// route changes — used by the live elevation chart + under-map strip. The terrain read is gated on
-// a COARSE signature (endpoint coords ~100 m + a bucketed length) so a live-growing breadcrumb
-// re-reads terrain roughly every ~5 points / 100 m, not on every 1 Hz GPS fix. Returns
-// { elev, loading, failed }; elev is null until a route with ≥2 points has been read.
+// Elevation profile for a route — used by the live elevation chart + under-map strip. Prefers the
+// route's OWN per-point elevation when it carries it (a 3rd value, e.g. an imported off-road.io GPX):
+// instant, no network, and never "unavailable" — the same source the event page uses. Only when the
+// route has no embedded elevation (a plain [lat,lon] breadcrumb / drawn route) does it read the
+// terrain (Open-Meteo, cached/deduped). The terrain read is gated on a COARSE signature (endpoint
+// coords ~100 m + a bucketed length) so a live-growing breadcrumb re-reads roughly every ~5 points /
+// 100 m, not on every 1 Hz GPS fix. Returns { elev, loading, failed }; elev is null until read.
 export function useElevationProfile(points) {
   const [state, setState] = useState({ elev: null, loading: false, failed: false });
   const pts = (points || []).filter((p) => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]));
@@ -16,6 +18,11 @@ export function useElevationProfile(points) {
 
   useEffect(() => {
     if (pts.length < 2) { setState({ elev: null, loading: false, failed: false }); return undefined; }
+
+    // Route already carries its own elevation → use it directly, no terrain fetch.
+    const embedded = profileFromRoute(pts);
+    if (embedded) { setState({ elev: embedded, loading: false, failed: false }); return undefined; }
+
     let alive = true; // the shared terrain read (cached/deduped) isn't abortable — guard stale updates
     setState((s) => ({ ...s, loading: true, failed: false }));
     (async () => {
