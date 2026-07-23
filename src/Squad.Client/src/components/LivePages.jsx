@@ -4,6 +4,7 @@ import { metricCatalog, metricGroupsFor, liveMetricValues, liveChartsView, liveR
 import LiveMapGL from './LiveMapGL.jsx';
 import LiveElevationStrip from './LiveElevationStrip.jsx';
 import LiveElevationChart from './LiveElevationChart.jsx';
+import { ClimbField } from './ClimbPro.jsx';
 import { mergePeerRanges } from '../lib/ranging.js';
 
 // ---- Group side column: teammates front→back on a rail + rear-radar vehicle blip ----
@@ -120,7 +121,7 @@ function PelotonField({ v }) {
 }
 
 // ---- a single field cell (metric / chart / map) with edit overlays ----
-function FieldCell({ f, editing, actions, index, indoor, mySport }) {
+function FieldCell({ f, editing, actions, index, indoor, mySport, climb }) {
   const stop = (e) => { if (e && e.stopPropagation) e.stopPropagation(); };
   // Long-press-to-edit is armed on every tile EXCEPT the map — holding on the map is a pan/
   // interaction gesture, not an intent to enter edit mode (enter edit from another tile instead).
@@ -159,6 +160,7 @@ function FieldCell({ f, editing, actions, index, indoor, mySport }) {
         </>
       )}
       {f.kind === 'elev' && <LiveElevationChart route={f.route} you={f.you} source={f.source} indoor={indoor} />}
+      {f.kind === 'climbpro' && <ClimbField climb={climb} indoor={indoor} />}
       {f.kind === 'peloton' && <PelotonField v={f.v} />}
       {f.kind === 'map' && (
         <>
@@ -245,7 +247,7 @@ function PickerSheet({ page, slot, actions, family }) {
   const cur = page.fields[slot];
   const motor = family === 'motorsport';
   // Motorsport has no power meter — drop the power chart (metricGroupsFor hides the rest).
-  const charts = [['chart:spd', 'Speed chart', 'graph'], ['chart:hr', 'HR chart', 'graph'], ...(motor ? [] : [['chart:power', 'Power chart', 'graph']]), ['elev:track', 'Elevation chart', 'graph']];
+  const charts = [['chart:spd', 'Speed chart', 'graph'], ['chart:hr', 'HR chart', 'graph'], ...(motor ? [] : [['chart:power', 'Power chart', 'graph']]), ['elev:track', 'Elevation chart', 'graph'], ['climbpro', 'Climb view', 'ClimbPro']];
   const maps = [['map', 'Route map', 'map'], ['map+elev', 'Route map + elevation', 'map'], ['elev:route', 'Route elevation', 'chart']];
   const group = [['peloton', 'Peloton spread', '2D']];
   const section = (title, rows) => (
@@ -323,6 +325,7 @@ export default function LivePages({ tel, lp, uwb, blePeers, indoor = false, mySp
       const you = youR ? [youR.lat, youR.lon] : (path.length ? path[path.length - 1] : null);
       return { ...base, kind: 'elev', source: isRoute ? 'route' : 'track', route: isRoute ? course : path, you };
     }
+    if (tok === 'climbpro') return { ...base, kind: 'climbpro' };
     if (tok === 'peloton') return { ...base, kind: 'peloton', v: { ...pelotonView(tel), uwb, blePeers } };
     if (charts[tok]) { const c = charts[tok]; return { ...base, kind: 'chart', label: c.label, value: c.cur, unit: c.unit, color: c.color, pts: c.pts, area: c.area }; }
     const m = metricCatalog[tok] || { label: tok, unit: '' };
@@ -367,7 +370,7 @@ export default function LivePages({ tel, lp, uwb, blePeers, indoor = false, mySp
       <div className="live-row" style={s('display:flex;gap:9px;padding:0 12px;touch-action:pan-y')} onPointerDown={onRowPointerDown} onPointerUp={onRowPointerUp}>
         {withSide && <GroupColumn tel={tel} />}
         <div style={s(gridStyle)}>
-          {fields.map((f, i) => <FieldCell key={i} f={f} index={i} editing={editFields} actions={actions} indoor={indoor} mySport={mySport} />)}
+          {fields.map((f, i) => <FieldCell key={i} f={f} index={i} editing={editFields} actions={actions} indoor={indoor} mySport={mySport} climb={climb} />)}
         </div>
       </div>
 
