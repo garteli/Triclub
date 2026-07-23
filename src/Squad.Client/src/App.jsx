@@ -7,7 +7,7 @@ import { FitSport } from './lib/fitEncoder.js';
 import { usePeerRanging } from './hooks/usePeerRanging.js';
 import { useUwbRanging } from './hooks/useUwbRanging.js';
 import { useRideTelemetry } from './hooks/useRideTelemetry.js';
-import { useFallDetection } from './hooks/useFallDetection.js';
+import { useFallDetection, FALL_IMPACT_MS2 } from './hooks/useFallDetection.js';
 import { useLivePages } from './hooks/useLivePages.js';
 import { useWakeLock } from './hooks/useWakeLock.js';
 import { useSquadFeed } from './hooks/useSquadFeed.js';
@@ -698,6 +698,15 @@ export default function App() {
   // a fall was detected → drives the full-screen "Are you OK?" overlay. Both reset when the ride ends.
   const [fallArmed, setFallArmed] = useState(false);
   const [crashPending, setCrashPending] = useState(null); // { lat, lon } | null
+  // Fall-detection impact sensitivity ('high' | 'medium' | 'low'), persisted across rides.
+  const [fallSensitivity, setFallSensitivityState] = useState(() => {
+    try { const v = localStorage.getItem('squad.fallSensitivity'); return FALL_IMPACT_MS2[v] ? v : 'medium'; } catch { return 'medium'; }
+  });
+  const setFallSensitivity = useCallback((v) => {
+    if (!FALL_IMPACT_MS2[v]) return;
+    setFallSensitivityState(v);
+    try { localStorage.setItem('squad.fallSensitivity', v); } catch { /* ignore */ }
+  }, []);
   // Reset arming only when a ride actually ends (live true → false), so it stays opt-in per ride but
   // can still be armed in the lobby before starting.
   const prevRideLive = useRef(rideLive);
@@ -767,7 +776,7 @@ export default function App() {
       manual: true,
     });
   }, []);
-  const fall = useFallDetection({ active: fallArmed && rideLive && !crashPending, onFall: handleFall });
+  const fall = useFallDetection({ active: fallArmed && rideLive && !crashPending, onFall: handleFall, impactMs2: FALL_IMPACT_MS2[fallSensitivity] });
   // Arm toggle: on → request the (iOS) motion permission from this tap, arm only if granted.
   const armFall = useCallback(async (on) => {
     if (!on) { setFallArmed(false); return; }
@@ -802,7 +811,7 @@ export default function App() {
 
   const live = { riders: liveRide.riders, status: liveRide.status, pushTelemetry: liveRide.pushTelemetry, recorder, sensors, tel, livePages, peerRanging, uwb, courses: courseOps, course: selectedCourse, events: eventOps, rideType: { value: rideSport, indoor: rideType.indoor, driver: !!rideType.driver, label: rideType.label, set: setRideSport },
     // Fall detection: arm/disarm + capability, plus incoming teammate crash alerts.
-    fall: { armed: fallArmed, arm: armFall, supported: fall.supported, permission: fall.permission, hasContact: !!profile?.emergencyPhone },
+    fall: { armed: fallArmed, arm: armFall, supported: fall.supported, permission: fall.permission, hasContact: !!profile?.emergencyPhone, sensitivity: fallSensitivity, setSensitivity: setFallSensitivity },
     sos: triggerSos, crash: liveRide.crash, dismissCrash: liveRide.dismissCrash };
 
   // Unread count for the global header's bell badge.
