@@ -67,6 +67,10 @@ export const getEventElevation = (token, squadId, eventId) =>
   req(`/api/squads/${squadId}/events/${eventId}/elevation`, { token });
 export const setEventElevation = (token, squadId, eventId, elevation) =>
   req(`/api/squads/${squadId}/events/${eventId}/elevation`, { method: 'POST', token, body: { elevation } });
+// Fallback: ask the backend to compute the profile from its own IP (when the client's terrain API
+// call was rate-limited) and cache it → { elevation }.
+export const computeEventElevation = (token, squadId, eventId) =>
+  req(`/api/squads/${squadId}/events/${eventId}/elevation/compute`, { method: 'POST', token });
 
 // Per-event branding (owner-only). kind is 'logo' | 'banner'; blob is a downscaled JPEG. Returns { url }.
 export async function uploadEventImage(token, squadId, eventId, kind, blob) {

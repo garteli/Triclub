@@ -5,7 +5,7 @@ import RouteMapGL from '../components/RouteMapGL.jsx';
 import AuthedAvatar from '../components/AuthedAvatar.jsx';
 import AuthedImage from '../components/AuthedImage.jsx';
 import SportIcon from '../components/SportIcon.jsx';
-import { listEventParticipants, joinEvent, leaveEvent, getEventRoute, setEventStartPlace, getEventElevation, setEventElevation } from '../lib/events.js';
+import { listEventParticipants, joinEvent, leaveEvent, getEventRoute, setEventStartPlace, getEventElevation, setEventElevation, computeEventElevation } from '../lib/events.js';
 import { buildElevationProfile } from '../lib/elevation.js';
 import { BASEMAP_LABEL, nextBasemap, inIsrael } from '../lib/basemaps.js';
 import { getRouteStyle, setRouteStyle as persistRouteStyle } from '../lib/routeStyle.js';
@@ -201,8 +201,13 @@ export default function EventDetail({ vm, state, actions, getToken }) {
         const profile = await buildElevationProfile(pts, ctrl.signal);
         setElev(profile);
         if (profile?.profile?.length) { try { await setEventElevation(t, squadId, ev.id, profile); } catch { /* best-effort cache */ } }
-      } catch (e) { if (e.name !== 'AbortError') setElev(null); }
-      finally { setElevLoading(false); }
+      } catch (e) {
+        if (e.name === 'AbortError') return;
+        // Client couldn't read the terrain (e.g. the free API is rate-limited) — let the backend
+        // compute it from its own IP and cache it for everyone.
+        try { const r = await computeEventElevation(t, squadId, ev.id); setElev(r?.elevation?.profile?.length ? r.elevation : null); }
+        catch { setElev(null); }
+      } finally { setElevLoading(false); }
     })();
     return () => ctrl.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
