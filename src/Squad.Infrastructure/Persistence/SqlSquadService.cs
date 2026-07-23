@@ -93,6 +93,15 @@ public sealed class SqlSquadService(string connectionString) : ISquadService
             new { squadId, athleteId }, cancellationToken: ct)) == 1;
     }
 
+    public async Task<IReadOnlyList<Guid>> GetMemberIdsAsync(Guid squadId, CancellationToken ct)
+    {
+        await using var conn = new SqlConnection(connectionString);
+        var rows = await conn.QueryAsync<Guid>(new CommandDefinition(
+            "SELECT AthleteId FROM dbo.Membership WHERE SquadId = @squadId;",
+            new { squadId }, cancellationToken: ct));
+        return rows.ToList();
+    }
+
     public async Task<bool> SetActiveSquadAsync(Guid squadId, Guid athleteId, CancellationToken ct)
     {
         // Only switch to a squad the athlete is actually a member of — guards against

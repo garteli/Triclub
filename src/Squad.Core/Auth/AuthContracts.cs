@@ -53,13 +53,16 @@ public sealed record ProfileDetail(
     string? Club, string? AgeGroup, string? PrimarySport, string? Level, int? Ftp, string? WeeklyHours, string? Bio,
     // BirthDate is an ISO 'yyyy-MM-dd' string; AgeGroup is derived from it on the client.
     string? BirthDate = null, string? Gender = null, decimal? WeightKg = null,
+    // Emergency contact for the live-ride fall-detection "Call" action.
+    string? EmergencyName = null, string? EmergencyPhone = null,
     // Proxy path to the athlete's avatar photo (null when they have none → initials).
     string? AvatarUrl = null);
 
 /// <summary>A profile edit. Null fields are left unchanged; the host recomputes Initials if Name changes.</summary>
 public sealed record ProfileUpdate(
     string? Name, string? Club, string? AgeGroup, string? PrimarySport, string? Level, int? Ftp, string? WeeklyHours, string? Bio,
-    string? BirthDate = null, string? Gender = null, decimal? WeightKg = null);
+    string? BirthDate = null, string? Gender = null, decimal? WeightKg = null,
+    string? EmergencyName = null, string? EmergencyPhone = null);
 
 /// <summary>Read/update the athlete's own profile.</summary>
 public interface IProfileService
@@ -144,6 +147,10 @@ public interface ISquadService
     /// <summary>Whether the athlete currently has a membership row in the squad. Used by the live-ride
     /// hub to keep non-members (e.g. someone the owner just removed) out of a squad's ride presence.</summary>
     Task<bool> IsMemberAsync(Guid squadId, Guid athleteId, CancellationToken ct);
+
+    /// <summary>All athlete ids with a membership row in the squad (not owner-scoped). Used to fan a
+    /// live-ride crash alert out to the whole squad's notification inbox.</summary>
+    Task<IReadOnlyList<Guid>> GetMemberIdsAsync(Guid squadId, CancellationToken ct);
 
     /// <summary>Switch the athlete's active squad to one they already belong to (the feed /
     /// leaderboard / activities follow). Returns false if they're not a member of it.</summary>

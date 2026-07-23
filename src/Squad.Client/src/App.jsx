@@ -7,6 +7,7 @@ import { FitSport } from './lib/fitEncoder.js';
 import { usePeerRanging } from './hooks/usePeerRanging.js';
 import { useUwbRanging } from './hooks/useUwbRanging.js';
 import { useRideTelemetry } from './hooks/useRideTelemetry.js';
+import { useFallDetection } from './hooks/useFallDetection.js';
 import { useLivePages } from './hooks/useLivePages.js';
 import { useWakeLock } from './hooks/useWakeLock.js';
 import { useSquadFeed } from './hooks/useSquadFeed.js';
@@ -37,6 +38,7 @@ import { useNotifications } from './hooks/useNotifications.js';
 import ControlDock from './components/ControlDock.jsx';
 import Phone from './components/Phone.jsx';
 import BootSplash from './components/BootSplash.jsx';
+import { CrashAlertOverlay, IncomingCrashBanner } from './components/CrashAlert.jsx';
 import AppHeader from './components/AppHeader.jsx';
 import SyncToast from './components/SyncToast.jsx';
 import Dashboard from './screens/Dashboard.jsx';
@@ -692,6 +694,17 @@ export default function App() {
   // A ride is "live" whenever it's active OR still recording — independent of which screen you're on,
   // so sensors, ranging, the hub, telemetry, wake lock and presence all keep running as you navigate.
   const rideLive = rideSessionActive || recorder.recording;
+  // Fall detection (opt-in per ride, off by default). `crashPending` holds the last fix at the moment
+  // a fall was detected → drives the full-screen "Are you OK?" overlay. Both reset when the ride ends.
+  const [fallArmed, setFallArmed] = useState(false);
+  const [crashPending, setCrashPending] = useState(null); // { lat, lon } | null
+  // Reset arming only when a ride actually ends (live true → false), so it stays opt-in per ride but
+  // can still be armed in the lobby before starting.
+  const prevRideLive = useRef(rideLive);
+  useEffect(() => {
+    if (prevRideLive.current && !rideLive) { setFallArmed(false); setCrashPending(null); }
+    prevRideLive.current = rideLive;
+  }, [rideLive]);
   // Saved routes/courses: pick one to follow on the live map (its geometry draws on the map, and it
   // can be attached to a planned ride by a coach). save() turns the just-recorded path into a course.
   // Restored from localStorage so the course you're following survives a refresh / app restart
@@ -736,6 +749,23 @@ export default function App() {
   recorderRef.current = recorder;
   const driverModeRef = useRef(!!rideType.driver);
   driverModeRef.current = !!rideType.driver;
+
+  // Fall detection: watches the accelerometer while armed + riding. On a detected fall it captures the
+  // last GPS fix and opens the confirmation overlay (paused while the overlay is up so it can't re-fire).
+  const handleFall = useCallback(() => {
+    setCrashPending((p) => p || {
+      lat: recorderRef.current?.lastFix?.lat ?? null,
+      lon: recorderRef.current?.lastFix?.lon ?? null,
+    });
+  }, []);
+  const fall = useFallDetection({ active: fallArmed && rideLive && !crashPending, onFall: handleFall });
+  // Arm toggle: on → request the (iOS) motion permission from this tap, arm only if granted.
+  const armFall = useCallback(async (on) => {
+    if (!on) { setFallArmed(false); return; }
+    const ok = await fall.requestPermission();
+    setFallArmed(ok);
+  }, [fall]);
+
   useEffect(() => {
     if (!rideLive || typeof liveRide.pushTelemetry !== 'function') return undefined;
     const beat = () => {
@@ -761,7 +791,10 @@ export default function App() {
     checkIn: (id) => checkInEvent(getToken(), id),
   }), [getToken, squadId]);
 
-  const live = { riders: liveRide.riders, status: liveRide.status, pushTelemetry: liveRide.pushTelemetry, recorder, sensors, tel, livePages, peerRanging, uwb, courses: courseOps, course: selectedCourse, events: eventOps, rideType: { value: rideSport, indoor: rideType.indoor, driver: !!rideType.driver, label: rideType.label, set: setRideSport } };
+  const live = { riders: liveRide.riders, status: liveRide.status, pushTelemetry: liveRide.pushTelemetry, recorder, sensors, tel, livePages, peerRanging, uwb, courses: courseOps, course: selectedCourse, events: eventOps, rideType: { value: rideSport, indoor: rideType.indoor, driver: !!rideType.driver, label: rideType.label, set: setRideSport },
+    // Fall detection: arm/disarm + capability, plus incoming teammate crash alerts.
+    fall: { armed: fallArmed, arm: armFall, supported: fall.supported, permission: fall.permission, hasContact: !!profile?.emergencyPhone },
+    crash: liveRide.crash, dismissCrash: liveRide.dismissCrash };
 
   // Unread count for the global header's bell badge.
   const notif = useNotifications({ getToken, enabled: authed });
@@ -823,6 +856,17 @@ export default function App() {
           inviteInfo={inviteInfo}
           meId={session?.athleteId} />
       </Phone>
+
+      {/* Fall detection: your own "Are you OK?" countdown, and a teammate's crash banner — both
+          global so they surface over any screen while a ride is live. */}
+      {crashPending && (
+        <CrashAlertOverlay
+          contact={{ name: profile?.emergencyName || null, phone: profile?.emergencyPhone || null }}
+          location={crashPending}
+          onAlert={() => liveRide.raiseCrashAlert(crashPending.lat, crashPending.lon)}
+          onClose={() => setCrashPending(null)} />
+      )}
+      {liveRide.crash && <IncomingCrashBanner crash={liveRide.crash} onDismiss={liveRide.dismissCrash} />}
     </div>
   );
 }
