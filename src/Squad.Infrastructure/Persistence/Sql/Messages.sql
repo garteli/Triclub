@@ -20,3 +20,9 @@ CREATE TABLE dbo.Message (
 -- History scan: newest-first within a squad.
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Message_Squad_Created' AND object_id = OBJECT_ID('dbo.Message'))
 CREATE INDEX IX_Message_Squad_Created ON dbo.Message (SquadId, CreatedUtc);
+
+-- Soft delete: when set, the author retracted the message. History still returns the row
+-- (so the thread keeps its shape) but the body is blanked server-side and the client shows
+-- a "message deleted" placeholder. Additive + idempotent.
+IF COL_LENGTH('dbo.Message', 'DeletedUtc') IS NULL
+ALTER TABLE dbo.Message ADD DeletedUtc DATETIMEOFFSET(0) NULL;

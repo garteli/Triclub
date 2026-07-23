@@ -18,10 +18,14 @@ namespace Squad.Infrastructure;
 
 public sealed class SqlDirectMessageService(string connectionString) : IDirectMessageService
 {
+    // Column order must match the DirectMessageItem record constructor (Deleted last). Deleted
+    // messages have their Body blanked here so retracted content never leaves the server.
     private const string SelectEnriched = """
         SELECT m.Id, m.SenderId, m.RecipientId,
                a.DisplayName AS SenderName, a.Initials, a.AvatarColor,
-               m.Body, m.CreatedUtc
+               CASE WHEN m.DeletedUtc IS NULL THEN m.Body ELSE N'' END AS Body,
+               m.CreatedUtc,
+               CAST(CASE WHEN m.DeletedUtc IS NULL THEN 0 ELSE 1 END AS BIT) AS Deleted
         FROM dbo.DirectMessage m
         JOIN dbo.Athlete a ON a.Id = m.SenderId
         """;
@@ -59,6 +63,21 @@ public sealed class SqlDirectMessageService(string connectionString) : IDirectMe
             """;
         await using var conn = new SqlConnection(connectionString);
         await conn.ExecuteAsync(new CommandDefinition(insert, new { id, sender, recipient, body }, cancellationToken: ct));
+
+        return await conn.QuerySingleOrDefaultAsync<DirectMessageItem>(new CommandDefinition(
+            SelectEnriched + " WHERE m.Id = @id;", new { id }, cancellationToken: ct));
+    }
+
+    public async Task<DirectMessageItem?> DeleteAsync(Guid id, Guid senderId, CancellationToken ct)
+    {
+        // Owner-gated soft delete: only the sender can retract, and only once.
+        const string update = """
+            UPDATE dbo.DirectMessage SET DeletedUtc = SYSDATETIMEOFFSET()
+            WHERE Id = @id AND SenderId = @senderId AND DeletedUtc IS NULL;
+            """;
+        await using var conn = new SqlConnection(connectionString);
+        var affected = await conn.ExecuteAsync(new CommandDefinition(update, new { id, senderId }, cancellationToken: ct));
+        if (affected == 0) return null; // not found, not theirs, or already deleted
 
         return await conn.QuerySingleOrDefaultAsync<DirectMessageItem>(new CommandDefinition(
             SelectEnriched + " WHERE m.Id = @id;", new { id }, cancellationToken: ct));

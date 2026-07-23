@@ -13,6 +13,12 @@ export function useSquadChat({ getToken, enabled = true, hubUrl = API_BASE + '/h
     setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
   }, []);
 
+  // Mark a message deleted in place (soft delete): blank the body, flag it. The bubble
+  // stays in the thread rendered as a "message deleted" placeholder.
+  const markDeleted = useCallback((id) => {
+    setMessages((prev) => prev.map((x) => (x.id === id ? { ...x, body: '', deleted: true } : x)));
+  }, []);
+
   // Initial history.
   useEffect(() => {
     if (!enabled) return;
@@ -42,6 +48,7 @@ export function useSquadChat({ getToken, enabled = true, hubUrl = API_BASE + '/h
       .build();
 
     conn.on('messagePosted', (m) => append(m));
+    conn.on('messageDeleted', (m) => markDeleted(m.id));
     conn.onreconnecting(() => setStatus('connecting'));
     conn.onreconnected(() => setStatus('live'));
     conn.onclose(() => setStatus('offline'));
@@ -64,5 +71,17 @@ export function useSquadChat({ getToken, enabled = true, hubUrl = API_BASE + '/h
     if (res.ok) append(await res.json()); // instant echo even if the hub lags
   }, [apiUrl, getToken, append]);
 
-  return { messages, status, send };
+  // Retract one of my own messages. Optimistic: mark deleted locally, then DELETE; the hub
+  // echo (messageDeleted) reconciles other clients. Revert nothing on failure beyond a reload.
+  const remove = useCallback(async (id) => {
+    if (!id) return;
+    markDeleted(id);
+    const token = getToken ? await getToken() : null;
+    await fetch(`${apiUrl}/${id}`, {
+      method: 'DELETE',
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
+  }, [apiUrl, getToken, markDeleted]);
+
+  return { messages, status, send, remove };
 }

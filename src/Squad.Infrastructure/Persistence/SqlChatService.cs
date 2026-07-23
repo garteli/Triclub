@@ -17,10 +17,14 @@ namespace Squad.Infrastructure;
 
 public sealed class SqlChatService(string connectionString) : IChatService
 {
+    // Column order must match the ChatMessage record constructor (Deleted last). Deleted
+    // messages have their Body blanked here so retracted content never leaves the server.
     private const string SelectEnriched = """
         SELECT m.Id, m.SquadId, m.AthleteId,
                a.DisplayName AS AthleteName, a.Initials, a.AvatarColor,
-               m.Body, m.CreatedUtc
+               CASE WHEN m.DeletedUtc IS NULL THEN m.Body ELSE N'' END AS Body,
+               m.CreatedUtc,
+               CAST(CASE WHEN m.DeletedUtc IS NULL THEN 0 ELSE 1 END AS BIT) AS Deleted
         FROM dbo.Message m
         JOIN dbo.Athlete a ON a.Id = m.AthleteId
         """;
@@ -50,6 +54,21 @@ public sealed class SqlChatService(string connectionString) : IChatService
             """;
         await using var conn = new SqlConnection(connectionString);
         await conn.ExecuteAsync(new CommandDefinition(insert, new { id, squadId, athleteId, body }, cancellationToken: ct));
+
+        return await conn.QuerySingleOrDefaultAsync<ChatMessage>(new CommandDefinition(
+            SelectEnriched + " WHERE m.Id = @id;", new { id }, cancellationToken: ct));
+    }
+
+    public async Task<ChatMessage?> DeleteAsync(Guid id, Guid athleteId, CancellationToken ct)
+    {
+        // Owner-gated soft delete: only the author can retract, and only once.
+        const string update = """
+            UPDATE dbo.Message SET DeletedUtc = SYSDATETIMEOFFSET()
+            WHERE Id = @id AND AthleteId = @athleteId AND DeletedUtc IS NULL;
+            """;
+        await using var conn = new SqlConnection(connectionString);
+        var affected = await conn.ExecuteAsync(new CommandDefinition(update, new { id, athleteId }, cancellationToken: ct));
+        if (affected == 0) return null; // not found, not theirs, or already deleted
 
         return await conn.QuerySingleOrDefaultAsync<ChatMessage>(new CommandDefinition(
             SelectEnriched + " WHERE m.Id = @id;", new { id }, cancellationToken: ct));
