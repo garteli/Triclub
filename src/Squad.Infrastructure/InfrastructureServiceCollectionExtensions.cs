@@ -51,6 +51,11 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddHttpClient<IRouteImportService, GpxUrlRouteImportService>(c =>
             c.Timeout = TimeSpan.FromSeconds(20));
 
+        // Elevation fallback (Open-Meteo, no key). Server-side terrain read for when a client is
+        // rate-limited; cached on the event, so it runs at most once per route.
+        services.AddHttpClient<IElevationService, OpenMeteoElevationService>(c =>
+            c.Timeout = TimeSpan.FromSeconds(12));
+
         // Persistence (SQL Server).
         services.AddScoped<IActivityRepository>(_ => new SqlActivityRepository(sqlConnectionString));
         services.AddScoped<IRawActivityStore>(_ => new SqlRawActivityStore(sqlConnectionString));

@@ -24,6 +24,7 @@ public static class SquadEventEndpoints
         app.MapPost("/api/squads/{squadId:guid}/events/{eventId:guid}/startplace", SetStartPlace).RequireAuthorization();
         app.MapGet("/api/squads/{squadId:guid}/events/{eventId:guid}/elevation", GetElevation).RequireAuthorization();
         app.MapPost("/api/squads/{squadId:guid}/events/{eventId:guid}/elevation", SetElevation).RequireAuthorization();
+        app.MapPost("/api/squads/{squadId:guid}/events/{eventId:guid}/elevation/compute", ComputeElevation).RequireAuthorization();
         // Anonymous on purpose: an .ics must be openable by plain navigation (no Authorization header),
         // which is how iOS/Android hand it to the Calendar app. Exposes only a PUBLISHED event's details.
         app.MapGet("/api/squads/{squadId:guid}/events/{eventId:guid}/calendar.ics", EventCalendar);
@@ -223,6 +224,28 @@ public static class SquadEventEndpoints
     }
 
     private sealed record ElevationRequest(System.Text.Json.JsonElement? Elevation);
+
+    // Server-side elevation fallback: when the client couldn't compute the profile (rate-limited),
+    // it asks the backend, which reads the terrain from its own IP and caches it for everyone.
+    private static async Task<IResult> ComputeElevation(
+        Guid squadId, Guid eventId, HttpContext http, ISquadEventStore events, IElevationService elevation, CancellationToken ct)
+    {
+        if (Me(http) is not { } me) return Results.Unauthorized();
+        // Already cached? Return it (also confirms the caller can see the event).
+        var cached = await events.GetElevationAsync(squadId, me, eventId, ct);
+        if (!string.IsNullOrWhiteSpace(cached))
+        {
+            using var c = System.Text.Json.JsonDocument.Parse(cached);
+            return Results.Ok(new { elevation = c.RootElement.Clone() });
+        }
+        var routeJson = await events.GetRouteAsync(squadId, me, eventId, ct);
+        if (string.IsNullOrWhiteSpace(routeJson)) return Results.NotFound(new { error = "No route for this session." });
+        var json = await elevation.ComputeAsync(routeJson, ct);
+        if (string.IsNullOrWhiteSpace(json)) return Results.Json(new { error = "Elevation service unavailable." }, statusCode: 503);
+        await events.SetElevationAsync(squadId, me, eventId, json, ct);
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+        return Results.Ok(new { elevation = doc.RootElement.Clone() });
+    }
 
     // Serve a published event as an .ics the OS can open in Calendar. Delivered as text/calendar so
     // iOS/Android recognise it and offer "Add to Calendar" — unlike a blob download, which iOS ignores.
