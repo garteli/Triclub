@@ -484,7 +484,7 @@ function ZoneBlock({ heading, icon, sub, zoneTitle, rows, intel, insightColor, o
 }
 
 // ---- workout analysis: mean power binned over time (real) ----
-function WorkoutAnalysis({ powerValues }) {
+function WorkoutAnalysis({ powerValues, onOpen }) {
   const bars = useMemo(() => {
     const v = finite(powerValues);
     if (v.length < 4) return null;
@@ -513,6 +513,11 @@ function WorkoutAnalysis({ powerValues }) {
           <line x1="0" y1={(H - (bars.max ? (bars.avg / bars.max) * (H - 6) : 0)).toFixed(1)} x2={W} y2={(H - (bars.max ? (bars.avg / bars.max) * (H - 6) : 0)).toFixed(1)} stroke="var(--text3)" strokeWidth="1" strokeDasharray="4 4" />
         </svg>
         <div style={s('font-size:10.5px;color:var(--text3);margin-top:6px')}>Mean power over the ride · dashed line = ride average ({Math.round(bars.avg)} W)</div>
+        {onOpen && (
+          <div className="ctl" onClick={onOpen} style={s('display:flex;align-items:center;justify-content:flex-end;gap:4px;margin-top:12px;padding-top:11px;border-top:1px solid var(--line);font-size:12.5px;font-weight:700;color:var(--accent)')}>
+            View workout · laps<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -817,7 +822,7 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
 
       <ActivityPhotos activityId={a.id} isMe={a.isMe} token={token} getToken={getToken} extRefresh={mediaRefresh} />
 
-      {hasRealPower && <WorkoutAnalysis powerValues={powerValues} />}
+      {hasRealPower && <WorkoutAnalysis powerValues={powerValues} onOpen={() => actions.go('laps')} />}
       <PowerCurve curve={analytics.curve} onOpen={() => actions.go('powercurve')} />
       <SensorTraces traces={traces} totalSec={totalSec} elevValues={elevValues} />
 
