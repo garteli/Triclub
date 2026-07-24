@@ -108,25 +108,25 @@ function AthleteTitle({ a, token, onAthlete }) {
   );
 }
 
-// ---- 3-column metric card ----
-function MetricHero({ a, load }) {
+// ---- 3-column metric card (design: coloured values — elev/speed green, power amber, load red) ----
+function MetricHero({ a, load, avgPower }) {
   const cells = [
-    ['Distance', a.dist, a.distU ? ' ' + a.distU : ''],
-    ['Elevation', a.elev, ' m'],
-    ['Moving Time', a.moving, ''],
-    ['Avg Speed', a.avgSpeed, a.speedU || ''],
-    ['Avg HR', a.avgHr || '—', a.avgHr ? ' bpm' : ''],
-    ['Training Load', String(load ?? a.load ?? 0), ''],
+    ['Distance', a.dist, a.distU ? ' ' + a.distU : '', 'var(--text)'],
+    ['Elev Gain', '↑' + a.elev, ' m', '#4fd23a'],
+    ['Moving Time', a.moving, '', 'var(--text)'],
+    ['Avg Speed', a.avgSpeed, a.speedU ? ' ' + a.speedU : '', '#4fd23a'],
+    ['Avg Power', avgPower != null ? String(avgPower) : '—', avgPower != null ? ' W' : '', '#f5a623'],
+    ['Load (TSS)', String(load ?? a.load ?? 0), '', '#ff5b52'],
   ];
   return (
     <div style={s('padding:14px 18px 0')}>
       <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:18px;display:grid;grid-template-columns:1fr 1fr 1fr;overflow:hidden')}>
-        {cells.map(([l, v, u], i) => {
-          const cell = `padding:13px 13px;${i % 3 > 0 ? 'border-left:1px solid var(--line);' : ''}${i >= 3 ? 'border-top:1px solid var(--line);' : ''}`;
+        {cells.map(([l, v, u, c], i) => {
+          const cell = `padding:15px 13px;${i % 3 > 0 ? 'border-left:1px solid var(--line);' : ''}${i >= 3 ? 'border-top:1px solid var(--line);' : ''}`;
           return (
             <div key={l} style={s(cell)}>
-              <div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600')}>{l}</div>
-              <div className="mono" style={s('font-size:19px;font-weight:700;margin-top:3px')}>{v}<span style={s('font-size:11px;color:var(--text2);font-weight:600')}>{u}</span></div>
+              <div className="mono" style={s(`font-size:23px;font-weight:800;letter-spacing:-.6px;line-height:1;color:${c}`)}>{v}<span style={s('font-size:11px;color:var(--text3);font-weight:600')}>{u}</span></div>
+              <div style={s('font-size:9.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;font-weight:600;margin-top:8px')}>{l}</div>
             </div>
           );
         })}
@@ -619,33 +619,46 @@ function Splits({ analytics, sport }) {
   );
 }
 
-// ---- best efforts (real) ----
+// ---- best efforts (real) — design: gradient power bars for the standard durations ----
+const BE_DURS = [5, 30, 60, 300, 600, 1200, 3600];
+const BE_LABEL = { 5: '5s', 30: '30s', 60: '1m', 300: '5m', 600: '10m', 1200: '20m', 3600: '1h' };
 function BestEfforts({ bestPower, bestDist }) {
-  if (!bestPower.length && !bestDist.length) return null;
-  const maxW = bestPower.length ? Math.max(...bestPower.map((e) => e.watts)) : 1;
+  const rows = (bestPower || []).filter((e) => BE_DURS.includes(e.sec)).sort((a, b) => a.sec - b.sec);
+  const dist = bestDist || [];
+  if (!rows.length && !dist.length) return null;
+  const maxW = rows.length ? Math.max(...rows.map((e) => e.watts)) : 1;
   return (
     <div style={s('padding:22px 18px 0')}>
-      <div style={s(title)}>Best Efforts{bestPower.length ? ' · Power' : ''}</div>
-      <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:12px 14px')}>
-        {bestPower.map((e) => (
-          <div key={e.sec} style={s('display:flex;align-items:center;gap:9px;padding:5px 0')}>
-            <div className="mono" style={s('width:38px;font-size:11px;color:var(--text2)')}>{fmtEffortDur(e.sec)}</div>
-            <div style={s('flex:1;height:8px;border-radius:4px;background:var(--bg4);overflow:hidden')}><div style={s(`height:100%;border-radius:4px;background:var(--accent);width:${Math.round((e.watts / maxW) * 100)}%`)} /></div>
-            <div className="mono" style={s('width:48px;text-align:right;font-size:12.5px;font-weight:700')}>{e.watts}<span style={s('font-size:9px;color:var(--text3)')}>w</span></div>
-            <div className="mono" style={s('width:40px;text-align:right;font-size:11px;color:var(--text3)')}>{e.avgHr != null ? `${e.avgHr}` : '—'}</div>
-          </div>
-        ))}
-        {bestDist.length > 0 && (
-          <>
-            <div style={s(`font-size:11px;font-weight:700;color:var(--text2);margin:${bestPower.length ? '10px' : '0'} 0 4px`)}>Distance</div>
-            {bestDist.map((e) => (
-              <div key={e.meters} style={s('display:flex;align-items:center;gap:9px;padding:4px 0')}>
-                <div style={s('width:46px;font-size:12px;font-weight:600')}>{DIST_LABEL[e.meters] || `${Math.round(e.meters / 1000)}K`}</div>
-                <div className="mono" style={s('flex:1;font-size:12px;font-weight:600')}>{fmtDur(e.sec)}</div>
-                <div className="mono" style={s('width:60px;text-align:right;font-size:11px;color:var(--text3)')}>{((e.meters / 1000) / (e.sec / 3600)).toFixed(1)} km/h</div>
-                <div className="mono" style={s('width:44px;text-align:right;font-size:11px;color:var(--text3)')}>{e.avgHr != null ? `${e.avgHr}` : '—'}</div>
+      <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:18px;padding:16px 16px 14px')}>
+        <div style={s('display:flex;align-items:center;gap:8px')}>
+          <Spark icon={boltPath} /><span style={s('font-size:16px;font-weight:700')}>Best Efforts</span>
+          {rows.length > 0 && <span style={s('margin-left:auto;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1.2px;font-weight:700')}>Power</span>}
+        </div>
+        {rows.length > 0 && (
+          <div style={s('display:flex;flex-direction:column;gap:11px;margin-top:14px')}>
+            {rows.map((e) => (
+              <div key={e.sec} style={s('display:flex;align-items:center;gap:11px')}>
+                <span className="mono" style={s('width:32px;font-size:12.5px;font-weight:700;color:var(--text2)')}>{BE_LABEL[e.sec]}</span>
+                <div style={s('flex:1;height:22px;border-radius:7px;background:var(--bg3);overflow:hidden')}>
+                  <div style={s(`height:100%;width:${Math.max(6, Math.round((e.watts / maxW) * 100))}%;border-radius:7px;background:linear-gradient(90deg,#ffd54a,#ff7a1a)`)} />
+                </div>
+                <span className="mono" style={s('width:54px;text-align:right;font-size:14.5px;font-weight:800')}>{e.watts}<span style={s('font-size:9px;color:var(--text3);font-weight:600')}> W</span></span>
               </div>
             ))}
+          </div>
+        )}
+        {dist.length > 0 && (
+          <>
+            <div style={s(`font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1.2px;font-weight:700;margin:${rows.length ? '16px' : '14px'} 0 10px`)}>Distance</div>
+            <div style={s('display:flex;flex-direction:column;gap:9px')}>
+              {dist.map((e) => (
+                <div key={e.meters} style={s('display:flex;align-items:center;gap:11px')}>
+                  <span style={s('width:44px;font-size:12px;font-weight:700;color:var(--text2)')}>{DIST_LABEL[e.meters] || `${Math.round(e.meters / 1000)}K`}</span>
+                  <span className="mono" style={s('flex:1;font-size:13.5px;font-weight:700')}>{fmtDur(e.sec)}</span>
+                  <span className="mono" style={s('font-size:11.5px;color:var(--text3)')}>{((e.meters / 1000) / (e.sec / 3600)).toFixed(1)} km/h</span>
+                </div>
+              ))}
+            </div>
           </>
         )}
       </div>
@@ -818,7 +831,7 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
       {saveOpen && hasMap && <SaveAsCourse route={route} defaultName={a.title} courses={live?.courses} onClose={() => setSaveOpen(false)} />}
 
       <AthleteTitle a={a} token={token} onAthlete={actions.openAthlete} />
-      <MetricHero a={a} load={effLoad} />
+      <MetricHero a={a} load={effLoad} avgPower={avgPower} />
       <DeviceWeather device={a.deviceName} weather={a.weather} />
 
       {/* social — real kudos (self-kudos blocked) + comments */}
@@ -862,9 +875,11 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
       {/* route broken into climbs/descents, with the power/speed/time actually ridden over each */}
       {breakdown && (
         <RouteBreakdown route={route} elev={breakdown.elev} stats={breakdown.stats}
-          onOpenSection={(sec) => actions.openSegment({ ...sec, activityId: a.id, activityTitle: a.title, sport: a.sport })}
+          onOpenSection={(sec) => actions.openSegment({ ...sec, activityId: a.id, activityTitle: a.title, sport: a.sport, activityWhenUtc: a.startUtc })}
           collapsible defaultOpen={false} title="Route & timing" />
       )}
+
+      <BestEfforts bestPower={analytics.bestPower} bestDist={analytics.bestDist} />
 
       {powerZoneRows && (
         <ZoneBlock heading="Power Zones" icon={<BoltIcon />}
@@ -898,8 +913,6 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
         </div>
       )}
 
-      <Splits analytics={analytics} sport={a.sport} />
-      <BestEfforts bestPower={analytics.bestPower} bestDist={analytics.bestDist} />
 
       {confirmDel && (
         <>

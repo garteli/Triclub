@@ -40,7 +40,7 @@ public sealed class SqlSegmentBoardService(string connectionString, IMemoryCache
         var path = (req.Path ?? [])
             .Where(p => p is { Length: >= 2 } && double.IsFinite(p[0]) && double.IsFinite(p[1]))
             .Select(p => new[] { p[0], p[1] }).ToArray();
-        if (path.Length < 2 || req.LengthM <= 0) return new SegmentBoard([]);
+        if (path.Length < 2 || req.LengthM <= 0) return new SegmentBoard([], 0);
 
         var scope = (req.Scope ?? "squad").ToLowerInvariant();
         var yearStart = new DateTimeOffset(new DateTime(DateTime.UtcNow.Year, 1, 1), TimeSpan.Zero);
@@ -66,7 +66,7 @@ public sealed class SqlSegmentBoardService(string connectionString, IMemoryCache
         await using var conn = new SqlConnection(connectionString);
         var cands = (await conn.QueryAsync<Cand>(new CommandDefinition(sql,
             new { sport = (byte)req.Sport, squadId, yearStart }, cancellationToken: ct))).ToList();
-        if (cands.Count == 0) return new SegmentBoard([]);
+        if (cands.Count == 0) return new SegmentBoard([], 0);
 
         // Bulk-load only the tracks we don't already have cached.
         var need = cands.Select(c => c.Id).Where(id => !cache.TryGetValue(TrackKey(id), out _)).ToList();
@@ -78,14 +78,16 @@ public sealed class SqlSegmentBoardService(string connectionString, IMemoryCache
                 cache.Set(TrackKey(id), DecodeTrack(blob), new MemoryCacheEntryOptions { SlidingExpiration = TimeSpan.FromMinutes(15) });
         }
 
-        // Best (fastest) matching effort per rider.
+        // Best (fastest) matching effort per rider, plus a raw count of the viewer's own matches.
         var best = new Dictionary<Guid, (Cand c, int time, double kph)>();
+        var yourEffortCount = 0;
         foreach (var c in cands)
         {
             ct.ThrowIfCancellationRequested();
             if (!cache.TryGetValue(TrackKey(c.Id), out Pt[]? pts) || pts is null || pts.Length < 2) continue;
             var m = Match(pts, path, req.LengthM);
             if (m is not { } hit) continue;
+            if (c.AthleteId == viewerId) yourEffortCount++;
             if (!best.TryGetValue(c.AthleteId, out var cur) || hit.time < cur.time)
                 best[c.AthleteId] = (c, hit.time, hit.kph);
         }
@@ -95,7 +97,7 @@ public sealed class SqlSegmentBoardService(string connectionString, IMemoryCache
             .Select(v => new SegmentEffort(v.c.AthleteId, v.c.Name, v.c.Initials, v.c.AvatarColor, v.c.AvatarUrl,
                 v.time, Math.Round(v.kph, 1), v.c.StartUtc, v.c.AthleteId == viewerId))
             .ToList();
-        return new SegmentBoard(efforts);
+        return new SegmentBoard(efforts, yourEffortCount);
     }
 
     private static string TrackKey(Guid id) => "seg-track:" + id.ToString("N");
