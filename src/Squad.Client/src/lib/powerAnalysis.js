@@ -122,6 +122,28 @@ export function curveWattsAt(curve, sec) {
   return hit ? hit.watts : null;
 }
 
+// Turn per-zone seconds into display rows: seconds, % of total, bar length (% of the busiest
+// zone), and the zone's bpm/W bound (from `fracs`×`ref`). Null when there's no time or no ref.
+// Shared by the activity Training Zones page. (fracs are the upper bounds; the last zone is open.)
+export function zoneDistribution(seconds, fracs, ref) {
+  const total = (seconds || []).reduce((a, b) => a + b, 0);
+  if (total <= 0 || !ref) return null;
+  const n = seconds.length, max = Math.max(...seconds);
+  const bounds = fracs.map((f) => f * ref);
+  const range = (i) => {
+    const lo = i === 0 ? null : Math.round(bounds[i - 1]);
+    const hi = i === n - 1 ? null : Math.round(bounds[i]) - 1;
+    if (lo == null) return `< ${hi + 1}`;
+    if (hi == null) return `> ${lo - 1}`;
+    return `${lo}–${hi}`;
+  };
+  return seconds.map((sec, i) => ({
+    i, z: `Z${i + 1}`, secs: sec,
+    bar: max > 0 ? Math.round((sec / max) * 100) : 0,
+    pct: Math.round((sec / total) * 100), range: range(i),
+  }));
+}
+
 function haversine(la1, lo1, la2, lo2) {
   const R = 6371000, r = Math.PI / 180;
   const dLa = (la2 - la1) * r, dLo = (lo2 - lo1) * r;

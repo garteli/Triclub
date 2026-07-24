@@ -431,10 +431,15 @@ function zoneRows(seconds, colors, names, fracs, ref) {
   }));
 }
 
-function ZoneBlock({ heading, sub, zoneTitle, rows, insight, insightColor }) {
+function ZoneBlock({ heading, sub, zoneTitle, rows, insight, insightColor, onOpen }) {
   return (
     <div style={s('padding:22px 18px 0')}>
-      {heading && <div style={s(title + (sub ? ';margin-bottom:4px' : ''))}>{heading}</div>}
+      {(heading || onOpen) && (
+        <div style={s('display:flex;align-items:baseline;justify-content:space-between' + (sub ? ';margin-bottom:4px' : ''))}>
+          <div style={s(title + ';margin:0')}>{heading}</div>
+          {onOpen && <span className="ctl" onClick={onOpen} style={s('font-size:11.5px;font-weight:700;color:#b98cff;display:flex;align-items:center;gap:2px')}>Full zones<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg></span>}
+        </div>
+      )}
       {sub && <div className="mono" style={s('font-size:12px;color:var(--text2);margin-bottom:12px')}>{sub}</div>}
       {rows && (
         <>
@@ -815,6 +820,7 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
       )}
       {powerZoneRows && (
         <ZoneBlock heading="" sub={null} zoneTitle={`Power Zones · FTP ${zones.ftp} W`} rows={powerZoneRows}
+          onOpen={() => actions.go('activityzones')}
           insight={<><b style={s('color:var(--text)')}>Distribution:</b> {zoneInsight(powerZoneRows)}</>} insightColor="var(--accent)" />
       )}
 
@@ -822,6 +828,7 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
       {(avgHr != null || hrZoneRows) && (
         <ZoneBlock heading="Heart Rate" sub={avgHr != null ? `avg ${avgHr} bpm${maxHr != null ? ` · max ${maxHr} bpm` : ''}` : null}
           zoneTitle={hrZoneRows ? `HR Zones · max ${zones.maxHr} bpm` : ''} rows={hrZoneRows}
+          onOpen={hrZoneRows && !powerZoneRows ? () => actions.go('activityzones') : undefined}
           insight={hrZoneRows ? <><b style={s('color:var(--text)')}>Distribution:</b> {zoneInsight(hrZoneRows)}</> : null} insightColor="var(--bad)" />
       )}
 
