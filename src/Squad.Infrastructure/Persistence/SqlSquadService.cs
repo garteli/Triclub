@@ -144,6 +144,63 @@ public sealed class SqlSquadService(string connectionString) : ISquadService
         return rows > 0 ? JoinOutcome.Requested : JoinOutcome.AlreadyRequested;
     }
 
+    public async Task<IReadOnlyList<MyMembership>> GetMembershipsAsync(Guid athleteId, CancellationToken ct)
+    {
+        // The caller's memberships joined to the club, newest-joined first. Personal "Solo" squads are
+        // the athlete's private space, not a club they can leave, so they're excluded.
+        await using var conn = new SqlConnection(connectionString);
+        var rows = await conn.QueryAsync<MyMembership>(new CommandDefinition("""
+            SELECT s.Id AS SquadId, s.Name, s.Discipline, s.Color, m.Role,
+                   (SELECT COUNT(*) FROM dbo.Membership mm WHERE mm.SquadId = s.Id) AS MemberCount,
+                   CAST(CASE WHEN a.SquadId = s.Id THEN 1 ELSE 0 END AS bit) AS IsActive,
+                   CAST(CASE WHEN s.OwnerId = @athleteId THEN 1 ELSE 0 END AS bit) AS IsOwner,
+                   CASE WHEN s.LogoBlob IS NOT NULL
+                        THEN '/api/images/squads/' + LOWER(CONVERT(varchar(36), s.Id)) + '/logo' END AS LogoUrl
+            FROM dbo.Membership m
+            JOIN dbo.Squad s   ON s.Id = m.SquadId
+            JOIN dbo.Athlete a ON a.Id = m.AthleteId
+            WHERE m.AthleteId = @athleteId AND s.Kind <> 'personal'
+            ORDER BY IsActive DESC, m.JoinedUtc DESC;
+            """, new { athleteId }, cancellationToken: ct));
+        return rows.ToList();
+    }
+
+    public async Task<LeaveSquadOutcome> LeaveAsync(Guid squadId, Guid athleteId, CancellationToken ct)
+    {
+        await using var conn = new SqlConnection(connectionString);
+        await conn.OpenAsync(ct);
+
+        var role = await conn.QuerySingleOrDefaultAsync<string?>(new CommandDefinition(
+            "SELECT Role FROM dbo.Membership WHERE SquadId = @squadId AND AthleteId = @athleteId;",
+            new { squadId, athleteId }, cancellationToken: ct));
+        if (role is null) return LeaveSquadOutcome.NotMember;
+        // The owner can't just walk away — that would orphan the club. They transfer ownership or delete it.
+        if (string.Equals(role, "owner", StringComparison.OrdinalIgnoreCase)) return LeaveSquadOutcome.IsOwner;
+
+        await using var tx = (SqlTransaction)await conn.BeginTransactionAsync(ct);
+        await conn.ExecuteAsync(new CommandDefinition(
+            "DELETE FROM dbo.Membership WHERE SquadId = @squadId AND AthleteId = @athleteId AND Role <> 'owner';",
+            new { squadId, athleteId }, tx, cancellationToken: ct));
+
+        // Clear any stale pending join-request so a later re-request isn't blocked by a leftover row.
+        await conn.ExecuteAsync(new CommandDefinition(
+            "DELETE FROM dbo.JoinRequest WHERE SquadId = @squadId AND AthleteId = @athleteId;",
+            new { squadId, athleteId }, tx, cancellationToken: ct));
+
+        // Athlete.SquadId is NOT NULL: if they just left their active squad, move them back to their own
+        // private "Solo" squad (else the landing club for legacy accounts) so feed/leaderboard stay valid.
+        await conn.ExecuteAsync(new CommandDefinition("""
+            UPDATE dbo.Athlete
+            SET SquadId = COALESCE(
+                (SELECT TOP 1 Id FROM dbo.Squad WHERE OwnerId = @athleteId AND Kind = 'personal' ORDER BY CreatedUtc),
+                @landing)
+            WHERE Id = @athleteId AND SquadId = @squadId AND @squadId <> @landing;
+            """, new { athleteId, squadId, landing = Squads.Landing }, tx, cancellationToken: ct));
+
+        await tx.CommitAsync(ct);
+        return LeaveSquadOutcome.Left;
+    }
+
     public async Task<IReadOnlyList<JoinRequestItem>> GetPendingRequestsForOwnerAsync(Guid ownerId, CancellationToken ct)
     {
         const string sql = """

@@ -20,6 +20,7 @@ public static class SquadEndpoints
         g.MapGet("/{id:guid}", Get);
         g.MapPost("", Create);
         g.MapPost("/{id:guid}/join", Join);
+        g.MapPost("/{id:guid}/leave", Leave);
         g.MapPost("/{id:guid}/activate", Activate);
         g.MapPost("/{id:guid}/requests/{athleteId:guid}/approve", Approve);
         g.MapPost("/{id:guid}/requests/{athleteId:guid}/decline", Decline);
@@ -118,6 +119,31 @@ public static class SquadEndpoints
         }
 
         return Results.Ok(new { outcome = outcome.ToString().ToLowerInvariant(), squad = await squads.GetAsync(id, me, ct) });
+    }
+
+    private static async Task<IResult> Leave(
+        Guid id, HttpContext http, ISquadService squads,
+        IRideSessionState rideState, IHubContext<RideHub> rideHub, CancellationToken ct)
+    {
+        if (Me(http) is not { } me) return Results.Unauthorized();
+        return await squads.LeaveAsync(id, me, ct) switch
+        {
+            LeaveSquadOutcome.Left => await OnLeft(id, me, rideState, rideHub, ct),
+            LeaveSquadOutcome.IsOwner => Results.Json(
+                new { error = "You own this group — transfer ownership to a coach or delete the group instead of leaving." },
+                statusCode: 409),
+            _ => Results.NotFound(new { error = "You're not a member of that group." }),
+        };
+    }
+
+    // Drop the departed athlete from the group's live-ride presence and tell the lobby, so they
+    // disappear immediately instead of lingering as a stale rider (mirrors owner RemoveMember).
+    private static async Task<IResult> OnLeft(
+        Guid id, Guid me, IRideSessionState rideState, IHubContext<RideHub> rideHub, CancellationToken ct)
+    {
+        rideState.Remove(id, me);
+        await rideHub.Clients.Group($"ride:{id}").SendAsync("riderLeft", me, ct);
+        return Results.Ok(new { status = "left" });
     }
 
     private static async Task<IResult> Activate(Guid id, HttpContext http, ISquadService squads, CancellationToken ct)

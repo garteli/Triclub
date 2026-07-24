@@ -109,6 +109,17 @@ public sealed record SquadMember(
     Guid AthleteId, string Name, string Initials, string AvatarColor, string Role,
     DateTimeOffset JoinedUtc, string? AvatarUrl = null);
 
+/// <summary>One of the caller's OWN club memberships, for the Profile "My clubs" list.
+/// IsActive = it's the athlete's active squad; IsOwner = they own it (owners leave by
+/// transferring ownership or deleting the club, never by leaving).</summary>
+public sealed record MyMembership(
+    Guid SquadId, string Name, string Discipline, string Color, string Role,
+    int MemberCount, bool IsActive, bool IsOwner, string? LogoUrl = null);
+
+/// <summary>Result of an athlete removing themselves from a club.
+/// IsOwner → refused (transfer or delete instead); NotMember → they weren't in it.</summary>
+public enum LeaveSquadOutcome { Left, IsOwner, NotMember }
+
 /// <summary>Result of an owner adding a member by email.</summary>
 public enum AddMemberOutcome { Added, AlreadyMember, AthleteNotFound, NotOwner }
 
@@ -164,6 +175,13 @@ public interface ISquadService
 
     /// <summary>Free squad → join immediately; gated squad → create a pending request (idempotent).</summary>
     Task<JoinOutcome> JoinOrRequestAsync(Guid squadId, string kind, Guid athleteId, CancellationToken ct);
+
+    /// <summary>The caller's own club memberships (excludes their private "Solo" squad), for the
+    /// Profile "My clubs" list. Flags which one is active and which they own.</summary>
+    Task<IReadOnlyList<MyMembership>> GetMembershipsAsync(Guid athleteId, CancellationToken ct);
+    /// <summary>The athlete removes themselves from a club. Owners are refused (they transfer or
+    /// delete the club instead). If it was their active squad, they're moved back to their Solo squad.</summary>
+    Task<LeaveSquadOutcome> LeaveAsync(Guid squadId, Guid athleteId, CancellationToken ct);
     /// <summary>Pending join requests across all squads owned by this athlete.</summary>
     Task<IReadOnlyList<JoinRequestItem>> GetPendingRequestsForOwnerAsync(Guid ownerId, CancellationToken ct);
     /// <summary>Owner approves a request → membership; returns the applicant's name (null if not owner / no request).</summary>

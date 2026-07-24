@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { s } from '../lib/style.js';
 import Avatar from '../components/Avatar.jsx';
 import { useProfilePage } from '../hooks/useProfilePage.js';
+import { useConfirm } from '../components/ConfirmModal.jsx';
 
 // Your own profile — all real. Identity + this-week standing (streak / squad rank) come
 // from the backend; every stat, chart, PB and badge below is derived from your actual
@@ -32,9 +33,24 @@ function goalCountdown(goal) {
   return { big: '✓', small: 'completed' };
 }
 
-export default function Profile({ vm, actions, getToken }) {
+export default function Profile({ vm, actions, getToken, onLeaveSquad }) {
   const me = vm.me || {};
-  const { page, status, setGoal, clearGoal } = useProfilePage({ getToken, enabled: !!getToken });
+  const { page, status, setGoal, clearGoal, refetch } = useProfilePage({ getToken, enabled: !!getToken });
+  const confirm = useConfirm();
+
+  // Leave a club (with a confirmation modal). The server refuses if you own it, and moves you
+  // back to your personal space if it was your active club; refresh the app + this page after.
+  const askLeave = (club) => confirm.open({
+    title: `Leave ${club.name}?`,
+    body: club.isActive
+      ? `You'll be removed from ${club.name} and moved back to your personal space. You can ask to re-join later.`
+      : `You'll be removed from ${club.name}. You can ask to re-join later.`,
+    confirmLabel: 'Leave group',
+    run: async () => {
+      if (onLeaveSquad) await onLeaveSquad(club.squadId);
+      await refetch();
+    },
+  });
 
   const sub = [page?.club ?? me.club, (page?.ageGroup ?? me.ageGroup) && `Age-group ${page?.ageGroup ?? me.ageGroup}`]
     .filter(Boolean).join(' · ');
@@ -134,20 +150,98 @@ export default function Profile({ vm, actions, getToken }) {
           meaningless for a motorsport club, so it's hidden there (see vm.family). */}
       {vm.family === 'endurance' && <DisciplineBreakdown disciplines={page?.disciplines} />}
 
-      {/* squad card — opens the club's group profile (falls back to Discover if no active club) */}
-      <div style={s(eyebrow + ';margin:22px 2px 12px')}>Squad</div>
-      <div className="ctl" onClick={() => (vm.activeClubId ? actions?.openGroup(vm.activeClubId) : actions?.go('discover'))} style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:13px 14px;display:flex;align-items:center;gap:12px')}>
-        <div style={s('width:44px;height:44px;border-radius:13px;background:linear-gradient(135deg,#ff8a3d,#ef5f1f);flex:none;display:flex;align-items:center;justify-content:center')}><SquadLogo /></div>
-        <div style={s('flex:1;min-width:0')}>
-          <div style={s('font-size:14px;font-weight:700')}>{page?.squadName || me.club || 'Your club'}</div>
-          {(page?.squadMembers > 0 || rank > 0) && (
-            <div style={s('font-size:11.5px;color:var(--text2)')}>
-              {[page?.squadMembers > 0 ? `${page.squadMembers} athlete${page.squadMembers === 1 ? '' : 's'}` : null, rank > 0 ? `Rank #${rank} this week` : null].filter(Boolean).join(' · ')}
-            </div>
-          )}
-        </div>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth="2" strokeLinecap="round"><path d="M9 6l6 6-6 6" /></svg>
+      {/* my clubs — every club I'm a member of, with self-leave (confirmation) */}
+      <MyClubs
+        memberships={page?.memberships}
+        ready={status === 'ready'}
+        fallbackName={page?.squadName || me.club}
+        fallbackMembers={page?.squadMembers}
+        activeClubId={vm.activeClubId}
+        rank={rank}
+        actions={actions}
+        onLeave={askLeave}
+      />
+
+      {confirm.node}
+    </div>
+  );
+}
+
+// ── my clubs (all memberships + self-leave) ───────────────────────────────────
+function MyClubs({ memberships, ready, fallbackName, fallbackMembers, activeClubId, rank, actions, onLeave }) {
+  const clubs = memberships || [];
+
+  // Until the page has loaded we don't know the memberships — show the active club as a
+  // single card (from the older fields) so the section never flashes empty.
+  if (!ready && clubs.length === 0) {
+    if (!fallbackName) return null;
+    return (
+      <>
+        <div style={s(eyebrow + ';margin:22px 2px 12px')}>My clubs</div>
+        <ClubCard
+          name={fallbackName}
+          sub={[fallbackMembers > 0 ? `${fallbackMembers} athlete${fallbackMembers === 1 ? '' : 's'}` : null, rank > 0 ? `Rank #${rank} this week` : null].filter(Boolean).join(' · ')}
+          onOpen={() => (activeClubId ? actions?.openGroup(activeClubId) : null)}
+        />
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div style={s('display:flex;justify-content:space-between;align-items:baseline;margin:22px 2px 12px')}>
+        <div style={s(eyebrow)}>My clubs</div>
+        <div className="ctl" onClick={() => actions?.go('discover')} style={s('font-size:11px;font-weight:700;color:var(--accent)')}>Find groups</div>
       </div>
+
+      {clubs.length === 0 ? (
+        <div className="ctl" onClick={() => actions?.go('discover')} style={s('border:1.5px dashed var(--line2);border-radius:16px;padding:16px 15px;background:var(--bg2)')}>
+          <div style={s('font-size:13.5px;font-weight:700')}>You haven't joined a club yet</div>
+          <div style={s('font-size:11.5px;color:var(--text2);margin-top:2px')}>Discover groups near you and ask to join.</div>
+        </div>
+      ) : (
+        <div style={s('display:flex;flex-direction:column;gap:10px')}>
+          {clubs.map((c) => (
+            <ClubCard
+              key={c.squadId}
+              name={c.name}
+              logoUrl={c.logoUrl}
+              color={c.color}
+              active={c.isActive}
+              role={c.isOwner ? 'owner' : c.role}
+              sub={[`${c.members} athlete${c.members === 1 ? '' : 's'}`, c.discipline].filter(Boolean).join(' · ')}
+              onOpen={() => actions?.openGroup(c.squadId)}
+              onLeave={c.isOwner ? null : () => onLeave(c)}
+            />
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+function ClubCard({ name, sub, logoUrl, color, active, role, onOpen, onLeave }) {
+  const roleChip = role === 'owner' ? 'Owner' : role === 'coach' ? 'Coach' : null;
+  return (
+    <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:13px 14px;display:flex;align-items:center;gap:12px')}>
+      <div className="ctl" onClick={onOpen} style={s('display:flex;align-items:center;gap:12px;flex:1;min-width:0')}>
+        <div style={s(`width:44px;height:44px;border-radius:13px;flex:none;display:flex;align-items:center;justify-content:center;overflow:hidden;${logoUrl ? '' : `background:linear-gradient(135deg,${color || '#ff8a3d'},#ef5f1f)`}`)}>
+          {logoUrl ? <img src={logoUrl} alt="" style={s('width:100%;height:100%;object-fit:cover')} /> : <SquadLogo />}
+        </div>
+        <div style={s('flex:1;min-width:0')}>
+          <div style={s('display:flex;align-items:center;gap:7px')}>
+            <div style={s('font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>{name}</div>
+            {active && <span style={s('flex:none;font-size:9px;font-weight:800;color:var(--accent-ink);background:var(--accent);padding:2px 7px;border-radius:6px;text-transform:uppercase;letter-spacing:.5px')}>Active</span>}
+            {roleChip && <span style={s('flex:none;font-size:9px;font-weight:700;color:var(--text2);background:var(--bg3);border:1px solid var(--line);padding:2px 7px;border-radius:6px')}>{roleChip}</span>}
+          </div>
+          {sub && <div style={s('font-size:11.5px;color:var(--text2);margin-top:2px')}>{sub}</div>}
+        </div>
+      </div>
+      {onLeave ? (
+        <div className="ctl" onClick={onLeave} style={s('flex:none;padding:8px 12px;border-radius:10px;font-size:12px;font-weight:700;color:var(--bad);background:color-mix(in srgb,var(--bad) 12%,transparent);border:1px solid color-mix(in srgb,var(--bad) 30%,transparent)')}>Leave</div>
+      ) : (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth="2" strokeLinecap="round" style={s('flex:none')}><path d="M9 6l6 6-6 6" /></svg>
+      )}
     </div>
   );
 }

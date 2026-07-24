@@ -19,6 +19,9 @@ export const listSquads = (token) => req('/api/squads', { token });
 export const getSquad = (token, id) => req(`/api/squads/${id}`, { token });
 export const createSquad = (token, body) => req('/api/squads', { method: 'POST', token, body });
 export const joinSquad = (token, id) => req(`/api/squads/${id}/join`, { method: 'POST', token });
+// Remove myself from a club (owners are refused — they transfer/delete instead). If it was my
+// active squad the server moves me back to my private Solo squad.
+export const leaveSquad = (token, id) => req(`/api/squads/${id}/leave`, { method: 'POST', token });
 // Switch the athlete's active squad to one they already belong to (feed/leaderboard follow).
 export const activateSquad = (token, id) => req(`/api/squads/${id}/activate`, { method: 'POST', token });
 
