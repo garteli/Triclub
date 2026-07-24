@@ -5,85 +5,142 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Privacy Policy — Domestique Hub</title>
 <meta name="robots" content="index, follow">
+<meta name="description" content="How Domestique Hub collects, uses and protects the training and personal data you and your squad share with us.">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root { color-scheme: dark; }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; background: #0b0c0e; color: #e7e9ee;
-    font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  }
-  .wrap { max-width: 760px; margin: 0 auto; padding: 40px 22px 96px; }
-  .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
-  .logo { width: 40px; height: 40px; border-radius: 11px; background: linear-gradient(150deg,#ff8a3d,#ff5a1f);
-          display: flex; align-items: center; justify-content: center; font-weight: 800; color: #fff; }
-  .brand b { font-size: 18px; font-weight: 800; letter-spacing: -.3px; }
-  .brand b span { color: #ff6a2c; }
-  h1 { font-size: 28px; letter-spacing: -.5px; margin: 8px 0 4px; }
-  .updated { color: #9aa0ac; font-size: 13px; margin-bottom: 32px; }
-  h2 { font-size: 19px; letter-spacing: -.3px; margin: 34px 0 10px; }
-  p, li { color: #c7ccd6; }
-  a { color: #ff8a4d; }
-  ul { padding-left: 20px; }
-  li { margin: 6px 0; }
-  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14.5px; }
-  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #20232b; vertical-align: top; }
-  th { color: #e7e9ee; font-weight: 700; }
-  .note { background: #12141a; border: 1px solid #20232b; border-radius: 12px; padding: 14px 16px; margin: 18px 0; }
-  footer { margin-top: 48px; padding-top: 20px; border-top: 1px solid #20232b; color: #9aa0ac; font-size: 13px; }
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:#07080a;font-family:'Space Grotesk',system-ui,sans-serif;-webkit-font-smoothing:antialiased;color:#eef2f6}
+a{color:#ff6a2c;text-decoration:none}a:hover{color:#ff8552}
+.lbl{font-size:11px;letter-spacing:2px;text-transform:uppercase;font-weight:600}
+.btn{cursor:pointer;transition:transform .12s ease}.btn:hover{transform:translateY(-2px)}
+.doc h2{font-size:22px;font-weight:700;letter-spacing:-.4px;margin:44px 0 0;scroll-margin-top:90px}
+.doc p{font-size:15.5px;line-height:1.72;color:#b3bcc7;margin:14px 0 0}
+.doc li{font-size:15.5px;line-height:1.7;color:#b3bcc7;margin:7px 0}
+.doc ul{margin:12px 0 0;padding-left:20px}
+.doc strong{color:#eef2f6;font-weight:600}
+.doc table{width:100%;border-collapse:collapse;margin:16px 0 0;font-size:14.5px}
+.doc th,.doc td{text-align:left;padding:11px 13px;border-bottom:1px solid rgba(255,255,255,.08);vertical-align:top}
+.doc th{color:#eef2f6;font-weight:700}
+.doc td{color:#b3bcc7;line-height:1.55}
+.note{margin:18px 0 0;padding:16px 18px;background:#101216;border:1px solid rgba(255,255,255,.07);border-radius:14px;font-size:14.5px;color:#c7ced7;line-height:1.62}
+.toc a{display:block;font-size:13.5px;color:#98a2ae;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05);transition:color .15s}
+.toc a:hover{color:#eef2f6}
+@media(max-width:720px){
+.docwrap{grid-template-columns:1fr !important;gap:8px !important;padding:30px 20px 70px !important}
+.toc{position:static !important;top:auto !important;background:#101216;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:16px 18px;margin-bottom:14px}
+.hdrwrap{padding:44px 20px 34px !important}
+.hdrwrap h1{font-size:34px !important;letter-spacing:-1px !important}
+.navwrap{padding:13px 18px !important;gap:14px !important}
+.doc h2{font-size:20px !important}
+.doc table,.doc thead,.doc tbody,.doc tr,.doc th,.doc td{display:block;width:100%}
+.doc th{display:none}
+.doc td{border-bottom:none;padding:2px 0}
+.doc tr{border-bottom:1px solid rgba(255,255,255,.08);padding:12px 0;display:block}
+}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="brand">
-    <div class="logo">///</div>
-    <b>Domestique <span>Team</span></b>
+<div style="width:100%;overflow-x:hidden">
+
+  <!-- NAV -->
+  <nav style="position:sticky;top:0;z-index:100;backdrop-filter:blur(16px);background:rgba(7,8,10,.72);border-bottom:1px solid rgba(255,255,255,.06)">
+    <div class="navwrap" style="max-width:1000px;margin:0 auto;padding:15px 28px;display:flex;align-items:center;gap:24px">
+      <a href="/home.html" style="display:flex;align-items:center;gap:10px;color:#eef2f6">
+        <span style="width:36px;height:36px;border-radius:10px;background:linear-gradient(155deg,#ff8a3d,#ef5f1f);box-shadow:inset 0 1px 2px rgba(255,255,255,.35);display:flex;align-items:center;justify-content:center"><svg width="28" height="28" viewBox="0 0 64 64" fill="none"><g stroke="#fff" stroke-width="5.4" stroke-linecap="round"><path d="M13 44 L23 30"/><path d="M25 46 L35 32" opacity=".85"/><path d="M37 48 L47 34" opacity=".55"/></g><circle cx="49.5" cy="20.5" r="4.4" fill="#fff"/></svg></span>
+        <span style="font-size:17px;font-weight:700;letter-spacing:-.3px">Domestique Hub</span>
+      </a>
+      <div style="margin-left:auto;display:flex;gap:18px;align-items:center">
+        <a href="/support.html" style="color:#98a2ae;font-size:14px;font-weight:500">Support</a>
+        <a href="/home.html" class="btn" style="background:#14171d;border:1px solid rgba(255,255,255,.12);color:#eef2f6;font-size:14px;font-weight:600;padding:9px 16px;border-radius:11px">← Back to site</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- HEADER -->
+  <header style="background:radial-gradient(900px 400px at 50% -20%, #17191f 0%, #07080a 60%);border-bottom:1px solid rgba(255,255,255,.06)">
+    <div class="hdrwrap" style="max-width:1000px;margin:0 auto;padding:60px 28px 46px">
+      <div class="lbl" style="color:#ff6a2c">Legal</div>
+      <h1 style="font-size:46px;font-weight:700;letter-spacing:-1.4px;margin:12px 0 0">Privacy Policy</h1>
+      <p style="font-size:16px;color:#98a2ae;margin:14px 0 0;max-width:640px;line-height:1.55">How Domestique Hub collects, uses and protects the training and personal data you and your squad share with us.</p>
+      <div style="font-size:13px;color:#5f6976;margin-top:18px">Last updated <strong style="color:#98a2ae;font-weight:600">July 24, 2026</strong></div>
+    </div>
+  </header>
+
+  <!-- BODY -->
+  <div class="docwrap" style="max-width:1000px;margin:0 auto;padding:48px 28px 90px;display:grid;grid-template-columns:210px 1fr;gap:48px;align-items:start">
+
+    <!-- TOC -->
+    <aside class="toc" style="position:sticky;top:100px">
+      <div class="lbl" style="font-size:10px;color:#5f6976;margin-bottom:10px">On this page</div>
+      <a href="#p1">1. Data we collect</a>
+      <a href="#p2">2. How we use it</a>
+      <a href="#p3">3. Sharing with your squad</a>
+      <a href="#p4">4. Third-party services</a>
+      <a href="#p5">5. Data retention</a>
+      <a href="#p6">6. Your rights &amp; controls</a>
+      <a href="#p7">7. Security</a>
+      <a href="#p8">8. Children's privacy</a>
+      <a href="#p9">9. Changes &amp; contact</a>
+    </aside>
+
+    <main class="doc">
+      <p style="margin-top:0">This Privacy Policy explains what information Domestique Hub ("we", "us") — a training app for cycling and triathlon clubs — processes when you use our apps, devices and website (the "Service"), and the choices you have. We collect only what a team-training experience needs. We do <strong>not</strong> use advertising or third-party analytics, we do <strong>not</strong> track you across other apps, and we do <strong>not</strong> sell your data.</p>
+
+      <h2 id="p1">1. Data we collect</h2>
+      <p>We collect information you provide directly and data generated as you train:</p>
+      <table>
+        <tr><th>Category</th><th>What</th><th>Why</th></tr>
+        <tr><td><strong>Account</strong></td><td>Your name, email address, and account identifier (from Sign in with Apple, Google, or email registration)</td><td>To create and secure your account</td></tr>
+        <tr><td><strong>Precise location</strong></td><td>GPS position, speed and elevation while you record a ride — including in the background when a live ride is active</td><td>To record your route and show your position to teammates during a group ride</td></tr>
+        <tr><td><strong>Health &amp; fitness</strong></td><td>Workout metrics (distance, pace, power, cadence, heart rate) and, if you connect Apple Health, readings such as resting heart rate, heart-rate variability, respiratory rate, VO₂ max, sleep and body weight</td><td>To build your training log, health trends and team leaderboards</td></tr>
+        <tr><td><strong>Photos</strong></td><td>Profile and activity photos you choose to add</td><td>To personalize your profile and posts</td></tr>
+        <tr><td><strong>Content</strong></td><td>Activity notes, goals, plans and messages you send in your squad</td><td>To provide the feed, planning and messaging features</td></tr>
+      </table>
+
+      <h2 id="p2">2. How we use it</h2>
+      <p>We use your data to operate and improve the Service — to record and analyse your activities, build your training log and health trends, generate route and performance insights, power live group rides and team leaderboards, sync your plans and calendar, and keep the Service secure. We do <strong>not</strong> sell your personal data and we do <strong>not</strong> use it for advertising.</p>
+      <div class="note">We do <strong>not</strong> use advertising or third-party analytics SDKs, and we do <strong>not</strong> use your data to track you across other companies' apps or websites. Under Apple's App Tracking Transparency framework, our answer is "No tracking."</div>
+
+      <h2 id="p3">3. Sharing with your squad</h2>
+      <p>When you join a squad or team, certain data is visible to its members and coaches — your activities, your position during live group rides, and your leaderboard standing — according to your in-app Privacy settings (profile visibility, activity-map visibility, "hide start &amp; finish", and live-location sharing). You control the visibility of each activity.</p>
+
+      <h2 id="p4">4. Third-party services</h2>
+      <p>We host data with <strong>Microsoft Azure</strong>. Sign-in is handled by <strong>Apple</strong> and <strong>Google</strong>. Optional integrations exchange data with <strong>Apple Health</strong> (on your device) and <strong>Garmin Connect</strong> (only if you connect it). These providers process data only as needed to provide their service. We do not use third-party advertising or analytics SDKs.</p>
+
+      <h2 id="p5">5. Data retention</h2>
+      <p>We keep your account and activity data while your account is active. When you delete an activity it is removed from your feed. When you delete your account (Settings → Privacy → "Delete account"), your account and all associated data — activities, memberships, messages, photos and any squads you own — are permanently removed from our systems. This is irreversible.</p>
+
+      <h2 id="p6">6. Your rights &amp; controls</h2>
+      <ul>
+        <li><strong>Privacy controls.</strong> Settings → Privacy lets you control profile and activity-map visibility, hide the start and finish of routes, and turn live-location sharing on or off.</li>
+        <li><strong>Delete your account.</strong> Settings → Privacy → "Delete account" permanently deletes your account and all associated data.</li>
+        <li><strong>Export your data.</strong> You can request a copy of your data from within the app or by emailing us.</li>
+        <li><strong>Permissions.</strong> Location, Bluetooth, Camera, Photos and Health access are optional and requested only when needed; you can change them anytime in your device settings.</li>
+      </ul>
+
+      <h2 id="p7">7. Security</h2>
+      <p>We protect data in transit and at rest using standard encryption, host it with Microsoft Azure, and restrict internal access on a need-to-know basis. No method of transmission or storage is perfectly secure, but we work continuously to safeguard your information.</p>
+
+      <h2 id="p8">8. Children's privacy</h2>
+      <p>The Service is not directed to children under 13, and we do not knowingly collect their data. If you believe a child has provided us personal data, contact us and we will delete it.</p>
+
+      <h2 id="p9">9. Changes &amp; contact</h2>
+      <p>We may update this policy from time to time. If we make material changes we will update the date above and, where appropriate, notify you in the app. Questions about your privacy? Email <a href="mailto:support@domestiquehub.com">support@domestiquehub.com</a>.</p>
+    </main>
   </div>
 
-  <h1>Privacy Policy</h1>
-  <div class="updated">Last updated: July 23, 2026</div>
+  <!-- FOOTER -->
+  <footer style="border-top:1px solid rgba(255,255,255,.06);background:#0a0b0d">
+    <div style="max-width:1000px;margin:0 auto;padding:24px 28px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;align-items:center">
+      <span style="font-size:12.5px;color:#5f6976">© 2026 Domestique Hub. All rights reserved.</span>
+      <div style="display:flex;gap:18px"><a href="/home.html" style="font-size:13px;color:#98a2ae">Home</a><a href="/support.html" style="font-size:13px;color:#98a2ae">Support</a></div>
+    </div>
+  </footer>
 
-  <p>Domestique Hub (“we,” “us”) is a training app for cycling and triathlon clubs. This policy explains what data the app collects, why, and the choices you have. We designed the app to collect only what a team‑training experience needs — and we do <strong>not</strong> track you across other apps or sell your data.</p>
-
-  <h2>Data we collect</h2>
-  <table>
-    <tr><th>Category</th><th>What</th><th>Why</th></tr>
-    <tr><td>Account</td><td>Your name, email address, and account identifier (from Sign in with Apple, Google, or email registration)</td><td>To create and secure your account</td></tr>
-    <tr><td>Precise location</td><td>GPS position, speed, and elevation while you record a ride — including in the background when a live ride is active</td><td>To record your route and show your position to your teammates during a group ride</td></tr>
-    <tr><td>Health &amp; fitness</td><td>Workout metrics (distance, pace, power, cadence, heart rate) and, if you connect Apple Health, readings such as resting heart rate, heart‑rate variability, respiratory rate, VO₂ max, sleep, and body weight</td><td>To build your training log, health trends, and team leaderboards</td></tr>
-    <tr><td>Photos</td><td>Profile and activity photos you choose to add</td><td>To personalize your profile and posts</td></tr>
-    <tr><td>Content</td><td>Activity notes, goals, plans, and messages you send in your squad</td><td>To provide the feed, planning, and messaging features</td></tr>
-  </table>
-
-  <div class="note">We do <strong>not</strong> use advertising or third‑party analytics SDKs, and we do <strong>not</strong> use your data to track you across other companies’ apps or websites. Under Apple’s App Tracking Transparency framework, our answer is “No tracking.”</div>
-
-  <h2>How your data is shared</h2>
-  <ul>
-    <li><strong>With your teammates.</strong> Your activities, position during live rides, and leaderboard standing are visible to members of your squad according to your in‑app Privacy settings (profile visibility, activity‑map visibility, “hide start &amp; finish,” live‑location sharing).</li>
-    <li><strong>Service providers.</strong> We host data with Microsoft Azure. Sign‑in is handled by Apple and Google; optional integrations exchange data with Apple Health (on your device) and Garmin Connect (if you connect it).</li>
-    <li><strong>We never sell your data</strong> and do not share it for advertising.</li>
-  </ul>
-
-  <h2>Your choices &amp; rights</h2>
-  <ul>
-    <li><strong>Privacy controls.</strong> Settings → Privacy lets you control profile and activity‑map visibility, hide the start/finish of routes, and turn live‑location sharing on or off.</li>
-    <li><strong>Delete your account.</strong> Settings → Privacy → “Delete account” permanently deletes your account and all associated data (activities, memberships, messages, photos, and any squads you own). This is irreversible.</li>
-    <li><strong>Export your data.</strong> You can request a copy of your data from within the app or by emailing us.</li>
-    <li><strong>Permissions.</strong> Location, Bluetooth, Camera, Photos, and Health access are optional and requested only when needed; you can change them anytime in iOS Settings.</li>
-  </ul>
-
-  <h2>Data retention</h2>
-  <p>We keep your data while your account is active. When you delete your account, your personal data is removed from our systems.</p>
-
-  <h2>Children</h2>
-  <p>Domestique Hub is not directed to children under 13, and we do not knowingly collect data from them.</p>
-
-  <h2>Changes</h2>
-  <p>If we make material changes to this policy, we will update the date above and, where appropriate, notify you in the app.</p>
-
-  <h2>Contact</h2>
-  <p>Questions about your privacy? Email <a href="mailto:support@domestiquehub.com">support@domestiquehub.com</a>.</p>
-
-  <footer>© 2026 Domestique Hub. All rights reserved.</footer>
 </div>
 </body>
 </html>
