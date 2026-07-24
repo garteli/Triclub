@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { s } from '../lib/style.js';
 import AuthedAvatar from './AuthedAvatar.jsx';
 import TileMap from './TileMap.jsx';
 import { toPathD } from '../lib/tiles.js';
 import useSheetDrag from '../hooks/useSheetDrag.js';
+import { ConfirmModal } from './ConfirmModal.jsx';
 
 // The shared squad-event card + its supporting bits, used by both the Events screen and the
 // Plan screen's group sessions so the two pages render events identically.
@@ -93,6 +95,7 @@ export function EventCard({
   const start = route && route.length ? route.find((p) => Array.isArray(p) && Number.isFinite(p[0])) : null;
 
   const pill = 'flex:none;padding:8px 15px;border-radius:11px;font-size:12px;font-weight:700';
+  const [confirmUnpub, setConfirmUnpub] = useState(false);
 
   return (
     <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:17px;padding:13px 14px')}>
@@ -210,7 +213,7 @@ export function EventCard({
           <div style={s('display:flex;gap:7px;margin-top:10px')}>
             <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : onEdit}
               style={s('flex:1;text-align:center;padding:9px;border-radius:10px;font-size:12px;font-weight:700;background:var(--bg3);border:1px solid var(--line);color:var(--text)')}>Edit</div>
-            <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : onPublish}
+            <div className={busy ? undefined : 'ctl'} onClick={busy ? undefined : () => (ev.published ? setConfirmUnpub(true) : onPublish())}
               style={s(`flex:1;text-align:center;padding:9px;border-radius:10px;font-size:12px;font-weight:700;${ev.published ? 'background:var(--bg3);border:1px solid var(--line);color:var(--text2)' : 'background:var(--accent-dim);border:1px solid color-mix(in srgb,var(--accent) 40%,transparent);color:var(--accent)'}`)}>
               {ev.published ? 'Unpublish' : 'Publish'}
             </div>
@@ -251,6 +254,16 @@ export function EventCard({
               style={s(`${pill};background:color-mix(in srgb,var(--good) 16%,transparent);border:1px solid color-mix(in srgb,var(--good) 40%,transparent);color:var(--good);opacity:${busy ? 0.6 : 1}`)}>{busy ? '…' : 'Going ✓'}</div>
           )}
         </div>
+      )}
+
+      {/* unpublishing removes the event from every member's calendar — confirm first
+          (delete is already confirmed by the parent screens) */}
+      {confirmUnpub && (
+        <ConfirmModal title="Unpublish this event?"
+          body={<>Its sessions will be removed from every member&rsquo;s calendar. The event itself is kept — you can re-publish it anytime.</>}
+          confirmLabel={busy ? 'Unpublishing…' : 'Unpublish'} busy={busy}
+          onCancel={() => setConfirmUnpub(false)}
+          onConfirm={async () => { await onPublish?.(); setConfirmUnpub(false); }} />
       )}
     </div>
   );
