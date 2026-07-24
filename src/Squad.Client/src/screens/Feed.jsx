@@ -6,8 +6,8 @@ import AuthedImage from '../components/AuthedImage.jsx';
 import { deleteActivity } from '../hooks/useActivities.js';
 import { useActivityPhotos } from '../hooks/useActivityPhotos.js';
 import { useActivityTrack } from '../hooks/useActivityTrack.js';
-import { buildFrames, frameRoute, gpsFrameCount, buildTraces } from '../lib/activityFrames.js';
-import { activitySectionBreakdown } from '../lib/activitySections.js';
+import { buildFrames, frameRoute, gpsFrameCount } from '../lib/activityFrames.js';
+import { activitySectionBreakdown, frameDistances } from '../lib/activitySections.js';
 import RouteBreakdown from '../components/RouteBreakdown.jsx';
 import { haversineMeters } from '../lib/geo.js';
 import { courseNameFromPoints } from '../lib/courses.js';
@@ -523,72 +523,63 @@ function WorkoutAnalysis({ powerValues, onOpen }) {
   );
 }
 
-// ---- power curve (real, log-time x) — taps through to the full Power Curve page ----
-function PowerCurve({ curve, onOpen }) {
-  if (curve.length < 2) return null;
-  const maxW = Math.max(...curve.map((c) => c.watts));
-  const first = curve[0].sec, last = curve[curve.length - 1].sec;
-  const lmin = Math.log(first), lspan = Math.log(last) - lmin || 1;
-  const W = 320, H = 150, padY = 8;
-  const X = (sec) => ((Math.log(sec) - lmin) / lspan) * W;
-  const Y = (w) => H - padY - (w / maxW) * (H - 2 * padY);
-  const line = curve.map((c, i) => `${i ? 'L' : 'M'}${X(c.sec).toFixed(1)},${Y(c.watts).toFixed(1)}`).join(' ');
-  const area = `${line} L${W},${H} L0,${H} Z`;
-  const ticks = [1, 5, 15, 30, 60, 300, 1200, 7200].filter((tk) => tk >= first && tk <= last);
-  return (
-    <div style={s('padding:16px 18px 0')}>
-      <div style={s('display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px')}>
-        <div style={s(title + ';margin:0')}>Power Curve</div>
-        {onOpen && <span className="ctl" onClick={onOpen} style={s('font-size:11.5px;font-weight:700;color:#b98cff;display:flex;align-items:center;gap:2px')}>Full curve<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg></span>}
-      </div>
-      <div className={onOpen ? 'ctl' : undefined} onClick={onOpen} style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:14px 14px 8px')}>
-        <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: '100%', height: H, display: 'block' }}>
-          <path d={area} fill="#7c2fd6" opacity="0.14" />
-          <path d={line} fill="none" stroke="#7c2fd6" strokeWidth="2.4" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
-        </svg>
-        <div style={s('position:relative;height:14px;margin-top:2px')}>
-          {ticks.map((tk) => <span key={tk} className="mono" style={s(`position:absolute;left:${((X(tk) / W) * 100).toFixed(1)}%;transform:translateX(-50%);font-size:9px;color:var(--text3)`)}>{CURVE_LABEL[tk]}</span>)}
-        </div>
-      </div>
-    </div>
-  );
+// A metric's area+line sparkline over sample index, in a 300×92 viewBox (matches the design).
+// Nulls are dropped so gaps don't dip to zero. Returns null when there's nothing to draw.
+function sparkPath(values, W = 300, H = 92, pad = 6) {
+  const pts = (values || []).map((v, i) => [i, v]).filter(([, v]) => v != null && Number.isFinite(v));
+  if (pts.length < 2) return null;
+  const ys = pts.map((p) => p[1]);
+  const min = Math.min(...ys), max = Math.max(...ys), span = (max - min) || 1;
+  const n = (values.length - 1) || 1;
+  const X = (i) => (i / n) * W, Y = (v) => (H - pad) - ((v - min) / span) * (H - 2 * pad);
+  const coords = pts.map((p) => `${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`);
+  return {
+    line: `M${coords.join(' L')}`,
+    area: `M${X(pts[0][0]).toFixed(1)},${H} L${coords.join(' L')} L${X(pts[pts.length - 1][0]).toFixed(1)},${H} Z`,
+    min, max, avg: ys.reduce((a, b) => a + b, 0) / ys.length,
+  };
 }
 
-// ---- static sensor trace charts (real; area sparkline + axis) ----
-// Each chart carries the elevation profile as a faint grey backdrop for context (the
-// shape of the climb behind HR/power/speed), matching the design.
-function SensorTraces({ traces, totalSec, elevValues }) {
-  const W = 320, H = 88;
-  const areaFor = (values) => {
-    const pts = values.map((v, i) => [i, v]).filter(([, v]) => v != null && Number.isFinite(v));
-    if (pts.length < 2) return null;
-    const ys = pts.map(([, v]) => v), min = Math.min(...ys), max = Math.max(...ys), span = (max - min) || 1;
-    const n = (values.length - 1) || 1;
-    const X = (i) => (i / n) * W, Y = (v) => (H - 2) - ((v - min) / span) * (H - 6);
-    const line = pts.map(([i, v]) => `${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(' ');
-    return { line, area: `${X(pts[0][0]).toFixed(1)},${H} ${line} ${X(pts[pts.length - 1][0]).toFixed(1)},${H}`, min, max, avg: ys.reduce((a, b) => a + b, 0) / ys.length };
-  };
-  const elev = areaFor(elevValues || []);
-  if (!traces.length) return null;
-  const ax = [1 / 6, 1 / 2, 5 / 6].map((f) => fmtDur(totalSec * f));
+// One design chart card: colour dot + title + right sub, a big figure, a gradient-filled sparkline
+// over the faint elevation backdrop, an x-axis, and an optional link (Power Curve) or stats (Power).
+function ChartCard({ title: t, color, sub, big, bigU, spark, elevSpark, gid, sw = 2, axis, onLink, linkLabel, stats }) {
+  if (!spark) return null;
+  const W = 300, H = 92;
   return (
-    <div style={s('padding:16px 18px 0;display:flex;flex-direction:column;gap:12px')}>
-      {traces.map((t) => {
-        const g = areaFor(t.values);
-        if (!g) return null;
-        const f = t.fmt || ((x) => Math.round(x));
-        return (
-          <div key={t.key} style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:14px 14px 8px')}>
-            <div style={s('display:flex;align-items:baseline;justify-content:space-between')}><span style={s('font-size:15px;font-weight:700')}>{t.title}</span><span className="mono" style={s('font-size:11.5px;color:var(--text3)')}>avg {f(g.avg)} · max {f(g.max)} {t.unit}</span></div>
-            <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: '100%', height: H, marginTop: 8, display: 'block' }}>
-              {elev && t.key !== 'elev' && <polygon points={elev.area} fill="rgba(255,255,255,.07)" />}
-              <polygon points={g.area} fill={t.stroke} opacity="0.28" />
-              <polyline points={g.line} fill="none" stroke={t.stroke} strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
-            </svg>
-            <div style={s('position:relative;height:13px')}>{ax.map((lbl, i) => <span key={i} className="mono" style={s(`position:absolute;left:${[16, 48, 80][i]}%;font-size:9px;color:var(--text3)`)}>{lbl}</span>)}</div>
+    <div style={s('padding:14px 18px 0')}>
+      <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:18px;padding:16px 16px 15px')}>
+        <div style={s('display:flex;align-items:center;gap:9px')}>
+          <span style={s(`width:9px;height:9px;border-radius:50%;background:${color}`)} />
+          <span style={s('font-size:15px;font-weight:700')}>{t}</span>
+          {sub && <span className="mono" style={s('margin-left:auto;font-size:11px;color:var(--text2)')}>{sub}</span>}
+        </div>
+        <div style={s('display:flex;align-items:baseline;gap:5px;margin-top:8px')}>
+          <span className="mono" style={s(`font-size:32px;font-weight:800;letter-spacing:-1px;color:${color};line-height:1`)}>{big}</span>
+          {bigU && <span className="mono" style={s('font-size:12px;font-weight:600;color:var(--text3)')}>{bigU}</span>}
+        </div>
+        <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: '100%', height: 96, display: 'block', marginTop: 12 }}>
+          <defs><linearGradient id={gid} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={color} stopOpacity=".25" /><stop offset="1" stopColor={color} stopOpacity="0" /></linearGradient></defs>
+          {elevSpark && <><path d={elevSpark.area} fill="rgba(255,255,255,.045)" /><path d={elevSpark.line} fill="none" stroke="rgba(255,255,255,.13)" strokeWidth="1.1" vectorEffect="non-scaling-stroke" /></>}
+          <path d={spark.area} fill={`url(#${gid})`} />
+          <path d={spark.line} fill="none" stroke={color} strokeWidth={sw} vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
+        </svg>
+        {axis && <div style={s('display:flex;justify-content:space-between;margin-top:4px')}>{axis.map((x, i) => <span key={i} className="mono" style={s('font-size:8.5px;color:var(--text3)')}>{x}</span>)}</div>}
+        {onLink && (
+          <div className="ctl" onClick={onLink} style={s('display:flex;align-items:center;justify-content:flex-end;gap:5px;margin-top:12px;padding-top:11px;border-top:1px solid var(--line);font-size:12.5px;font-weight:700;color:var(--accent)')}>
+            {linkLabel}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
           </div>
-        );
-      })}
+        )}
+        {stats && stats.length > 0 && (
+          <div style={s('margin-top:12px;border-top:1px solid var(--line)')}>
+            {stats.map((st, i) => (
+              <div key={st.k} style={s(`display:flex;align-items:center;justify-content:space-between;padding:11px 0;${i < stats.length - 1 ? 'border-bottom:1px solid var(--line)' : ''}`)}>
+                <span style={s('font-size:13.5px;color:var(--text2)')}>{st.k}</span>
+                <span className="mono" style={s(`font-size:15px;font-weight:800;${st.c ? `color:${st.c}` : ''}`)}>{st.v}{st.u && <span style={s('font-size:10px;color:var(--text3);font-weight:600')}> {st.u}</span>}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -728,14 +719,21 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
   const frames = useMemo(() => buildFrames(track), [track]);
   const route = useMemo(() => frameRoute(frames), [frames]);
   const hasMap = useMemo(() => gpsFrameCount(frames) >= 2, [frames]);
-  const traces = useMemo(() => buildTraces(frames), [frames]);
   const powerValues = useMemo(() => frames.map((f) => f.power), [frames]);
   const hrValues = useMemo(() => frames.map((f) => f.hr), [frames]);
+  const speedValues = useMemo(() => frames.map((f) => f.speed), [frames]);
+  const cadValues = useMemo(() => frames.map((f) => f.cadence), [frames]);
   const elevValues = useMemo(() => frames.map((f) => f.elev), [frames]);
+  const analytics = useActivityAnalytics(track, laps, a?.sport);
+  // Sparklines for the design chart cards (over the faint elevation backdrop).
+  const chartElev = useMemo(() => sparkPath(elevValues), [elevValues]);
+  const sparks = useMemo(() => ({
+    hr: sparkPath(hrValues), power: sparkPath(powerValues), speed: sparkPath(speedValues), cadence: sparkPath(cadValues),
+    curve: sparkPath((analytics.curve || []).map((c) => c.watts)),
+  }), [hrValues, powerValues, speedValues, cadValues, analytics.curve]);
   // Route split into flats/climbs/descents from the recorded elevation, with the power/speed/time
   // actually ridden over each stretch mapped onto it (null for indoor / no-GPS recordings).
   const breakdown = useMemo(() => activitySectionBreakdown(frames), [frames]);
-  const analytics = useActivityAnalytics(track, laps, a?.sport);
   const relEffort = useMemo(() => computeTrimp(track, analytics.zones.maxHr), [track, analytics.zones.maxHr]);
 
   // Opening an activity should always start at the top, not wherever the previous
@@ -774,6 +772,17 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
   const { zones, np, ifactor, pwZones, hZones, workKJ } = analytics;
   const avgPower = avgOf(powerValues), maxPower = maxOf(powerValues);
   const avgHr = avgOf(hrValues), maxHr = maxOf(hrValues);
+  const avg1 = (arr) => { const f = finite(arr); return f.length ? Math.round(f.reduce((x, y) => x + y, 0) / f.length * 10) / 10 : null; };
+  const max1 = (arr) => { const f = finite(arr); return f.length ? Math.round(Math.max(...f) * 10) / 10 : null; };
+  const avgSpeed = avg1(speedValues), maxSpeed = max1(speedValues);
+  const avgCad = avgOf(cadValues), maxCad = maxOf(cadValues);
+  // x-axis labels for the chart cards: km if there's GPS distance, else elapsed time.
+  const chartAxis = useMemo(() => {
+    const d = frameDistances(frames);
+    const totalKm = d.length ? d[d.length - 1] / 1000 : 0;
+    if (totalKm > 0.3) return [0, 0.25, 0.5, 0.75, 1].map((f) => `${Math.round(f * totalKm)}`);
+    return totalSec > 0 ? [0, 0.25, 0.5, 0.75, 1].map((f) => fmtDur(totalSec * f)) : null;
+  }, [frames, totalSec]);
 
   // Training Load = TSS. Prefer the device's value (a.load); when it's missing but we have
   // power + the athlete's FTP, compute it: hours × IF² × 100 (NP relative to FTP).
@@ -789,11 +798,14 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
   const powerZoneRows = (hasRealPower && pwZones) ? zoneRows(pwZones, POWER_COLORS, PWR_ZONE_NAMES, PWR_ZONE_FRACS, zones.ftp) : null;
   const hrZoneRows = hZones ? zoneRows(hZones, HR_COLORS, HR_ZONE_NAMES, HR_ZONE_FRACS, zones.maxHr) : null;
 
-  const powerStats = !hasRealPower ? [] : [
-    avgPower > 0 && ['Avg Power', `${avgPower} W`],
-    maxPower > 0 && ['Max Power', `${maxPower} W`],
-    np > 0 && ['Normalized Power', `${np} W`],
-    workKJ >= 1 && ['Work', `${Math.round(workKJ)} kJ`],
+  // Stats list rendered inside the Power chart card (design).
+  const powerChartStats = !hasRealPower ? null : [
+    avgPower > 0 && { k: 'Avg Power', v: avgPower, u: 'W' },
+    workKJ >= 1 && { k: 'Total Work', v: Math.round(workKJ), u: 'kJ' },
+    maxPower > 0 && { k: 'Max Power', v: maxPower, u: 'W', c: '#ff6a2c' },
+    np > 0 && { k: 'Weighted Avg Power', v: np, u: 'W', c: '#ffc24d' },
+    effLoad > 0 && { k: 'Training Load', v: effLoad, u: '' },
+    intensityPct != null && { k: 'Intensity', v: intensityPct, u: '' },
   ].filter(Boolean);
 
   return (
@@ -823,30 +835,37 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
       <ActivityPhotos activityId={a.id} isMe={a.isMe} token={token} getToken={getToken} extRefresh={mediaRefresh} />
 
       {hasRealPower && <WorkoutAnalysis powerValues={powerValues} onOpen={() => actions.go('laps')} />}
-      <PowerCurve curve={analytics.curve} onOpen={() => actions.go('powercurve')} />
-      <SensorTraces traces={traces} totalSec={totalSec} elevValues={elevValues} />
 
-      {/* route broken into climbs/descents, with the power/speed/time actually ridden over each —
-          collapsible, sitting right under the elevation trace */}
+      {/* charts — power curve + sensor traces as design chart cards */}
+      {sparks.curve && (
+        <ChartCard title="Power Curve" color="#b98cff" sub="peak · full ride" big={analytics.curve[0].watts} bigU="W"
+          gid="ch_pc" sw={3} spark={sparks.curve} elevSpark={chartElev} axis={['5s', '1m', '5m', '20m', '1h']}
+          onLink={() => actions.go('powercurve')} linkLabel="View full power curve" />
+      )}
+      {sparks.hr && (
+        <ChartCard title="Heart Rate" color="#ff5064" sub={maxHr != null ? `avg · max ${maxHr}` : 'avg'} big={avgHr} bigU="bpm"
+          gid="ch_hr" sw={2.4} spark={sparks.hr} elevSpark={chartElev} axis={chartAxis} />
+      )}
+      {sparks.power && (
+        <ChartCard title="Power" color="#ff6a2c" sub={np > 0 ? `avg · NP ${np}` : 'avg power'} big={avgPower} bigU="W"
+          gid="ch_pw" sw={2} spark={sparks.power} elevSpark={chartElev} axis={chartAxis} stats={powerChartStats} />
+      )}
+      {sparks.speed && (
+        <ChartCard title="Speed" color="#c3e83a" sub={maxSpeed != null ? `avg · max ${maxSpeed}` : 'avg'} big={avgSpeed} bigU="kph"
+          gid="ch_sp" sw={2} spark={sparks.speed} elevSpark={chartElev} axis={chartAxis} />
+      )}
+      {sparks.cadence && (
+        <ChartCard title="Cadence" color="#37c0ff" sub={maxCad != null ? `avg · max ${maxCad}` : 'avg'} big={avgCad} bigU="rpm"
+          gid="ch_cd" sw={2} spark={sparks.cadence} elevSpark={chartElev} axis={chartAxis} />
+      )}
+
+      {/* route broken into climbs/descents, with the power/speed/time actually ridden over each */}
       {breakdown && (
         <RouteBreakdown route={route} elev={breakdown.elev} stats={breakdown.stats}
           onOpenSection={(sec) => actions.openSegment({ ...sec, activityId: a.id, activityTitle: a.title, sport: a.sport })}
           collapsible defaultOpen={false} title="Route & timing" />
       )}
 
-      {/* power stats + zones */}
-      {(powerStats.length > 0 || powerZoneRows) && (
-        <div style={s('padding:22px 18px 0')}>
-          <div style={s(title)}>Power</div>
-          {powerStats.length > 0 && (
-            <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;overflow:hidden')}>
-              {powerStats.map(([k, v], i) => (
-                <div key={k} style={s(`display:flex;align-items:center;padding:12px 15px;${i ? 'border-top:1px solid var(--line)' : ''}`)}><span style={s('flex:1;font-size:13px;color:var(--text2)')}>{k}</span><span className="mono" style={s('font-size:14px;font-weight:700')}>{v}</span></div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
       {powerZoneRows && (
         <ZoneBlock heading="Power Zones" icon={<BoltIcon />}
           zoneTitle={`Based on your power meter and FTP of ${zones.ftp} W`}
