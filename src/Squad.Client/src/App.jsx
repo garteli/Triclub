@@ -79,6 +79,7 @@ import UploadActivity from './screens/UploadActivity.jsx';
 import Sensors from './screens/Sensors.jsx';
 import Units from './screens/Units.jsx';
 import MapLayers from './screens/MapLayers.jsx';
+import PowerCurvePage from './screens/PowerCurvePage.jsx';
 import TrainingZones from './screens/TrainingZones.jsx';
 import NotificationPrefs from './screens/NotificationPrefs.jsx';
 import Privacy from './screens/Privacy.jsx';
@@ -138,7 +139,7 @@ const screens = {
   discover: Discover, group: GroupProfile, manage: ManageGroup, recordpay: RidePayment, ledger: CoachLedger, requests: JoinRequests, chat: Messages, dm: DirectMessages,
   settings: Settings, welcome: Welcome, register: Register, login: Login, newgroup: CreateGroup,
   athlete: AthleteProfile, editprofile: EditProfile, notifs: Notifications, activities: Activities,
-  upload: UploadActivity, sensors: Sensors,
+  upload: UploadActivity, sensors: Sensors, powercurve: PowerCurvePage,
   units: Units, maplayers: MapLayers, zones: TrainingZones, notifprefs: NotificationPrefs, privacy: Privacy, help: Help, legal: Legal,
   admin: Admin, adminuser: AdminUserDetail, admingroup: AdminGroupDetail,
 };
@@ -166,6 +167,7 @@ const HEADER_META = {
   editprofile: { title: 'Edit profile' },
   // Content pages.
   activities: { title: 'Activities' },
+  powercurve: { title: 'Power Curve' },
   discover: { title: 'Discover' },
   seg: { title: 'Segments' },
   clubrank: { title: 'Club Ranking' },
