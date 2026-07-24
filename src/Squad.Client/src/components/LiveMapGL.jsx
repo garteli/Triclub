@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { s } from '../lib/style.js';
-import { BASEMAP_LABEL, baseSource, applyBasemap, nextBasemap, inIsrael } from '../lib/basemaps.js';
+import { BASEMAP_LABEL, baseSource, applyBasemap, nextBasemap, inIsrael, resolveBasemap } from '../lib/basemaps.js';
 import { getRouteStyle, setRouteStyle as persistRouteStyle } from '../lib/routeStyle.js';
 import { getMapView, setMapStyle as persistMapStyle } from '../lib/mapView.js';
 import { addRouteArrows, styleArrows } from '../lib/mapArrows.js';
@@ -84,8 +84,8 @@ export default function LiveMapGL({ pts, course, path, riders, mySport, interact
   const markerSigRef = useRef('');     // last rider signature, so we only rebuild on real change
   const [follow, setFollow] = useState(false); // false = north-up (free pan), true = follow heading
   const [failed, setFailed] = useState(false);
-  const [basemap, setBasemap] = useState(() => getMapView().style); // shared basemap layer (persisted across all maps)
-  const basemapRef = useRef(getMapView().style);
+  const [basemap, setBasemap] = useState(() => resolveBasemap(getMapView().style)); // shared basemap layer (favorites-aware)
+  const basemapRef = useRef(resolveBasemap(getMapView().style));
   const [rstyle, setRstyle] = useState(getRouteStyle); // per-user route colour + width (path + arrows)
   const [styleOpen, setStyleOpen] = useState(false);
   const rstyleRef = useRef(rstyle);

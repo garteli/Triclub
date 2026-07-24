@@ -1,5 +1,8 @@
+import { useState } from 'react';
 import { s } from '../lib/style.js';
 import { unitsLabel } from '../lib/prefs.js';
+import { BASEMAP_ORDER, BASEMAP_LABEL } from '../lib/basemaps.js';
+import { getMapLayerPrefs, setMapLayerPrefs, getMapView, setMapStyle } from '../lib/mapView.js';
 
 const label = 'font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.3px;font-weight:600;margin:22px 2px 10px';
 const card = 'background:var(--bg2);border:1px solid var(--line);border-radius:16px';
@@ -39,6 +42,73 @@ const Stepper = ({ label, value, unit, min, max, onChange }) => (
     </div>
   </div>
 );
+
+const Chip = ({ active, onClick, children }) => (
+  <div className="ctl" onClick={onClick} style={s('padding:8px 12px;border-radius:10px;font-size:12px;font-weight:600;' + (active ? 'background:var(--accent);color:var(--accent-ink)' : 'background:var(--bg3);border:1px solid var(--line);color:var(--text2)'))}>{children}</div>
+);
+
+// Favorite basemap layers (which appear in every map's layer switcher) + the default layer
+// maps open on. Persisted in localStorage (mapView.js); basemaps.js reads it to filter/resolve.
+function MapLayersSection() {
+  const seed = () => {
+    const p = getMapLayerPrefs();
+    const fav = new Set(p.favorites ? p.favorites.filter((k) => BASEMAP_ORDER.includes(k)) : BASEMAP_ORDER);
+    if (fav.size === 0) BASEMAP_ORDER.forEach((k) => fav.add(k));
+    let def = p.defaultStyle;
+    if (!fav.has(def)) def = BASEMAP_ORDER.find((k) => fav.has(k)) || 'voyager';
+    return { fav, def };
+  };
+  const [{ fav, def }, set] = useState(seed);
+
+  const commit = (nextFav, nextDef) => {
+    setMapLayerPrefs({ favorites: BASEMAP_ORDER.filter((k) => nextFav.has(k)), defaultStyle: nextDef });
+    // Keep the shared "current layer" valid: if it's no longer a favorite, snap it to the default.
+    if (!nextFav.has(getMapView().style)) setMapStyle(nextDef);
+    set({ fav: nextFav, def: nextDef });
+  };
+
+  const toggleFav = (key) => {
+    const next = new Set(fav);
+    if (next.has(key)) { if (next.size <= 1) return; next.delete(key); } // keep at least one
+    else next.add(key);
+    const nextDef = next.has(def) ? def : BASEMAP_ORDER.find((k) => next.has(k));
+    commit(next, nextDef);
+  };
+
+  const pickDefault = (key) => {
+    if (!fav.has(key)) return;
+    setMapLayerPrefs({ favorites: BASEMAP_ORDER.filter((k) => fav.has(k)), defaultStyle: key });
+    setMapStyle(key); // apply now so the next map opens on it
+    set({ fav, def: key });
+  };
+
+  const favList = BASEMAP_ORDER.filter((k) => fav.has(k));
+  return (
+    <>
+      <div style={s(label)}>Maps</div>
+      <div style={s(card + ';padding:14px 15px')}>
+        <div style={s(rowLabel)}>Favorite layers</div>
+        {BASEMAP_ORDER.map((k, i) => (
+          <div key={k} style={s(`display:flex;align-items:center;${i ? 'margin-top:12px' : ''}`)}>
+            <div style={s('flex:1;min-width:0')}>
+              <span style={s('font-size:13.5px;font-weight:600;color:var(--text)')}>{BASEMAP_LABEL[k]}</span>
+              {k === 'offroad' && <span style={s('font-size:10.5px;color:var(--text3);margin-left:7px')}>Israel only</span>}
+            </div>
+            <Toggle on={fav.has(k)} onClick={() => toggleFav(k)} />
+          </div>
+        ))}
+        <div style={s('height:1px;background:var(--line);margin:15px 0')} />
+        <div style={s(rowLabel)}>Default layer</div>
+        <div style={s('display:flex;gap:7px;flex-wrap:wrap')}>
+          {favList.map((k) => <Chip key={k} active={def === k} onClick={() => pickDefault(k)}>{BASEMAP_LABEL[k]}</Chip>)}
+        </div>
+      </div>
+      <div style={s('font-size:11px;color:var(--text3);margin:8px 2px 0;line-height:1.5;padding:0 2px')}>
+        Only favorite layers appear in the map layer switcher. New maps open on your default layer.
+      </div>
+    </>
+  );
+}
 
 export default function Settings({ vm, state, actions, fallInfo }) {
   const { theme, accent, units } = state;
@@ -84,6 +154,9 @@ export default function Settings({ vm, state, actions, fallInfo }) {
           </>
         )}
       </div>
+
+      {/* maps — favorite basemap layers + the default every map opens on */}
+      <MapLayersSection />
 
       {/* safety — fall / incident detection (configured here, runs automatically during a live ride) */}
       {fallInfo && (

@@ -6,6 +6,8 @@
 // so we cap maxzoom and let MapLibre overzoom past that; the host serves open CORS
 // (Access-Control-Allow-Origin: *), so the cross-origin WebGL texture upload works.
 
+import { getMapLayerPrefs } from './mapView.js';
+
 const cartoTiles = (seg) => ['a', 'b', 'c', 'd'].map((sd) => `https://${sd}.basemaps.cartocdn.com/rastertiles/${seg}/{z}/{x}/{y}.png`);
 
 export const BASEMAPS = {
@@ -25,12 +27,34 @@ export const BASEMAP_LABEL = { voyager: 'Voyager', light: 'Light', satellite: 'S
 export const inIsrael = (lat, lon) =>
   Number.isFinite(lat) && Number.isFinite(lon) && lat >= 29.0 && lat <= 33.5 && lon >= 34.0 && lon <= 36.2;
 
-// Basemap keys available for the locale — drops Off-road outside Israel.
-export const basemapOrder = (allowOffroad) => BASEMAP_ORDER.filter((k) => k !== 'offroad' || allowOffroad);
+// Basemap keys available for the locale, restricted to the athlete's favorites (Settings → Maps).
+// Off-road is dropped outside Israel. If the favorites list would leave nothing for this locale,
+// fall back to the full locale set so the switcher (and its modulo) always has something to cycle.
+export const basemapOrder = (allowOffroad) => {
+  const byLocale = BASEMAP_ORDER.filter((k) => k !== 'offroad' || allowOffroad);
+  const { favorites } = getMapLayerPrefs();
+  if (!favorites) return byLocale; // null = all layers (default, nothing filtered)
+  const fav = byLocale.filter((k) => favorites.includes(k));
+  return fav.length ? fav : byLocale;
+};
 export const nextBasemap = (key, allowOffroad = true) => {
   const order = basemapOrder(allowOffroad);
   const i = order.indexOf(key);
   return order[(i + 1) % order.length];
+};
+
+// The athlete's default layer, constrained to what's available (favorites ∩ locale).
+export const defaultBasemap = (allowOffroad = true) => {
+  const order = basemapOrder(allowOffroad);
+  const { defaultStyle } = getMapLayerPrefs();
+  return order.includes(defaultStyle) ? defaultStyle : order[0];
+};
+
+// Sanitize a persisted/last-used layer key for opening a map: keep it if it's an available
+// favorite, otherwise fall back to the default. Guarantees maps never open on a hidden layer.
+export const resolveBasemap = (key, allowOffroad = true) => {
+  const order = basemapOrder(allowOffroad);
+  return order.includes(key) ? key : defaultBasemap(allowOffroad);
 };
 
 // A MapLibre raster-source spec for the given basemap key (falls back to voyager).

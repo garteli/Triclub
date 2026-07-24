@@ -7,7 +7,7 @@ import AuthedImage from '../components/AuthedImage.jsx';
 import SportIcon from '../components/SportIcon.jsx';
 import { listEventParticipants, joinEvent, leaveEvent, getEventRoute, setEventStartPlace, getEventElevation, setEventElevation, computeEventElevation } from '../lib/events.js';
 import { buildElevationProfile, profileFromRoute } from '../lib/elevation.js';
-import { BASEMAP_LABEL, nextBasemap, inIsrael } from '../lib/basemaps.js';
+import { BASEMAP_LABEL, nextBasemap, inIsrael, resolveBasemap, defaultBasemap } from '../lib/basemaps.js';
 import { getRouteStyle, setRouteStyle as persistRouteStyle } from '../lib/routeStyle.js';
 import { getMapView, setMapStyle as persistMapStyle } from '../lib/mapView.js';
 import { eventShareUrl } from '../lib/eventLink.js';
@@ -137,7 +137,7 @@ export default function EventDetail({ vm, state, actions, getToken }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [mapFull, setMapFull] = useState(false); // fullscreen route map overlay
-  const [mapStyle, setMapStyle] = useState(() => getMapView().style); // basemap layer (shared across maps)
+  const [mapStyle, setMapStyle] = useState(() => resolveBasemap(getMapView().style)); // basemap layer (shared, favorites-aware)
   const [rstyle, setRstyle] = useState(getRouteStyle);  // per-user route colour + width (shared)
   const [styleOpen, setStyleOpen] = useState(false);    // route-style picker open
   const [dirTarget, setDirTarget] = useState(null);     // { lat, lon, title } → Directions action sheet
@@ -157,7 +157,7 @@ export default function EventDetail({ vm, state, actions, getToken }) {
   const cycleLayer = () => setMapStyle((st) => nextBasemap(st, israel));
   const applyRstyle = (next) => { setRstyle(next); persistRouteStyle(next); };
   // Fall back to a global basemap if we're on Off-road but the route isn't in Israel.
-  useEffect(() => { if (!israel && mapStyle === 'offroad') setMapStyle('voyager'); }, [israel, mapStyle]);
+  useEffect(() => { if (!israel && mapStyle === 'offroad') setMapStyle(defaultBasemap(false)); }, [israel, mapStyle]);
   // Persist the chosen layer so every map in the app opens on the same basemap.
   useEffect(() => { persistMapStyle(mapStyle); }, [mapStyle]);
 
