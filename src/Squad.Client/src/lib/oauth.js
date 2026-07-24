@@ -119,8 +119,11 @@ export async function getGoogleIdToken(cfg) {
     if (!cfg?.google?.iosClientId) {
       throw new Error('Google sign-in isn’t set up for the app yet (missing iOS client id).');
     }
+    // No `scopes`: we only need the id_token (which already carries email + basic profile). Requesting
+    // extra scopes triggers the plugin's access-token flow, which on Android errors "You CANNOT use
+    // scopes without modifying the main activity" — and we don't need that access token anyway.
     const res = await withTimeout(
-      nativeLogin(cfg, { provider: 'google', options: { scopes: ['email', 'profile'] } }),
+      nativeLogin(cfg, { provider: 'google' }),
       SIGNIN_TIMEOUT_MS, 'Google sign-in timed out — please try again.');
     const idToken = res?.result?.idToken;
     if (!idToken) throw new Error('Google sign-in did not return a token.');
