@@ -62,13 +62,18 @@ public sealed record ProfileDetail(
     // Emergency contact for the live-ride fall-detection "Call" action.
     string? EmergencyName = null, string? EmergencyPhone = null,
     // Proxy path to the athlete's avatar photo (null when they have none → initials).
-    string? AvatarUrl = null);
+    string? AvatarUrl = null,
+    // CSV of profile fields the athlete hides from OTHER athletes' view of them (keys:
+    // ftp, weight, age, hours). Enforced server-side in AthleteEndpoints; the owner always
+    // sees their own values. Empty/null = nothing hidden.
+    string? HiddenFields = null);
 
-/// <summary>A profile edit. Null fields are left unchanged; the host recomputes Initials if Name changes.</summary>
+/// <summary>A profile edit. Null fields are left unchanged; the host recomputes Initials if Name changes.
+/// HiddenFields is special: it's a full replacement, so send "" to clear (not null, which is "leave as-is").</summary>
 public sealed record ProfileUpdate(
     string? Name, string? Club, string? AgeGroup, string? PrimarySport, string? Level, int? Ftp, string? WeeklyHours, string? Bio,
     string? BirthDate = null, string? Gender = null, decimal? WeightKg = null,
-    string? EmergencyName = null, string? EmergencyPhone = null);
+    string? EmergencyName = null, string? EmergencyPhone = null, string? HiddenFields = null);
 
 /// <summary>Read/update the athlete's own profile.</summary>
 public interface IProfileService

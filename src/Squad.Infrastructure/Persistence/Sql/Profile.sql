@@ -21,3 +21,6 @@ IF COL_LENGTH('dbo.Athlete', 'WeightKg')    IS NULL ALTER TABLE dbo.Athlete ADD 
 -- Emergency contact — surfaced by the live-ride fall-detection "Call" action.
 IF COL_LENGTH('dbo.Athlete', 'EmergencyName')  IS NULL ALTER TABLE dbo.Athlete ADD EmergencyName  NVARCHAR(120) NULL;
 IF COL_LENGTH('dbo.Athlete', 'EmergencyPhone') IS NULL ALTER TABLE dbo.Athlete ADD EmergencyPhone NVARCHAR(40)  NULL;
+-- CSV of profile fields hidden from OTHER athletes (keys: ftp, weight, age, hours). Enforced
+-- server-side in AthleteEndpoints; the owner always sees their own values. NULL/'' = nothing hidden.
+IF COL_LENGTH('dbo.Athlete', 'HiddenFields')   IS NULL ALTER TABLE dbo.Athlete ADD HiddenFields   NVARCHAR(200) NULL;
