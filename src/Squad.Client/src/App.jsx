@@ -81,6 +81,7 @@ import Units from './screens/Units.jsx';
 import MapLayers from './screens/MapLayers.jsx';
 import PowerCurvePage from './screens/PowerCurvePage.jsx';
 import ActivityZones from './screens/ActivityZones.jsx';
+import SegmentPage from './screens/SegmentPage.jsx';
 import TrainingZones from './screens/TrainingZones.jsx';
 import NotificationPrefs from './screens/NotificationPrefs.jsx';
 import Privacy from './screens/Privacy.jsx';
@@ -140,7 +141,7 @@ const screens = {
   discover: Discover, group: GroupProfile, manage: ManageGroup, recordpay: RidePayment, ledger: CoachLedger, requests: JoinRequests, chat: Messages, dm: DirectMessages,
   settings: Settings, welcome: Welcome, register: Register, login: Login, newgroup: CreateGroup,
   athlete: AthleteProfile, editprofile: EditProfile, notifs: Notifications, activities: Activities,
-  upload: UploadActivity, sensors: Sensors, powercurve: PowerCurvePage, activityzones: ActivityZones,
+  upload: UploadActivity, sensors: Sensors, powercurve: PowerCurvePage, activityzones: ActivityZones, segment: SegmentPage,
   units: Units, maplayers: MapLayers, zones: TrainingZones, notifprefs: NotificationPrefs, privacy: Privacy, help: Help, legal: Legal,
   admin: Admin, adminuser: AdminUserDetail, admingroup: AdminGroupDetail,
 };
@@ -170,6 +171,7 @@ const HEADER_META = {
   activities: { title: 'Activities' },
   powercurve: { title: 'Power Curve' },
   activityzones: { title: 'Training Zones' },
+  segment: { title: 'Segment' },
   discover: { title: 'Discover' },
   seg: { title: 'Segments' },
   clubrank: { title: 'Club Ranking' },
@@ -631,6 +633,8 @@ export default function App() {
     decline: () => setState((s) => ({ ...s, reqStatus: { ...s.reqStatus, [s.selApplicant]: 'declined' } })),
     // activities
     openActivity: (id) => setState((s) => ({ ...s, selActivity: id, screen: 'feed', activityBack: s.screen === 'feed' ? s.activityBack : s.screen })),
+    // one route section of an activity → the Segment detail page (your effort over that stretch)
+    openSegment: (seg) => patch({ selSegment: seg, screen: 'segment' }),
     // profiles — tapping your OWN avatar (squad rail / leaderboard / feed) opens your own
     // Profile page (goal race, my clubs, stats), not the public teammate view.
     openAthlete: (id) => setState((s) => {

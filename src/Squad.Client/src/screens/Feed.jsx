@@ -802,6 +802,7 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
           collapsible, sitting right under the elevation trace */}
       {breakdown && (
         <RouteBreakdown route={route} elev={breakdown.elev} stats={breakdown.stats}
+          onOpenSection={(sec) => actions.openSegment({ ...sec, activityId: a.id, activityTitle: a.title, sport: a.sport })}
           collapsible defaultOpen={false} title="Route & timing" />
       )}
 
