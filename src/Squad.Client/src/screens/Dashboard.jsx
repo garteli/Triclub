@@ -3,12 +3,16 @@ import { s, html } from '../lib/style.js';
 import Avatar from '../components/Avatar.jsx';
 import AuthedAvatar from '../components/AuthedAvatar.jsx';
 import AuthedImage from '../components/AuthedImage.jsx';
-import SportIcon from '../components/SportIcon.jsx';
 import FeedActivityCard from '../components/FeedActivityCard.jsx';
+import { EventCard, DirectionsSheet } from '../components/EventCard.jsx';
 import { useNotifications } from '../hooks/useNotifications.js';
 import { mapRow } from '../hooks/usePlan.js';
 import { discIcon } from '../data/squadData.js';
-import { listSquadEvents } from '../lib/events.js';
+import {
+  listSquadEvents, getEventRoute, listEventParticipants, setEventStartPlace,
+  joinEvent, leaveEvent, checkInEvent, undoCheckInEvent,
+} from '../lib/events.js';
+import { reverseGeocode } from '../lib/reverseGeocode.js';
 
 // Monday (week start, matching the plan's week convention) `weekOffset` weeks from today,
 // as a 'yyyy-MM-dd' string for the /api/plan?weekStart= query.
@@ -25,40 +29,75 @@ function eventIsToday(iso) {
     && d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
 }
 
-// The "today" hero for a motorsport club: a group ride scheduled for today (from the club's
-// events), mirroring the endurance plan card so a coach's just-added ride actually shows here.
-function TodayEventCard({ ev, onOpen, token, rtl = false, label = null }) {
-  const d = new Date(ev.start);
-  const time = Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString(rtl ? 'he-IL' : 'en-US', { hour: 'numeric', minute: '2-digit' });
-  const sub = [time, ev.courseName, ev.courseKm ? `${ev.courseKm.toFixed(1)} km` : null].filter(Boolean).join(' · ');
-  const going = ev.joinCount || 0;
+// The "today"/"up next" hero for a group event — renders the SAME rich card as the Events page
+// (date chip, sport, title, when/where, route-map preview, who's-going + RSVP), fetching the
+// event's route + participants the same lazy way Events.jsx does so the two match exactly.
+function HeroEventCard({ ev: initialEv, squadId, getToken, onOpen }) {
+  const [ev, setEv] = useState(initialEv);
+  useEffect(() => setEv(initialEv), [initialEv]);
+
+  const hasRoute = !!(initialEv.courseId || initialEv.courseName || initialEv.courseKm);
+  const [route, setRoute] = useState(hasRoute ? null : undefined); // undefined → no route to draw
+  const [faces, setFaces] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [dirTarget, setDirTarget] = useState(null);
+  const token = getToken?.() ?? null;
+
+  // Fetch the event's participants (faces) and route (map preview + directions) once.
+  useEffect(() => {
+    let ok = true;
+    (async () => {
+      const t = await getToken?.();
+      if ((initialEv.joinCount || 0) > 0) {
+        try { const p = await listEventParticipants(t, squadId, initialEv.id); if (ok) setFaces(p || []); }
+        catch { if (ok) setFaces([]); }
+      } else setFaces([]);
+      if (hasRoute) {
+        try {
+          const rt = await getEventRoute(t, squadId, initialEv.id);
+          const pts = rt?.points?.length ? rt.points : null;
+          if (ok) setRoute(pts);
+          // Name the start point once (reverse geocode) and cache it, like the Events page.
+          if (pts && !initialEv.startPlace) {
+            const st = pts.find((p) => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]));
+            if (st) {
+              const name = await reverseGeocode(st[0], st[1]);
+              if (name && ok) { setEv((e) => ({ ...e, startPlace: name })); try { await setEventStartPlace(t, squadId, initialEv.id, name); } catch { /* best-effort */ } }
+            }
+          }
+        } catch { if (ok) setRoute(null); }
+      }
+    })();
+    return () => { ok = false; };
+  }, [initialEv.id, squadId, getToken, hasRoute, initialEv.joinCount, initialEv.startPlace]);
+
+  const run = async (fn, fields, refreshFaces) => {
+    setBusy(true);
+    try {
+      const t = await getToken?.();
+      await fn(t, ev.id);
+      const next = fields(ev);
+      setEv((e) => ({ ...e, ...next }));
+      if (refreshFaces) { try { const p = await listEventParticipants(t, squadId, ev.id); setFaces(p || []); } catch { /* keep old */ } }
+    } catch { /* surfaced on the Events page; the hero stays quiet */ }
+    finally { setBusy(false); }
+  };
+  const join = () => run(joinEvent, (e) => ({ joined: true, joinCount: (e.joinCount || 0) + 1 }), true);
+  const leave = () => run(leaveEvent, (e) => ({ joined: false, checkedIn: false, joinCount: Math.max(0, (e.joinCount || 1) - 1) }), true);
+  const checkin = () => run(checkInEvent, (e) => ({ checkedIn: true, checkedInCount: (e.checkedInCount || 0) + 1 }));
+  const undoCheckin = () => run(undoCheckInEvent, (e) => ({ checkedIn: false, checkedInCount: Math.max(0, (e.checkedInCount || 1) - 1) }));
+
   return (
-    <div className="ctl" onClick={() => onOpen?.(ev)} style={s('background:linear-gradient(160deg,var(--bg3),var(--bg2));border:1px solid var(--line);border-radius:22px;overflow:hidden')}>
-      {ev.bannerUrl
-        ? <div style={s('height:96px;overflow:hidden')}><AuthedImage url={ev.bannerUrl} token={token} style="width:100%;height:100%;object-fit:cover" /></div>
-        : <div style={s('height:4px;background:var(--accent)')} />}
-      <div style={s(`padding:17px 18px 18px;${rtl ? 'text-align:right' : ''}`)}>
-        <div style={s(`display:flex;justify-content:space-between;align-items:flex-start;${rtl ? 'flex-direction:row-reverse' : ''}`)}>
-          <div style={s(`display:flex;gap:12px;align-items:center;${rtl ? 'flex-direction:row-reverse' : ''}`)}>
-            <div style={s('width:46px;height:46px;border-radius:14px;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;flex:none;overflow:hidden')}>
-              {ev.logoUrl
-                ? <AuthedImage url={ev.logoUrl} token={token} style="width:100%;height:100%;object-fit:cover" />
-                : <SportIcon name="moto" size={24} color="var(--accent)" />}
-            </div>
-            <div>
-              <div style={s('font-size:19px;font-weight:700;letter-spacing:-.4px')}>{ev.title}</div>
-              {sub && <div style={s('font-size:13px;color:var(--text2)')}>{sub}</div>}
-            </div>
-          </div>
-          <div style={s('background:var(--accent);color:var(--accent-ink);font-size:10px;font-weight:700;padding:4px 8px;border-radius:7px;text-transform:uppercase;letter-spacing:.5px;flex:none')}>{label ?? (rtl ? 'היום' : 'Today')}</div>
-        </div>
-        <div style={s('display:flex;margin-top:14px')}>
-          <div className="ctl" style={s('flex:1;background:var(--accent);color:var(--accent-ink);text-align:center;padding:13px;border-radius:13px;font-weight:700;font-size:14px')}>
-            {rtl ? (going ? `${going} רשומים · צפה` : 'צפה באירוע') : (going ? `${going} going · View` : 'View ride')}
-          </div>
-        </div>
-      </div>
-    </div>
+    <>
+      <EventCard ev={ev} isOwner={false} busy={busy} token={token} route={route} participants={faces}
+        onOpen={() => onOpen?.(ev)}
+        onDirections={(lat, lon) => setDirTarget({ lat, lon, title: ev.title })}
+        onJoin={join} onLeave={leave} onCheckIn={checkin} onUndoCheckIn={undoCheckin} />
+      {dirTarget && (
+        <DirectionsSheet target={dirTarget} onClose={() => setDirTarget(null)}
+          onPick={(url) => { try { window.open(url, '_blank', 'noopener'); } catch { /* ignore */ } setDirTarget(null); }} />
+      )}
+    </>
   );
 }
 
@@ -160,16 +199,16 @@ function EmptyHero({ family, go, rtl }) {
 }
 
 // The home "today" hero: eyebrow + the chosen session/event card (or empty state).
-function TodayHero({ vm, go, openEvent, token, rtl, todayEvent, upcomingEvent, nextWeekSession }) {
+function TodayHero({ vm, go, openEvent, getToken, rtl, todayEvent, upcomingEvent, nextWeekSession }) {
   const hero = pickHero(vm, todayEvent, upcomingEvent, nextWeekSession);
   const upNext = hero && !hero.isToday;
   const eyebrow = upNext
     ? (rtl ? 'הבא בתור' : 'Up next')
     : (rtl ? `היום · ${vm.todayLabelHe}` : `Today · ${vm.todayLabel}`);
-  const label = hero
+  const label = hero && hero.kind === 'session'
     ? (hero.isToday
       ? (rtl ? 'היום' : 'Today')
-      : heroDayLabel(hero.kind === 'session' ? localDate(hero.item.iso) : new Date(hero.item.start), rtl))
+      : heroDayLabel(localDate(hero.item.iso), rtl))
     : null;
   return (
     <>
@@ -179,7 +218,8 @@ function TodayHero({ vm, go, openEvent, token, rtl, todayEvent, upcomingEvent, n
       ) : hero.kind === 'session' ? (
         <PlanHero wk={hero.item} label={label} isToday={hero.isToday} go={go} rtl={rtl} />
       ) : (
-        <TodayEventCard ev={hero.item} onOpen={openEvent} token={token} rtl={rtl} label={label} />
+        // Group events render as the rich Events-page card (date chip · route map · RSVP).
+        <HeroEventCard ev={hero.item} squadId={vm.activeClubId} getToken={getToken} onOpen={openEvent} />
       )}
     </>
   );
@@ -285,7 +325,7 @@ function DashboardEN({ vm, go, openAthlete, openActivity, openEvent, getToken, o
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .4s ease')}>
       {/* today hero — today's session/event, else the earliest upcoming one, else empty */}
-      <TodayHero vm={vm} go={go} openEvent={openEvent} token={token} rtl={false} todayEvent={todayEvent} upcomingEvent={upcomingEvent} nextWeekSession={nextWeekSession} />
+      <TodayHero vm={vm} go={go} openEvent={openEvent} getToken={getToken} rtl={false} todayEvent={todayEvent} upcomingEvent={upcomingEvent} nextWeekSession={nextWeekSession} />
 
       {/* squad status */}
       <div style={s('display:flex;justify-content:space-between;align-items:baseline;margin:22px 2px 12px')}>
@@ -318,7 +358,7 @@ function DashboardHE({ vm, go, openAthlete, openActivity, openEvent, getToken, o
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .4s ease;text-align:right')}>
       {/* today hero — today's session/event, else the earliest upcoming one, else empty */}
-      <TodayHero vm={vm} go={go} openEvent={openEvent} token={token} rtl todayEvent={todayEvent} upcomingEvent={upcomingEvent} nextWeekSession={nextWeekSession} />
+      <TodayHero vm={vm} go={go} openEvent={openEvent} getToken={getToken} rtl todayEvent={todayEvent} upcomingEvent={upcomingEvent} nextWeekSession={nextWeekSession} />
 
       <div style={s('display:flex;justify-content:space-between;align-items:baseline;margin:22px 2px 12px;flex-direction:row-reverse')}>
         <div style={s('font-size:12px;color:var(--text3);font-weight:600')}>המועדון השבוע</div>
