@@ -111,6 +111,8 @@ export default function Welcome({ actions, inviteInfo }) {
         <OrDivider>{anySocial ? 'or with email' : 'sign in with email'}</OrDivider>
         <div className="ctl" onClick={() => actions.go('register')} style={s('background:var(--accent);color:var(--accent-ink);text-align:center;padding:15px;border-radius:14px;font-weight:700;font-size:15px;margin-top:4px')}>Create account</div>
         <div style={s('text-align:center;font-size:13px;color:var(--text2);margin-top:16px')}>Already have an account? <span className="ctl" onClick={() => actions.go('login')} style={s('color:var(--accent);font-weight:700')}>Log in</span></div>
+        {/* Link to the static marketing home page (served at /home.html by Squad.Web). */}
+        <div style={s('text-align:center;font-size:12px;margin-top:14px')}><a href="/home.html" style={s('color:var(--text2);text-decoration:none;font-weight:600')}>About Domestique Hub →</a></div>
         <div style={s('text-align:center;font-size:10.5px;color:var(--text3);margin-top:14px;line-height:1.5')}>By continuing you agree to Domestique Hub's Terms &amp; Privacy Policy.</div>
       </div>
     </div>
