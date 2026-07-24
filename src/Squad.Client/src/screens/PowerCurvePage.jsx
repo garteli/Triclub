@@ -71,7 +71,7 @@ export default function PowerCurvePage({ vm, actions, getToken }) {
   const showHistCurve = showHist && histReady;
 
   return (
-    <div style={s('padding:2px 16px 120px;animation:floatUp .35s ease')}>
+    <div style={s('display:flex;flex-direction:column;min-height:calc(100dvh - var(--app-header-h));padding:2px 16px 120px;animation:floatUp .35s ease')}>
       {/* legend toggles */}
       <div style={s('display:flex;gap:10px;margin:4px 0 14px')}>
         <Toggle on={showRide} onClick={() => setShowRide((v) => !v)} dot={RIDE} label="This ride" />
@@ -116,8 +116,10 @@ function Toggle({ on, onClick, dot, label, disabled }) {
 }
 
 // Log-time x-axis power curve. Both curves share one scale so they overlay for comparison.
-// The SVG height (px) equals its viewBox height so y-axis labels align in px; x-axis labels
-// flow in a full-width strip beneath it (same idea as the inline card, which aligns cleanly).
+// The plot flexes to fill the page's remaining height; the SVG stretches to it via
+// preserveAspectRatio="none", so both axes' labels are positioned as viewBox-fraction
+// percentages (not px) to stay aligned at any rendered height. H_PX is just the viewBox
+// coordinate height (an arbitrary aspect unit), no longer a fixed pixel size.
 const H_PX = 268;
 function Chart({ rideCurve, histCurve, loading }) {
   const g = useMemo(() => {
@@ -142,15 +144,15 @@ function Chart({ rideCurve, histCurve, loading }) {
 
   if (!g) {
     return (
-      <div style={s('height:320px;display:flex;align-items:center;justify-content:center;background:var(--bg2);border:1px solid var(--line);border-radius:16px;color:var(--text3);font-size:12.5px')}>
+      <div style={s('flex:1;min-height:320px;display:flex;align-items:center;justify-content:center;background:var(--bg2);border:1px solid var(--line);border-radius:16px;color:var(--text3);font-size:12.5px')}>
         {loading ? 'Reading the ride…' : 'Turn on a curve to see it.'}
       </div>
     );
   }
   return (
-    <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:10px 10px 8px')}>
-      <div style={s(`position:relative;height:${H_PX}px`)}>
-        <svg viewBox={`0 0 ${g.W} ${g.H}`} preserveAspectRatio="none" style={{ width: '100%', height: `${H_PX}px`, display: 'block' }}>
+    <div style={s('flex:1;min-height:0;display:flex;flex-direction:column;background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:10px 10px 8px')}>
+      <div style={s('position:relative;flex:1;min-height:0')}>
+        <svg viewBox={`0 0 ${g.W} ${g.H}`} preserveAspectRatio="none" style={{ width: '100%', height: '100%', display: 'block' }}>
           <defs><linearGradient id="pcFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={RIDE} stopOpacity=".22" /><stop offset="1" stopColor={RIDE} stopOpacity="0" /></linearGradient></defs>
           {g.yTicks.map((t) => <line key={t.v} x1={g.L} y1={t.y} x2={g.R} y2={t.y} stroke="var(--line)" strokeWidth="1" vectorEffect="non-scaling-stroke" />)}
           {g.xTicks.map((t) => <line key={t.t} x1={t.x} y1={g.T} x2={t.x} y2={g.B} stroke="var(--line)" strokeWidth="1" strokeDasharray="3 5" vectorEffect="non-scaling-stroke" />)}
@@ -165,7 +167,7 @@ function Chart({ rideCurve, histCurve, loading }) {
         </svg>
         {/* y-axis labels — top in px matches the svg (viewBox H == pixel H) */}
         {g.yTicks.filter((t) => t.v > 0).map((t) => (
-          <span key={t.v} className="mono" style={s(`position:absolute;top:${t.y.toFixed(1)}px;left:0;transform:translateY(-50%);font-size:9.5px;color:var(--text3);background:var(--bg2);padding-right:3px`)}>{t.v}</span>
+          <span key={t.v} className="mono" style={s(`position:absolute;top:${(t.y / g.H * 100).toFixed(2)}%;left:0;transform:translateY(-50%);font-size:9.5px;color:var(--text3);background:var(--bg2);padding-right:3px`)}>{t.v}</span>
         ))}
       </div>
       {/* x-axis labels — full-width strip under the plot, aligned by viewBox fraction */}
