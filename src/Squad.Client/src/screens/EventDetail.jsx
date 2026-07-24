@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { s } from '../lib/style.js';
+import useSheetDrag from '../hooks/useSheetDrag.js';
 import RouteMapGL from '../components/RouteMapGL.jsx';
 import AuthedAvatar from '../components/AuthedAvatar.jsx';
 import AuthedImage from '../components/AuthedImage.jsx';
@@ -99,11 +100,14 @@ function MapStyleControls({ mapStyle, cycleLayer, styleOpen, setStyleOpen }) {
 // Directions action sheet — pick which navigation app to open for the start point.
 function DirectionsSheet({ target, onClose, onPick }) {
   const apps = navApps(target.lat, target.lon);
+  const drag = useSheetDrag(onClose);
   return (
     <>
       <div className="ctl" onClick={onClose} style={s('position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:320;animation:floatUp .2s ease')} />
-      <div className="scr" style={s('position:fixed;left:0;right:0;bottom:0;z-index:321;background:var(--bg);border-top:1px solid var(--line2);border-radius:22px 22px 0 0;padding:16px 16px calc(20px + env(safe-area-inset-bottom));animation:floatUp .22s ease')}>
-        <div style={s('width:38px;height:4px;border-radius:2px;background:var(--line2);margin:0 auto 14px')} />
+      <div className="scr" style={s(`position:fixed;left:0;right:0;bottom:0;z-index:321;background:var(--bg);border-top:1px solid var(--line2);border-radius:22px 22px 0 0;padding:16px 16px calc(20px + env(safe-area-inset-bottom));animation:floatUp .22s ease;${drag.sheetStyle}`)}>
+        <div {...drag.handleProps} style={s('display:flex;justify-content:center;padding:2px 0 12px;margin-top:-6px;cursor:grab;touch-action:none')}>
+          <div style={s('width:38px;height:4px;border-radius:2px;background:var(--line2)')} />
+        </div>
         <div style={s('font-size:15px;font-weight:700')}>Get directions</div>
         {target.title && <div style={s('font-size:12px;color:var(--text2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>to {target.title}</div>}
         <div style={s('display:flex;flex-direction:column;gap:8px;margin-top:14px')}>

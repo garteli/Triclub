@@ -1,17 +1,21 @@
 import { s } from '../lib/style.js';
 import { useSensors } from '../hooks/useSensors.js';
 import { SENSOR_CATALOG } from '../lib/ble.js';
+import useSheetDrag from '../hooks/useSheetDrag.js';
 
 // kind -> display label, for the auto-detect result sheet.
 const LABELS = Object.fromEntries(SENSOR_CATALOG.map((c) => [c.kind, c.label]));
 
 // Result of a "search all" scan. Themed via CSS vars → consistent in dark & light.
 function ScanSheet({ result, error, onClose }) {
+  const drag = useSheetDrag(onClose);
   return (
     <>
       <div className="ctl" onClick={onClose} style={s('position:absolute;inset:0;background:rgba(0,0,0,.55);z-index:50;animation:floatUp .2s ease')} />
-      <div className="scr" style={s('position:absolute;left:0;right:0;bottom:0;z-index:51;background:var(--bg);border-radius:26px 26px 0 0;border-top:1px solid var(--line2);padding:16px 18px 30px;animation:floatUp .3s ease')}>
-        <div style={s('width:40px;height:4px;border-radius:3px;background:var(--line2);margin:0 auto 16px')} />
+      <div className="scr" style={s(`position:absolute;left:0;right:0;bottom:0;z-index:51;background:var(--bg);border-radius:26px 26px 0 0;border-top:1px solid var(--line2);padding:16px 18px 30px;animation:floatUp .3s ease;${drag.sheetStyle}`)}>
+        <div {...drag.handleProps} style={s('display:flex;justify-content:center;padding:2px 0 14px;cursor:grab;touch-action:none')}>
+          <div style={s('width:40px;height:4px;border-radius:3px;background:var(--line2)')} />
+        </div>
         {error ? (
           <>
             <div style={s('font-size:17px;font-weight:700')}>No sensor connected</div>

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { s } from '../lib/style.js';
+import useSheetDrag from '../hooks/useSheetDrag.js';
 import { BASEMAP_LABEL, nextBasemap, inIsrael, resolveBasemap } from '../lib/basemaps.js';
 import { getMapView, setMapView } from '../lib/mapView.js';
 import { getRouteStyle } from '../lib/routeStyle.js';
@@ -22,6 +23,7 @@ export default function ActivityHero({ a, route, frames, hasMap, status, token, 
   const [is3D, setIs3D] = useState(() => getMapView().is3D);
   const [full, setFull] = useState(false);
   const [menu, setMenu] = useState(false); // overflow (···) sheet: Save route / Delete
+  const menuDrag = useSheetDrag(() => setMenu(false));
   const [playing, setPlaying] = useState(false);
   const mapRef = useRef(null);
   const glRef = useRef(null);
@@ -103,8 +105,10 @@ export default function ActivityHero({ a, route, frames, hasMap, status, token, 
         <>
           <div className="ctl" onClick={() => setMenu(false)} style={s('position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:60;animation:floatUp .2s ease')} />
           <div style={s('position:fixed;left:0;right:0;bottom:0;z-index:61;display:flex;justify-content:center;pointer-events:none')}>
-            <div className="scr" style={s('width:100%;max-width:480px;pointer-events:auto;background:var(--bg);border-radius:24px 24px 0 0;border-top:1px solid var(--line2);padding:12px 16px calc(16px + env(safe-area-inset-bottom));animation:floatUp .3s ease')}>
-              <div style={s('width:40px;height:4px;border-radius:3px;background:var(--line2);margin:2px auto 12px')} />
+            <div className="scr" style={s(`width:100%;max-width:480px;pointer-events:auto;background:var(--bg);border-radius:24px 24px 0 0;border-top:1px solid var(--line2);padding:12px 16px calc(16px + env(safe-area-inset-bottom));animation:floatUp .3s ease;${menuDrag.sheetStyle}`)}>
+              <div {...menuDrag.handleProps} style={s('display:flex;justify-content:center;padding:0 0 12px;margin-top:-2px;cursor:grab;touch-action:none')}>
+                <div style={s('width:40px;height:4px;border-radius:3px;background:var(--line2)')} />
+              </div>
               {onSaveRoute && (
                 <div className="ctl" onClick={() => { setMenu(false); onSaveRoute(); }} style={s('display:flex;align-items:center;gap:12px;padding:14px 8px;border-radius:12px;font-size:15px;font-weight:600;color:var(--text)')}>
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" /></svg>

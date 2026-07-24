@@ -93,13 +93,14 @@ export function useRideTelemetry({ t, active, riders = [], recorder, sensors, me
       if (dRunM > 5) grade = ((eBuf[eBuf.length - 1] - eBuf[0]) / dRunM) * 100;
     }
 
-    // Prefer the recorder's own elapsed (it survives leaving/re-entering the display, and a
-    // reload/resume) so the ride timer reflects how long recording has actually run, not how
-    // long this display has been open. Fall back to the local ref for teammate-only viewing.
+    // The elapsed timer reflects how long RECORDING has actually run — not how long this display
+    // has been open. So it stays 0 until the recorder starts (opening the ride display no longer
+    // makes the clock tick). Prefer the recorder's own elapsed (it survives leaving/re-entering the
+    // display and a reload/resume); fall back to time since recording began only if it's missing.
     const recElapsed = recorder?.elapsedSec;
-    const elapsed = recorder?.recording && recElapsed != null
-      ? recElapsed
-      : Math.round((Date.now() - startRef.current) / 1000);
+    const elapsed = recorder?.recording
+      ? (recElapsed != null ? recElapsed : Math.round((Date.now() - startRef.current) / 1000))
+      : 0;
     const avgpwr = avg(hist.current.pwr);
     const recording = !!recorder?.recording;
     const now = new Date();
