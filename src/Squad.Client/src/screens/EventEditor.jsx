@@ -123,21 +123,28 @@ export default function EventEditor({ vm, state, actions, getToken, onDataChange
   useEffect(() => { if (!israel && mapStyle === 'offroad') setMapStyle(defaultBasemap(false)); }, [israel, mapStyle]);
   useEffect(() => { persistMapStyle(mapStyle); }, [mapStyle]);
 
-  // ── per-event branding (edit mode only — needs a saved event id to attach images to) ──
+  // ── per-event branding ──
+  // Editing: images upload immediately (we have a saved event id to attach them to).
+  // New event: there's no id yet, so a picked image is held locally as a data URL (pendingBanner/
+  // pendingLogo) and uploaded right after the event is created (see save()).
   const bannerInput = useRef(null);
   const logoInput = useRef(null);
   const [logoUrl, setLogoUrl] = useState(editing?.logoUrl || null);
   const [bannerUrl, setBannerUrl] = useState(editing?.bannerUrl || null);
+  const [pendingBanner, setPendingBanner] = useState(null); // data URL, new-event only
+  const [pendingLogo, setPendingLogo] = useState(null);     // data URL, new-event only
   const [imgBusy, setImgBusy] = useState('');
   const [imgErr, setImgErr] = useState('');
   const [imgEditing, setImgEditing] = useState(null); // { kind, img } — crop/zoom/pan editor
   const evSquadId = editing?.squadId || squadId;
   const imgBase = editing ? `/api/images/squads/${String(evSquadId).toLowerCase()}/events/${String(editing.id).toLowerCase()}` : null;
+  const hasBanner = !!(bannerUrl || pendingBanner);
+  const hasLogo = !!(logoUrl || pendingLogo);
 
   // Pick a file → open the crop/zoom/pan editor (square for the logo, wide for the banner).
   const pickImage = (kind) => async (e) => {
     const file = e.target.files?.[0]; e.target.value = '';
-    if (!file || !editing) return;
+    if (!file) return;
     setImgErr('');
     try {
       setImgEditing({ kind, img: await loadImageFile(file) });
@@ -146,11 +153,16 @@ export default function EventEditor({ vm, state, actions, getToken, onDataChange
 
   const closeImgEditor = () => { imgEditing?.img?.close?.(); setImgEditing(null); };
 
-  // The editor hands back a cropped JPEG data URL → upload it as the event logo/banner.
+  // The editor hands back a cropped JPEG data URL. Editing → upload it now; new event → hold it
+  // locally (uploaded after the event is created).
   const applyImage = async (dataUrl) => {
     const kind = imgEditing?.kind;
     closeImgEditor();
-    if (!kind || !editing) return;
+    if (!kind) return;
+    if (!editing) {
+      if (kind === 'banner') setPendingBanner(dataUrl); else setPendingLogo(dataUrl);
+      return;
+    }
     setImgBusy(kind); setImgErr('');
     try {
       const t = await getToken?.();
@@ -163,7 +175,10 @@ export default function EventEditor({ vm, state, actions, getToken, onDataChange
     finally { setImgBusy(''); }
   };
   const removeImage = (kind) => async () => {
-    if (!editing) return;
+    if (!editing) {
+      if (kind === 'banner') setPendingBanner(null); else setPendingLogo(null);
+      return;
+    }
     setImgBusy(kind); setImgErr('');
     try {
       await deleteEventImage(await getToken?.(), evSquadId, editing.id, kind);
@@ -184,8 +199,19 @@ export default function EventEditor({ vm, state, actions, getToken, onDataChange
     try {
       const tok = await getToken?.();
       const body = { title: title.trim(), sport, start, courseId: courseId || null, notes: notes.trim() || null };
-      if (isEdit) await updateSquadEvent(tok, squadId, editing.id, body);
-      else await createSquadEvent(tok, squadId, { ...body, published: mode === 'publish' });
+      if (isEdit) {
+        await updateSquadEvent(tok, squadId, editing.id, body);
+      } else {
+        const created = await createSquadEvent(tok, squadId, { ...body, published: mode === 'publish' });
+        // A new event has no id until now, so any banner/logo picked while composing is uploaded here.
+        const newId = created?.id;
+        if (newId && (pendingBanner || pendingLogo)) {
+          try {
+            if (pendingBanner) await uploadEventImage(tok, squadId, newId, 'banner', dataUrlToBlob(pendingBanner));
+            if (pendingLogo) await uploadEventImage(tok, squadId, newId, 'logo', dataUrlToBlob(pendingLogo));
+          } catch { /* event is created; branding upload is best-effort (editable later) */ }
+        }
+      }
       onDataChanged?.();
       actions.go('events');
     } catch (e) {
@@ -256,44 +282,44 @@ export default function EventEditor({ vm, state, actions, getToken, onDataChange
             style={s(inputStyle + ';resize:vertical;line-height:1.4')} />
         </div>
 
-        {isEdit ? (
-          <div>
-            <div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin:0 2px 7px')}>Branding · optional</div>
-            <div className="ctl" onClick={() => bannerInput.current?.click()}
-              style={s('position:relative;height:120px;border-radius:14px;overflow:hidden;border:1px dashed var(--line2);background:var(--bg3);display:flex;align-items:center;justify-content:center')}>
-              {bannerUrl
-                ? <AuthedImage url={bannerUrl} token={getToken?.()} style="width:100%;height:100%;object-fit:cover" />
+        <div>
+          <div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin:0 2px 7px')}>Branding · optional</div>
+          <div className="ctl" onClick={() => bannerInput.current?.click()}
+            style={s('position:relative;height:120px;border-radius:14px;overflow:hidden;border:1px dashed var(--line2);background:var(--bg3);display:flex;align-items:center;justify-content:center')}>
+            {bannerUrl
+              ? <AuthedImage url={bannerUrl} token={getToken?.()} style="width:100%;height:100%;object-fit:cover" />
+              : pendingBanner
+                ? <img src={pendingBanner} alt="" style={s('width:100%;height:100%;object-fit:cover')} />
                 : <span style={s('font-size:12.5px;color:var(--text3)')}>{imgBusy === 'banner' ? 'Uploading…' : '+ Event banner'}</span>}
-            </div>
-            <div style={s('display:flex;align-items:center;gap:12px;margin-top:10px')}>
-              <div className="ctl" onClick={() => logoInput.current?.click()}
-                style={s('width:56px;height:56px;border-radius:14px;overflow:hidden;border:1px dashed var(--line2);background:var(--bg3);display:flex;align-items:center;justify-content:center;flex:none')}>
-                {logoUrl
-                  ? <AuthedImage url={logoUrl} token={getToken?.()} style="width:100%;height:100%;object-fit:cover" />
+          </div>
+          <div style={s('display:flex;align-items:center;gap:12px;margin-top:10px')}>
+            <div className="ctl" onClick={() => logoInput.current?.click()}
+              style={s('width:56px;height:56px;border-radius:14px;overflow:hidden;border:1px dashed var(--line2);background:var(--bg3);display:flex;align-items:center;justify-content:center;flex:none')}>
+              {logoUrl
+                ? <AuthedImage url={logoUrl} token={getToken?.()} style="width:100%;height:100%;object-fit:cover" />
+                : pendingLogo
+                  ? <img src={pendingLogo} alt="" style={s('width:100%;height:100%;object-fit:cover')} />
                   : <span style={s('font-size:22px;color:var(--text3);line-height:1')}>{imgBusy === 'logo' ? '…' : '+'}</span>}
-              </div>
-              <div style={s('flex:1;font-size:12px;color:var(--text3);line-height:1.4')}>Logo + banner shown on the event card and its page.</div>
-              {(logoUrl || bannerUrl) && (
-                <div className="ctl" onClick={() => { if (logoUrl) removeImage('logo')(); if (bannerUrl) removeImage('banner')(); }} style={s('font-size:11.5px;font-weight:700;color:var(--bad);flex:none')}>Clear</div>
-              )}
             </div>
-            {imgErr && <div style={s('font-size:11.5px;color:var(--bad);margin-top:6px')}>{imgErr}</div>}
-            <input ref={bannerInput} type="file" accept="image/*" onChange={pickImage('banner')} style={s('display:none')} />
-            <input ref={logoInput} type="file" accept="image/*" onChange={pickImage('logo')} style={s('display:none')} />
-            {imgEditing && (
-              <ImageEditor
-                img={imgEditing.img}
-                aspect={imgEditing.kind === 'banner' ? 2 : 1}
-                outWidth={imgEditing.kind === 'banner' ? 1600 : 512}
-                title={imgEditing.kind === 'banner' ? 'Position banner' : 'Position logo'}
-                onCancel={closeImgEditor}
-                onDone={applyImage}
-              />
+            <div style={s('flex:1;font-size:12px;color:var(--text3);line-height:1.4')}>Logo + banner shown on the event card and its page.</div>
+            {(hasLogo || hasBanner) && (
+              <div className="ctl" onClick={() => { if (hasLogo) removeImage('logo')(); if (hasBanner) removeImage('banner')(); }} style={s('font-size:11.5px;font-weight:700;color:var(--bad);flex:none')}>Clear</div>
             )}
           </div>
-        ) : (
-          <div style={s('font-size:11.5px;color:var(--text3);line-height:1.4;padding:2px')}>Tip: save the event, then reopen it to add a banner and logo.</div>
-        )}
+          {imgErr && <div style={s('font-size:11.5px;color:var(--bad);margin-top:6px')}>{imgErr}</div>}
+          <input ref={bannerInput} type="file" accept="image/*" onChange={pickImage('banner')} style={s('display:none')} />
+          <input ref={logoInput} type="file" accept="image/*" onChange={pickImage('logo')} style={s('display:none')} />
+          {imgEditing && (
+            <ImageEditor
+              img={imgEditing.img}
+              aspect={imgEditing.kind === 'banner' ? 2 : 1}
+              outWidth={imgEditing.kind === 'banner' ? 1600 : 512}
+              title={imgEditing.kind === 'banner' ? 'Position banner' : 'Position logo'}
+              onCancel={closeImgEditor}
+              onDone={applyImage}
+            />
+          )}
+        </div>
 
         {error && <div style={s('font-size:12.5px;color:var(--bad);font-weight:600')}>{error}</div>}
 
