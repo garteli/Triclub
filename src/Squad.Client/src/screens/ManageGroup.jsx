@@ -2,11 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { s } from '../lib/style.js';
 import { Back, Title, Sub, FieldLabel, Field, TextArea, Chips, PrimaryBtn } from './wizard.jsx';
 import AuthedImage from '../components/AuthedImage.jsx';
+import ImageEditor from '../components/ImageEditor.jsx';
 import GroupTargets from '../components/GroupTargets.jsx';
 import { useConfirm } from '../components/ConfirmModal.jsx';
 import { useJoinRequests } from '../hooks/useJoinRequests.js';
-import { downscaleToJpeg } from '../lib/photos.js';
-import { dataUrlToBlob } from '../lib/avatar.js';
+import { dataUrlToBlob, loadImageFile } from '../lib/avatar.js';
 import { bustAuthedImage } from '../lib/authedImage.js';
 import {
   updateSquad, listMembers, removeMember, setMemberRole, transferOwnership,
@@ -68,6 +68,7 @@ export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged
 
   const bannerInput = useRef(null);
   const logoInput = useRef(null);
+  const [editing, setEditing] = useState(null); // { kind, img } — open crop/zoom/pan editor
 
   // roster
   const [members, setMembers] = useState(null);
@@ -109,13 +110,26 @@ export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged
     );
   }
 
+  // Pick a file → open the crop/zoom/pan editor (square for the logo, wide for the banner).
   const pickImage = (kindKey) => async (e) => {
     const file = e.target.files?.[0];
-    e.target.value = '';
+    e.target.value = ''; // allow re-selecting the same file
     if (!file) return;
+    setErr('');
+    try {
+      setEditing({ kind: kindKey, img: await loadImageFile(file) });
+    } catch (ex) { setErr(ex.message || 'Could not use that image.'); }
+  };
+
+  const closeEditor = () => { editing?.img?.close?.(); setEditing(null); };
+
+  // The editor hands back a cropped JPEG data URL → upload it as the logo/banner.
+  const applyImage = async (dataUrl) => {
+    const kindKey = editing?.kind;
+    closeEditor();
+    if (!kindKey) return;
     setBusy(true); setErr('');
     try {
-      const dataUrl = await downscaleToJpeg(file, kindKey === 'banner' ? 1600 : 512, 0.85);
       const t = await getToken?.();
       await uploadSquadImage(t, g.id, kindKey, dataUrlToBlob(dataUrl));
       bustAuthedImage(`/api/images/squads/${String(g.id).toLowerCase()}/${kindKey}`);
@@ -262,6 +276,17 @@ export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged
       </div>
       <input ref={bannerInput} type="file" accept="image/*" onChange={pickImage('banner')} style={{ display: 'none' }} />
       <input ref={logoInput} type="file" accept="image/*" onChange={pickImage('logo')} style={{ display: 'none' }} />
+
+      {editing && (
+        <ImageEditor
+          img={editing.img}
+          aspect={editing.kind === 'banner' ? 2 : 1}
+          outWidth={editing.kind === 'banner' ? 1600 : 512}
+          title={editing.kind === 'banner' ? 'Position banner' : 'Position logo'}
+          onCancel={closeEditor}
+          onDone={applyImage}
+        />
+      )}
 
       {/* ---- details ---- */}
       <Field label="Group name" value={name} onChange={setName} placeholder="Your club name" />

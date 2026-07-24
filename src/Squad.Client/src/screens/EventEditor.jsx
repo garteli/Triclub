@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { s } from '../lib/style.js';
 import { Back } from './wizard.jsx';
 import AuthedImage from '../components/AuthedImage.jsx';
+import ImageEditor from '../components/ImageEditor.jsx';
 import { listCourses, createCourse, deleteCourse, importCourseFromUrl, getCourse } from '../lib/courses.js';
 import CoursePicker from '../components/CoursePicker.jsx';
 import RouteMapGL from '../components/RouteMapGL.jsx';
@@ -10,8 +11,7 @@ import { BASEMAP_LABEL, nextBasemap, inIsrael } from '../lib/basemaps.js';
 import { getRouteStyle } from '../lib/routeStyle.js';
 import { getMapView, setMapStyle as persistMapStyle } from '../lib/mapView.js';
 import { createSquadEvent, updateSquadEvent, uploadEventImage, deleteEventImage, toOffsetIso, toLocalInput } from '../lib/events.js';
-import { downscaleToJpeg } from '../lib/photos.js';
-import { dataUrlToBlob } from '../lib/avatar.js';
+import { dataUrlToBlob, loadImageFile } from '../lib/avatar.js';
 import { bustAuthedImage } from '../lib/authedImage.js';
 
 // Add / edit a group session (event). Reached from the Events tab: coach taps "Add event"
@@ -131,15 +131,29 @@ export default function EventEditor({ vm, state, actions, getToken, onDataChange
   const [bannerUrl, setBannerUrl] = useState(editing?.bannerUrl || null);
   const [imgBusy, setImgBusy] = useState('');
   const [imgErr, setImgErr] = useState('');
+  const [imgEditing, setImgEditing] = useState(null); // { kind, img } — crop/zoom/pan editor
   const evSquadId = editing?.squadId || squadId;
   const imgBase = editing ? `/api/images/squads/${String(evSquadId).toLowerCase()}/events/${String(editing.id).toLowerCase()}` : null;
 
+  // Pick a file → open the crop/zoom/pan editor (square for the logo, wide for the banner).
   const pickImage = (kind) => async (e) => {
     const file = e.target.files?.[0]; e.target.value = '';
     if (!file || !editing) return;
+    setImgErr('');
+    try {
+      setImgEditing({ kind, img: await loadImageFile(file) });
+    } catch (ex) { setImgErr(ex.message || 'Could not use that image.'); }
+  };
+
+  const closeImgEditor = () => { imgEditing?.img?.close?.(); setImgEditing(null); };
+
+  // The editor hands back a cropped JPEG data URL → upload it as the event logo/banner.
+  const applyImage = async (dataUrl) => {
+    const kind = imgEditing?.kind;
+    closeImgEditor();
+    if (!kind || !editing) return;
     setImgBusy(kind); setImgErr('');
     try {
-      const dataUrl = await downscaleToJpeg(file, kind === 'banner' ? 1600 : 512, 0.85);
       const t = await getToken?.();
       await uploadEventImage(t, evSquadId, editing.id, kind, dataUrlToBlob(dataUrl));
       const url = `${imgBase}/${kind}`;
@@ -270,6 +284,16 @@ export default function EventEditor({ vm, state, actions, getToken, onDataChange
             {imgErr && <div style={s('font-size:11.5px;color:var(--bad);margin-top:6px')}>{imgErr}</div>}
             <input ref={bannerInput} type="file" accept="image/*" onChange={pickImage('banner')} style={s('display:none')} />
             <input ref={logoInput} type="file" accept="image/*" onChange={pickImage('logo')} style={s('display:none')} />
+            {imgEditing && (
+              <ImageEditor
+                img={imgEditing.img}
+                aspect={imgEditing.kind === 'banner' ? 2 : 1}
+                outWidth={imgEditing.kind === 'banner' ? 1600 : 512}
+                title={imgEditing.kind === 'banner' ? 'Position banner' : 'Position logo'}
+                onCancel={closeImgEditor}
+                onDone={applyImage}
+              />
+            )}
           </div>
         ) : (
           <div style={s('font-size:11.5px;color:var(--text3);line-height:1.4;padding:2px')}>Tip: save the event, then reopen it to add a banner and logo.</div>
