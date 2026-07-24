@@ -724,6 +724,7 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
   const speedValues = useMemo(() => frames.map((f) => f.speed), [frames]);
   const cadValues = useMemo(() => frames.map((f) => f.cadence), [frames]);
   const elevValues = useMemo(() => frames.map((f) => f.elev), [frames]);
+  const analytics = useActivityAnalytics(track, laps, a?.sport);
   // Sparklines for the design chart cards (over the faint elevation backdrop).
   const chartElev = useMemo(() => sparkPath(elevValues), [elevValues]);
   const sparks = useMemo(() => ({
@@ -733,7 +734,6 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
   // Route split into flats/climbs/descents from the recorded elevation, with the power/speed/time
   // actually ridden over each stretch mapped onto it (null for indoor / no-GPS recordings).
   const breakdown = useMemo(() => activitySectionBreakdown(frames), [frames]);
-  const analytics = useActivityAnalytics(track, laps, a?.sport);
   const relEffort = useMemo(() => computeTrimp(track, analytics.zones.maxHr), [track, analytics.zones.maxHr]);
 
   // Opening an activity should always start at the top, not wherever the previous
