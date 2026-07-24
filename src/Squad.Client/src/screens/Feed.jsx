@@ -35,9 +35,9 @@ const Spark = ({ icon }) => (
 const boltPath = <path d="M13 2L4.5 13H11l-1 9 8.5-11H12z" />;
 
 // ---- activity photos (attached or captured in-ride) + add-photos on your own ----
-function ActivityPhotos({ activityId, isMe, token, getToken }) {
+function ActivityPhotos({ activityId, isMe, token, getToken, extRefresh = 0 }) {
   const [refresh, setRefresh] = useState(0);
-  const { photos } = useActivityPhotos(activityId, { getToken, enabled: !!activityId, refreshSignal: refresh });
+  const { photos } = useActivityPhotos(activityId, { getToken, enabled: !!activityId, refreshSignal: refresh + extRefresh });
   const fileRef = useRef(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -437,7 +437,7 @@ function ZoneBlock({ heading, sub, zoneTitle, rows, insight, insightColor, onOpe
       {(heading || onOpen) && (
         <div style={s('display:flex;align-items:baseline;justify-content:space-between' + (sub ? ';margin-bottom:4px' : ''))}>
           <div style={s(title + ';margin:0')}>{heading}</div>
-          {onOpen && <span className="ctl" onClick={onOpen} style={s('font-size:11.5px;font-weight:700;color:#b98cff;display:flex;align-items:center;gap:2px')}>Full zones<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg></span>}
+          {onOpen && <span className="ctl" onClick={onOpen} style={s('font-size:11.5px;font-weight:700;color:#b98cff;display:flex;align-items:center;gap:2px')}>Aggregate zones<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg></span>}
         </div>
       )}
       {sub && <div className="mono" style={s('font-size:12px;color:var(--text2);margin-bottom:12px')}>{sub}</div>}
@@ -695,6 +695,7 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
   const [deleting, setDeleting] = useState(false);
   const [delErr, setDelErr] = useState('');
   const [saveOpen, setSaveOpen] = useState(false);
+  const [mediaRefresh, setMediaRefresh] = useState(0); // bumped when a ··· "Add media" upload lands
 
   const { track, laps, matched, status } = useActivityTrack(a?.id, { getToken });
   const frames = useMemo(() => buildFrames(track), [track]);
@@ -773,6 +774,7 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
     <div style={s('padding:0 0 120px;animation:floatUp .35s ease')}>
       <ActivityHero a={a} route={route} frames={frames} hasMap={hasMap} status={status} token={token}
         onDelete={() => setConfirmDel(true)}
+        onMediaAdded={() => setMediaRefresh((n) => n + 1)}
         onSaveRoute={hasMap && live?.courses?.save ? () => setSaveOpen(true) : undefined} />
 
       {saveOpen && hasMap && <SaveAsCourse route={route} defaultName={a.title} courses={live?.courses} onClose={() => setSaveOpen(false)} />}
@@ -792,7 +794,7 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
       <StubTrends matched={matched} />
       <Goals myActivities={vm.myActivities} />
 
-      <ActivityPhotos activityId={a.id} isMe={a.isMe} token={token} getToken={getToken} />
+      <ActivityPhotos activityId={a.id} isMe={a.isMe} token={token} getToken={getToken} extRefresh={mediaRefresh} />
 
       {hasRealPower && <WorkoutAnalysis powerValues={powerValues} />}
       <PowerCurve curve={analytics.curve} onOpen={() => actions.go('powercurve')} />

@@ -3,6 +3,7 @@ import { s } from '../lib/style.js';
 import { BASEMAP_LABEL, nextBasemap, inIsrael, resolveBasemap } from '../lib/basemaps.js';
 import { getMapView, setMapView } from '../lib/mapView.js';
 import { getRouteStyle } from '../lib/routeStyle.js';
+import { downscaleToJpeg, uploadActivityPhoto } from '../lib/photos.js';
 import RouteMapGL from './RouteMapGL.jsx';
 import FullMap from './FullMap.jsx';
 
@@ -13,7 +14,7 @@ const validPts = (route) => (route || []).filter((p) => Array.isArray(p) && Numb
 // play (route replay at 4×). Falls back to a gradient panel when there's no GPS.
 const glass = 'background:rgba(20,23,29,.72);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.1);color:#fff';
 
-export default function ActivityHero({ a, route, frames, hasMap, status, token, onBack, onDelete, onSaveRoute }) {
+export default function ActivityHero({ a, route, frames, hasMap, status, token, onBack, onDelete, onSaveRoute, onMediaAdded }) {
   // Off-road only makes sense over Israel (its tiles are blank elsewhere).
   const israel = (() => { const p = validPts(route)[0]; return p ? inIsrael(p[0], p[1]) : true; })();
   // Restore the athlete's last-selected layer + 2D/3D view (persisted); resolveBasemap drops
@@ -21,14 +22,30 @@ export default function ActivityHero({ a, route, frames, hasMap, status, token, 
   const [mapStyle, setMapStyle] = useState(() => resolveBasemap(getMapView().style, israel));
   const [is3D, setIs3D] = useState(() => getMapView().is3D);
   const [full, setFull] = useState(false);
-  const [menu, setMenu] = useState(false); // overflow (···) sheet: Save route / Delete
+  const [menu, setMenu] = useState(false); // overflow (···) sheet: Add media / Save route / Delete
   const [playing, setPlaying] = useState(false);
+  const [mediaBusy, setMediaBusy] = useState(false);
+  const [mediaErr, setMediaErr] = useState('');
+  const mediaInput = useRef(null);
   const mapRef = useRef(null);
   const glRef = useRef(null);
   const headRef = useRef(null);
   const rafRef = useRef(0);
   const canPlay = hasMap && validPts(route).length > 1;
   const cycleStyle = () => setMapStyle((st) => nextBasemap(st, israel));
+  // "Add media" (··· menu): pick an image, downscale, upload to this activity, then let the
+  // parent refresh the Photos section.
+  const onMediaFile = async (e) => {
+    const file = e.target.files?.[0]; e.target.value = '';
+    if (!file) return;
+    setMediaBusy(true); setMediaErr('');
+    try {
+      const dataUrl = await downscaleToJpeg(file);
+      await uploadActivityPhoto(token, dataUrl, { activityId: a.id });
+      onMediaAdded?.();
+    } catch (er) { setMediaErr(er.message || 'Could not add that image.'); }
+    finally { setMediaBusy(false); }
+  };
   // Persist the last layer + view so reopening any activity map restores them.
   useEffect(() => { setMapView({ style: mapStyle, is3D }); }, [mapStyle, is3D]);
   // Honor the per-user route colour/width (shared with every other map). Read on open; the
@@ -105,6 +122,16 @@ export default function ActivityHero({ a, route, frames, hasMap, status, token, 
           <div style={s('position:fixed;left:0;right:0;bottom:0;z-index:61;display:flex;justify-content:center;pointer-events:none')}>
             <div className="scr" style={s('width:100%;max-width:480px;pointer-events:auto;background:var(--bg);border-radius:24px 24px 0 0;border-top:1px solid var(--line2);padding:12px 16px calc(16px + env(safe-area-inset-bottom));animation:floatUp .3s ease')}>
               <div style={s('width:40px;height:4px;border-radius:3px;background:var(--line2);margin:2px auto 12px')} />
+              {a.isMe && (
+                <>
+                  <input ref={mediaInput} type="file" accept="image/*" onChange={onMediaFile} style={s('display:none')} />
+                  <div className="ctl" onClick={mediaBusy ? undefined : () => mediaInput.current?.click()} style={s(`display:flex;align-items:center;gap:12px;padding:14px 8px;border-radius:12px;font-size:15px;font-weight:600;color:var(--text);opacity:${mediaBusy ? 0.6 : 1}`)}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" /></svg>
+                    {mediaBusy ? 'Uploading…' : 'Add media'}
+                  </div>
+                  {mediaErr && <div style={s('font-size:11.5px;color:var(--bad);padding:0 8px 6px')}>{mediaErr}</div>}
+                </>
+              )}
               {onSaveRoute && (
                 <div className="ctl" onClick={() => { setMenu(false); onSaveRoute(); }} style={s('display:flex;align-items:center;gap:12px;padding:14px 8px;border-radius:12px;font-size:15px;font-weight:600;color:var(--text)')}>
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" /></svg>
