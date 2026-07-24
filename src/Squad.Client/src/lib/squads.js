@@ -38,6 +38,8 @@ export const removeMember = (token, id, athleteId) => req(`/api/squads/${id}/mem
 // Owner promotes/demotes a member's role ('coach' | 'member'), and transfers ownership to a coach.
 export const setMemberRole = (token, id, athleteId, role) => req(`/api/squads/${id}/members/${athleteId}/role`, { method: 'POST', token, body: { role } });
 export const transferOwnership = (token, id, athleteId) => req(`/api/squads/${id}/transfer/${athleteId}`, { method: 'POST', token });
+// Owner permanently deletes the group (members are moved back to their Solo squad server-side).
+export const deleteSquad = (token, id) => req(`/api/squads/${id}`, { method: 'DELETE', token });
 
 // Invite links: owner mints a shareable link (reset=true rotates it → { token }); anyone can look
 // up an invite before signing up ({ token, squadId, squadName, discipline, color, memberCount, logoUrl });

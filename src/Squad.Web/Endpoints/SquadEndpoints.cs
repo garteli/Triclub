@@ -26,6 +26,7 @@ public static class SquadEndpoints
         g.MapPost("/{id:guid}/requests/{athleteId:guid}/decline", Decline);
         // Owner management: edit details/pricing + roster (add/remove members).
         g.MapPatch("/{id:guid}", Update);
+        g.MapDelete("/{id:guid}", Delete);
         g.MapGet("/{id:guid}/members", Members);
         g.MapPost("/{id:guid}/members", AddMember);
         g.MapDelete("/{id:guid}/members/{athleteId:guid}", RemoveMember);
@@ -194,6 +195,20 @@ public static class SquadEndpoints
         if (!await squads.UpdateAsync(id, me, body, ct))
             return Results.NotFound(new { error = "Squad not found, or you don't manage it." });
         return Results.Ok(await squads.GetAsync(id, me, ct));
+    }
+
+    private static async Task<IResult> Delete(Guid id, HttpContext http, ISquadService squads, CancellationToken ct)
+    {
+        if (Me(http) is not { } me) return Results.Unauthorized();
+        return await squads.DeleteAsync(id, me, ct) switch
+        {
+            DeleteSquadOutcome.Deleted => Results.Ok(new { status = "deleted" }),
+            DeleteSquadOutcome.Protected => Results.Json(
+                new { error = "This group can't be deleted." }, statusCode: 409),
+            DeleteSquadOutcome.NotOwner => Results.NotFound(
+                new { error = "Group not found, or you don't own it." }),
+            _ => Results.NotFound(new { error = "Group not found." }),
+        };
     }
 
     private static async Task<IResult> Members(Guid id, HttpContext http, ISquadService squads, CancellationToken ct)
