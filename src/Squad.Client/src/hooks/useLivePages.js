@@ -232,6 +232,17 @@ export function useLivePages(t, active, family) {
     setPages((ps) => [...ps, { name: 'Custom', side: 'none', layout: 'grid', fields: ['spd', 'hr', 'pwr', 'dist'] }]);
     setDataPage((_) => pages.length); // land on the new page
   }, [pages.length]);
+  // Apply a pro-inspired preset's page(s), fresh-copied so they don't share refs with the
+  // catalogue and tagged `pro` (for the pager badge). Default appends and lands on the first
+  // added page; `{ replace:true }` swaps the whole page-set. Either way, drop out of edit.
+  const applyPreset = useCallback((preset, opts = {}) => {
+    const add = (preset?.pages || []).map((p) => ({ ...p, fields: p.fields.slice(), pro: true }));
+    if (!add.length) return;
+    if (opts.replace) { setPages(add); setDataPage(0); }
+    else { setPages((ps) => [...ps, ...add]); setDataPage(pages.length); } // first appended = current length
+    setEditFields(false);
+    closePicker();
+  }, [pages.length, closePicker]);
   const deletePage = useCallback(() => {
     setPages((ps) => (ps.length <= 1 ? ps : ps.filter((_, i) => i !== Math.min(dataPage, ps.length - 1))));
     setDataPage((p) => Math.max(0, p - 1));
@@ -256,7 +267,7 @@ export function useLivePages(t, active, family) {
       goPage, nextPage, prevPage, toggleEdit, toggleAutoRotate, setMono: setMonoOn,
       setPageLayout, setPageSide, setPageCount, moveSlot, resizeSlot, addField, removeField,
       pressStart, pressEnd, onDragStart, onDropAt, setHero,
-      openPicker, closePicker, pickField, addPage, deletePage, pokePager,
+      openPicker, closePicker, pickField, addPage, deletePage, pokePager, applyPreset,
     },
   };
 }
