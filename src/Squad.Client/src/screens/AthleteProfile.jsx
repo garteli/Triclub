@@ -32,7 +32,7 @@ export default function AthleteProfile({ vm, state, actions, getToken }) {
         <Avatar photo={a.photo} initials={a.initials} color={a.color} size={64} radius={20} fontSize={22} />
         <div style={s('flex:1;min-width:0')}>
           <div style={s('font-size:21px;font-weight:700;letter-spacing:-.4px')}>{a.name}</div>
-          <div style={s('font-size:12.5px;color:var(--text2)')}>{a.club} · Age-group {a.ageGroup}</div>
+          <div style={s('font-size:12.5px;color:var(--text2)')}>{[a.club, a.ageGroup && `Age-group ${a.ageGroup}`].filter(Boolean).join(' · ')}</div>
           <div style={s('display:flex;gap:6px;margin-top:6px;flex-wrap:wrap')}>
             {a.rank && <span style={s('font-size:10px;font-weight:700;color:var(--accent-ink);background:var(--accent);padding:2px 7px;border-radius:6px')}>Rank #{a.rank}</span>}
             <span style={s('font-size:10px;font-weight:700;color:var(--text2);background:var(--bg3);border:1px solid var(--line);padding:2px 7px;border-radius:6px')}>⚡ {a.streak}-day streak</span>
@@ -75,7 +75,9 @@ export default function AthleteProfile({ vm, state, actions, getToken }) {
       <div style={s(label)}>Fitness</div>
       <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:14px 15px')}>
         <div style={s('display:flex;align-items:baseline;justify-content:space-between')}>
-          <div><span className="mono" style={s('font-size:24px;font-weight:700')}>{a.ftp}</span><span style={s('font-size:12px;color:var(--text2)')}> W FTP</span></div>
+          {a.ftp !== '' && a.ftp != null
+            ? <div><span className="mono" style={s('font-size:24px;font-weight:700')}>{a.ftp}</span><span style={s('font-size:12px;color:var(--text2)')}> W FTP</span></div>
+            : <div style={s('font-size:12.5px;color:var(--text3)')}>FTP not shared</div>}
           <div style={s('font-size:11.5px;color:var(--text3)')}>{a.sport}</div>
         </div>
         <div style={s('display:flex;flex-direction:column;gap:10px;margin-top:14px')}>

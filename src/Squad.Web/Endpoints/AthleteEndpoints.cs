@@ -43,12 +43,20 @@ public static class AthleteEndpoints
         var isMe = id == me;
         var isFollowing = !isMe && await follows.IsFollowingAsync(me, id, ct);
 
+        // Fields the athlete chose to hide from others (Privacy → Profile details). The owner
+        // always sees their own values; everyone else gets the hidden ones nulled out.
+        var hidden = (p.HiddenFields ?? "")
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(x => x.ToLowerInvariant())
+            .ToHashSet();
+        bool Hide(string key) => !isMe && hidden.Contains(key);
+
         return Results.Ok(new
         {
             id = p.Id, isMe, isFollowing,
             name = p.Name, initials = p.Initials, color = p.AvatarColor,
-            club = p.Club, ageGroup = p.AgeGroup, sport = p.PrimarySport, level = p.Level,
-            ftp = p.Ftp, weekly = p.WeeklyHours, bio = p.Bio,
+            club = p.Club, ageGroup = Hide("age") ? null : p.AgeGroup, sport = p.PrimarySport, level = p.Level,
+            ftp = Hide("ftp") ? null : p.Ftp, weekly = Hide("hours") ? null : p.WeeklyHours, bio = p.Bio,
             rank,
             streak = row?.Streak ?? 0,
             volumeHours = row?.VolumeHours ?? 0,

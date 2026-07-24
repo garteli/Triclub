@@ -24,7 +24,8 @@ public sealed class SqlProfileService(string connectionString) : IProfileService
                    BirthDate, Gender, WeightKg,
                    EmergencyName, EmergencyPhone,
                    CASE WHEN AvatarBlob IS NOT NULL
-                        THEN '/api/images/avatars/' + LOWER(CONVERT(varchar(36), Id)) END AS AvatarUrl
+                        THEN '/api/images/avatars/' + LOWER(CONVERT(varchar(36), Id)) END AS AvatarUrl,
+                   HiddenFields
             FROM dbo.Athlete WHERE Id = @athleteId;
             """;
         await using var conn = new SqlConnection(connectionString);
@@ -65,7 +66,10 @@ public sealed class SqlProfileService(string connectionString) : IProfileService
                 Gender       = COALESCE(@Gender, Gender),
                 WeightKg     = COALESCE(@WeightKg, WeightKg),
                 EmergencyName  = COALESCE(@EmergencyName, EmergencyName),
-                EmergencyPhone = COALESCE(@EmergencyPhone, EmergencyPhone)
+                EmergencyPhone = COALESCE(@EmergencyPhone, EmergencyPhone),
+                -- HiddenFields is a full replacement (the client always sends the complete CSV,
+                -- or "" to clear), so COALESCE lets null mean "leave as-is" and "" mean "nothing hidden".
+                HiddenFields   = COALESCE(@HiddenFields, HiddenFields)
             WHERE Id = @athleteId;
             """;
         await using var conn = new SqlConnection(connectionString);
@@ -74,7 +78,7 @@ public sealed class SqlProfileService(string connectionString) : IProfileService
             athleteId, name, initials,
             f.Club, f.AgeGroup, f.PrimarySport, f.Level, f.Ftp, f.WeeklyHours, f.Bio,
             f.BirthDate, f.Gender, f.WeightKg,
-            f.EmergencyName, f.EmergencyPhone,
+            f.EmergencyName, f.EmergencyPhone, f.HiddenFields,
         }, cancellationToken: ct));
     }
 }

@@ -625,8 +625,13 @@ export default function App() {
     decline: () => setState((s) => ({ ...s, reqStatus: { ...s.reqStatus, [s.selApplicant]: 'declined' } })),
     // activities
     openActivity: (id) => setState((s) => ({ ...s, selActivity: id, screen: 'feed', activityBack: s.screen === 'feed' ? s.activityBack : s.screen })),
-    // profiles
-    openAthlete: (id) => setState((s) => ({ ...s, selMember: id, screen: 'athlete', profileBack: s.screen === 'athlete' ? s.profileBack : s.screen })),
+    // profiles — tapping your OWN avatar (squad rail / leaderboard / feed) opens your own
+    // Profile page (goal race, my clubs, stats), not the public teammate view.
+    openAthlete: (id) => setState((s) => {
+      const myId = s.session?.athleteId;
+      if (myId && String(id).toLowerCase() === String(myId).toLowerCase()) return { ...s, screen: 'profile' };
+      return { ...s, selMember: id, screen: 'athlete', profileBack: s.screen === 'athlete' ? s.profileBack : s.screen };
+    }),
     setMe: (p) => setState((s) => ({ ...s, me: { ...s.me, ...p } })),
     toggleFollow: (id) => setState((s) => ({ ...s, following: { ...s.following, [id]: !s.following[id] } })),
     // auth
