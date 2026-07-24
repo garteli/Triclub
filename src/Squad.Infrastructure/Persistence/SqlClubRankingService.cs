@@ -36,7 +36,8 @@ public sealed class SqlClubRankingService(string connectionString) : IClubRankin
 
         await using var conn = new SqlConnection(connectionString);
 
-        var clubs = (await conn.QueryAsync<ClubRow>(new CommandDefinition(ClubsSql, cancellationToken: ct))).ToList();
+        var clubs = (await conn.QueryAsync<ClubRow>(new CommandDefinition(ClubsSql,
+            new { me = me ?? Guid.Empty, demoClub = Squads.ReviewDemoClub }, cancellationToken: ct))).ToList();
 
         var members = (await conn.QueryAsync<MemberCountRow>(new CommandDefinition(MembersSql, cancellationToken: ct)))
             .ToDictionary(m => m.SquadId, m => m.Members);
@@ -139,8 +140,14 @@ public sealed class SqlClubRankingService(string connectionString) : IClubRankin
         return (first + second).ToUpperInvariant();
     }
 
+    // The App Store review demo club is kept off the board for everyone except its own
+    // members (the reviewer), so it can't be seen or joined from the public rankings.
     private const string ClubsSql = """
-        SELECT Id, Name, Color, Discipline FROM dbo.Squad WHERE Kind <> 'personal';
+        SELECT s.Id, s.Name, s.Color, s.Discipline
+        FROM dbo.Squad s
+        WHERE s.Kind <> 'personal'
+          AND (s.Name <> @demoClub OR EXISTS (
+               SELECT 1 FROM dbo.Membership dm WHERE dm.SquadId = s.Id AND dm.AthleteId = @me));
         """;
 
     private const string MembersSql = """
