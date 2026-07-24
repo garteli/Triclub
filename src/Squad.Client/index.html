@@ -6,7 +6,15 @@
          shrinks the visual viewport and pans the page sideways ("the width breaks when the
          keyboard opens"). Maps use MapLibre's own canvas pinch-zoom, so this doesn't affect them. -->
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-    <title>Domestique Hub · Team Training Platform</title>
+    <title>Domestique Hub — Team Training Platform</title>
+    <!-- Home-page description + app name for Google's OAuth consent-screen verification (and link
+         previews). Kept in the static HTML so it's visible without running the SPA's JavaScript. -->
+    <meta name="description" content="Domestique Hub is a team training app for multi-sport and motorsport clubs. Train together and ride together: shared training plans, group events and rides, a live group-ride computer, leaderboards and rankings — your team's whole season in one app." />
+    <meta property="og:title" content="Domestique Hub" />
+    <meta property="og:site_name" content="Domestique Hub" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://www.domestiquehub.com/" />
+    <meta property="og:description" content="A team training app for multi-sport and motorsport clubs — shared plans, group events and rides, a live group-ride computer, leaderboards and rankings. Your team's whole season in one app." />
 
     <!-- Earliest possible launch timestamp so the app can hold the splash for a minimum time. -->
     <script>window.__bootAt = Date.now();</script>
@@ -52,6 +60,10 @@
           </svg>
         </div>
         <div style="font-size:22px;font-weight:700;letter-spacing:-.4px;color:#eef2f6">Domestique<span style="color:#ff6a2c"> Hub</span></div>
+        <div style="font-size:13px;line-height:1.5;color:#98a2ae;max-width:300px;text-align:center;padding:0 20px">
+          A team training app for multi-sport &amp; motorsport clubs — shared training plans, group events and rides,
+          a live group-ride computer, and club leaderboards. Your team's whole season, in one app.
+        </div>
       </div>
     </div>
     <script type="module" src="/src/main.jsx"></script>
