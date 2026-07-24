@@ -52,6 +52,8 @@ export function sectionStats(frames, sections) {
       maxPower: round(max(idx.map((i) => frames[i].power))),
       avgSpeed: round1(avg(idx.map((i) => frames[i].speed))),
       maxSpeed: round1(max(idx.map((i) => frames[i].speed))),
+      avgHr: round(avg(idx.map((i) => frames[i].hr))),
+      maxHr: round(max(idx.map((i) => frames[i].hr))),
       durationSec: offs.length >= 2 ? Math.round(offs[offs.length - 1] - offs[0]) : null,
     };
   }

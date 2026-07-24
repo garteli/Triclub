@@ -24,7 +24,7 @@ function StatCell({ value, unit, label, color }) {
   );
 }
 
-export default function RouteBreakdown({ route, elev, loading, stats, collapsible = false, defaultOpen = false, title = 'Route breakdown' }) {
+export default function RouteBreakdown({ route, elev, loading, stats, onOpenSection, collapsible = false, defaultOpen = false, title = 'Route breakdown' }) {
   const [open, setOpen] = useState(defaultOpen);
   const analysis = useMemo(() => (elev?.profile ? analyzeProfile(elev.profile) : null), [elev]);
   const [names, setNames] = useState({}); // section.index → reverse-geocoded name
@@ -143,8 +143,16 @@ export default function RouteBreakdown({ route, elev, loading, stats, collapsibl
           const st = stats?.[sec.index]; // timing actually ridden over this stretch (activity page only)
           const hasSpeed = st && (st.avgSpeed != null || st.maxSpeed != null);
           const hasPower = st && (st.avgPower != null || st.maxPower != null);
+          const open = onOpenSection ? () => onOpenSection({
+            index: sec.index, name: nameFor(sec), kind: sec.kind, cat: sec.cat, color: sec.color,
+            lenM: sec.lenM, gainM: sec.gainM, avgGradPct: sec.avgGradPct, maxGradPct: sec.maxGradPct,
+            startM: sec.startM, endM: sec.endM,
+            profile: analysis.profile.slice(sec.aIdx, sec.bIdx + 1).map((p) => ({ dist: p.dist, e: p.e })),
+            effort: st || null,
+          }) : undefined;
           return (
-            <div key={sec.index} style={s('display:flex;align-items:stretch;gap:11px;background:var(--bg2);border:1px solid var(--line);border-radius:15px;padding:11px 13px;position:relative;overflow:hidden')}>
+            <div key={sec.index} className={open ? 'ctl' : undefined} onClick={open}
+              style={s('display:flex;align-items:stretch;gap:11px;background:var(--bg2);border:1px solid var(--line);border-radius:15px;padding:11px 13px;position:relative;overflow:hidden')}>
               <span style={s(`position:absolute;left:0;top:0;bottom:0;width:4px;background:${sec.color}`)} />
               <div style={s('flex:none;width:34px;display:flex;flex-direction:column;align-items:center;justify-content:center')}>
                 <span className="mono" style={s(`font-size:20px;font-weight:700;color:${sec.color};line-height:1`)}>{sec.index}</span>
@@ -169,6 +177,7 @@ export default function RouteBreakdown({ route, elev, loading, stats, collapsibl
                   </div>
                 )}
               </div>
+              {open && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={s('flex:none;align-self:center')}><path d="M9 6l6 6-6 6" /></svg>}
             </div>
           );
         })}
