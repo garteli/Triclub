@@ -14,6 +14,19 @@ import { fmtDur } from '../hooks/useActivityAnalytics.js';
 
 const W = 940, H = 300, TOP = 30, BOT = 6; // profile viewBox + insets (matches the design)
 
+// A downsampled [lat,lon] polyline of the route between two distances (metres) — the geometry the
+// server matches against other riders' tracks to rank a segment. ~24 points is enough to fix the shape.
+function sectionPath(route, startM, endM) {
+  const out = [];
+  const n = 24;
+  for (let k = 0; k <= n; k++) {
+    const m = startM + (endM - startM) * (k / n);
+    const c = coordAtDistance(route, m);
+    if (c && Number.isFinite(c[0]) && Number.isFinite(c[1])) out.push([c[0], c[1]]);
+  }
+  return out;
+}
+
 // One little value+caption cell in a section's timing row (rendered only when its metric exists).
 function StatCell({ value, unit, label, color }) {
   return (
@@ -148,6 +161,9 @@ export default function RouteBreakdown({ route, elev, loading, stats, onOpenSect
             lenM: sec.lenM, gainM: sec.gainM, avgGradPct: sec.avgGradPct, maxGradPct: sec.maxGradPct,
             startM: sec.startM, endM: sec.endM,
             profile: analysis.profile.slice(sec.aIdx, sec.bIdx + 1).map((p) => ({ dist: p.dist, e: p.e })),
+            // Downsampled [lat,lon] polyline of this stretch → the server matches it against other
+            // riders' tracks to build the segment leaderboard.
+            path: sectionPath(route, sec.startM, sec.endM),
             effort: st || null,
           }) : undefined;
           return (
