@@ -858,8 +858,20 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
           onOpen={() => actions.openZones('hr')} linkLabel="Heart Rate Zones" />
       )}
 
-      {hasRealPower && !zones.ftp && (
-        <div style={s('padding:12px 18px 0;font-size:11px;color:var(--text3);line-height:1.5')}>Set your FTP &amp; max HR in <b>Settings → Training zones</b> to unlock power / heart-rate zones and Intensity Factor.</div>
+      {((hasRealPower && !zones.ftp) || (analytics.hasHr && !zones.maxHr)) && (
+        <div style={s('padding:18px 18px 0')}>
+          <div className="ctl" onClick={() => actions.go('zones')}
+            style={s('display:flex;align-items:center;gap:12px;background:var(--bg2);border:1px solid color-mix(in srgb,var(--accent) 32%,var(--line));border-radius:16px;padding:14px 15px')}>
+            <div style={s('width:38px;height:38px;flex:none;border-radius:11px;background:var(--accent-dim);display:flex;align-items:center;justify-content:center')}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20V10M18 20V4M6 20v-4" /></svg>
+            </div>
+            <div style={s('flex:1;min-width:0')}>
+              <div style={s('font-size:13.5px;font-weight:700')}>Unlock your training zones</div>
+              <div style={s('font-size:11.5px;color:var(--text2);margin-top:2px;line-height:1.4')}>Set your FTP &amp; max HR to see power / heart-rate zones, Athlete Intelligence and Intensity Factor.</div>
+            </div>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={s('flex:none')}><path d="M9 6l6 6-6 6" /></svg>
+          </div>
+        </div>
       )}
 
       <Splits analytics={analytics} sport={a.sport} />
