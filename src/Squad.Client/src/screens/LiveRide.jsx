@@ -130,78 +130,6 @@ function TodayRides({ live, actions }) {
   );
 }
 
-// Impact-sensitivity blurb shown next to the selector — what each level trades off.
-const SENS_HINT = {
-  low: 'Needs a harder crash',
-  medium: 'Balanced',
-  high: 'Triggers more easily',
-};
-
-// Fall-detection arm card for the lobby. Toggles accelerometer monitoring for this ride, tunes the
-// impact sensitivity, and nudges the rider to set an emergency contact (for the auto-call).
-function FallDetectCard({ fall, actions, motor = false }) {
-  const unsupported = fall.supported === false;
-  const on = !!fall.armed;
-  const title = motor ? 'Incident detection' : 'Fall detection';
-  const sub = unsupported
-    ? 'Not available on this device or browser.'
-    : on
-      ? (motor
-        ? 'Armed — we’ll check on you after a hard impact, then alert your squad.'
-        : 'Armed — we’ll check on you after a hard impact, then alert your squad.')
-      : (motor
-        ? 'Alert your squad and call automatically on a hard crash or roll-over.'
-        : 'Alert your squad automatically if you crash while riding.');
-  return (
-    <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:14px;margin-top:14px')}>
-      <div style={s('display:flex;align-items:center;gap:11px')}>
-        <div style={s(`width:36px;height:36px;border-radius:11px;flex:none;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--bad) 14%,var(--bg3));color:var(--bad)`)}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l9 4v6c0 5-3.8 8.5-9 10-5.2-1.5-9-5-9-10V6l9-4z" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
-        </div>
-        <div style={s('flex:1;min-width:0')}>
-          <div style={s('font-size:13.5px;font-weight:700')}>{title}</div>
-          <div style={s('font-size:11px;color:var(--text3);line-height:1.4')}>{sub}</div>
-        </div>
-        <div className={unsupported ? undefined : 'ctl'} onClick={unsupported ? undefined : () => fall.arm(!on)}
-          style={s(`width:46px;height:28px;border-radius:16px;flex:none;padding:3px;display:flex;align-items:center;box-sizing:border-box;justify-content:${on ? 'flex-end' : 'flex-start'};background:${on ? 'var(--good)' : 'var(--bg4)'};opacity:${unsupported ? 0.4 : 1};transition:background .15s`)}>
-          <div style={s('width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.35)')} />
-        </div>
-      </div>
-
-      {!unsupported && fall.setSensitivity && (
-        <div style={s('margin-top:13px')}>
-          <div style={s('display:flex;align-items:center;justify-content:space-between;margin:0 2px 6px')}>
-            <span style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:600')}>Impact sensitivity</span>
-            <span style={s('font-size:10.5px;color:var(--text3)')}>{SENS_HINT[fall.sensitivity] || ''}</span>
-          </div>
-          <div style={s('display:flex;gap:5px;background:var(--bg3);border:1px solid var(--line);border-radius:11px;padding:4px')}>
-            {[['low', 'Low'], ['medium', 'Medium'], ['high', 'High']].map(([v, label]) => {
-              const sel = (fall.sensitivity || 'medium') === v;
-              return (
-                <div key={v} className="ctl" onClick={() => fall.setSensitivity(v)}
-                  style={s(`flex:1;text-align:center;padding:7px 4px;border-radius:8px;font-size:11.5px;font-weight:700;` + (sel ? 'background:var(--accent);color:var(--accent-ink)' : 'color:var(--text2)'))}>{label}</div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-      {on && !fall.hasContact && (
-        <div className="ctl" onClick={() => actions.go('editprofile')}
-          style={s('margin-top:11px;display:flex;align-items:center;gap:8px;padding:9px 11px;border-radius:11px;background:color-mix(in srgb,var(--warn) 12%,var(--bg3));border:1px solid color-mix(in srgb,var(--warn) 30%,transparent)')}>
-          <span style={s('font-size:11.5px;color:var(--text2);line-height:1.4;flex:1')}>Add an emergency contact in your profile so we can call them.</span>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth="2.2" strokeLinecap="round"><path d="M9 6l6 6-6 6" /></svg>
-        </div>
-      )}
-      {fall.permission === 'denied' && (
-        <div style={s('margin-top:10px;font-size:11px;color:var(--bad);line-height:1.4')}>Motion access was blocked. Enable it for this site in your browser settings, then try again.</div>
-      )}
-      {!unsupported && (
-        <div style={s('margin-top:10px;font-size:10.5px;color:var(--text3);line-height:1.4')}>Best-effort — works while the app is open and can miss or misfire. Never rely on it alone in an emergency.</div>
-      )}
-    </div>
-  );
-}
-
 function Lobby({ vm, actions, live }) {
   const riders = live?.riders || [];
   const gear = gearComponentsFromSensors(live?.sensors);
@@ -266,10 +194,7 @@ function Lobby({ vm, actions, live }) {
       {/* shared recorder — GPS + BLE sensors, streams to the ride hub while active */}
       <RideRecorder recorder={live?.recorder} sensors={live?.sensors} streaming={!!live?.pushTelemetry} sport={live?.rideType?.value} family={vm.family} />
 
-      {/* fall / incident detection — opt-in per ride. Watches the phone's accelerometer while riding;
-          a hard impact + stillness opens an "Are you OK?" countdown, then alerts the squad + calls
-          your emergency contact. Best-effort, works while the app is open. */}
-      {live?.fall && <FallDetectCard fall={live.fall} actions={actions} motor={vm.family === 'motorsport'} />}
+      {/* Fall / incident detection is configured in Settings (not per-ride). */}
 
       {/* Bike / Vehicle & gear — connected components (battery from the sensors, when they report it) */}
       <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:14px;margin-top:14px')}>

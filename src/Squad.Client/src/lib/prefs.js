@@ -31,6 +31,12 @@ export const defaultPrefs = {
     pauseKph: 2,   // pause when speed drops below this
     resumeKph: 4,  // resume after speed holds above this for 5 s
   },
+  // Fall / incident detection during a live ride (configured in Settings). When on, the phone's
+  // accelerometer is watched while recording; a hard impact opens an "Are you OK?" countdown.
+  fallDetect: {
+    enabled: false,
+    sensitivity: 'medium', // 'low' | 'medium' | 'high' — impact threshold
+  },
   privacy: {
     profile: 'squad',      // who can see your profile: 'public' | 'squad' | 'private'
     activityMap: 'squad',  // who can see your activity maps
@@ -55,6 +61,7 @@ function merge(saved) {
     temp: saved.temp ?? defaultPrefs.temp,
     notif: { ...defaultPrefs.notif, ...(saved.notif || {}) },
     autoPause: { ...defaultPrefs.autoPause, ...(saved.autoPause || {}) },
+    fallDetect: { ...defaultPrefs.fallDetect, ...(saved.fallDetect || {}) },
     privacy: { ...defaultPrefs.privacy, ...(saved.privacy || {}) },
   };
 }
@@ -70,8 +77,8 @@ export function loadPrefs() {
 // Persist just the preference slice of app state.
 export function savePrefs(state) {
   try {
-    const { theme, accent, lang, units, temp, notif, autoPause, privacy } = state;
-    localStorage.setItem(KEY, JSON.stringify({ theme, accent, lang, units, temp, notif, autoPause, privacy }));
+    const { theme, accent, lang, units, temp, notif, autoPause, fallDetect, privacy } = state;
+    localStorage.setItem(KEY, JSON.stringify({ theme, accent, lang, units, temp, notif, autoPause, fallDetect, privacy }));
   } catch { /* storage unavailable */ }
   return state;
 }

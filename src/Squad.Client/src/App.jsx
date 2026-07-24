@@ -698,24 +698,15 @@ export default function App() {
   // A ride is "live" whenever it's active OR still recording — independent of which screen you're on,
   // so sensors, ranging, the hub, telemetry, wake lock and presence all keep running as you navigate.
   const rideLive = rideSessionActive || recorder.recording;
-  // Fall detection (opt-in per ride, off by default). `crashPending` holds the last fix at the moment
-  // a fall was detected → drives the full-screen "Are you OK?" overlay. Both reset when the ride ends.
-  const [fallArmed, setFallArmed] = useState(false);
+  // Fall / incident detection is a persisted Settings preference (enabled + sensitivity). When on, the
+  // detector runs automatically for the whole ride. `crashPending` holds the last fix at the moment a
+  // fall was detected → drives the full-screen "Are you OK?" overlay; it clears when the ride ends.
+  const fallDetect = state.fallDetect || { enabled: false, sensitivity: 'medium' };
+  const fallSensitivity = FALL_IMPACT_MS2[fallDetect.sensitivity] ? fallDetect.sensitivity : 'medium';
   const [crashPending, setCrashPending] = useState(null); // { lat, lon } | null
-  // Fall-detection impact sensitivity ('high' | 'medium' | 'low'), persisted across rides.
-  const [fallSensitivity, setFallSensitivityState] = useState(() => {
-    try { const v = localStorage.getItem('squad.fallSensitivity'); return FALL_IMPACT_MS2[v] ? v : 'medium'; } catch { return 'medium'; }
-  });
-  const setFallSensitivity = useCallback((v) => {
-    if (!FALL_IMPACT_MS2[v]) return;
-    setFallSensitivityState(v);
-    try { localStorage.setItem('squad.fallSensitivity', v); } catch { /* ignore */ }
-  }, []);
-  // Reset arming only when a ride actually ends (live true → false), so it stays opt-in per ride but
-  // can still be armed in the lobby before starting.
   const prevRideLive = useRef(rideLive);
   useEffect(() => {
-    if (prevRideLive.current && !rideLive) { setFallArmed(false); setCrashPending(null); }
+    if (prevRideLive.current && !rideLive) setCrashPending(null); // clear any pending overlay when a ride ends
     prevRideLive.current = rideLive;
   }, [rideLive]);
   // Saved routes/courses: pick one to follow on the live map (its geometry draws on the map, and it
@@ -763,31 +754,35 @@ export default function App() {
   const driverModeRef = useRef(!!rideType.driver);
   driverModeRef.current = !!rideType.driver;
 
-  // Fall detection: watches the accelerometer while armed + riding. On a detected fall it captures the
-  // last GPS fix and opens the confirmation overlay (paused while the overlay is up so it can't re-fire).
+  // Fall detection: watches the accelerometer while enabled (a Settings pref) + riding. On a detected
+  // fall it captures the last GPS fix and opens the confirmation overlay (paused while the overlay is
+  // up so it can't re-fire).
   const handleFall = useCallback(() => {
     setCrashPending((p) => p || {
       lat: recorderRef.current?.lastFix?.lat ?? null,
       lon: recorderRef.current?.lastFix?.lon ?? null,
     });
   }, []);
-  // Manual SOS (button on the live ride) — same alert path, but a deliberate confirm instead of a
-  // detected-fall countdown. Covers crashes the auto-detector misses (or when it's not armed).
-  const triggerSos = useCallback(() => {
-    setCrashPending((p) => p || {
-      lat: recorderRef.current?.lastFix?.lat ?? null,
-      lon: recorderRef.current?.lastFix?.lon ?? null,
-      manual: true,
-    });
-  }, []);
-  const fall = useFallDetection({ active: fallArmed && rideLive && !crashPending, onFall: handleFall, impactMs2: FALL_IMPACT_MS2[fallSensitivity] });
-  // Arm toggle: on → request the (iOS) motion permission from this tap, arm only if granted.
-  const armFall = useCallback(async (on) => {
-    if (!on) { setFallArmed(false); return; }
-    unlockAlarm(); // this tap is our chance to unlock audio for the countdown alarm later (iOS)
-    const ok = await fall.requestPermission();
-    setFallArmed(ok);
-  }, [fall]);
+  const fall = useFallDetection({ active: fallDetect.enabled && rideLive && !crashPending, onFall: handleFall, impactMs2: FALL_IMPACT_MS2[fallSensitivity] });
+  // Latest requestPermission for the Settings toggle to call from its tap (needs a gesture on iOS).
+  const fallPermRef = useRef(fall.requestPermission);
+  fallPermRef.current = fall.requestPermission;
+  // Persist fall-detect prefs. Enabling is a user gesture (Settings toggle) → our chance to request
+  // the iOS motion permission and unlock the countdown alarm audio.
+  const setFallPref = useCallback((patch) => setState((s) => savePrefs({ ...s, fallDetect: { ...(s.fallDetect || {}), ...patch } })), []);
+  const enableFall = useCallback(async (on) => {
+    if (on) { unlockAlarm(); try { await fallPermRef.current?.(); } catch { /* permission flow */ } }
+    setFallPref({ enabled: on });
+  }, [setFallPref]);
+  const fallInfo = useMemo(() => ({
+    enabled: !!fallDetect.enabled,
+    sensitivity: fallSensitivity,
+    supported: fall.supported,
+    permission: fall.permission,
+    hasContact: !!profile?.emergencyPhone,
+    setEnabled: enableFall,
+    setSensitivity: (v) => { if (FALL_IMPACT_MS2[v]) setFallPref({ sensitivity: v }); },
+  }), [fallDetect.enabled, fallSensitivity, fall.supported, fall.permission, profile?.emergencyPhone, enableFall, setFallPref]);
 
   useEffect(() => {
     if (!rideLive || typeof liveRide.pushTelemetry !== 'function') return undefined;
@@ -815,9 +810,8 @@ export default function App() {
   }), [getToken, squadId]);
 
   const live = { riders: liveRide.riders, status: liveRide.status, pushTelemetry: liveRide.pushTelemetry, recorder, sensors, tel, livePages, peerRanging, uwb, courses: courseOps, course: selectedCourse, events: eventOps, rideType: { value: rideSport, indoor: rideType.indoor, driver: !!rideType.driver, label: rideType.label, set: setRideSport },
-    // Fall detection: arm/disarm + capability, plus incoming teammate crash alerts.
-    fall: { armed: fallArmed, arm: armFall, supported: fall.supported, permission: fall.permission, hasContact: !!profile?.emergencyPhone, sensitivity: fallSensitivity, setSensitivity: setFallSensitivity },
-    sos: triggerSos, crash: liveRide.crash, dismissCrash: liveRide.dismissCrash };
+    // Incoming teammate crash alerts (fall detection is configured in Settings, not here).
+    crash: liveRide.crash, dismissCrash: liveRide.dismissCrash };
 
   // Unread count for the global header's bell badge.
   const notif = useNotifications({ getToken, enabled: authed });
@@ -877,6 +871,7 @@ export default function App() {
           planMine={authed ? planMineOps : undefined}
           notif={notif}
           inviteInfo={inviteInfo}
+          fallInfo={fallInfo}
           meId={session?.athleteId} />
         <UpdateBanner />
       </Phone>

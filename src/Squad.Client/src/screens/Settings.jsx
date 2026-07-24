@@ -40,9 +40,10 @@ const Stepper = ({ label, value, unit, min, max, onChange }) => (
   </div>
 );
 
-export default function Settings({ vm, state, actions }) {
+export default function Settings({ vm, state, actions, fallInfo }) {
   const { theme, accent, units } = state;
   const ap = state.autoPause || { enabled: true, pauseKph: 2, resumeKph: 4 };
+  const motor = vm?.family === 'motorsport';
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
       {/* title + back now in the global app header */}
@@ -83,6 +84,49 @@ export default function Settings({ vm, state, actions }) {
           </>
         )}
       </div>
+
+      {/* safety — fall / incident detection (configured here, runs automatically during a live ride) */}
+      {fallInfo && (
+        <>
+          <div style={s(label)}>Safety</div>
+          <div style={s(card + ';padding:14px 15px')}>
+            <div style={s('display:flex;align-items:center')}>
+              <div style={s('flex:1;min-width:0')}>
+                <div style={s('font-size:13.5px;font-weight:600;color:var(--text)')}>{motor ? 'Incident detection' : 'Fall detection'}</div>
+                <div style={s('font-size:11px;color:var(--text3);margin-top:2px;line-height:1.4')}>
+                  {motor
+                    ? 'Alert your squad and call automatically on a hard crash or roll-over during a session.'
+                    : 'Alert your squad automatically if you crash during a live ride.'}
+                </div>
+              </div>
+              {fallInfo.supported === false
+                ? <span style={s('font-size:10.5px;color:var(--text3);flex:none')}>Unavailable</span>
+                : <Toggle on={fallInfo.enabled} onClick={() => fallInfo.setEnabled(!fallInfo.enabled)} />}
+            </div>
+            {fallInfo.enabled && fallInfo.supported !== false && (
+              <>
+                <div style={s('height:1px;background:var(--line);margin:14px 0')} />
+                <div style={s(rowLabel)}>Impact sensitivity</div>
+                <div style={s('display:flex;gap:7px')}>
+                  <Seg active={fallInfo.sensitivity === 'low'} onClick={() => fallInfo.setSensitivity('low')}>Low</Seg>
+                  <Seg active={fallInfo.sensitivity === 'medium'} onClick={() => fallInfo.setSensitivity('medium')}>Medium</Seg>
+                  <Seg active={fallInfo.sensitivity === 'high'} onClick={() => fallInfo.setSensitivity('high')}>High</Seg>
+                </div>
+                {!fallInfo.hasContact && (
+                  <div className="ctl" onClick={() => actions.go('editprofile')} style={s('margin-top:12px;display:flex;align-items:center;gap:8px;padding:10px 11px;border-radius:11px;background:color-mix(in srgb,var(--warn) 12%,var(--bg3));border:1px solid color-mix(in srgb,var(--warn) 30%,transparent)')}>
+                    <span style={s('font-size:11.5px;color:var(--text2);line-height:1.4;flex:1')}>Add an emergency contact in your profile so we can call them.</span>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth="2.2" strokeLinecap="round"><path d="M9 6l6 6-6 6" /></svg>
+                  </div>
+                )}
+                {fallInfo.permission === 'denied' && (
+                  <div style={s('margin-top:10px;font-size:11px;color:var(--bad);line-height:1.4')}>Motion access was blocked. Enable it for the app in your device settings, then turn this off and on again.</div>
+                )}
+                <div style={s('margin-top:10px;font-size:10.5px;color:var(--text3);line-height:1.4')}>Best-effort — works while the app is open and can miss or misfire. Never rely on it alone in an emergency.</div>
+              </>
+            )}
+          </div>
+        </>
+      )}
 
       {/* general */}
       <div style={s(label)}>General</div>
