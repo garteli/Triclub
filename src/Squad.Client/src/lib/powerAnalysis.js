@@ -104,6 +104,24 @@ export function powerCurve(track) {
   return out;
 }
 
+// Best-of envelope across several power curves (each [{sec,watts}]): the highest watts at
+// every duration. Used for the "last 6 weeks" comparison on the Power Curve page.
+export function curveEnvelope(curves) {
+  const best = new Map();
+  for (const c of curves || []) {
+    for (const pt of c || []) {
+      if (!best.has(pt.sec) || pt.watts > best.get(pt.sec)) best.set(pt.sec, pt.watts);
+    }
+  }
+  return [...best.entries()].map(([sec, watts]) => ({ sec, watts })).sort((a, b) => a.sec - b.sec);
+}
+
+// The best average power sustained for `sec` in a curve (exact duration match), or null.
+export function curveWattsAt(curve, sec) {
+  const hit = (curve || []).find((c) => c.sec === sec);
+  return hit ? hit.watts : null;
+}
+
 function haversine(la1, lo1, la2, lo2) {
   const R = 6371000, r = Math.PI / 180;
   const dLa = (la2 - la1) * r, dLo = (lo2 - lo1) * r;

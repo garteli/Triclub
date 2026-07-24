@@ -491,8 +491,8 @@ function WorkoutAnalysis({ powerValues }) {
   );
 }
 
-// ---- power curve (real, log-time x) ----
-function PowerCurve({ curve }) {
+// ---- power curve (real, log-time x) — taps through to the full Power Curve page ----
+function PowerCurve({ curve, onOpen }) {
   if (curve.length < 2) return null;
   const maxW = Math.max(...curve.map((c) => c.watts));
   const first = curve[0].sec, last = curve[curve.length - 1].sec;
@@ -505,8 +505,11 @@ function PowerCurve({ curve }) {
   const ticks = [1, 5, 15, 30, 60, 300, 1200, 7200].filter((tk) => tk >= first && tk <= last);
   return (
     <div style={s('padding:16px 18px 0')}>
-      <div style={s(title)}>Power Curve</div>
-      <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:14px 14px 8px')}>
+      <div style={s('display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px')}>
+        <div style={s(title + ';margin:0')}>Power Curve</div>
+        {onOpen && <span className="ctl" onClick={onOpen} style={s('font-size:11.5px;font-weight:700;color:#b98cff;display:flex;align-items:center;gap:2px')}>Full curve<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg></span>}
+      </div>
+      <div className={onOpen ? 'ctl' : undefined} onClick={onOpen} style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:14px 14px 8px')}>
         <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: '100%', height: H, display: 'block' }}>
           <path d={area} fill="#7c2fd6" opacity="0.14" />
           <path d={line} fill="none" stroke="#7c2fd6" strokeWidth="2.4" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
@@ -787,7 +790,7 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
       <ActivityPhotos activityId={a.id} isMe={a.isMe} token={token} getToken={getToken} />
 
       {hasRealPower && <WorkoutAnalysis powerValues={powerValues} />}
-      <PowerCurve curve={analytics.curve} />
+      <PowerCurve curve={analytics.curve} onOpen={() => actions.go('powercurve')} />
       <SensorTraces traces={traces} totalSec={totalSec} elevValues={elevValues} />
 
       {/* route broken into climbs/descents, with the power/speed/time actually ridden over each —

@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 // later view can retry.
 const trackCache = new Map(); // activityId -> Promise<{ track, laps, matched }>
 
-function loadTrack(activityId, token) {
+export function loadTrack(activityId, token) {
   const cached = trackCache.get(activityId);
   if (cached) return cached;
   const p = (async () => {
