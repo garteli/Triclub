@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { s } from '../lib/style.js';
-import { BASEMAP_LABEL, baseSource, applyBasemap, nextBasemap, inIsrael } from '../lib/basemaps.js';
+import { BASEMAP_LABEL, baseSource, applyBasemap, nextBasemap, inIsrael, defaultBasemap } from '../lib/basemaps.js';
 import { getRouteStyle, setRouteStyle as persistRouteStyle } from '../lib/routeStyle.js';
 import { addRouteArrows, styleArrows } from '../lib/mapArrows.js';
 import { setMapView } from '../lib/mapView.js';
@@ -104,7 +104,7 @@ export default function FullMap({ route, style: initialStyle = 'voyager', is3D: 
   }, [rstyle]);
 
   // If we opened on Off-road but the route isn't in Israel, fall back to a global basemap.
-  useEffect(() => { if (!israel && mapStyle === 'offroad') setMapStyle('voyager'); }, [israel, mapStyle]);
+  useEffect(() => { if (!israel && mapStyle === 'offroad') setMapStyle(defaultBasemap(false)); }, [israel, mapStyle]);
 
   // Persist the last-selected layer + view, and sync the inline hero behind us (onView).
   useEffect(() => { setMapView({ style: mapStyle, is3D }); onView?.(mapStyle, is3D); }, [mapStyle, is3D]); // eslint-disable-line react-hooks/exhaustive-deps

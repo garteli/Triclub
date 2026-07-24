@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { s } from '../lib/style.js';
-import { BASEMAP_LABEL, nextBasemap, inIsrael } from '../lib/basemaps.js';
+import { BASEMAP_LABEL, nextBasemap, inIsrael, resolveBasemap } from '../lib/basemaps.js';
 import { getMapView, setMapView } from '../lib/mapView.js';
 import { getRouteStyle } from '../lib/routeStyle.js';
 import RouteMapGL from './RouteMapGL.jsx';
@@ -16,8 +16,9 @@ const glass = 'background:rgba(20,23,29,.72);backdrop-filter:blur(8px);border:1p
 export default function ActivityHero({ a, route, frames, hasMap, status, token, onBack, onDelete, onSaveRoute }) {
   // Off-road only makes sense over Israel (its tiles are blank elsewhere).
   const israel = (() => { const p = validPts(route)[0]; return p ? inIsrael(p[0], p[1]) : true; })();
-  // Restore the athlete's last-selected layer + 2D/3D view (persisted); drop Off-road when not in Israel.
-  const [mapStyle, setMapStyle] = useState(() => { const v = getMapView(); return (v.style === 'offroad' && !israel) ? 'voyager' : v.style; });
+  // Restore the athlete's last-selected layer + 2D/3D view (persisted); resolveBasemap drops
+  // Off-road when not in Israel AND falls back to the default if the layer isn't a favorite.
+  const [mapStyle, setMapStyle] = useState(() => resolveBasemap(getMapView().style, israel));
   const [is3D, setIs3D] = useState(() => getMapView().is3D);
   const [full, setFull] = useState(false);
   const [menu, setMenu] = useState(false); // overflow (···) sheet: Save route / Delete

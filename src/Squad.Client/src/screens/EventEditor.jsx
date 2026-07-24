@@ -7,7 +7,7 @@ import { listCourses, createCourse, deleteCourse, importCourseFromUrl, getCourse
 import CoursePicker from '../components/CoursePicker.jsx';
 import RouteMapGL from '../components/RouteMapGL.jsx';
 import SportIcon from '../components/SportIcon.jsx';
-import { BASEMAP_LABEL, nextBasemap, inIsrael } from '../lib/basemaps.js';
+import { BASEMAP_LABEL, nextBasemap, inIsrael, resolveBasemap, defaultBasemap } from '../lib/basemaps.js';
 import { getRouteStyle } from '../lib/routeStyle.js';
 import { getMapView, setMapStyle as persistMapStyle } from '../lib/mapView.js';
 import { createSquadEvent, updateSquadEvent, uploadEventImage, deleteEventImage, toOffsetIso, toLocalInput } from '../lib/events.js';
@@ -69,7 +69,7 @@ export default function EventEditor({ vm, state, actions, getToken, onDataChange
   // getCourse resolves. rstyle = the app-wide route colour/width; mapStyle = shared basemap layer.
   const [routePts, setRoutePts] = useState(null); // [[lat,lon],…] | null
   const [mapFull, setMapFull] = useState(false);  // fullscreen route map overlay
-  const [mapStyle, setMapStyle] = useState(() => getMapView().style);
+  const [mapStyle, setMapStyle] = useState(() => resolveBasemap(getMapView().style));
   const rstyle = useMemo(() => getRouteStyle(), []);
 
   useEffect(() => {
@@ -121,7 +121,7 @@ export default function EventEditor({ vm, state, actions, getToken, onDataChange
   // Off-road basemap only makes sense over Israel (blank tiles elsewhere); fall back otherwise.
   const israel = useMemo(() => (routeStart ? inIsrael(routeStart[0], routeStart[1]) : true), [routeStart]);
   const cycleLayer = () => setMapStyle((st) => nextBasemap(st, israel));
-  useEffect(() => { if (!israel && mapStyle === 'offroad') setMapStyle('voyager'); }, [israel, mapStyle]);
+  useEffect(() => { if (!israel && mapStyle === 'offroad') setMapStyle(defaultBasemap(false)); }, [israel, mapStyle]);
   useEffect(() => { persistMapStyle(mapStyle); }, [mapStyle]);
 
   // ── per-event branding (edit mode only — needs a saved event id to attach images to) ──
