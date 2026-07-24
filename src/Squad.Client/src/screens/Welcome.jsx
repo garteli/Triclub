@@ -5,7 +5,7 @@ import Logo from '../components/Logo.jsx';
 import SportIcon from '../components/SportIcon.jsx';
 import InviteBanner from '../components/InviteBanner.jsx';
 import GoogleButton from '../components/GoogleButton.jsx';
-import { isInAppBrowser, isNativePlatform } from '../lib/platform.js';
+import { isInAppBrowser, isNativePlatform, appleSignInAvailable } from '../lib/platform.js';
 import { preloadApple } from '../lib/oauth.js';
 import {
   oauthSignIn, authConfig, exchangeGoogleCredential,
@@ -102,7 +102,7 @@ export default function Welcome({ actions, inviteInfo }) {
             {providers.google && (isNativePlatform()
               ? <SocialButton provider="google" onClick={() => social('google')} />
               : <GoogleButton clientId={providers.google.clientId} onCredential={onGoogleCredential} onError={setError} />)}
-            {providers.apple && <SocialButton provider="apple" onClick={() => social('apple')} />}
+            {providers.apple && appleSignInAvailable() && <SocialButton provider="apple" onClick={() => social('apple')} />}
           </div>
         )}
 

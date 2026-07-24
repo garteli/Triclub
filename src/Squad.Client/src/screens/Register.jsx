@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { s } from '../lib/style.js';
 import { StepHeader, Title, Sub, FieldLabel, Field, Chips, PrimaryBtn } from './wizard.jsx';
 import { SocialButton, BiometricButton, OrDivider, RememberRow } from '../components/AuthButtons.jsx';
+import { appleSignInAvailable } from '../lib/platform.js';
 import InviteBanner from '../components/InviteBanner.jsx';
 import {
   registerWithEmail, updateProfile, oauthSignIn, authConfig,
@@ -92,7 +93,7 @@ export default function Register({ actions, inviteInfo }) {
           {(anySocial || bioReady) && (
             <div style={s('display:flex;flex-direction:column;gap:10px;margin-top:18px')}>
               {providers.google && <SocialButton provider="google" onClick={() => social('google')} />}
-              {providers.apple && <SocialButton provider="apple" onClick={() => social('apple')} />}
+              {providers.apple && appleSignInAvailable() && <SocialButton provider="apple" onClick={() => social('apple')} />}
               {bioReady && <BiometricButton onClick={bioSignIn} />}
             </div>
           )}
