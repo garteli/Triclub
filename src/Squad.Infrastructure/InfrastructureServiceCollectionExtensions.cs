@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Net.Http;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -64,6 +65,11 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IClubRankingService>(_ => new SqlClubRankingService(sqlConnectionString));
         services.AddScoped<IFeedReadService>(_ => new SqlFeedService(sqlConnectionString));
         services.AddScoped<IActivityReadService>(_ => new SqlActivityReadService(sqlConnectionString));
+        // Ad-hoc segment leaderboard: matches a supplied polyline against stored GPS tracks. Needs a
+        // memory cache to hold decompressed tracks between scope toggles (bounded by sliding expiry).
+        services.AddMemoryCache();
+        services.AddScoped<ISegmentBoardService>(sp => new SqlSegmentBoardService(
+            sqlConnectionString, sp.GetRequiredService<IMemoryCache>()));
         services.AddScoped<IAthleteAccounts>(_ => new SqlAthleteAccounts(sqlConnectionString));
         services.AddScoped<IProfileService>(_ => new SqlProfileService(sqlConnectionString));
         services.AddScoped<ISquadService>(_ => new SqlSquadService(sqlConnectionString));

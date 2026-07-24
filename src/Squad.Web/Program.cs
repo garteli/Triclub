@@ -157,6 +157,7 @@ app.MapLeaderboard();      // GET  /api/squads/{squadId}/leaderboard
 app.MapClubRanking();      // GET  /api/clubs/ranking (cross-club board)
 app.MapFeed();             // GET  /api/feed
 app.MapAthletes();         // GET /api/athletes/{id} (+ follow/unfollow)
+app.MapSegments();         // POST /api/segments/board (ad-hoc segment leaderboard from a route section)
 app.MapNotifications();     // GET /api/notifications (+ /read)
 app.MapPlan();             // GET /api/plan
 app.MapChat();             // GET/POST /api/messages
