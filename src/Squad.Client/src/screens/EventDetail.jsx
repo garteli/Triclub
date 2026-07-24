@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { s } from '../lib/style.js';
-import { Back } from './wizard.jsx';
 import RouteMapGL from '../components/RouteMapGL.jsx';
 import AuthedAvatar from '../components/AuthedAvatar.jsx';
 import AuthedImage from '../components/AuthedImage.jsx';
@@ -238,8 +237,7 @@ export default function EventDetail({ vm, state, actions, getToken }) {
   if (!ev) {
     return (
       <div style={s('padding:20px')}>
-        <Back onClick={() => actions.back?.()} />
-        <div style={s('font-size:14px;color:var(--text2);margin-top:16px')}>That event is no longer available.</div>
+        <div style={s('font-size:14px;color:var(--text2)')}>That event is no longer available.</div>
       </div>
     );
   }
@@ -314,15 +312,7 @@ export default function EventDetail({ vm, state, actions, getToken }) {
 
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
-      {/* header — back · title · share */}
-      <div style={s('display:flex;align-items:center;gap:12px;margin:6px 0 4px')}>
-        <Back onClick={() => actions.back?.()} />
-        <div style={s('flex:1;font-size:20px;font-weight:700;letter-spacing:-.4px')}>Event</div>
-        <div className="ctl" onClick={doShare} aria-label="Share event"
-          style={s('width:36px;height:36px;flex:none;border-radius:11px;background:var(--bg2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--text2)')}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4" /></svg>
-        </div>
-      </div>
+      {/* back + "Event" title now in the global app header (share lives in the actions row below) */}
 
       {/* banner hero (if the coach set one) */}
       {ev.bannerUrl && (

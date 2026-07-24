@@ -185,9 +185,14 @@ const HEADER_META = {
   admin: { title: 'System admin' },
   adminuser: { title: 'User details' },
   admingroup: { title: 'Group details' },
+  // Tab root screens — club branding, no Back (they keep their own in-page section title below,
+  // like the Leaderboard). `plan` is the endurance 2nd tab; `events` the motorsport 2nd tab.
+  plan: { root: true },
+  events: { root: true },
+  // Event sub-pages (Back + title via the global header; their in-page header rows were removed).
+  eventdetail: { title: 'Event' },
+  eventeditor: { title: (vm, state) => (state?.selEvent ? 'Edit event' : 'New event') },
   // Tab root + contextual screens (dynamic titles from the view model).
-  // (plan intentionally omitted: the Training Plan page carries its own in-page header, like the
-  //  Events page, so it renders without the global club-branding AppHeader.)
   athlete: { title: (vm) => vm.athlete?.name || 'Athlete' },
   group: { title: (vm) => vm.selGroupData?.name || 'Group' },
   recordpay: { title: 'Record a payment' },
