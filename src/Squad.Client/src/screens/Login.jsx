@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { s } from '../lib/style.js';
 import { Back, Title, Sub, Field, PrimaryBtn } from './wizard.jsx';
 import { SocialButton, BiometricButton, OrDivider, RememberRow } from '../components/AuthButtons.jsx';
+import { appleSignInAvailable } from '../lib/platform.js';
 import {
   loginWithEmail, oauthSignIn, authConfig,
   biometricAvailable, biometricEnrolled, signInWithBiometric,
@@ -71,7 +72,7 @@ export default function Login({ actions }) {
       {(anySocial || bioReady) && (
         <div style={s('display:flex;flex-direction:column;gap:10px;margin-top:18px')}>
           {providers.google && <SocialButton provider="google" onClick={() => social('google')} label="Sign in with Google" />}
-          {providers.apple && <SocialButton provider="apple" onClick={() => social('apple')} label="Sign in with Apple" />}
+          {providers.apple && appleSignInAvailable() && <SocialButton provider="apple" onClick={() => social('apple')} label="Sign in with Apple" />}
           {bioReady && <BiometricButton onClick={bioSignIn} />}
         </div>
       )}
