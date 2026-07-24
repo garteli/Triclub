@@ -12,8 +12,10 @@ public sealed record SegmentEffort(
     Guid AthleteId, string Name, string Initials, string AvatarColor, string? AvatarUrl,
     int TimeSec, double AvgSpeedKph, DateTimeOffset WhenUtc, bool IsMe);
 
-/// <summary>The ranked board — one entry per rider (their fastest matching effort), fastest first.</summary>
-public sealed record SegmentBoard(IReadOnlyList<SegmentEffort> Efforts);
+/// <summary>The ranked board — one entry per rider (their fastest matching effort), fastest first.
+/// YourEffortCount is how many of the viewer's own activities matched this stretch (not deduped),
+/// so the segment page can show "N efforts". Bounded by the candidate scan cap.</summary>
+public sealed record SegmentBoard(IReadOnlyList<SegmentEffort> Efforts, int YourEffortCount);
 
 /// <summary>Ranks efforts over an ad-hoc segment by scanning stored GPS tracks. No stored segment
 /// table — each request matches the supplied polyline against candidate activities on the fly.</summary>
