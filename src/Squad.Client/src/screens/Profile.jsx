@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { s } from '../lib/style.js';
 import Avatar from '../components/Avatar.jsx';
+import AuthedImage from '../components/AuthedImage.jsx';
 import { useProfilePage } from '../hooks/useProfilePage.js';
 import { useConfirm } from '../components/ConfirmModal.jsx';
 
@@ -37,6 +38,15 @@ export default function Profile({ vm, actions, getToken, onLeaveSquad }) {
   const me = vm.me || {};
   const { page, status, setGoal, clearGoal, refetch } = useProfilePage({ getToken, enabled: !!getToken });
   const confirm = useConfirm();
+
+  // Club logos are private images behind an authed endpoint — resolve the bearer once so
+  // <AuthedImage> can fetch them (a plain <img src> can't send the Authorization header).
+  const [token, setToken] = useState(null);
+  useEffect(() => {
+    let ok = true;
+    Promise.resolve(getToken?.()).then((t) => { if (ok) setToken(t || null); });
+    return () => { ok = false; };
+  }, [getToken]);
 
   // Leave a club (with a confirmation modal). The server refuses if you own it, and moves you
   // back to your personal space if it was your active club; refresh the app + this page after.
@@ -159,6 +169,7 @@ export default function Profile({ vm, actions, getToken, onLeaveSquad }) {
         activeClubId={vm.activeClubId}
         rank={rank}
         actions={actions}
+        token={token}
         onLeave={askLeave}
       />
 
@@ -168,7 +179,7 @@ export default function Profile({ vm, actions, getToken, onLeaveSquad }) {
 }
 
 // ── my clubs (all memberships + self-leave) ───────────────────────────────────
-function MyClubs({ memberships, ready, fallbackName, fallbackMembers, activeClubId, rank, actions, onLeave }) {
+function MyClubs({ memberships, ready, fallbackName, fallbackMembers, activeClubId, rank, actions, token, onLeave }) {
   const clubs = memberships || [];
 
   // Until the page has loaded we don't know the memberships — show the active club as a
@@ -207,6 +218,7 @@ function MyClubs({ memberships, ready, fallbackName, fallbackMembers, activeClub
               name={c.name}
               logoUrl={c.logoUrl}
               color={c.color}
+              token={token}
               active={c.isActive}
               role={c.isOwner ? 'owner' : c.role}
               sub={[`${c.members} athlete${c.members === 1 ? '' : 's'}`, c.discipline].filter(Boolean).join(' · ')}
@@ -220,14 +232,18 @@ function MyClubs({ memberships, ready, fallbackName, fallbackMembers, activeClub
   );
 }
 
-function ClubCard({ name, sub, logoUrl, color, active, role, onOpen, onLeave }) {
+function ClubCard({ name, sub, logoUrl, color, token, active, role, onOpen, onLeave }) {
   const roleChip = role === 'owner' ? 'Owner' : role === 'coach' ? 'Coach' : null;
   return (
     <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:13px 14px;display:flex;align-items:center;gap:12px')}>
       <div className="ctl" onClick={onOpen} style={s('display:flex;align-items:center;gap:12px;flex:1;min-width:0')}>
-        <div style={s(`width:44px;height:44px;border-radius:13px;flex:none;display:flex;align-items:center;justify-content:center;overflow:hidden;${logoUrl ? '' : `background:linear-gradient(135deg,${color || '#ff8a3d'},#ef5f1f)`}`)}>
-          {logoUrl ? <img src={logoUrl} alt="" style={s('width:100%;height:100%;object-fit:cover')} /> : <SquadLogo />}
-        </div>
+        {logoUrl
+          ? <AuthedImage url={logoUrl} token={token} style="width:44px;height:44px;border-radius:13px;flex:none" />
+          : (
+            <div style={s(`width:44px;height:44px;border-radius:13px;flex:none;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,${color || '#ff8a3d'},#ef5f1f)`)}>
+              <SquadLogo />
+            </div>
+          )}
         <div style={s('flex:1;min-width:0')}>
           <div style={s('display:flex;align-items:center;gap:7px')}>
             <div style={s('font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>{name}</div>
