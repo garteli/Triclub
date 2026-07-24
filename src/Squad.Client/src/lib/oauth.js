@@ -39,17 +39,23 @@ let _nativeReady;
 async function nativeSocialLogin(cfg) {
   const { SocialLogin } = await import('@capgo/capacitor-social-login');
   if (!_nativeReady) {
-    _nativeReady = SocialLogin.initialize({
+    const initCfg = {
       google: {
         iOSClientId: cfg?.google?.iosClientId,      // native iOS OAuth client
         iOSServerClientId: cfg?.google?.clientId,   // web client id (server audience)
         webClientId: cfg?.google?.clientId,
       },
-      apple: {
-        clientId: cfg?.apple?.clientId,             // Services ID (web/Android); iOS uses the bundle id
+    };
+    // Apple's native init needs a redirectUrl on Android (a web OAuth flow) that we don't have —
+    // including it makes the whole initialize() throw ("apple.android.redirectUrl is null or empty"),
+    // which would ALSO break Google sign-in. So configure Apple only where it's used (iOS).
+    if (Capacitor.getPlatform() !== 'android') {
+      initCfg.apple = {
+        clientId: cfg?.apple?.clientId,             // Services ID (web); iOS uses the bundle id
         redirectUrl: '',                            // empty => no redirect on iOS
-      },
-    }).catch((e) => { _nativeReady = undefined; throw e; });
+      };
+    }
+    _nativeReady = SocialLogin.initialize(initCfg).catch((e) => { _nativeReady = undefined; throw e; });
   }
   await _nativeReady;
   return { SocialLogin };
