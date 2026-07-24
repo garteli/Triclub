@@ -40,8 +40,14 @@ public sealed class SqlSquadService(string connectionString) : ISquadService
         await using var conn = new SqlConnection(connectionString);
         var rows = await conn.QueryAsync<SquadSummary>(new CommandDefinition(
             // Personal "Solo" squads (one per signup) are private — never list them in Discover.
-            SelectSummary + " WHERE s.Kind <> 'personal' ORDER BY MemberCount DESC, s.CreatedUtc DESC;",
-            new { me = me ?? Guid.Empty }, cancellationToken: ct));
+            // The App Store review demo club is hidden too, except for its own members (the reviewer).
+            SelectSummary + """
+             WHERE s.Kind <> 'personal'
+               AND (s.Name <> @demoClub OR EXISTS (
+                    SELECT 1 FROM dbo.Membership dm WHERE dm.SquadId = s.Id AND dm.AthleteId = @me))
+             ORDER BY MemberCount DESC, s.CreatedUtc DESC;
+            """,
+            new { me = me ?? Guid.Empty, demoClub = Squads.ReviewDemoClub }, cancellationToken: ct));
         return rows.ToList();
     }
 

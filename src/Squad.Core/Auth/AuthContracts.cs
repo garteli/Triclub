@@ -8,6 +8,12 @@ namespace Squad.Core;
 public static class Squads
 {
     public static readonly Guid Landing = new("c1a5b000-0000-0000-0000-000000000001");
+
+    /// <summary>The App Store / Google Play review demo club. Kept live so the reviewer
+    /// (and the seeded demo accounts) can exercise a fully-populated group, but hidden from
+    /// every public surface — Discover, the club-rankings board, the sysadmin console — for
+    /// everyone who isn't a member of it. Gate on membership, not on a hard-coded email.</summary>
+    public const string ReviewDemoClub = "Bay Area Tri Club";
 }
 
 /// <summary>A persisted account row (== an Athlete). Password and/or a federated subject.</summary>
