@@ -8,9 +8,10 @@ import { fmtDur } from '../hooks/useActivityAnalytics.js';
 // Grand-Tour stage profile — a colour-coded profile with climb-category chips, then a section-by-
 // section list. All derived from the real terrain profile (elev), so nothing is fabricated.
 //
-// Reused on the activity detail page: pass `stats` (section.index → { avgPower, maxPower, avgSpeed,
-// maxSpeed, durationSec }, from lib/activitySections.js) to add a "what you actually rode over this
-// stretch" row to each section card, and `collapsible` to wrap the whole block behind a header toggle.
+// Reused on the activity detail page (collapsible variant): the stage profile shows by default with
+// a pin header (↑gain · N seg) and a "{max} m high · ↑{gain} m gain" headline; opening reveals the
+// section cards. Pass `stats` (section.index → { avgPower, maxPower, avgSpeed, maxSpeed, durationSec },
+// from lib/activitySections.js) to add a "what you actually rode over this stretch" row per section.
 
 const W = 940, H = 300, TOP = 30, BOT = 6; // profile viewBox + insets (matches the design)
 
@@ -26,6 +27,15 @@ function sectionPath(route, startM, endM) {
   }
   return out;
 }
+
+// km without a trailing ".0" (mockup: "0 → 13 KM", "13 → 15.3 KM").
+const km1 = (m) => { const k = m / 1000; return k % 1 ? k.toFixed(1) : String(Math.round(k)); };
+
+const PinIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="#ec4899" style={{ flex: 'none' }}>
+    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z" />
+  </svg>
+);
 
 // One little value+caption cell in a section's timing row (rendered only when its metric exists).
 function StatCell({ value, unit, label, color }) {
@@ -107,112 +117,150 @@ export default function RouteBreakdown({ route, elev, loading, stats, onOpenSect
     </div>
   );
 
-  const body = (
-    <div style={s('margin-top:12px')}>
-      {/* summary stats */}
-      <div style={s('display:flex;gap:7px')}>
-        {stat(totalKm.toFixed(1), 'km', 'Distance')}
-        {stat(`↑${totalGainM}`, 'm', 'Climbing')}
-        {stat(String(climbCount), '', 'Rated climbs')}
-      </div>
-
-      {/* stage profile */}
-      <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:18px;padding:13px 12px 10px;margin-top:11px')}>
-        <div style={s('display:flex;align-items:center;justify-content:space-between;margin-bottom:2px')}>
-          <span style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1.3px;font-weight:600')}>Stage profile</span>
-          <span className="mono" style={s('font-size:10px;color:var(--text2)')}>{minE}–{maxE} m</span>
-        </div>
-        <div style={s('position:relative;width:100%;height:150px')}>
-          <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: '100%', height: '100%', display: 'block' }}>
-            <path d={areaD} fill="rgba(255,255,255,.05)" />
-            {ridgeSegs.map((seg, i) => <path key={i} d={seg.d} fill="none" stroke={seg.color} strokeWidth="3.5" strokeLinejoin="round" strokeLinecap="round" />)}
-          </svg>
-          <div style={s('position:absolute;inset:0;pointer-events:none')}>
-            {chips.map((c) => (
-              <div key={c.key} style={s(`position:absolute;left:${c.leftPct}%;top:${c.topPct}%;transform:translate(-50%,-115%)`)}>
-                <span className="mono" style={s(`display:flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 3px;border-radius:4px;background:${c.color};color:${c.ink};font-size:10px;font-weight:800;box-shadow:0 2px 5px rgba(0,0,0,.5)`)}>{c.cat}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div style={s('position:relative;height:14px;margin-top:1px')}>
-          {ticks.map((t, i) => <span key={i} className="mono" style={s(`position:absolute;left:${t.leftPct}%;transform:translateX(-50%);font-size:8.5px;color:var(--text3)`)}>{t.km}</span>)}
-        </div>
-        <div style={s('display:flex;flex-wrap:wrap;gap:9px 12px;margin-top:9px;padding-top:10px;border-top:1px solid var(--line)')}>
-          {PROFILE_LEGEND.map((l) => (
-            <div key={l.label} style={s('display:flex;align-items:center;gap:5px')}>
-              <span style={s(`width:14px;height:5px;border-radius:3px;background:${l.c}`)} />
-              <span style={s('font-size:9.5px;color:var(--text2);font-weight:600')}>{l.label}</span>
+  // The coloured stage-profile SVG + summit chips + km axis + gradient legend — shared by both variants.
+  const chartSvg = (
+    <>
+      <div style={s('position:relative;width:100%;height:150px')}>
+        <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: '100%', height: '100%', display: 'block' }}>
+          <path d={areaD} fill="rgba(255,255,255,.05)" />
+          {ridgeSegs.map((seg, i) => <path key={i} d={seg.d} fill="none" stroke={seg.color} strokeWidth="3.5" strokeLinejoin="round" strokeLinecap="round" />)}
+        </svg>
+        <div style={s('position:absolute;inset:0;pointer-events:none')}>
+          {chips.map((c) => (
+            <div key={c.key} style={s(`position:absolute;left:${c.leftPct}%;top:${c.topPct}%;transform:translate(-50%,-115%)`)}>
+              <span className="mono" style={s(`display:flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 3px;border-radius:4px;background:${c.color};color:${c.ink};font-size:10px;font-weight:800;box-shadow:0 2px 5px rgba(0,0,0,.5)`)}>{c.cat}</span>
             </div>
           ))}
         </div>
       </div>
-
-      {/* section-by-section list */}
-      <div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.4px;font-weight:600;margin:20px 2px 10px')}>The route, section by section</div>
-      <div style={s('display:flex;flex-direction:column;gap:8px')}>
-        {sections.map((sec) => {
-          const cs = sec.cat ? catStyle(sec.cat) : null;
-          const st = stats?.[sec.index]; // timing actually ridden over this stretch (activity page only)
-          const hasSpeed = st && (st.avgSpeed != null || st.maxSpeed != null);
-          const hasPower = st && (st.avgPower != null || st.maxPower != null);
-          const open = onOpenSection ? () => onOpenSection({
-            index: sec.index, name: nameFor(sec), kind: sec.kind, cat: sec.cat, color: sec.color,
-            lenM: sec.lenM, gainM: sec.gainM, avgGradPct: sec.avgGradPct, maxGradPct: sec.maxGradPct,
-            startM: sec.startM, endM: sec.endM,
-            profile: analysis.profile.slice(sec.aIdx, sec.bIdx + 1).map((p) => ({ dist: p.dist, e: p.e })),
-            // Downsampled [lat,lon] polyline of this stretch → the server matches it against other
-            // riders' tracks to build the segment leaderboard.
-            path: sectionPath(route, sec.startM, sec.endM),
-            effort: st || null,
-          }) : undefined;
-          return (
-            <div key={sec.index} className={open ? 'ctl' : undefined} onClick={open}
-              style={s('display:flex;align-items:stretch;gap:11px;background:var(--bg2);border:1px solid var(--line);border-radius:15px;padding:11px 13px;position:relative;overflow:hidden')}>
-              <span style={s(`position:absolute;left:0;top:0;bottom:0;width:4px;background:${sec.color}`)} />
-              <div style={s('flex:none;width:34px;display:flex;flex-direction:column;align-items:center;justify-content:center')}>
-                <span className="mono" style={s(`font-size:20px;font-weight:700;color:${sec.color};line-height:1`)}>{sec.index}</span>
-                {cs && <span className="mono" style={s(`margin-top:4px;min-width:15px;height:15px;padding:0 3px;display:flex;align-items:center;justify-content:center;border-radius:4px;background:${cs.color};color:${cs.ink};font-size:9px;font-weight:800`)}>{sec.cat}</span>}
-              </div>
-              <div style={s('flex:1;min-width:0')}>
-                <div dir="auto" style={s('font-size:13.5px;font-weight:700;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>{nameFor(sec)}</div>
-                <div style={s('font-size:10.5px;color:var(--text2);margin-top:2px')}>{sectionKindLabel(sec)} · {(sec.startM / 1000).toFixed(1)} → {(sec.endM / 1000).toFixed(1)} km</div>
-                <div style={s('display:flex;gap:14px;margin-top:8px')}>
-                  <div><span className="mono" style={s('font-size:13px;font-weight:700')}>{(sec.lenM / 1000).toFixed(1)}</span><span style={s('font-size:9px;color:var(--text3)')}> km</span></div>
-                  <div><span className="mono" style={s(`font-size:13px;font-weight:700;color:${sec.color}`)}>{sec.avgGradPct >= 0 ? '+' : ''}{sec.avgGradPct.toFixed(1)}</span><span style={s('font-size:9px;color:var(--text3)')}> %</span></div>
-                  <div><span className="mono" style={s('font-size:13px;font-weight:700')}>{sec.gainM >= 0 ? '↑' : '↓'}{Math.abs(sec.gainM)}</span><span style={s('font-size:9px;color:var(--text3)')}> m</span></div>
-                </div>
-                {/* what you actually rode over this stretch (real recorded power / speed / time) */}
-                {(st?.durationSec != null || hasSpeed || hasPower) && (
-                  <div style={s('display:flex;flex-wrap:wrap;gap:9px 16px;margin-top:9px;padding-top:9px;border-top:1px solid var(--line)')}>
-                    {st.durationSec != null && <StatCell value={fmtDur(st.durationSec)} label="Time" />}
-                    {st.avgSpeed != null && <StatCell value={st.avgSpeed.toFixed(1)} unit="km/h" label="Avg spd" color="var(--bike)" />}
-                    {st.maxSpeed != null && <StatCell value={st.maxSpeed.toFixed(1)} unit="km/h" label="Max spd" color="var(--bike)" />}
-                    {st.avgPower != null && <StatCell value={String(st.avgPower)} unit="W" label="Avg pwr" color="var(--accent)" />}
-                    {st.maxPower != null && <StatCell value={String(st.maxPower)} unit="W" label="Max pwr" color="var(--accent)" />}
-                  </div>
-                )}
-              </div>
-              {open && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={s('flex:none;align-self:center')}><path d="M9 6l6 6-6 6" /></svg>}
-            </div>
-          );
-        })}
+      <div style={s('position:relative;height:14px;margin-top:1px')}>
+        {ticks.map((t, i) => <span key={i} className="mono" style={s(`position:absolute;left:${t.leftPct}%;transform:translateX(-50%);font-size:8.5px;color:var(--text3)`)}>{t.km}</span>)}
       </div>
+      <div style={s('display:flex;flex-wrap:wrap;gap:9px 12px;margin-top:9px;padding-top:10px;border-top:1px solid var(--line)')}>
+        {PROFILE_LEGEND.map((l) => (
+          <div key={l.label} style={s('display:flex;align-items:center;gap:5px')}>
+            <span style={s(`width:14px;height:5px;border-radius:3px;background:${l.c}`)} />
+            <span style={s('font-size:9.5px;color:var(--text2);font-weight:600')}>{l.label}</span>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+
+  // The section-by-section cards (each its own rounded card) — shared by both variants.
+  const sectionsList = (
+    <div style={s('display:flex;flex-direction:column;gap:8px')}>
+      {sections.map((sec) => {
+        const cs = sec.cat ? catStyle(sec.cat) : null;
+        const st = stats?.[sec.index]; // timing actually ridden over this stretch (activity page only)
+        const hasSpeed = st && (st.avgSpeed != null || st.maxSpeed != null);
+        const hasPower = st && (st.avgPower != null || st.maxPower != null);
+        const openSec = onOpenSection ? () => onOpenSection({
+          index: sec.index, name: nameFor(sec), kind: sec.kind, cat: sec.cat, color: sec.color,
+          lenM: sec.lenM, gainM: sec.gainM, avgGradPct: sec.avgGradPct, maxGradPct: sec.maxGradPct,
+          startM: sec.startM, endM: sec.endM,
+          profile: analysis.profile.slice(sec.aIdx, sec.bIdx + 1).map((p) => ({ dist: p.dist, e: p.e })),
+          // Downsampled [lat,lon] polyline of this stretch → the server matches it against other
+          // riders' tracks to build the segment leaderboard.
+          path: sectionPath(route, sec.startM, sec.endM),
+          effort: st || null,
+        }) : undefined;
+        return (
+          <div key={sec.index} className={openSec ? 'ctl' : undefined} onClick={openSec}
+            style={s('display:flex;align-items:stretch;gap:11px;background:var(--bg2);border:1px solid var(--line);border-radius:15px;padding:11px 13px;position:relative;overflow:hidden')}>
+            <span style={s(`position:absolute;left:0;top:0;bottom:0;width:4px;background:${sec.color}`)} />
+            <div style={s('flex:none;width:34px;display:flex;flex-direction:column;align-items:center;justify-content:center')}>
+              <span className="mono" style={s(`font-size:20px;font-weight:700;color:${sec.color};line-height:1`)}>{sec.index}</span>
+              {cs && <span className="mono" style={s(`margin-top:4px;min-width:15px;height:15px;padding:0 3px;display:flex;align-items:center;justify-content:center;border-radius:4px;background:${cs.color};color:${cs.ink};font-size:9px;font-weight:800`)}>{sec.cat}</span>}
+            </div>
+            <div style={s('flex:1;min-width:0')}>
+              <div dir="auto" style={s('font-size:13.5px;font-weight:700;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>{nameFor(sec)}</div>
+              <div style={s('font-size:10px;color:var(--text2);margin-top:2px;text-transform:uppercase;letter-spacing:.4px;font-weight:600')}>{sectionKindLabel(sec)} · {km1(sec.startM)} → {km1(sec.endM)} km</div>
+              <div style={s('display:flex;gap:14px;margin-top:8px')}>
+                <div><span className="mono" style={s('font-size:13px;font-weight:700')}>{(sec.lenM / 1000).toFixed(1)}</span><span style={s('font-size:9px;color:var(--text3)')}> km</span></div>
+                <div><span className="mono" style={s(`font-size:13px;font-weight:700;color:${sec.color}`)}>{sec.avgGradPct >= 0 ? '+' : ''}{sec.avgGradPct.toFixed(1)}</span><span style={s('font-size:9px;color:var(--text3)')}> %</span></div>
+                <div><span className="mono" style={s('font-size:13px;font-weight:700')}>{sec.gainM >= 0 ? '↑' : '↓'}{Math.abs(sec.gainM)}</span><span style={s('font-size:9px;color:var(--text3)')}> m</span></div>
+              </div>
+              {/* what you actually rode over this stretch (real recorded power / speed / time) */}
+              {(st?.durationSec != null || hasSpeed || hasPower) && (
+                <div style={s('display:flex;flex-wrap:wrap;gap:9px 16px;margin-top:9px;padding-top:9px;border-top:1px solid var(--line)')}>
+                  {st.durationSec != null && <StatCell value={fmtDur(st.durationSec)} label="Time" />}
+                  {st.avgSpeed != null && <StatCell value={st.avgSpeed.toFixed(1)} unit="kph" label="Avg spd" color="var(--bike)" />}
+                  {st.maxSpeed != null && <StatCell value={st.maxSpeed.toFixed(1)} unit="kph" label="Max spd" color="var(--bike)" />}
+                  {st.avgPower != null && <StatCell value={String(st.avgPower)} unit="W" label="Avg pwr" color="var(--accent)" />}
+                  {st.maxPower != null && <StatCell value={String(st.maxPower)} unit="W" label="Max pwr" color="var(--accent)" />}
+                </div>
+              )}
+            </div>
+            {openSec && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={s('flex:none;align-self:center')}><path d="M9 6l6 6-6 6" /></svg>}
+          </div>
+        );
+      })}
     </div>
   );
 
-  if (!collapsible) return body;
+  // Event-page variant (design 1a): summary stat boxes → stage profile → all sections, always open.
+  if (!collapsible) {
+    return (
+      <div style={s('margin-top:12px')}>
+        <div style={s('display:flex;gap:7px')}>
+          {stat(totalKm.toFixed(1), 'km', 'Distance')}
+          {stat(`↑${totalGainM}`, 'm', 'Climbing')}
+          {stat(String(climbCount), '', 'Rated climbs')}
+        </div>
+        <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:18px;padding:13px 12px 10px;margin-top:11px')}>
+          <div style={s('display:flex;align-items:center;justify-content:space-between;margin-bottom:2px')}>
+            <span style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1.3px;font-weight:600')}>Stage profile</span>
+            <span className="mono" style={s('font-size:10px;color:var(--text2)')}>{minE}–{maxE} m</span>
+          </div>
+          {chartSvg}
+        </div>
+        <div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.4px;font-weight:600;margin:20px 2px 10px')}>The route, section by section</div>
+        {sectionsList}
+      </div>
+    );
+  }
+
+  // Activity-page variant (this mockup): pin header + headline + stage profile always visible; the
+  // section cards drop in below when opened.
   return (
     <div style={s('padding:16px 18px 0')}>
-      <div className="ctl" onClick={() => setOpen((v) => !v)}
-        style={s('display:flex;align-items:center;gap:11px;background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:13px 15px')}>
-        <div style={s('flex:1;min-width:0')}>
-          <div style={s('font-size:15px;font-weight:700')}>{title}</div>
-          <div className="mono" style={s('font-size:11px;color:var(--text3);margin-top:2px')}>{totalKm.toFixed(1)} km · ↑{totalGainM} m · {climbCount} climb{climbCount === 1 ? '' : 's'}</div>
+      <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:18px;padding:15px 15px 13px')}>
+        {/* header — pin + title + ↑gain · N seg + expand chevron */}
+        <div className="ctl" onClick={() => setOpen((v) => !v)} style={s('display:flex;align-items:center;gap:10px')}>
+          <PinIcon />
+          <span style={s('font-size:17px;font-weight:700')}>{title}</span>
+          <span className="mono" style={s('margin-left:auto;font-size:12px;color:var(--text2)')}>↑{totalGainM} m · {sections.length} seg</span>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"
+            style={{ flex: 'none', transform: open ? 'rotate(90deg)' : 'none', transition: 'transform .18s' }}><path d="M9 6l6 6-6 6" /></svg>
         </div>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .18s' }}><path d="M6 9l6 6 6-6" /></svg>
+
+        {/* elevation label + range */}
+        <div style={s('display:flex;align-items:center;justify-content:space-between;margin-top:15px')}>
+          <span style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1.3px;font-weight:600')}>Elevation · Stage profile</span>
+          <span className="mono" style={s('font-size:10.5px;color:var(--text2)')}>{minE}–{maxE} m</span>
+        </div>
+        {/* headline — max elevation (hero) + total gain */}
+        <div style={s('display:flex;align-items:baseline;flex-wrap:wrap;gap:3px 10px;margin-top:6px')}>
+          <span style={s('display:flex;align-items:baseline;gap:4px')}>
+            <span className="mono" style={s('font-size:30px;font-weight:800;letter-spacing:-1px;line-height:1;color:var(--good)')}>{maxE}</span>
+            <span style={s('font-size:12px;color:var(--text3);font-weight:600')}>m high</span>
+          </span>
+          <span style={s('display:flex;align-items:baseline;gap:4px')}>
+            <span className="mono" style={s('font-size:30px;font-weight:800;letter-spacing:-1px;line-height:1')}>↑{totalGainM}</span>
+            <span style={s('font-size:12px;color:var(--text3);font-weight:600')}>m gain</span>
+          </span>
+        </div>
+
+        <div style={s('margin-top:12px')}>{chartSvg}</div>
       </div>
-      {open && body}
+
+      {open && (
+        <div style={s('margin-top:10px')}>
+          <div style={s('font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.4px;font-weight:600;margin:6px 2px 10px')}>The route, section by section</div>
+          {sectionsList}
+        </div>
+      )}
     </div>
   );
 }
