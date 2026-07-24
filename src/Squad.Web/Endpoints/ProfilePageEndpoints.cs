@@ -45,6 +45,7 @@ public static class ProfilePageEndpoints
         var rank = row is null ? 0 : boardList.FindIndex(r => r.AthleteId == me) + 1;
 
         var squad = await squads.GetAsync(p.SquadId, me, ct);
+        var memberships = await squads.GetMembershipsAsync(me, ct);
         var s = await stats.GetAsync(me, now, ct);
         var goal = await goals.GetAsync(me, ct);
 
@@ -65,6 +66,20 @@ public static class ProfilePageEndpoints
             squadMembers = squad?.MemberCount ?? boardList.Count,
             rank,
             streak = row?.Streak ?? 0,
+
+            // All the athlete's club memberships (for the "My clubs" list + self-leave).
+            memberships = memberships.Select(m => new
+            {
+                squadId = m.SquadId,
+                name = m.Name,
+                discipline = m.Discipline,
+                color = m.Color,
+                role = m.Role,
+                members = m.MemberCount,
+                isActive = m.IsActive,
+                isOwner = m.IsOwner,
+                logoUrl = m.LogoUrl,
+            }),
 
             following = s.Following,
             followers = s.Followers,

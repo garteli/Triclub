@@ -20,7 +20,7 @@ import { usePlan } from './hooks/usePlan.js';
 import { usePlanMonth } from './hooks/usePlanMonth.js';
 import { useGarminSync } from './hooks/useGarminSync.js';
 import { useHealthSync } from './hooks/useHealthSync.js';
-import { createSquad, joinSquad, activateSquad, getInvite, acceptInvite } from './lib/squads.js';
+import { createSquad, joinSquad, leaveSquad, activateSquad, getInvite, acceptInvite } from './lib/squads.js';
 import { captureInviteFromUrl, pendingInvite, clearInvite } from './lib/invite.js';
 import { captureEventFromUrl, pendingEventLink, clearEventLink } from './lib/eventLink.js';
 import { listCourses, getCourse, createCourse, deleteCourse, importCourseFromUrl } from './lib/courses.js';
@@ -426,6 +426,13 @@ export default function App() {
     onSwitchSquad: async (id) => {
       if (id === session.squadId) return;
       await activateSquad(session.token, id);
+      await refreshSession();
+      setRefreshSignal((n) => n + 1);
+    },
+    // Leave a club I'm a member of. If it was my active club the server moves me back to my
+    // Solo squad — refresh the session so the header/feed/leaderboard follow.
+    onLeaveSquad: async (id) => {
+      await leaveSquad(session.token, id);
       await refreshSession();
       setRefreshSignal((n) => n + 1);
     },
@@ -865,6 +872,7 @@ export default function App() {
           onJoinSquad={authed ? squadOps.onJoinSquad : undefined}
           onCreateSquad={authed ? squadOps.onCreateSquad : undefined}
           onSwitchSquad={authed ? squadOps.onSwitchSquad : undefined}
+          onLeaveSquad={authed ? squadOps.onLeaveSquad : undefined}
           payments={undefined /* ride payments hidden for now — re-enable with `authed ? paymentOps : undefined` */}
           onPublishPlan={authed ? onPublishPlan : undefined}
           plans={authed ? planOps : undefined} plan={selectedPlan}
