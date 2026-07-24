@@ -4,6 +4,7 @@ import { FREE_COLS, FREE_ROWS, ensureSlots } from '../hooks/useLivePages.js';
 
 const FREE_GAP = 6; // px gap between free-grid cells (kept in sync with the grid's `gap`)
 import { metricCatalog, metricGroupsFor, liveMetricValues, liveChartsView, liveRadarView, spreadRiders, pelotonView, metricAccent, metricIcon } from '../lib/liveMetrics.js';
+import { LIVE_PRESETS, LIVE_PRESET_SETS, PRESET_TOKEN_LABEL } from '../lib/livePresets.js';
 import LiveMapGL from './LiveMapGL.jsx';
 import LiveElevationStrip from './LiveElevationStrip.jsx';
 import LiveElevationChart from './LiveElevationChart.jsx';
@@ -383,7 +384,7 @@ function seg(activeVal, val, label, onSet) {
   );
 }
 
-function EditPanel({ page, actions, mono }) {
+function EditPanel({ page, actions, mono, family, onOpenPresets }) {
   const count = page.fields.length;
   const free = page.layout === 'free';
   return (
@@ -409,6 +410,14 @@ function EditPanel({ page, actions, mono }) {
       )}
       <div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin:11px 0 7px')}>Colour</div>
       <div style={s('display:flex;gap:6px')}>{[[false, 'Colour'], [true, 'Mono']].map(([id, l]) => seg(!!mono, id, l, () => actions.setMono(id)))}</div>
+      {/* Pro layouts — a gallery of persona-designed pages to drop in. Cycling-tuned (power,
+          W/kg, climbs), so hidden on motorsport rides where those fields don't apply. */}
+      {family !== 'motorsport' && (
+        <div className="ctl" onClick={onOpenPresets} style={s('display:flex;align-items:center;justify-content:center;gap:7px;text-align:center;padding:10px;border-radius:10px;font-size:12px;font-weight:700;background:var(--accent-dim);border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);color:var(--accent);margin-top:12px')}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l2.6 6.3 6.8.5-5.2 4.4 1.6 6.6L12 17.8 6.2 21.3l1.6-6.6L2.6 9.8l6.8-.5z" /></svg>
+          Pro layouts
+        </div>
+      )}
       <div style={s('display:flex;gap:8px;margin-top:12px')}>
         <div className="ctl" onClick={actions.addPage} style={s('flex:1;text-align:center;padding:9px;border-radius:10px;font-size:12px;font-weight:700;background:var(--bg3);border:1px dashed var(--line2);color:var(--text2)')}>+ Add page</div>
         <div className="ctl" onClick={actions.deletePage} style={s('width:46px;background:var(--bg3);border:1px solid var(--line);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--bad)')}>
@@ -475,9 +484,86 @@ function PickerSheet({ page, slot, actions, family }) {
   );
 }
 
+// ---- pro-layout gallery bottom sheet: pick a persona-designed page to add to the ride ----
+const presetTokenLabel = (tok) => PRESET_TOKEN_LABEL[tok] || metricCatalog[tok]?.label || tok;
+
+function PresetCard({ preset, onApply }) {
+  const p = preset.pages[0];
+  const extra = preset.pages.length - 1;
+  return (
+    <div onClick={onApply} style={s('cursor:pointer;display:flex;gap:11px;padding:12px 13px;border-radius:13px;border:1px solid var(--line);background:var(--bg2)')}>
+      <div style={s(`width:38px;height:38px;flex:none;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:19px;background:color-mix(in srgb,${preset.accent} 20%,var(--bg3));border:1px solid color-mix(in srgb,${preset.accent} 45%,transparent)`)}>{preset.emoji}</div>
+      <div style={s('flex:1;min-width:0')}>
+        <div style={s('display:flex;align-items:baseline;gap:8px;flex-wrap:wrap')}>
+          <span style={s('font-size:14px;font-weight:700;letter-spacing:-.2px')}>{preset.persona}</span>
+          <span className="mono" style={s(`font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:${preset.accent}`)}>{preset.tag}</span>
+        </div>
+        <div style={s('font-size:11.5px;color:var(--text2);line-height:1.35;margin-top:3px')}>{preset.blurb}</div>
+        {/* tiny layout preview — the fields this page carries + its arrangement */}
+        <div style={s('display:flex;flex-wrap:wrap;gap:4px;margin-top:8px;align-items:center')}>
+          <span style={s('font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text3)')}>{p.layout}{p.side === 'group' ? ' · group' : ''}</span>
+          {p.fields.slice(0, 6).map((tok, i) => (
+            <span key={i} className="mono" style={s('font-size:9.5px;font-weight:600;color:var(--text2);background:var(--bg3);border:1px solid var(--line);border-radius:6px;padding:1px 6px')}>{presetTokenLabel(tok)}</span>
+          ))}
+          {extra > 0 && <span style={s('font-size:9.5px;color:var(--text3)')}>+{extra} page{extra > 1 ? 's' : ''}</span>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PresetSheet({ onApply, onClose }) {
+  // Same pull-down-to-dismiss behaviour as the field picker.
+  const [dragY, setDragY] = useState(0);
+  const [touched, setTouched] = useState(false);
+  // Add page (append) vs Replace all (swap the whole page-set). Full sets shine in Replace all.
+  const [mode, setMode] = useState('add');
+  const replace = mode === 'replace';
+  const drag = useRef(null);
+  const onGrabDown = (e) => { setTouched(true); drag.current = { y: e.clientY, t: e.timeStamp }; try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* no capture */ } };
+  const onGrabMove = (e) => { if (drag.current) { const dy = e.clientY - drag.current.y; setDragY(dy > 0 ? dy : 0); } };
+  const onGrabUp = (e) => {
+    const d = drag.current; if (!d) return;
+    const dy = e.clientY - d.y; const flick = dy > 30 && e.timeStamp - d.t < 250;
+    drag.current = null;
+    if (dy > 90 || flick) onClose(); else setDragY(0);
+  };
+  const section = (title, items) => (
+    <>
+      <div style={s('font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin:2px 0 7px')}>{title}</div>
+      <div style={s('display:flex;flex-direction:column;gap:9px;margin-bottom:16px')}>
+        {items.map((preset) => <PresetCard key={preset.id} preset={preset} onApply={() => onApply(preset, replace)} />)}
+      </div>
+    </>
+  );
+  return (
+    <>
+      <div className="ctl" onClick={onClose} style={s(`position:absolute;inset:0;background:rgba(0,0,0,${(0.55 * Math.max(0, 1 - dragY / 400)).toFixed(2)});z-index:50`)} />
+      <div className="scr" style={s(`position:absolute;left:0;right:0;bottom:0;z-index:51;background:var(--bg);border-radius:26px 26px 0 0;border-top:1px solid var(--line2);max-height:80%;overflow-y:auto;padding:14px 18px 32px;${dragY ? `transform:translateY(${dragY}px);transition:none` : (touched ? 'transform:translateY(0);transition:transform .22s ease' : 'animation:floatUp .3s ease')}`)}>
+        <div onPointerDown={onGrabDown} onPointerMove={onGrabMove} onPointerUp={onGrabUp} onPointerCancel={onGrabUp} style={s('touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none;margin:-14px -18px 0;padding:14px 18px 2px')}>
+          <div style={s('width:40px;height:4px;border-radius:3px;background:var(--line2);margin:0 auto 14px')} />
+          <div style={s('font-size:17px;font-weight:700;letter-spacing:-.3px')}>Pro layouts</div>
+          <div style={s('font-size:11.5px;color:var(--text3);margin:4px 0 11px;line-height:1.4')}>
+            {replace
+              ? 'Ride-tested designs by discipline. Tap one to replace all your pages with it.'
+              : 'Ride-tested designs by discipline. Tap one to add it as new pages — your existing pages stay put.'}
+          </div>
+        </div>
+        {/* Add vs Replace-all mode */}
+        <div style={s('display:flex;gap:6px;margin-bottom:16px')}>
+          {[['add', 'Add page'], ['replace', 'Replace all']].map(([id, l]) => seg(mode, id, l, () => setMode(id)))}
+        </div>
+        {section('Full sets', LIVE_PRESET_SETS)}
+        {section('Single pages', LIVE_PRESETS)}
+      </div>
+    </>
+  );
+}
+
 // ---- the unified full-screen rotating page system ----
 export default function LivePages({ tel, lp, uwb, blePeers, indoor = false, mySport, climb }) {
   const { pages, pageIdx, editFields, picker, autoRotate, actions, family, mono } = lp;
+  const [presetsOpen, setPresetsOpen] = useState(false);
   const page = pages[pageIdx];
   const side = page.side || 'none';
   const withSide = side !== 'none';
@@ -605,16 +691,19 @@ export default function LivePages({ tel, lp, uwb, blePeers, indoor = false, mySp
       {!editFields && pages.length > 1 && (
         <div style={s('flex:none;display:flex;flex-direction:column;align-items:center;gap:5px;padding:8px 12px 2px;touch-action:pan-y')}
           onPointerDown={onRowPointerDown} onPointerUp={onRowPointerUp}>
-          <div style={s('font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.9px;color:var(--text3)')}>{page.name} · swipe to change</div>
+          <div style={s('display:flex;align-items:center;gap:6px')}>
+            {page.pro && <span style={s('font-size:8px;font-weight:800;letter-spacing:.7px;color:var(--accent-ink);background:var(--accent);border-radius:5px;padding:1px 5px')}>PRO</span>}
+            <span style={s('font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.9px;color:var(--text3)')}>{page.name} · swipe to change</span>
+          </div>
           <div style={s('display:flex;gap:7px;align-items:center')}>
             {pages.map((p, i) => (
-              <div key={i} onClick={() => actions.goPage(i)} style={s(`width:8px;height:8px;border-radius:50%;cursor:pointer;transition:all .15s;${i === pageIdx ? 'background:var(--accent);transform:scale(1.35)' : 'background:var(--line2)'}`)} />
+              <div key={i} onClick={() => actions.goPage(i)} style={s(`width:8px;height:8px;border-radius:50%;cursor:pointer;transition:all .15s;${i === pageIdx ? 'background:var(--accent);transform:scale(1.35)' : 'background:var(--line2)'}${p.pro && i !== pageIdx ? ';box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 45%,transparent)' : ''}`)} />
             ))}
           </div>
         </div>
       )}
 
-      {editFields && <EditPanel page={page} actions={actions} mono={mono} />}
+      {editFields && <EditPanel page={page} actions={actions} mono={mono} family={family} onOpenPresets={() => setPresetsOpen(true)} />}
 
       {/* Pager dock — edit-only. During a ride the page is changed by horizontal swipe (or
           Auto-rotate) and edit is entered by long-pressing a tile, so the dock stays out of
@@ -625,10 +714,13 @@ export default function LivePages({ tel, lp, uwb, blePeers, indoor = false, mySp
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--text)" strokeWidth="2.2" strokeLinecap="round"><path d="M15 6l-6 6 6 6" /></svg>
         </div>
         <div style={s('flex:1;text-align:center;min-width:0')}>
-          <div style={s('font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>{page.name}</div>
+          <div style={s('display:flex;align-items:center;justify-content:center;gap:6px;min-width:0')}>
+            {page.pro && <span style={s('font-size:8px;font-weight:800;letter-spacing:.7px;color:var(--accent-ink);background:var(--accent);border-radius:5px;padding:1px 5px;flex:none')}>PRO</span>}
+            <span style={s('font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis')}>{page.name}</span>
+          </div>
           <div style={s('display:flex;gap:6px;justify-content:center;margin-top:5px')}>
             {pages.map((p, i) => (
-              <div key={i} onClick={() => actions.goPage(i)} style={s(`width:8px;height:8px;border-radius:50%;cursor:pointer;transition:all .15s;${i === pageIdx ? 'background:var(--accent);transform:scale(1.4)' : 'background:var(--line2)'}`)} />
+              <div key={i} onClick={() => actions.goPage(i)} style={s(`width:8px;height:8px;border-radius:50%;cursor:pointer;transition:all .15s;${i === pageIdx ? 'background:var(--accent);transform:scale(1.4)' : 'background:var(--line2)'}${p.pro && i !== pageIdx ? ';box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 45%,transparent)' : ''}`)} />
             ))}
           </div>
         </div>
@@ -641,6 +733,8 @@ export default function LivePages({ tel, lp, uwb, blePeers, indoor = false, mySp
       )}
 
       {picker.open && <PickerSheet page={page} slot={picker.slot} actions={actions} family={family} />}
+
+      {presetsOpen && <PresetSheet onClose={() => setPresetsOpen(false)} onApply={(preset, replace) => { actions.applyPreset(preset, { replace }); setPresetsOpen(false); }} />}
     </>
   );
 }
