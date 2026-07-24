@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { s, html } from '../lib/style.js';
+import useSheetDrag from '../hooks/useSheetDrag.js';
 
 // Coach's plan editor — build a squad's training week, assign athletes, and
 // "publish". The layout is ported from the design handoff (the `planeditor`
@@ -60,6 +61,7 @@ const initialsOf = (m) => m.initials || (m.name || '?').split(' ').map((w) => w[
 function SessionSheet({ editor, onField, onSave, onDelete, onClose, courses, courseBusy, onPickCourse }) {
   const canDelete = !!editor.id;
   const [showCourses, setShowCourses] = useState(false);
+  const drag = useSheetDrag(onClose);
   return (
     <>
       <div className="ctl" onClick={onClose} style={s('position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50;animation:floatUp .2s ease')} />
@@ -68,8 +70,10 @@ function SessionSheet({ editor, onField, onSave, onDelete, onClose, courses, cou
           is click-through (pointer-events:none) so taps outside the sheet hit the
           overlay and close it; the sheet re-enables its own pointer events. */}
       <div style={s('position:fixed;left:0;right:0;bottom:0;z-index:51;display:flex;justify-content:center;pointer-events:none')}>
-      <div className="scr" style={s('width:100%;max-width:480px;pointer-events:auto;background:var(--bg);border-radius:24px 24px 0 0;border-top:1px solid var(--line2);max-height:90dvh;overflow-y:auto;padding:14px 18px 28px;animation:floatUp .3s ease')}>
-        <div style={s('width:40px;height:4px;border-radius:3px;background:var(--line2);margin:0 auto 14px')} />
+      <div className="scr" style={s(`width:100%;max-width:480px;pointer-events:auto;background:var(--bg);border-radius:24px 24px 0 0;border-top:1px solid var(--line2);max-height:90dvh;overflow-y:auto;padding:14px 18px 28px;animation:floatUp .3s ease;${drag.sheetStyle}`)}>
+        <div {...drag.handleProps} style={s('display:flex;justify-content:center;padding:2px 0 12px;margin-top:-2px;cursor:grab;touch-action:none')}>
+          <div style={s('width:40px;height:4px;border-radius:3px;background:var(--line2)')} />
+        </div>
         <div style={s('display:flex;align-items:center;justify-content:space-between')}>
           <div style={s('font-size:18px;font-weight:700')}>{editor.id ? 'Edit session' : 'New session'} · {editor.day}</div>
           <div className="ctl" onClick={onClose} style={s('font-size:13px;color:var(--text2);font-weight:600')}>Close</div>

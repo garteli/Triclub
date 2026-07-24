@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { s } from '../lib/style.js';
+import useSheetDrag from '../hooks/useSheetDrag.js';
 import EmptyState from '../components/EmptyState.jsx';
 import { EventCard, DirectionsSheet } from '../components/EventCard.jsx';
 import { ConfirmModal } from '../components/ConfirmModal.jsx';
@@ -179,13 +180,16 @@ function MyPlansSheet({ planMine, onClose }) {
   };
 
   const pending = confirmId ? (items || []).find((p) => p.planId === confirmId) : null;
+  const drag = useSheetDrag(busyId ? () => {} : onClose);
 
   return (
     <>
       <div className="ctl" onClick={busyId ? undefined : onClose} style={s('position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50;animation:floatUp .2s ease')} />
       <div style={s('position:fixed;left:0;right:0;bottom:0;z-index:51;display:flex;justify-content:center;pointer-events:none')}>
-        <div className="scr" style={s('width:100%;max-width:480px;pointer-events:auto;background:var(--bg);border-radius:24px 24px 0 0;border-top:1px solid var(--line2);max-height:85dvh;overflow-y:auto;padding:14px 18px 28px;animation:floatUp .3s ease')}>
-          <div style={s('width:40px;height:4px;border-radius:3px;background:var(--line2);margin:0 auto 14px')} />
+        <div className="scr" style={s(`width:100%;max-width:480px;pointer-events:auto;background:var(--bg);border-radius:24px 24px 0 0;border-top:1px solid var(--line2);max-height:85dvh;overflow-y:auto;padding:14px 18px 28px;animation:floatUp .3s ease;${drag.sheetStyle}`)}>
+          <div {...drag.handleProps} style={s('display:flex;justify-content:center;padding:2px 0 12px;margin-top:-2px;cursor:grab;touch-action:none')}>
+            <div style={s('width:40px;height:4px;border-radius:3px;background:var(--line2)')} />
+          </div>
           <div style={s('display:flex;align-items:center;justify-content:space-between')}>
             <div style={s('font-size:18px;font-weight:700')}>Your plans</div>
             <div className="ctl" onClick={onClose} style={s('font-size:13px;color:var(--text2);font-weight:600')}>Close</div>
@@ -242,6 +246,7 @@ function WorkoutSheet({ wkDetail, actions, live }) {
     if (course?.points?.length) live?.courses?.setCourse?.(course);
     actions.go('ride');
   };
+  const drag = useSheetDrag(actions.closeWorkout);
   return (
     <>
       <div className="ctl" onClick={actions.closeWorkout} style={s('position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50;animation:floatUp .2s ease')} />
@@ -250,8 +255,10 @@ function WorkoutSheet({ wkDetail, actions, live }) {
           (see PlanEditor's sheet for the same fix). The wrapper is click-through so taps
           outside the sheet hit the overlay; the sheet re-enables its own pointer events. */}
       <div style={s('position:fixed;left:0;right:0;bottom:0;z-index:51;display:flex;justify-content:center;pointer-events:none')}>
-      <div className="scr" style={s('width:100%;max-width:480px;pointer-events:auto;background:var(--bg);border-radius:26px 26px 0 0;border-top:1px solid var(--line2);max-height:90dvh;overflow-y:auto;animation:floatUp .3s ease;padding:14px 18px 32px')}>
-        <div style={s('width:40px;height:4px;border-radius:3px;background:var(--line2);margin:0 auto 16px')} />
+      <div className="scr" style={s(`width:100%;max-width:480px;pointer-events:auto;background:var(--bg);border-radius:26px 26px 0 0;border-top:1px solid var(--line2);max-height:90dvh;overflow-y:auto;animation:floatUp .3s ease;padding:14px 18px 32px;${drag.sheetStyle}`)}>
+        <div {...drag.handleProps} style={s('display:flex;justify-content:center;padding:2px 0 14px;cursor:grab;touch-action:none')}>
+          <div style={s('width:40px;height:4px;border-radius:3px;background:var(--line2)')} />
+        </div>
         <div style={s(`height:4px;background:${wkDetail.color};border-radius:3px;margin-bottom:14px;width:52px`)} />
         <div style={s('font-size:22px;font-weight:700;letter-spacing:-.4px')}>{wkDetail.title}</div>
         <div style={s('font-size:13px;color:var(--text2);margin-top:2px')}>{wkDetail.meta}</div>
