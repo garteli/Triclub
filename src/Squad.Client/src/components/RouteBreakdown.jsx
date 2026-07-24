@@ -2,14 +2,30 @@ import { useEffect, useMemo, useState } from 'react';
 import { s } from '../lib/style.js';
 import { analyzeProfile, catStyle, sectionKindLabel, coordAtDistance, PROFILE_LEGEND } from '../lib/routeProfile.js';
 import { reverseGeocode } from '../lib/reverseGeocode.js';
+import { fmtDur } from '../hooks/useActivityAnalytics.js';
 
 // Event-page "route breakdown" (design 1a): the route split into flats / climbs / descents like a
 // Grand-Tour stage profile — a colour-coded profile with climb-category chips, then a section-by-
 // section list. All derived from the real terrain profile (elev), so nothing is fabricated.
+//
+// Reused on the activity detail page: pass `stats` (section.index → { avgPower, maxPower, avgSpeed,
+// maxSpeed, durationSec }, from lib/activitySections.js) to add a "what you actually rode over this
+// stretch" row to each section card, and `collapsible` to wrap the whole block behind a header toggle.
 
 const W = 940, H = 300, TOP = 30, BOT = 6; // profile viewBox + insets (matches the design)
 
-export default function RouteBreakdown({ route, elev, loading }) {
+// One little value+caption cell in a section's timing row (rendered only when its metric exists).
+function StatCell({ value, unit, label, color }) {
+  return (
+    <div>
+      <div className="mono" style={s(`font-size:13px;font-weight:700;${color ? `color:${color}` : ''}`)}>{value}{unit && <span style={s('font-size:9px;color:var(--text3);font-weight:600')}> {unit}</span>}</div>
+      <div style={s('font-size:8px;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;margin-top:2px')}>{label}</div>
+    </div>
+  );
+}
+
+export default function RouteBreakdown({ route, elev, loading, stats, collapsible = false, defaultOpen = false, title = 'Route breakdown' }) {
+  const [open, setOpen] = useState(defaultOpen);
   const analysis = useMemo(() => (elev?.profile ? analyzeProfile(elev.profile) : null), [elev]);
   const [names, setNames] = useState({}); // section.index → reverse-geocoded name
 
@@ -32,7 +48,10 @@ export default function RouteBreakdown({ route, elev, loading }) {
 
   // The event always has a route here (the parent gates on it), so never render blank: show a
   // loading state while the terrain is read, and an explicit fallback if it couldn't be resolved.
+  // The collapsible (activity-page) variant is built from local frames, so there's nothing to wait
+  // on — just render nothing when the recording can't be broken down.
   if (!analysis) {
+    if (collapsible) return null;
     return (
       <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:18px;padding:20px;text-align:center;color:var(--text3);font-size:12.5px;margin-top:12px')}>
         {loading ? 'Reading the terrain…' : 'Elevation profile unavailable'}
@@ -75,7 +94,7 @@ export default function RouteBreakdown({ route, elev, loading }) {
     </div>
   );
 
-  return (
+  const body = (
     <div style={s('margin-top:12px')}>
       {/* summary stats */}
       <div style={s('display:flex;gap:7px')}>
@@ -121,6 +140,9 @@ export default function RouteBreakdown({ route, elev, loading }) {
       <div style={s('display:flex;flex-direction:column;gap:8px')}>
         {sections.map((sec) => {
           const cs = sec.cat ? catStyle(sec.cat) : null;
+          const st = stats?.[sec.index]; // timing actually ridden over this stretch (activity page only)
+          const hasSpeed = st && (st.avgSpeed != null || st.maxSpeed != null);
+          const hasPower = st && (st.avgPower != null || st.maxPower != null);
           return (
             <div key={sec.index} style={s('display:flex;align-items:stretch;gap:11px;background:var(--bg2);border:1px solid var(--line);border-radius:15px;padding:11px 13px;position:relative;overflow:hidden')}>
               <span style={s(`position:absolute;left:0;top:0;bottom:0;width:4px;background:${sec.color}`)} />
@@ -136,11 +158,36 @@ export default function RouteBreakdown({ route, elev, loading }) {
                   <div><span className="mono" style={s(`font-size:13px;font-weight:700;color:${sec.color}`)}>{sec.avgGradPct >= 0 ? '+' : ''}{sec.avgGradPct.toFixed(1)}</span><span style={s('font-size:9px;color:var(--text3)')}> %</span></div>
                   <div><span className="mono" style={s('font-size:13px;font-weight:700')}>{sec.gainM >= 0 ? '↑' : '↓'}{Math.abs(sec.gainM)}</span><span style={s('font-size:9px;color:var(--text3)')}> m</span></div>
                 </div>
+                {/* what you actually rode over this stretch (real recorded power / speed / time) */}
+                {(st?.durationSec != null || hasSpeed || hasPower) && (
+                  <div style={s('display:flex;flex-wrap:wrap;gap:9px 16px;margin-top:9px;padding-top:9px;border-top:1px solid var(--line)')}>
+                    {st.durationSec != null && <StatCell value={fmtDur(st.durationSec)} label="Time" />}
+                    {st.avgSpeed != null && <StatCell value={st.avgSpeed.toFixed(1)} unit="km/h" label="Avg spd" color="var(--bike)" />}
+                    {st.maxSpeed != null && <StatCell value={st.maxSpeed.toFixed(1)} unit="km/h" label="Max spd" color="var(--bike)" />}
+                    {st.avgPower != null && <StatCell value={String(st.avgPower)} unit="W" label="Avg pwr" color="var(--accent)" />}
+                    {st.maxPower != null && <StatCell value={String(st.maxPower)} unit="W" label="Max pwr" color="var(--accent)" />}
+                  </div>
+                )}
               </div>
             </div>
           );
         })}
       </div>
+    </div>
+  );
+
+  if (!collapsible) return body;
+  return (
+    <div style={s('padding:16px 18px 0')}>
+      <div className="ctl" onClick={() => setOpen((v) => !v)}
+        style={s('display:flex;align-items:center;gap:11px;background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:13px 15px')}>
+        <div style={s('flex:1;min-width:0')}>
+          <div style={s('font-size:15px;font-weight:700')}>{title}</div>
+          <div className="mono" style={s('font-size:11px;color:var(--text3);margin-top:2px')}>{totalKm.toFixed(1)} km · ↑{totalGainM} m · {climbCount} climb{climbCount === 1 ? '' : 's'}</div>
+        </div>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .18s' }}><path d="M6 9l6 6 6-6" /></svg>
+      </div>
+      {open && body}
     </div>
   );
 }
