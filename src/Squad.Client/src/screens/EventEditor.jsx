@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { s } from '../lib/style.js';
-import { Back } from './wizard.jsx';
 import AuthedImage from '../components/AuthedImage.jsx';
 import ImageEditor from '../components/ImageEditor.jsx';
 import { listCourses, createCourse, deleteCourse, importCourseFromUrl, getCourse } from '../lib/courses.js';
@@ -197,10 +196,7 @@ export default function EventEditor({ vm, state, actions, getToken, onDataChange
 
   return (
     <div style={s('padding:6px 18px 120px;animation:floatUp .35s ease')}>
-      <div style={s('display:flex;align-items:center;gap:12px;margin:6px 0 4px')}>
-        <Back onClick={() => actions.go('events')} />
-        <div style={s('font-size:20px;font-weight:700;letter-spacing:-.4px')}>{isEdit ? 'Edit event' : 'New event'}</div>
-      </div>
+      {/* back + "New event" / "Edit event" title now in the global app header */}
 
       <div style={s('display:flex;flex-direction:column;gap:12px;margin-top:14px')}>
         <div>
