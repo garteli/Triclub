@@ -7,6 +7,8 @@ import { deleteActivity } from '../hooks/useActivities.js';
 import { useActivityPhotos } from '../hooks/useActivityPhotos.js';
 import { useActivityTrack } from '../hooks/useActivityTrack.js';
 import { buildFrames, frameRoute, gpsFrameCount, buildTraces } from '../lib/activityFrames.js';
+import { activitySectionBreakdown } from '../lib/activitySections.js';
+import RouteBreakdown from '../components/RouteBreakdown.jsx';
 import { haversineMeters } from '../lib/geo.js';
 import { courseNameFromPoints } from '../lib/courses.js';
 import { describeWeather } from '../lib/weather.js';
@@ -694,6 +696,9 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
   const powerValues = useMemo(() => frames.map((f) => f.power), [frames]);
   const hrValues = useMemo(() => frames.map((f) => f.hr), [frames]);
   const elevValues = useMemo(() => frames.map((f) => f.elev), [frames]);
+  // Route split into flats/climbs/descents from the recorded elevation, with the power/speed/time
+  // actually ridden over each stretch mapped onto it (null for indoor / no-GPS recordings).
+  const breakdown = useMemo(() => activitySectionBreakdown(frames), [frames]);
   const analytics = useActivityAnalytics(track, laps, a?.sport);
   const relEffort = useMemo(() => computeTrimp(track, analytics.zones.maxHr), [track, analytics.zones.maxHr]);
 
@@ -784,6 +789,13 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
       {hasRealPower && <WorkoutAnalysis powerValues={powerValues} />}
       <PowerCurve curve={analytics.curve} />
       <SensorTraces traces={traces} totalSec={totalSec} elevValues={elevValues} />
+
+      {/* route broken into climbs/descents, with the power/speed/time actually ridden over each —
+          collapsible, sitting right under the elevation trace */}
+      {breakdown && (
+        <RouteBreakdown route={route} elev={breakdown.elev} stats={breakdown.stats}
+          collapsible defaultOpen={false} title="Route & timing" />
+      )}
 
       {/* power stats + zones */}
       {(powerStats.length > 0 || powerZoneRows) && (
