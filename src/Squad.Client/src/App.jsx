@@ -640,6 +640,8 @@ export default function App() {
     openActivity: (id) => setState((s) => ({ ...s, selActivity: id, screen: 'feed', activityBack: s.screen === 'feed' ? s.activityBack : s.screen })),
     // one route section of an activity → the Segment detail page (your effort over that stretch)
     openSegment: (seg) => patch({ selSegment: seg, screen: 'segment' }),
+    // aggregate Training Zones page, opened on a specific metric ('power' | 'hr')
+    openZones: (metric) => patch({ zonesMetric: metric, screen: 'activityzones' }),
     // profiles — tapping your OWN avatar (squad rail / leaderboard / feed) opens your own
     // Profile page (goal race, my clubs, stats), not the public teammate view.
     openAthlete: (id) => setState((s) => {
