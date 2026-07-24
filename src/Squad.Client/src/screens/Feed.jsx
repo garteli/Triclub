@@ -431,20 +431,32 @@ function zoneRows(seconds, colors, names, fracs, ref) {
   }));
 }
 
-function ZoneBlock({ heading, sub, zoneTitle, rows, insight, insightColor, onOpen }) {
+// Group zone rows into named intensity buckets → the "Athlete Intelligence" read-out
+// (power: recovery/endurance/tempo/threshold/high-intensity; HR folds Z5 into anaerobic).
+function zoneIntel(rows, metric) {
+  const pctOf = (zs) => rows.filter((r) => zs.includes(r.z)).reduce((a, r) => a + r.pct, 0);
+  const groups = metric === 'power'
+    ? [['recovery', ['Z1']], ['endurance', ['Z2']], ['tempo', ['Z3']], ['threshold', ['Z4']], ['high-intensity', ['Z5', 'Z6', 'Z7']]]
+    : [['recovery', ['Z1']], ['endurance', ['Z2']], ['tempo', ['Z3']], ['threshold', ['Z4']], ['anaerobic', ['Z5']]];
+  const parts = groups.map(([label, zs]) => ({ label, pct: pctOf(zs) })).filter((g) => g.pct > 0).sort((a, b) => b.pct - a.pct);
+  return parts.length ? `${parts.map((g) => `${g.pct}% ${g.label}`).join(', ')}.` : null;
+}
+
+const BoltIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2L3 14h7l-1 8 10-12h-7z" /></svg>;
+
+function ZoneBlock({ heading, icon, sub, zoneTitle, rows, intel, insightColor, onOpen, linkLabel }) {
   return (
     <div style={s('padding:22px 18px 0')}>
-      {(heading || onOpen) && (
-        <div style={s('display:flex;align-items:baseline;justify-content:space-between' + (sub ? ';margin-bottom:4px' : ''))}>
-          <div style={s(title + ';margin:0')}>{heading}</div>
-          {onOpen && <span className="ctl" onClick={onOpen} style={s('font-size:11.5px;font-weight:700;color:#b98cff;display:flex;align-items:center;gap:2px')}>Aggregate zones<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg></span>}
+      {heading && (
+        <div style={s(title + ';margin:0;display:flex;align-items:center;gap:7px' + (sub ? ';margin-bottom:4px' : ''))}>
+          {icon && <span style={s(`color:${insightColor};display:flex`)}>{icon}</span>}{heading}
         </div>
       )}
       {sub && <div className="mono" style={s('font-size:12px;color:var(--text2);margin-bottom:12px')}>{sub}</div>}
       {rows && (
-        <>
-          {zoneTitle && <div style={s('font-size:12px;color:var(--text3);margin:0 0 4px')}>{zoneTitle}</div>}
-          <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:13px 14px;display:flex;flex-direction:column;gap:9px')}>
+        <div style={s('background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:13px 14px')}>
+          {zoneTitle && <div style={s('font-size:11.5px;color:var(--text3);margin:0 0 11px;line-height:1.4')}>{zoneTitle}</div>}
+          <div style={s('display:flex;flex-direction:column;gap:9px')}>
             {rows.map((z) => (
               <div key={z.z} style={s('display:flex;align-items:center;gap:9px')}>
                 <span style={s(`width:22px;font-size:11px;font-weight:800;color:${z.c}`)}>{z.z}</span>
@@ -454,8 +466,18 @@ function ZoneBlock({ heading, sub, zoneTitle, rows, insight, insightColor, onOpe
               </div>
             ))}
           </div>
-          {insight && <div style={s(`background:color-mix(in srgb,${insightColor} 10%,var(--bg2));border:1px solid color-mix(in srgb,${insightColor} 28%,transparent);border-radius:14px;padding:12px 14px;margin-top:10px;font-size:12.5px;color:var(--text2);line-height:1.5`)}>{insight}</div>}
-        </>
+          {intel && (
+            <div style={s('margin-top:12px;padding-top:12px;border-top:1px solid var(--line)')}>
+              <div style={s(`display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:${insightColor}`)}><BoltIcon />Athlete Intelligence</div>
+              <div style={s('font-size:12px;color:var(--text2);line-height:1.55;margin-top:6px')}>{intel}</div>
+            </div>
+          )}
+          {onOpen && (
+            <div className="ctl" onClick={onOpen} style={s(`display:flex;align-items:center;justify-content:flex-end;gap:4px;margin-top:12px;padding-top:11px;border-top:1px solid var(--line);font-size:12.5px;font-weight:700;color:${insightColor}`)}>
+              View your aggregate {linkLabel}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6" /></svg>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
@@ -761,7 +783,6 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
 
   const powerZoneRows = (hasRealPower && pwZones) ? zoneRows(pwZones, POWER_COLORS, PWR_ZONE_NAMES, PWR_ZONE_FRACS, zones.ftp) : null;
   const hrZoneRows = hZones ? zoneRows(hZones, HR_COLORS, HR_ZONE_NAMES, HR_ZONE_FRACS, zones.maxHr) : null;
-  const zoneInsight = (rows) => rows.map((z) => `${z.pct}% ${z.name.toLowerCase()}`).join(', ') + '.';
 
   const powerStats = !hasRealPower ? [] : [
     avgPower > 0 && ['Avg Power', `${avgPower} W`],
@@ -822,17 +843,19 @@ export default function Feed({ vm, state, actions, getToken, onDataChanged, meId
         </div>
       )}
       {powerZoneRows && (
-        <ZoneBlock heading="" sub={null} zoneTitle={`Power Zones · FTP ${zones.ftp} W`} rows={powerZoneRows}
-          onOpen={() => actions.go('activityzones')}
-          insight={<><b style={s('color:var(--text)')}>Distribution:</b> {zoneInsight(powerZoneRows)}</>} insightColor="var(--accent)" />
+        <ZoneBlock heading="Power Zones" icon={<BoltIcon />}
+          zoneTitle={`Based on your power meter and FTP of ${zones.ftp} W`}
+          rows={powerZoneRows} intel={zoneIntel(powerZoneRows, 'power')} insightColor="var(--accent)"
+          onOpen={() => actions.openZones('power')} linkLabel="Power Zones" />
       )}
 
-      {/* heart rate + zones */}
-      {(avgHr != null || hrZoneRows) && (
-        <ZoneBlock heading="Heart Rate" sub={avgHr != null ? `avg ${avgHr} bpm${maxHr != null ? ` · max ${maxHr} bpm` : ''}` : null}
-          zoneTitle={hrZoneRows ? `HR Zones · max ${zones.maxHr} bpm` : ''} rows={hrZoneRows}
-          onOpen={hrZoneRows && !powerZoneRows ? () => actions.go('activityzones') : undefined}
-          insight={hrZoneRows ? <><b style={s('color:var(--text)')}>Distribution:</b> {zoneInsight(hrZoneRows)}</> : null} insightColor="var(--bad)" />
+      {/* heart-rate zones */}
+      {hrZoneRows && (
+        <ZoneBlock heading="Heart Rate Zones"
+          icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21l-1.4-1.3C5.4 15 2 11.9 2 8.2 2 5.4 4.2 3.2 7 3.2c1.6 0 3.1.7 4 1.9 1-1.2 2.4-1.9 4-1.9 2.8 0 5 2.2 5 5 0 3.7-3.4 6.8-8.6 11.5L12 21z" /></svg>}
+          zoneTitle={`Based on your max heart rate of ${zones.maxHr} bpm`}
+          rows={hrZoneRows} intel={zoneIntel(hrZoneRows, 'hr')} insightColor="var(--bad)"
+          onOpen={() => actions.openZones('hr')} linkLabel="Heart Rate Zones" />
       )}
 
       {hasRealPower && !zones.ftp && (

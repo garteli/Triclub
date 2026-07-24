@@ -39,10 +39,10 @@ async function pool(items, n, fn) {
   await Promise.all(Array.from({ length: Math.min(n, items.length) }, worker));
 }
 
-export default function ActivityZones({ vm, actions, getToken }) {
+export default function ActivityZones({ vm, state, actions, getToken }) {
   const zones = useMemo(() => loadZones(), []); // device FTP / max HR
   const hasFtp = !!zones.ftp, hasMaxHr = !!zones.maxHr;
-  const [metric, setMetric] = useState('power');
+  const [metric, setMetric] = useState(state?.zonesMetric === 'hr' ? 'hr' : 'power');
   const active = metric === 'power' && hasFtp ? 'power' : metric === 'hr' && hasMaxHr ? 'hr' : hasFtp ? 'power' : hasMaxHr ? 'hr' : 'power';
   const [range, setRange] = useState('3M');
   const [data, setData] = useState({ status: 'loading' });
