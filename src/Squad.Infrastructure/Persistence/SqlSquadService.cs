@@ -407,6 +407,47 @@ public sealed class SqlSquadService(string connectionString) : ISquadService
         return TransferOwnershipOutcome.Ok;
     }
 
+    public async Task<DeleteSquadOutcome> DeleteAsync(Guid squadId, Guid ownerId, CancellationToken ct)
+    {
+        await using var conn = new SqlConnection(connectionString);
+        await conn.OpenAsync(ct);
+
+        var kind = await conn.QuerySingleOrDefaultAsync<string?>(new CommandDefinition(
+            "SELECT Kind FROM dbo.Squad WHERE Id = @squadId;", new { squadId }, cancellationToken: ct));
+        if (kind is null) return DeleteSquadOutcome.NotFound;
+        // The landing club and auto-managed personal ("Solo") squads are never user-deletable.
+        if (squadId == Squads.Landing || string.Equals(kind, "personal", StringComparison.OrdinalIgnoreCase))
+            return DeleteSquadOutcome.Protected;
+        if (!await OwnsSquad(conn, squadId, ownerId, ct)) return DeleteSquadOutcome.NotOwner;
+
+        await using var tx = (SqlTransaction)await conn.BeginTransactionAsync(ct);
+
+        // Move anyone whose active squad is this club back to their own private Solo squad
+        // (falling back to the landing club for legacy accounts that never got one).
+        await conn.ExecuteAsync(new CommandDefinition("""
+            UPDATE a SET a.SquadId = COALESCE(
+                    (SELECT TOP 1 Id FROM dbo.Squad p WHERE p.OwnerId = a.Id AND p.Kind = 'personal' ORDER BY p.CreatedUtc),
+                    @landing)
+            FROM dbo.Athlete a
+            WHERE a.SquadId = @squadId;
+            """, new { squadId, landing = Squads.Landing }, tx, cancellationToken: ct));
+
+        // Dependent rows (every table with an FK to dbo.Squad), then the club itself.
+        // Deleting a SquadEvent cascades its RSVP rows via ON DELETE CASCADE.
+        await conn.ExecuteAsync(new CommandDefinition("""
+            DELETE FROM dbo.SquadTarget WHERE SquadId = @squadId;
+            DELETE FROM dbo.JoinRequest WHERE SquadId = @squadId;
+            DELETE FROM dbo.RidePayment WHERE SquadId = @squadId;
+            DELETE FROM dbo.SquadEvent  WHERE SquadId = @squadId;
+            DELETE FROM dbo.SquadInvite WHERE SquadId = @squadId;
+            DELETE FROM dbo.Membership  WHERE SquadId = @squadId;
+            DELETE FROM dbo.Squad       WHERE Id      = @squadId;
+            """, new { squadId }, tx, cancellationToken: ct));
+
+        await tx.CommitAsync(ct);
+        return DeleteSquadOutcome.Deleted;
+    }
+
     // ----- invite links -------------------------------------------------------
 
     public async Task<string?> CreateInviteAsync(Guid squadId, Guid ownerId, bool reset, CancellationToken ct)

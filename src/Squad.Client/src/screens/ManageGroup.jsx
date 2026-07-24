@@ -38,7 +38,7 @@ const RoleChip = ({ onClick, accent, good, children }) => {
 // Owner-only management for a squad: branding (logo + banner), details & pricing, and the member
 // roster (roles / remove / ownership transfer, each behind a confirmation modal). Members join via
 // join requests or the invite link — there is no add-by-email. Everything is gated server-side too.
-export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged }) {
+export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged, onDeleteSquad }) {
   const g = vm.selGroupData || {};
   const isOwner = !!meId && !!g.owner && String(g.owner).toLowerCase() === String(meId).toLowerCase();
 
@@ -75,6 +75,7 @@ export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged
   const [memberMsg, setMemberMsg] = useState('');
   const [memberErr, setMemberErr] = useState('');
   const roleConfirm = useConfirm();   // modal confirmations for remove / role changes / ownership transfer
+  const deleteConfirm = useConfirm(); // separate modal for the type-the-name delete-group gate
 
   // invite link (friends who sign up with it auto-join this group)
   const [inviteUrl, setInviteUrl] = useState('');
@@ -241,6 +242,17 @@ export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged
     requireText: g.name || '',
     confirmLabel: 'Transfer ownership',
     run: async () => { await transferOwnership(await getToken?.(), g.id, m.athleteId); await reloadRoster(); },
+  });
+
+  // Permanently delete the whole group. Gated by typing the group name, since it's irreversible and
+  // removes every member's access. On success the server moves everyone (incl. this owner) back to
+  // their Solo squad and App refreshes the session; we leave the (now-gone) manage screen.
+  const askDelete = () => deleteConfirm.open({
+    title: 'Delete this group?',
+    body: <>This permanently deletes <b style={s('color:var(--text)')}>{g.name || 'this group'}</b> — its sessions, invites, targets and member roster. Everyone is moved back to their own Solo space. This can’t be undone.</>,
+    requireText: g.name || '',
+    confirmLabel: 'Delete group',
+    run: async () => { await onDeleteSquad?.(g.id); actions.go('dash'); },
   });
 
   const bannerUrl = g.bannerUrl ? `${g.bannerUrl}` : null;
@@ -418,8 +430,21 @@ export default function ManageGroup({ vm, actions, getToken, meId, onDataChanged
       {/* ---- group targets (coach sets club races from an event link) ---- */}
       <div style={s('margin-top:22px')}><GroupTargets squadId={g.id} getToken={getToken} mode="manage" /></div>
 
-      {/* confirmation modal for remove / role changes / ownership transfer */}
+      {/* ---- danger zone: delete the whole group (owner only) ---- */}
+      {isOwner && onDeleteSquad && (
+        <>
+          <FieldLabel>Danger zone</FieldLabel>
+          <div style={s('background:color-mix(in srgb,var(--bad) 8%,var(--bg2));border:1px solid color-mix(in srgb,var(--bad) 30%,transparent);border-radius:14px;padding:14px 15px')}>
+            <div style={s('font-size:13.5px;font-weight:700')}>Delete this group</div>
+            <div style={s('font-size:12px;color:var(--text2);line-height:1.5;margin-top:3px')}>Permanently removes {name || 'the group'} and everyone’s access. Members return to their own Solo space. This can’t be undone.</div>
+            <div className="ctl" onClick={askDelete} style={s('margin-top:12px;text-align:center;background:var(--bad);color:#fff;font-weight:700;font-size:13.5px;padding:11px;border-radius:11px')}>Delete group</div>
+          </div>
+        </>
+      )}
+
+      {/* confirmation modals for remove / role changes / ownership transfer, and delete-group */}
       {roleConfirm.node}
+      {deleteConfirm.node}
     </div>
   );
 }

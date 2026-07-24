@@ -139,6 +139,10 @@ public sealed record SetRoleRequest(string Role);
 /// the previous owner is demoted to coach, and there is still exactly one owner.</summary>
 public enum TransferOwnershipOutcome { Ok, NotOwner, TargetNotMember, TargetNotCoach, SameAsOwner }
 
+/// <summary>Result of the owner permanently deleting their group. Personal ("Solo") squads and the
+/// landing club are protected; only the squad's owner may delete it.</summary>
+public enum DeleteSquadOutcome { Deleted, NotOwner, Protected, NotFound }
+
 /// <summary>Body for the owner's "add member by email" call.</summary>
 public sealed record AddMemberRequest(string Email);
 
@@ -211,6 +215,10 @@ public interface ISquadService
     /// <summary>Transfer ownership to another coach: the target becomes the sole owner and the previous
     /// owner is demoted to coach (never removed). The target must already be a coach of the squad.</summary>
     Task<TransferOwnershipOutcome> TransferOwnershipAsync(Guid squadId, Guid newOwnerId, Guid ownerId, CancellationToken ct);
+    /// <summary>Owner permanently deletes the group: dependent rows (events + RSVPs, targets, invites,
+    /// payments, join-requests, memberships) are removed and any member whose active squad was this one
+    /// is moved back to their private Solo squad. Personal squads + the landing club are refused.</summary>
+    Task<DeleteSquadOutcome> DeleteAsync(Guid squadId, Guid ownerId, CancellationToken ct);
 
     // ----- invite links (coach invites friends to join their group) -----------
 
