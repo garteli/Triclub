@@ -78,6 +78,7 @@ import Activities from './screens/Activities.jsx';
 import UploadActivity from './screens/UploadActivity.jsx';
 import Sensors from './screens/Sensors.jsx';
 import Units from './screens/Units.jsx';
+import MapLayers from './screens/MapLayers.jsx';
 import TrainingZones from './screens/TrainingZones.jsx';
 import NotificationPrefs from './screens/NotificationPrefs.jsx';
 import Privacy from './screens/Privacy.jsx';
@@ -138,7 +139,7 @@ const screens = {
   settings: Settings, welcome: Welcome, register: Register, login: Login, newgroup: CreateGroup,
   athlete: AthleteProfile, editprofile: EditProfile, notifs: Notifications, activities: Activities,
   upload: UploadActivity, sensors: Sensors,
-  units: Units, zones: TrainingZones, notifprefs: NotificationPrefs, privacy: Privacy, help: Help, legal: Legal,
+  units: Units, maplayers: MapLayers, zones: TrainingZones, notifprefs: NotificationPrefs, privacy: Privacy, help: Help, legal: Legal,
   admin: Admin, adminuser: AdminUserDetail, admingroup: AdminGroupDetail,
 };
 
@@ -153,6 +154,7 @@ const HEADER_META = {
   notifs: { title: 'Notifications' },
   // Settings family (share components/SettingsUI Header, now title-less).
   units: { title: 'Units' },
+  maplayers: { title: 'Maps' },
   zones: { title: 'Training zones' },
   notifprefs: { title: 'Notifications' },
   privacy: { title: 'Privacy' },
